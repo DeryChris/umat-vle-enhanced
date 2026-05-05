@@ -1,0 +1,96 @@
+# ============================================================
+# MOODLE
+# ============================================================
+
+# Moodle local config contains database credentials - never commit
+moodle/config.php
+
+# Moodle data directory
+moodledata/
+
+# Moodle cache and temp files
+moodle/cache/
+moodle/localcache/
+moodle/temp/
+moodle/trashdir/
+moodle/sessions/
+
+# ============================================================
+# PYTHON AI SERVICE
+# ============================================================
+
+# Virtual environment - each person creates their own locally
+ai_service/venv/
+ai_service/.venv/
+
+# Python compiled files
+ai_service/__pycache__/
+ai_service/**/__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment file contains API keys - never commit this
+ai_service/.env
+
+# Uploaded files (temporary processing storage)
+ai_service/uploads/*
+!ai_service/uploads/.gitkeep
+
+# ChromaDB vector database (built locally)
+ai_service/chroma_db/*
+!ai_service/chroma_db/.gitkeep
+
+# Log files
+ai_service/*.log
+ai_service/logs/
+
+# Pytest
+ai_service/.pytest_cache/
+ai_service/htmlcov/
+ai_service/.coverage
+
+# ============================================================
+# NODE / GRUNT (Moodle AMD build tools)
+# ============================================================
+node_modules/
+moodle/node_modules/
+
+# AMD build output is generated locally - not committed
+moodle/local/umat_ai/amd/build/*
+!moodle/local/umat_ai/amd/build/.gitkeep
+
+# ============================================================
+# IDE AND EDITORS
+# ============================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.suo
+*.user
+.vs/
+.qodo
+
+# ============================================================
+# OPERATING SYSTEM
+# ============================================================
+.DS_Store
+.DS_Store?
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ============================================================
+# SENSITIVE FILES - NEVER COMMIT THESE
+# ============================================================
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+*.env
+!*.env.example
+
+filetree.md
