@@ -1,0 +1,82 @@
+{{!
+    Template: local/umat_ai/templates/ai_chat_panel.mustache
+    Renders the AI chat panel on a course page.
+
+    Context variables:
+    - courseid (int)
+    - coursename (string)
+    - has_capability (bool) — whether user can use the chat
+    - indexed (bool) — whether course materials are indexed
+}}
+
+<div class="umat-ai-panel" id="umat-ai-panel">
+
+    <div class="ai-panel-header">
+        <i class="fa fa-robot ai-icon"></i>
+        <h4>{{#str}}chatpanel_title, local_umat_ai{{/str}}</h4>
+
+        {{#indexed}}
+        <span class="badge badge-success ml-auto">
+            <i class="fa fa-check-circle"></i>
+            {{#str}}materials_indexed, local_umat_ai{{/str}}
+        </span>
+        {{/indexed}}
+
+        {{^indexed}}
+        <span class="badge badge-warning ml-auto">
+            <i class="fa fa-exclamation-triangle"></i>
+            {{#str}}no_materials, local_umat_ai{{/str}}
+        </span>
+        {{/indexed}}
+    </div>
+
+    {{#has_capability}}
+    <div class="umat-chat-container" data-region="umat-chat-container">
+        <div class="chat-message ai">
+            <p>{{#str}}ai_greeting, local_umat_ai{{/str}}</p>
+        </div>
+    </div>
+
+    <div class="input-group mt-2">
+        <input
+            type="text"
+            class="form-control"
+            data-region="umat-question-input"
+            placeholder="{{#str}}ask_placeholder, local_umat_ai{{/str}}"
+            maxlength="500"
+            aria-label="Ask AI a question"
+        >
+        <div class="input-group-append">
+            <button
+                class="btn btn-primary"
+                type="button"
+                data-region="umat-send-btn"
+            >
+                <i class="fa fa-paper-plane"></i>
+                {{#str}}send, local_umat_ai{{/str}}
+            </button>
+        </div>
+    </div>
+
+    <small class="text-muted mt-1 d-block">
+        <i class="fa fa-info-circle"></i>
+        {{#str}}ai_disclaimer, local_umat_ai{{/str}}
+    </small>
+    {{/has_capability}}
+
+    {{^has_capability}}
+    <div class="alert alert-info">
+        <i class="fa fa-lock"></i>
+        {{#str}}no_access, local_umat_ai{{/str}}
+    </div>
+    {{/has_capability}}
+
+</div>
+
+{{#js}}
+require(['local_umat_ai/ai_chat_panel'], function(AiChatPanel) {
+    AiChatPanel.init({
+        courseId: {{courseid}}
+    });
+});
+{{/js}}

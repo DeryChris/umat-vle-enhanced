@@ -18,7 +18,7 @@ $CFG->dboptions = array (
 );
 
 $CFG->wwwroot   = 'http://localhost';
-$CFG->dataroot  = 'C:\\xampp\\moodledata';  // change this to where you put your moodledata directory eg. C:\moodledata
+$CFG->dataroot  = 'C:\\Projects\\umat-vle-enhanced/moodledata';  // change this to where you put your moodledata directory eg. C:\moodledata
 $CFG->admin     = 'admin';
 
 $CFG->directorypermissions = 0777;
