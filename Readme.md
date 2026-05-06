@@ -22,8 +22,8 @@ These features are built as Moodle plugins, meaning they survive Moodle core upd
 
 | Name | Role | GitHub |
 |------|------|--------|
-| Seidu | Project Lead, Developer | [@seidu](https://github.com/seidu) |
-| Ackon Emmanuel | Developer | [@ackon](https://github.com/ackon) |
+| Seidu | Project Lead, Developer | [@kinseidu](https://github.com/kinseidu) |
+| Ackon Emmanuel | Developer | [@ackonemmanuel](https://github.com/ackonemmanuel) |
 | Chrispen | Developer | [@derychris](https://github.com/derychris) |
 | Agartha | Researcher, UI/UX Designer | [@agartha](https://github.com/agartha) |
 | Johnson | Researcher, UI/UX Designer | [@johnson](https://github.com/johnson) |
@@ -64,7 +64,7 @@ For detailed architecture documentation, see [docs/architecture.md](docs/archite
 | Live Classes | BigBlueButton |
 | Database | PostgreSQL 15/16 |
 | Vector Store | ChromaDB |
-| LLM | OpenAI GPT-4o Mini |
+| LLM | Gemini-1.5-Flash |
 | Speech-to-Text | OpenAI Whisper |
 | Embeddings | OpenAI text-embedding-3-small |
 | Local Server | XAMPP (Apache) |
@@ -77,12 +77,16 @@ For detailed architecture documentation, see [docs/architecture.md](docs/archite
 ```
 umat-vle-enhanced/
 ├── moodle/                    # Full Moodle installation + custom plugins
-│   ├── local/umat_ai/         # Custom Moodle plugin (AI features)
-│   └── theme/umat/            # Custom UMaT theme
+│    
+│   ├── mod/bigbluebuttonbn/   # BigBlueButton plugin
+│   └── public/                # Custom UMaT theme
+|        ├── theme/umat/
+|        └── local/umat_ai/    # Custom Moodle plugin (AI features)
 ├── ai_service/                # Python FastAPI AI processing service
 ├── docs/                      # Project documentation
 ├── .github/                   # GitHub configuration
 ├── .gitignore
+├── cron.bat                   # Scheduled tasks - continuously run cron.php
 ├── README.md                  # This file
 └── CONTRIBUTING.md            # Contribution guidelines
 ```
@@ -103,6 +107,8 @@ The setup guide covers everything from installing required software to running t
 1. Open XAMPP Control Panel
 2. Start Apache
 3. Open browser → `http://localhost`
+4. Run this file `umat-vle-enhanced\cron.bat`.
+
 
 **Start AI Service:**
 ```bash

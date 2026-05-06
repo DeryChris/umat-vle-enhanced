@@ -14,7 +14,7 @@ The existing Moodle 4.3 LTS installation. We do not touch any core files. All cu
 
 ### 2. local_umat_ai Plugin
 
-A Moodle local plugin located at `moodle/local/umat_ai/`. It handles:
+A Moodle local plugin located at `moodle/public/local/umat_ai/`. It handles:
 
 - Admin settings (AI service URL, API keys, model selection)
 - Database table definitions for AI data (sessions, outputs, materials, chat logs)
@@ -27,7 +27,7 @@ A Moodle local plugin located at `moodle/local/umat_ai/`. It handles:
 
 ### 3. theme_umat Plugin
 
-A Moodle theme at `moodle/theme/umat/`. It:
+A Moodle theme at `moodle/public/theme/umat/`. It:
 
 - Extends Boost (the default Moodle theme)
 - Applies UMaT brand colours (navy blue `#003580`, gold `#C8A951`) via SCSS variables
@@ -47,7 +47,7 @@ A separate Python service at `ai_service/`. It:
 - Downloads BBB recordings and extracts audio using ffmpeg
 - Transcribes audio using OpenAI Whisper (local model, no additional API cost)
 - Indexes course materials (PDFs) into ChromaDB vector store
-- Answers student questions using RAG (semantic retrieval from ChromaDB + OpenAI LLM)
+- Answers student questions using RAG (semantic retrieval from ChromaDB + Gemini LLM)
 - Generates summaries, notes, and quiz questions from lecture transcripts
 
 ### 6. PostgreSQL
@@ -78,7 +78,7 @@ Scheduled task (index_materials, runs every 15 min) picks it up
     ↓
 Moodle plugin sends file to Python service POST /api/v1/materials/index
     ↓
-Python service parses PDF, splits into chunks, generates embeddings (OpenAI)
+Python service parses PDF, splits into chunks, generates embeddings (Gemini)
     ↓
 Embeddings stored in ChromaDB under the course's collection
     ↓
@@ -124,7 +124,7 @@ Moodle PHP calls Python service POST /api/v1/query
     ↓
 Python service: embeds question → searches ChromaDB for relevant chunks (top 5)
     ↓
-Relevant chunks + question sent to OpenAI LLM with RAG prompt
+Relevant chunks + question sent to Gemini LLM with RAG prompt
     ↓
 LLM generates answer constrained to course content only
     ↓
@@ -226,7 +226,7 @@ Interaction logged in umat_ai_chat_logs table for analytics
 
 - All Moodle plugin web services use Moodle's built-in capability system (`local/umat_ai:chatwithai`, `local/umat_ai:viewsummary`, `local/umat_ai:approveoutput`, `local/umat_ai:viewanalytics`)
 - The Python AI service uses bearer token authentication — the same token is configured in Moodle's plugin settings and the AI service's `.env` file
-- API keys (OpenAI) are stored in the `.env` file on the server and never exposed to the client
+- API keys (Gemini) are stored in the `.env` file on the server and never exposed to the client
 
 ### Rate Limiting
 
@@ -238,7 +238,7 @@ Interaction logged in umat_ai_chat_logs table for analytics
 
 ### Data Privacy (Ghana Data Protection Act 2012)
 
-- Student questions are sent to OpenAI servers for processing — this is disclosed in the plugin's privacy provider and the UI
+- Student questions are sent to Gemini servers for processing — this is disclosed in the plugin's privacy provider and the UI
 - All student data can be exported and deleted via Moodle's standard privacy tools (implemented in `classes/privacy/provider.php`)
 
 ---
@@ -265,5 +265,5 @@ The only risk is if Moodle deprecates an API your plugin calls. Monitor `docs.mo
 | FastAPI | Modern, fast, async-capable Python framework; automatic Swagger UI documentation |
 | OpenAI Whisper | Runs locally — no per-minute transcription cost; good accuracy on English academic speech |
 | ChromaDB | Embedded, no separate server required; easy to reset per-course; good Python integration |
-| GPT-4o Mini | Cost-effective — approximately $0.05–0.10 per lecture session for summary + notes + quiz |
+| Gemini-1.5-Flash | Cost-effective — approximately $0.05–0.10 per lecture session for summary + notes + quiz |
 | BigBlueButton | Open-source; designed for education; Moodle plugin is maintained by the BBB team |

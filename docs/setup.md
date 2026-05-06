@@ -90,52 +90,46 @@ Save the file and restart Apache in XAMPP Control Panel.
 
 **Create the project databases:**
 
-Open **pgAdmin 4** from your Start menu. It opens in your browser. Set a master password when prompted.
+Open **pgAdmin 4** from your Start menu. Set a master password when prompted.
 
-In the left panel, right-click on **PostgreSQL 15** → **Query Tool**. Paste and run this:
+In the left panel, right-click on **postgres** → **Query Tool**. Paste and run(F5) this:
 
 ```sql
--- Create Moodle database user
-CREATE USER moodleuser WITH PASSWORD 'MoodlePass2024!';
-
 -- Create Moodle database
-CREATE DATABASE moodledb
-    OWNER moodleuser
+CREATE DATABASE moodle
+    OWNER postgres
     ENCODING 'UTF8'
     LC_COLLATE 'en_US.UTF-8'
     LC_CTYPE 'en_US.UTF-8'
     TEMPLATE template0;
 
-GRANT ALL PRIVILEGES ON DATABASE moodledb TO moodleuser;
+GRANT ALL PRIVILEGES ON DATABASE moodle TO postgres;
 ```
 
 Click the **Run** button (the play icon). You should see "Query returned successfully."
 
-Now switch the database dropdown at the top from `postgres` to `moodledb`, then run:
+Now switch the database dropdown at the top from `postgres` to `moodle`, then run(F5):
 ```sql
-GRANT ALL ON SCHEMA public TO moodleuser;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO moodleuser;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO moodleuser;
+GRANT ALL ON SCHEMA public TO postgres;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres;
 ```
 
 Switch back to the `postgres` database and run:
 ```sql
--- Create AI service database user
-CREATE USER aiserviceuser WITH PASSWORD 'AIServicePass2024!';
-
 -- Create AI service database
 CREATE DATABASE umat_ai_db
-    OWNER aiserviceuser
+    OWNER postgres
     ENCODING 'UTF8';
 
-GRANT ALL PRIVILEGES ON DATABASE umat_ai_db TO aiserviceuser;
+GRANT ALL PRIVILEGES ON DATABASE umat_ai_db TO postgres; 
 ```
 
-Switch to `umat_ai_db` and run:
+Switch to `umat_ai_db`. right-click on `umat_ai_db` → **Query Tool**. Paste and run(F5):
 ```sql
-GRANT ALL ON SCHEMA public TO aiserviceuser;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO aiserviceuser;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO aiserviceuser;
+GRANT ALL ON SCHEMA public TO postgres; 
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres;
 ```
 
 **Verify:** In pgAdmin left panel, refresh Databases. You should see both `moodledb` and `umat_ai_db`.
@@ -182,7 +176,7 @@ git config --global user.email "your.email@example.com"
 ```bash
 mkdir C:\Projects
 cd C:\Projects
-git clone https://github.com/seidugit/umat-vle-enhanced.git
+git clone https://github.com/derychris/umat-vle-enhanced.git
 cd umat-vle-enhanced
 ```
 
@@ -191,7 +185,7 @@ You now have the project at `C:\Projects\umat-vle-enhanced\`.
 ---
 
 ## Step 5: Install Moodle
-
+<!-- TODO: ignore moodle components from repo -->
 **Download Moodle 4.3 LTS:**
 
 Go to [download.moodle.org](https://download.moodle.org/) and download Moodle 4.3.x as a ZIP file.
@@ -207,6 +201,17 @@ Your moodle folder should now contain files like `index.php`, `admin`, `auth`, `
 ```bash
 mkdir C:\MoodleData
 ```
+
+**Create Moodle's `config.php` file:**
+
+```bash
+cd moodle
+copy config.php.example config.php
+```
+
+Open `moodle/config.php` in VS Code and fill in the values.
+
+
 
 **Verify PHP can connect to PostgreSQL:**
 
@@ -244,17 +249,9 @@ Create the admin account using a real email you can access.
 
 **Set up the Moodle cron job:**
 
-Open Windows Task Scheduler (search for it in Start menu). Create a new Basic Task:
-- Name: `Moodle Cron`
-- Trigger: Daily, repeat every 1 minute, for a duration of 1 day (indefinitely)
-- Action: Start a program
-- Program: `C:\xampp\php\php.exe`
-- Arguments: `C:\Projects\umat-vle-enhanced\moodle\admin\cli\cron.php`
+**Run** this file `umat-vle-enhanced\cron.bat`.
+`Double-Click` to **run** and press `Ctrl+C` to **stop**.
 
-Or run it manually in a terminal whenever you need background tasks to run:
-```bash
-C:\xampp\php\php.exe C:\Projects\umat-vle-enhanced\moodle\admin\cli\cron.php
-```
 
 **Enable developer mode:**
 

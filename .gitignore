@@ -2,6 +2,40 @@
 # MOODLE
 # ============================================================
 
+# Moodle Components
+moodle/admin/
+moodle/.github/
+moodle/.upgradenotes/
+moodle/.grunt/
+moodle/.phpstorm.meta.php/
+moodle/lib/
+moodle/public/
+moodle/CONTRIBUTING.md
+moodle/COPYING.txt
+moodle/githash.php
+moodle/Gruntfile.js
+moodle/index.php
+moodle/INSTALL.txt
+moodle/npm-shrinkwrap.json
+moodle/package.json
+moodle/phpcs.xml.dist
+moodle/phpunit.xml.dist
+moodle/README.md
+moodle/TRADEMARK.txt
+moodle/UPGRADING.md
+moodle/.eslintrc
+moodle/.gherkin-lintrc
+moodle/.gitattributes
+moodle/.jshintignore
+moodle/.jshintrc
+moodle/.nvmrc
+moodle/.shifter.json
+moodle/.stylelintrc
+moodle/composer.json
+moodle/composer.lock
+moodle/config-dist.php
+moodle/mod/
+
 # Moodle local config contains database credentials - never commit
 moodle/config.php
 
@@ -93,4 +127,5 @@ secrets/
 *.env
 !*.env.example
 
+# Miscellaneous
 filetree.md

@@ -6,7 +6,7 @@
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
-from langchain_openai import OpenAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from config import get_settings
 from typing import List, Tuple
 
@@ -29,9 +29,9 @@ def get_chroma_client():
 def get_embedding_function():
     global _embedding_function
     if _embedding_function is None:
-        _embedding_function = OpenAIEmbeddings(
-            model=settings.embedding_model,
-            openai_api_key=settings.openai_api_key,
+        _embedding_function = GoogleGenerativeAIEmbeddings(
+            model=settings.embedding_model,          # text-embedding-004
+            google_api_key=settings.google_api_key,
         )
     return _embedding_function
 

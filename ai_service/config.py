@@ -13,15 +13,15 @@ class Settings(BaseSettings):
     ai_service_port: int = 8000
 
     # OpenAI
-    openai_api_key: str
-    llm_model: str = "gpt-4o-mini"
-    embedding_model: str = "text-embedding-3-small"
+    google_api_key: str    
+    llm_model: str = "gemini-1.5-flash"
+    embedding_model: str = "text-embedding-004"
 
     # Database
     ai_db_host: str = "localhost"
     ai_db_port: int = 5432
     ai_db_name: str = "umat_ai_db"
-    ai_db_user: str = "aiserviceuser"
+    ai_db_user: str = "postgres"
     ai_db_password: str
 
     # ChromaDB

@@ -29,7 +29,7 @@ Check if the service is running. No authentication required. Use this to confirm
   "status": "healthy",
   "version": "1.0.0",
   "whisper_model": "base",
-  "llm_model": "gpt-4o-mini"
+  "llm_model": "gemini-1.5-flash"
 }
 ```
 
@@ -247,14 +247,12 @@ Then add requests as described above using `{{base_url}}` and `{{token}}` in you
 
 ---
 
-## Cost Estimates (OpenAI API)
+## Cost Estimates (Google Gemini API)
 
 | Operation | Approximate Cost |
 |-----------|-----------------|
 | 1-hour lecture summary + notes + quiz | $0.05 – $0.10 |
 | 10 student Q&A questions | $0.01 – $0.02 |
-| Indexing a 50-page PDF (embeddings) | $0.005 |
+| Indexing a 50-page PDF (embeddings) | $0.001 |
 
 Whisper transcription is **free** — it runs locally on your machine using the downloaded model.
-
-Set a hard spending limit on your OpenAI account dashboard during development to avoid unexpected charges.
