@@ -9,9 +9,11 @@ All endpoints except `GET /api/v1/health` require Bearer token authentication.
 Authorization: Bearer your-service-token
 ```
 
-The token is set in `ai_service/.env` as `AI_SERVICE_TOKEN` and must match the value configured in Moodle's plugin settings (Site Admin → Plugins → Local plugins → UMaT AI Academic Support → AI Service Token).
+The token is set in `ai_service/.env` as `AI_SERVICE_TOKEN` and must match the value in Moodle's plugin settings (Site Admin → Plugins → Local plugins → UMaT AI Academic Support → AI Service Token).
 
-**Full interactive API documentation** with request/response examples is available at `http://localhost:8000/docs` when the service is running (Swagger UI).
+> **Getting your token** — request it from Chrispen ([@derychris](https://github.com/derychris)) via the WhatsApp group.
+
+**Full interactive API documentation** is available at `http://localhost:8000/docs` when the service is running (Swagger UI).
 
 ---
 
@@ -19,7 +21,7 @@ The token is set in `ai_service/.env` as `AI_SERVICE_TOKEN` and must match the v
 
 ### GET /api/v1/health
 
-Check if the service is running. No authentication required. Use this to confirm the service is up before testing other endpoints.
+Check if the service is running. No authentication required.
 
 **Request:** No body required
 
@@ -50,7 +52,7 @@ Upload a course material file (PDF or text) and index it into ChromaDB so studen
 |-------|------|----------|-------------|
 | course_id | integer | Yes | Moodle course ID |
 | material_id | integer | Yes | Moodle file/resource ID |
-| filename | string | Yes | Original filename (e.g., `lecture1.pdf`) |
+| filename | string | Yes | Original filename (e.g. `lecture1.pdf`) |
 | file | file | Yes | The actual PDF or .txt file |
 
 **Supported file types:** `.pdf`, `.txt`, `.md`
@@ -72,13 +74,13 @@ Upload a course material file (PDF or text) and index it into ChromaDB so studen
 - Method: POST
 - URL: `http://localhost:8000/api/v1/materials/index`
 - Authorization: Bearer `your-token`
-- Body: form-data with fields: `course_id=2`, `material_id=1`, `filename=test.pdf`, `file=[select a PDF]`
+- Body: form-data — `course_id=2`, `material_id=1`, `filename=test.pdf`, `file=[select a PDF]`
 
 ---
 
 ### POST /api/v1/query
 
-Answer a student question using RAG. The service searches ChromaDB for relevant content from the course's indexed materials and lecture transcripts, then sends those chunks to the LLM to generate a contextually grounded answer.
+Answer a student question using RAG. The service searches ChromaDB for relevant content from the course's indexed materials and lecture transcripts, then sends those chunks to Gemini to generate a grounded answer.
 
 **Request body (JSON):**
 ```json
@@ -123,9 +125,9 @@ Answer a student question using RAG. The service searches ChromaDB for relevant 
 
 ### POST /api/v1/recording/process
 
-Submit a BBB recording URL for full processing: download → audio extraction → Whisper transcription → ChromaDB indexing → AI summary/notes/quiz generation.
+Submit a BBB recording URL for full processing: download → audio extraction → Whisper transcription → ChromaDB indexing → Gemini summary/notes/quiz generation.
 
-Processing happens in the background. The endpoint returns a `job_id` immediately. Use the status endpoint to check progress.
+Processing happens in the background. The endpoint returns a `job_id` immediately. Poll the status endpoint to check progress.
 
 **Request body (JSON):**
 ```json
@@ -165,7 +167,7 @@ Processing happens in the background. The endpoint returns a `job_id` immediatel
 
 Check the status of a recording processing job.
 
-**Path parameter:** `job_id` — the UUID returned by `/api/v1/recording/process`
+**Path parameter:** `job_id` — the UUID returned by the process endpoint
 
 **Response:**
 ```json
@@ -186,7 +188,7 @@ Check the status of a recording processing job.
 | `queued` | Job is waiting to be processed |
 | `downloading` | Downloading the recording from BBB |
 | `transcribing` | Extracting audio and running Whisper |
-| `processing_ai` | Generating summary, notes, quiz via LLM |
+| `processing_ai` | Generating summary, notes, quiz via Gemini |
 | `completed` | All processing done successfully |
 | `failed` | An error occurred — see `error` field |
 
@@ -227,9 +229,9 @@ Create a collection named **"UMaT AI Service"** with these collection-level vari
 | Variable | Value |
 |----------|-------|
 | `base_url` | `http://localhost:8000` |
-| `token` | your AI service token |
+| `token` | your AI service token (get from Chrispen) |
 
-Then add requests as described above using `{{base_url}}` and `{{token}}` in your URLs and Authorization headers. This makes it easy to switch between environments without changing every request manually.
+Use `{{base_url}}` and `{{token}}` in all requests so you only need to update them in one place.
 
 ---
 
@@ -238,7 +240,7 @@ Then add requests as described above using `{{base_url}}` and `{{token}}` in you
 | HTTP Code | Meaning |
 |-----------|---------|
 | 200 | Success |
-| 400 | Bad request — invalid input (e.g., unsupported file type, empty file) |
+| 400 | Bad request — invalid input (unsupported file type, empty file) |
 | 401 | Unauthorized — wrong or missing bearer token |
 | 403 | Forbidden — no Authorization header at all |
 | 404 | Not found — job_id or material does not exist |
@@ -255,4 +257,6 @@ Then add requests as described above using `{{base_url}}` and `{{token}}` in you
 | 10 student Q&A questions | $0.01 – $0.02 |
 | Indexing a 50-page PDF (embeddings) | $0.001 |
 
-Whisper transcription is **free** — it runs locally on your machine using the downloaded model.
+Whisper transcription is **free** — it runs locally using the downloaded model.
+
+Set a hard spending limit on your Google AI Studio account during development to avoid unexpected charges.

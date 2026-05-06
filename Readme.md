@@ -12,7 +12,7 @@ This project enhances the existing UMaT Moodle Virtual Learning Environment (VLE
 
 1. **Native Live Class Module** — Integrated BigBlueButton video conferencing directly within Moodle, eliminating the need for external platforms like Zoom or Google Meet. Includes automatic attendance tracking.
 
-2. **Generative AI Academic Support** — A RAG-based AI assistant that answers student questions using only official course materials and lecture transcripts. Includes automatic lecture summarization, structured note generation, and practice question creation.
+2. **Generative AI Academic Support** — A RAG-based AI assistant that answers student questions using only official course materials and lecture transcripts. Includes automatic lecture summarisation, structured note generation, and practice question creation.
 
 These features are built as Moodle plugins, meaning they survive Moodle core updates and remain integrated regardless of platform version changes.
 
@@ -30,22 +30,22 @@ These features are built as Moodle plugins, meaning they survive Moodle core upd
 
 **Supervisor:** Dr. Emmanuel Effah
 
+> **API keys, tokens, and passwords** — contact [@derychris](https://github.com/derychris) (Chrispen)
+
 ---
 
 ## System Architecture
 
-The system consists of three integrated components:
-
 ```
 [Moodle Frontend] <-> [Moodle PHP Plugin] <-> [Python FastAPI AI Service]
-                            |                           |command:codium.auth.portalAccountSignInNotificationButton
-                   [BigBlueButton Server]        [ChromaDB + OpenAI]
+                            |                           |
+                   [BigBlueButton Server]        [ChromaDB + Gemini]
                             |
                       [PostgreSQL]
 ```
 
 - **Moodle** handles all user authentication, course management, and UI rendering
-- **Python FastAPI Service** handles all AI processing (transcription, RAG, summarization)
+- **Python FastAPI Service** handles all AI processing (transcription, RAG, summarisation)
 - **BigBlueButton** provides live video conferencing
 - **PostgreSQL** stores all data
 - **ChromaDB** stores vector embeddings for RAG retrieval
@@ -58,7 +58,7 @@ For detailed architecture documentation, see [docs/architecture.md](docs/archite
 
 | Layer | Technology |
 |-------|-----------|
-| LMS Platform | Moodle 4.3 LTS |
+| LMS Platform | Moodle 5.1.3x |
 | Plugin Language | PHP 8.2 |
 | AI Service | Python 3.11, FastAPI |
 | Live Classes | BigBlueButton |
@@ -66,7 +66,7 @@ For detailed architecture documentation, see [docs/architecture.md](docs/archite
 | Vector Store | ChromaDB |
 | LLM | Gemini-1.5-Flash |
 | Speech-to-Text | OpenAI Whisper |
-| Embeddings | OpenAI text-embedding-3-small |
+| Embeddings | Google Generative AI Embeddings |
 | Local Server | XAMPP (Apache) |
 | Version Control | Git + GitHub |
 
@@ -76,19 +76,17 @@ For detailed architecture documentation, see [docs/architecture.md](docs/archite
 
 ```
 umat-vle-enhanced/
-├── moodle/                    # Full Moodle installation + custom plugins
-│    
-│   ├── mod/bigbluebuttonbn/   # BigBlueButton plugin
-│   └── public/                # Custom UMaT theme
-|        ├── theme/umat/
-|        └── local/umat_ai/    # Custom Moodle plugin (AI features)
-├── ai_service/                # Python FastAPI AI processing service
-├── docs/                      # Project documentation
-├── .github/                   # GitHub configuration
+├── moodle/                        # Moodle installation
+│   ├── public/                    # Moodle 5.x public directory
+│   │   ├── local/umat_ai/         # UMaT AI plugin (Moodle scans here)
+│   │   └── theme/umat/            # UMaT theme (Moodle scans here)
+│   └── mod/bigbluebuttonbn/       # BigBlueButton plugin
+├── ai_service/                    # Python FastAPI AI processing service
+├── docs/                          # Project documentation
 ├── .gitignore
-├── cron.bat                   # Scheduled tasks - continuously run cron.php
-├── README.md                  # This file
-└── CONTRIBUTING.md            # Contribution guidelines
+├── cron.bat                       # Runs Moodle cron continuously (Windows)
+├── README.md                      # This file
+└── CONTRIBUTING.md                # Contribution guidelines
 ```
 
 ---
@@ -97,18 +95,14 @@ umat-vle-enhanced/
 
 ### For New Team Members
 
-Follow the complete setup guide here: **[docs/setup.md](docs/setup.md)**
-
-The setup guide covers everything from installing required software to running the project locally.
+Follow the complete setup guide: **[docs/setup.md](docs/setup.md)**
 
 ### Quick Start (If Already Set Up)
 
 **Start Moodle:**
-1. Open XAMPP Control Panel
-2. Start Apache
+1. Open XAMPP Control Panel → Start Apache
+2. Run `umat-vle-enhanced\cron.bat` (double-click, press `Ctrl+C` to stop)
 3. Open browser → `http://localhost`
-4. Run this file `umat-vle-enhanced\cron.bat`.
-
 
 **Start AI Service:**
 ```bash
@@ -119,37 +113,34 @@ python main.py
 
 **Verify everything is running:**
 - Moodle: `http://localhost`
-- AI Service: `http://localhost:8000/docs`
+- AI Service Swagger UI: `http://localhost:8000/docs`
 - pgAdmin: PostgreSQL on port 5432
 
 ---
 
-## How We Use GitHub (Simple Guide)
+## How We Use GitHub
 
-We use **one branch only — `main`**. Every team member commits directly to main. No pull requests, no feature branches.
-
-**The three commands you need every day:**
+We use **one branch — `main`**. No feature branches, no pull requests.
 
 ```bash
-# 1. Before you start work — get the latest code from GitHub
+# Before you start — get the latest from GitHub
 git pull origin main
 
-# 2. After you make changes — save your work locally
+# After you make changes — save and describe your work
 git add .
 git commit -m "describe what you changed"
 
-# 3. Upload your changes to GitHub so the team can see them
+# Upload to GitHub so the team can see it
 git push origin main
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full simple workflow.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow and conflict resolution guide.
 
 ---
 
 ## API Documentation
 
-The AI Service API is documented at:
-- **Interactive (Swagger UI):** `http://localhost:8000/docs` (when service is running)
+- **Interactive (Swagger UI):** `http://localhost:8000/docs` (when AI service is running)
 - **Reference:** [docs/api.md](docs/api.md)
 
 ---
@@ -164,6 +155,6 @@ University of Mines and Technology, Tarkwa, Ghana
 
 ## Academic Context
 
-This project is submitted in partial fulfilment of the requirements for the award of the
+Submitted in partial fulfilment of the requirements for the award of the
 **Bachelor of Science in Information Systems and Technology**
 University of Mines and Technology, Tarkwa — 2026

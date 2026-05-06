@@ -8,13 +8,15 @@ We are using a **simple GitHub workflow** — one branch (`main`), no pull reque
 
 ## Team Members and Responsibilities
 
-| Name | Role | Area of Work |
-|------|------|-------------|
-| **Seidu** | Project Lead, Developer | Overall direction, Moodle PHP plugin, PostgreSQL schemas, code reviews |
-| **Ackon Emmanuel** | Developer | Moodle PHP plugin, SCSS theme styling, plugin settings and capabilities |
-| **Chrispen** | Developer | Python AI service, FastAPI routes, ChromaDB, Whisper transcription |
-| **Agartha** | Researcher, UI/UX Designer | UI wireframes, Mustache templates, SCSS components, system research |
-| **Johnson** | Researcher, UI/UX Designer | AMD JavaScript modules, frontend interactions, system research, documentation |
+| Name | Role | GitHub | Area of Work |
+|------|------|--------|-------------|
+| **Seidu** | Project Lead, Developer | [@kinseidu](https://github.com/kinseidu) | Overall direction, Python AI service, PostgreSQL schemas, code reviews |
+| **Ackon Emmanuel** | Developer | [@ackonemmanuel](https://github.com/ackonemmanuel) | Moodle PHP plugin (db, classes, external services, privacy) |
+| **Chrispen** | Developer | [@derychris](https://github.com/derychris) | Plugin settings/version, SCSS theme, API keys & secrets holder |
+| **Agartha** | Researcher, UI/UX Designer | [@agartha](https://github.com/agartha) | Mustache templates, theme layouts, SCSS components, system research |
+| **Johnson** | Researcher, UI/UX Designer | [@johnson](https://github.com/johnson) | AMD JavaScript modules, language strings, documentation |
+
+> **API keys, tokens, and passwords** — all secrets are held by Chrispen ([@derychris](https://github.com/derychris)). Request them via the WhatsApp group.
 
 ---
 
@@ -24,7 +26,7 @@ We use **one branch — `main`**. Everyone commits directly to main. There are n
 
 ### The Three Commands You Need Every Day
 
-**Step 1 — Pull before you start working** (always do this first to get the latest code):
+**Step 1 — Pull before you start working:**
 ```bash
 git pull origin main
 ```
@@ -40,54 +42,48 @@ git commit -m "describe what you changed"
 git push origin main
 ```
 
-That's it. Do these three things every time you work on the project.
-
 ---
 
 ## Day-by-Day Routine
 
-Every time you sit down to work on the project:
-
-**1. Open your terminal and navigate to the project folder:**
+**1. Navigate to the project folder:**
 ```bash
 cd C:\Projects\umat-vle-enhanced
 ```
 
-**2. Pull the latest changes from GitHub:**
+**2. Pull latest changes first — always:**
 ```bash
 git pull origin main
 ```
-This downloads any changes your teammates made since you last worked. Always do this before you start — otherwise you may overwrite their work.
 
-**3. Do your work** — edit files, write code, update documents.
+**3. Do your work.**
 
-**4. When you are done (or at the end of each working session), save and upload:**
+**4. Save and upload at end of session:**
 ```bash
 git add .
 git commit -m "what I did today"
 git push origin main
 ```
 
-**Tip:** Push at the end of every session, even if the work is not finished. It is better to push unfinished work than to lose it.
+**Tip:** Push at the end of every session even if work is unfinished. It is better to push incomplete work than to lose it.
 
 ---
 
 ## Writing Good Commit Messages
 
-A commit message is a short note that tells your teammates what you changed. Write it in plain English. Be specific.
+Write in plain English. Be specific enough that a teammate understands without asking.
 
-**Good examples:**
+**Good:**
 ```
 added BigBlueButton plugin to moodle
-fixed the PHP error in the event observer
+fixed PHP error in the event observer
 updated README with setup instructions
-created the ai chat panel mustache template
+created the AI chat panel mustache template
 fixed database connection issue in config.py
-added whisper transcription module
-updated team names in README
+added Whisper transcription module
 ```
 
-**Bad examples:**
+**Bad:**
 ```
 update
 fix
@@ -96,29 +92,24 @@ stuff
 asdfgh
 ```
 
-There is no strict format — just describe what you actually did, clearly enough that a teammate understands without asking you.
-
 ---
 
 ## What to Do if `git push` is Rejected
 
-If you try to push and get an error like `rejected` or `non-fast-forward`, it means a teammate pushed changes after you last pulled. Fix it like this:
+A rejection means a teammate pushed after you last pulled.
 
 ```bash
-# Step 1: Pull their changes first
 git pull origin main
-
-# Step 2: If there are no conflicts, just push again
 git push origin main
 ```
 
-If you see conflict markers in a file (lines with `<<<<<<<`, `=======`, `>>>>>>>`), see the conflict resolution section below.
+If `git pull` shows conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`), see the conflict resolution section below.
 
 ---
 
 ## Resolving Conflicts
 
-A conflict happens when two people edit the same part of the same file. Git cannot decide which version to keep, so it marks the file and asks you to decide.
+A conflict happens when two people edit the same part of the same file.
 
 **A conflicted file looks like this:**
 ```
@@ -132,10 +123,9 @@ your teammate's version of the code
 **To fix it:**
 1. Open the file in VS Code
 2. VS Code shows buttons: **Accept Current Change** | **Accept Incoming Change** | **Accept Both Changes**
-3. Click the one that makes sense, or manually edit the file to combine both versions correctly
-4. Delete all the `<<<<<<<`, `=======`, `>>>>>>>` markers
-5. Save the file
-6. Then run:
+3. Choose the correct version, or manually merge both
+4. Delete all `<<<<<<<`, `=======`, `>>>>>>>` markers
+5. Save, then:
 
 ```bash
 git add .
@@ -143,49 +133,50 @@ git commit -m "resolved conflict in filename"
 git push origin main
 ```
 
-**How to avoid conflicts:** Work in your own files as much as possible. If you know a teammate is editing a file right now, wait until they push before you edit the same file.
+**Best way to avoid conflicts:** Stay in your own files. If a teammate is actively editing a file, wait until they push before editing the same file.
 
 ---
 
 ## What Each Person Should Work On
 
-To minimise conflicts, each person should stick to their area:
+Stay in your own area to minimise conflicts.
 
-**Seidu (Project Lead):**
+**Seidu ([@kinseidu](https://github.com/kinseidu)) — Project Lead:**
 - `ai_service/` — all Python FastAPI service files
 - `ai_service/core/` — transcription, RAG, LLM, document loader, vector store
 - `ai_service/api/` — all API routes
 - `ai_service/models/` — schemas and database models
 - `ai_service/tests/` — Python unit tests
-
-**Ackon Emmanuel:**
-- `moodle/local/umat_ai/db/` — database tables, capabilities, tasks, events, services
-- `moodle/local/umat_ai/classes/task/` — scheduled tasks
-- `moodle/local/umat_ai/classes/event/` — event handlers
-- `moodle/local/umat_ai/classes/external/` — web service external functions
-- `moodle/local/umat_ai/classes/privacy/` — privacy provider
 - Overall code review and architecture decisions
 
-**Chrispen:**
-- `moodle/local/umat_ai/settings.php`, `version.php`, `lib.php`
-- `moodle/theme/umat/scss/` — SCSS theme styling
-- `moodle/theme/umat/version.php`, `config.php`
+**Ackon Emmanuel ([@ackonemmanuel](https://github.com/ackonemmanuel)):**
+- `moodle/public/local/umat_ai/db/` — database tables, capabilities, tasks, events, services
+- `moodle/public/local/umat_ai/classes/task/` — scheduled tasks
+- `moodle/public/local/umat_ai/classes/event/` — event handlers
+- `moodle/public/local/umat_ai/classes/external/` — web service external functions
+- `moodle/public/local/umat_ai/classes/privacy/` — privacy provider
 
-**Agartha:**
-- `moodle/local/umat_ai/templates/` — Mustache templates
-- `moodle/theme/umat/layout/` — theme layout overrides
-- `docs/` — research documentation and architecture docs
+**Chrispen ([@derychris](https://github.com/derychris)):**
+- `moodle/public/local/umat_ai/settings.php`, `version.php`, `lib.php`
+- `moodle/public/theme/umat/scss/` — SCSS theme styling
+- `moodle/public/theme/umat/version.php`, `config.php`
+- Holds all API keys, tokens, and passwords — share via WhatsApp group only
+
+**Agartha ([@agartha](https://github.com/agartha)):**
+- `moodle/public/local/umat_ai/templates/` — Mustache templates
+- `moodle/public/theme/umat/layout/` — theme layout overrides
+- `docs/architecture.md` — system architecture documentation
 - UI wireframes and design specifications
 
-**Johnson:**
-- `moodle/local/umat_ai/amd/src/` — JavaScript AMD modules
-- `moodle/local/umat_ai/lang/` — language strings
+**Johnson ([@johnson](https://github.com/johnson)):**
+- `moodle/public/local/umat_ai/amd/` — JavaScript AMD modules
+- `moodle/public/local/umat_ai/lang/` — language strings
 - `docs/api.md` — API documentation
 - `docs/setup.md` — setup guide maintenance
 
 **Everyone:**
 - `README.md` — update as needed
-- `docs/troubleshooting.md` — add problems and solutions as you discover them
+- `docs/troubleshooting.md` — add problems and solutions as you find them
 
 ---
 
@@ -194,16 +185,16 @@ To minimise conflicts, each person should stick to their area:
 **Never commit:**
 - `.env` files
 - `moodle/config.php`
-- API keys
+- API keys or tokens
 - Database passwords
 
-Share secrets through your WhatsApp group chat. Each person puts them in their local `.env` file which is gitignored.
+All secrets are managed by **Chrispen** ([@derychris](https://github.com/derychris)). Request them via the WhatsApp group and store them only in your local `.env` file, which is gitignored.
 
 ---
 
 ## Getting Help
 
-If you are stuck for more than 30 minutes on something:
-1. Post in the WhatsApp group with a clear description of the problem and what you already tried
-2. If it is a code problem, copy and paste the exact error message — not a photo of your screen
-3. If Seidu is unavailable, Ackon and Chrispen can help with code issues; Agartha and Johnson can help with UI/documentation issues
+If you are stuck for more than 30 minutes:
+1. Post in the WhatsApp group — describe the problem and what you already tried
+2. For code issues, paste the **exact error message** (not a photo of your screen)
+3. If Seidu is unavailable, Ackon and Chrispen can help with code; Agartha and Johnson can help with UI/documentation

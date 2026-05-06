@@ -10,13 +10,13 @@ The UMaT VLE Enhanced system extends Moodle through a plugin-based architecture.
 
 ### 1. Moodle Core
 
-The existing Moodle 4.3 LTS installation. We do not touch any core files. All customisation happens through plugins.
+The existing Moodle 5.1.3x installation. We do not touch any core files. All customisation happens through plugins placed in the `moodle/public/` directory, which Moodle 5.x scans automatically.
 
 ### 2. local_umat_ai Plugin
 
 A Moodle local plugin located at `moodle/public/local/umat_ai/`. It handles:
 
-- Admin settings (AI service URL, API keys, model selection)
+- Admin settings (AI service URL, Gemini API key, model selection)
 - Database table definitions for AI data (sessions, outputs, materials, chat logs)
 - Scheduled tasks that communicate with the AI service every 5–15 minutes
 - Event observers that react to BBB session endings and file uploads
@@ -36,7 +36,7 @@ A Moodle theme at `moodle/public/theme/umat/`. It:
 
 ### 4. BigBlueButton Integration
 
-The existing BigBlueButtonBN Moodle plugin (`moodle/mod/bigbluebuttonbn/`) connects Moodle to a BBB server. We do not modify this plugin. Our `local_umat_ai` plugin listens for events that BBB fires (meeting_ended) and triggers AI processing in response.
+The existing BigBlueButtonBN Moodle plugin (`moodle/mod/bigbluebuttonbn/`) connects Moodle to a BBB server. We do not modify this plugin. Our `local_umat_ai` plugin listens for events that BBB fires (`meeting_ended`) and triggers AI processing in response.
 
 ### 5. Python FastAPI AI Service
 
@@ -45,16 +45,16 @@ A separate Python service at `ai_service/`. It:
 - Runs independently on port 8000
 - Receives requests from Moodle via HTTP (authenticated with a bearer token)
 - Downloads BBB recordings and extracts audio using ffmpeg
-- Transcribes audio using OpenAI Whisper (local model, no additional API cost)
+- Transcribes audio using OpenAI Whisper (runs locally — no per-minute transcription cost)
 - Indexes course materials (PDFs) into ChromaDB vector store
 - Answers student questions using RAG (semantic retrieval from ChromaDB + Gemini LLM)
-- Generates summaries, notes, and quiz questions from lecture transcripts
+- Generates summaries, notes, and quiz questions from lecture transcripts using Gemini-1.5-Flash
 
 ### 6. PostgreSQL
 
 Two databases:
 
-- `moodledb` — All Moodle data including the AI plugin's tables (`umat_ai_sessions`, `umat_ai_outputs`, `umat_ai_materials`, `umat_ai_chat_logs`)
+- `moodle` — All Moodle data including the AI plugin's tables (`umat_ai_sessions`, `umat_ai_outputs`, `umat_ai_materials`, `umat_ai_chat_logs`)
 - `umat_ai_db` — AI service's own data (processing jobs, indexed documents, chat logs)
 
 ### 7. ChromaDB
@@ -104,7 +104,7 @@ Python service: downloads recording → extracts audio (ffmpeg) → transcribes 
     ↓
 Transcript chunked and indexed in ChromaDB
     ↓
-LLM generates summary, notes, quiz from transcript (OpenAI)
+Gemini LLM generates summary, notes, quiz from transcript
     ↓
 Results stored, awaiting lecturer approval
     ↓
@@ -137,7 +137,7 @@ Interaction logged in umat_ai_chat_logs table for analytics
 
 ## Database Schema
 
-### Moodle Plugin Tables (in moodledb)
+### Moodle Plugin Tables (in `moodle` database)
 
 **`mdl_umat_ai_sessions`** — Tracks each BBB session and its processing status
 
@@ -189,7 +189,7 @@ Interaction logged in umat_ai_chat_logs table for analytics
 | sources | text | JSON array of source document names |
 | timecreated | int | Unix timestamp |
 
-### AI Service Tables (in umat_ai_db)
+### AI Service Tables (in `umat_ai_db`)
 
 **`processing_jobs`** — Tracks background recording processing
 
@@ -225,12 +225,12 @@ Interaction logged in umat_ai_chat_logs table for analytics
 ### Authentication and Authorisation
 
 - All Moodle plugin web services use Moodle's built-in capability system (`local/umat_ai:chatwithai`, `local/umat_ai:viewsummary`, `local/umat_ai:approveoutput`, `local/umat_ai:viewanalytics`)
-- The Python AI service uses bearer token authentication — the same token is configured in Moodle's plugin settings and the AI service's `.env` file
-- API keys (Gemini) are stored in the `.env` file on the server and never exposed to the client
+- The Python AI service uses bearer token authentication — the same token is in Moodle's plugin settings and the AI service's `.env` file
+- The Gemini API key is stored in `.env` and never exposed to the client
 
 ### Rate Limiting
 
-- Students are limited to 10 AI questions per minute per user (enforced in the Moodle web service before calling the AI service)
+- Students are limited to 10 AI questions per minute per user, enforced in the Moodle web service before calling the AI service
 
 ### Content Approval
 
@@ -238,7 +238,7 @@ Interaction logged in umat_ai_chat_logs table for analytics
 
 ### Data Privacy (Ghana Data Protection Act 2012)
 
-- Student questions are sent to Gemini servers for processing — this is disclosed in the plugin's privacy provider and the UI
+- Student questions are sent to Google Gemini servers for processing — disclosed in the plugin's privacy provider and the UI
 - All student data can be exported and deleted via Moodle's standard privacy tools (implemented in `classes/privacy/provider.php`)
 
 ---
@@ -247,12 +247,12 @@ Interaction logged in umat_ai_chat_logs table for analytics
 
 When Moodle releases an update:
 
-1. Core files update — your plugin folders (`local/umat_ai/`, `theme/umat/`) are not touched
+1. Core files update — `moodle/public/local/umat_ai/` and `moodle/public/theme/umat/` are not touched
 2. Admin visits `/admin` — Moodle runs its own core database upgrade
-3. Your plugin's `db/upgrade.php` runs only if your plugin's version number changed
+3. Our plugin's `db/upgrade.php` runs only if the plugin's version number changed
 4. All capabilities, events, tasks, and web services remain registered
 
-The only risk is if Moodle deprecates an API your plugin calls. Monitor `docs.moodle.org/dev/Upgrade_notes` before any core update. This project uses only stable, documented Moodle APIs (external API, scheduled tasks, events, Moodle's CURL wrapper).
+The only risk is if Moodle deprecates an API our plugin calls. Monitor `docs.moodle.org/dev/Upgrade_notes` before any core update. This project uses only stable, documented Moodle APIs.
 
 ---
 
@@ -260,10 +260,10 @@ The only risk is if Moodle deprecates an API your plugin calls. Monitor `docs.mo
 
 | Choice | Reason |
 |--------|--------|
-| Moodle 4.3 LTS | Long-term support — security patches for years; widely used in African universities |
-| PostgreSQL over MySQL | Better concurrency and JSON support; the AI service also uses PostgreSQL for consistency |
-| FastAPI | Modern, fast, async-capable Python framework; automatic Swagger UI documentation |
+| Moodle 5.1.3x LTS | Long-term support; widely used in African universities |
+| PostgreSQL over MySQL | Better concurrency and JSON support; consistent across both the Moodle and AI service databases |
+| FastAPI | Modern, async-capable Python framework; automatic Swagger UI documentation |
 | OpenAI Whisper | Runs locally — no per-minute transcription cost; good accuracy on English academic speech |
-| ChromaDB | Embedded, no separate server required; easy to reset per-course; good Python integration |
+| ChromaDB | Embedded, no separate server required; easy to reset per course; good Python integration |
 | Gemini-1.5-Flash | Cost-effective — approximately $0.05–0.10 per lecture session for summary + notes + quiz |
-| BigBlueButton | Open-source; designed for education; Moodle plugin is maintained by the BBB team |
+| BigBlueButton | Open-source; designed for education; Moodle plugin maintained by the BBB team |

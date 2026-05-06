@@ -23,7 +23,10 @@ $CFG->admin     = 'admin';
 
 $CFG->directorypermissions = 0777;
 
-// $CFG->extra_plugin_dirs = array('../plugin','../theme') ;  // Points to the the plugins outside of moodle
+// For development purposes
+$CFG->debug = 32767;
+$CFG->cachejs = false;
+$CFG->jsrev = -1;
 
 require_once(__DIR__ . '/lib/setup.php');
 
