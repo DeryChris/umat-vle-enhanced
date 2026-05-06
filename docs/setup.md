@@ -25,7 +25,34 @@ Download all of these before starting. Use the exact versions specified.
 
 ---
 
-## Step 1: Install XAMPP
+## Step 1: Install Git and Clone the Repository
+
+1. Run the Git installer, keep all defaults
+2. Open Command Prompt and verify:
+```bash
+git --version
+```
+
+3. Configure your identity (use your real name and GitHub email):
+```bash
+git config --global user.name "Your Full Name"
+git config --global user.email "your.email@example.com"
+```
+
+4. Clone the repository:
+```bash
+mkdir C:\Projects
+cd C:\Projects
+git clone https://github.com/derychris/umat-vle-enhanced.git
+cd umat-vle-enhanced
+```
+
+You now have the project at `C:\Projects\umat-vle-enhanced\`.
+
+---
+
+
+## Step 2: Install XAMPP
 
 1. Run the XAMPP installer
 2. When asked which components to install, keep the defaults — you only **need Apache and PHP**. You can uncheck MySQL/MariaDB since you are using PostgreSQL
@@ -64,7 +91,7 @@ Save the file. In XAMPP Control Panel, click **Stop** then **Start** on Apache.
 
 ---
 
-## Step 2: Configure PHP for Moodle
+## Step 3: Configure PHP for Moodle
 
 **Do this before running the Moodle installer.** Moodle checks every one of these settings during installation and will block you if they are wrong. Fix them all now.
 
@@ -141,7 +168,7 @@ Delete: C:\Projects\umat-vle-enhanced\moodle\phpinfo.php
 
 ---
 
-## Step 3: Install PostgreSQL
+## Step 4: Install PostgreSQL
 
 1. Run the PostgreSQL installer
 2. Keep the default installation directory
@@ -197,31 +224,6 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres;
 
 ---
 
-## Step 4: Install Git and Clone the Repository
-
-1. Run the Git installer, keep all defaults
-2. Open Command Prompt and verify:
-```bash
-git --version
-```
-
-3. Configure your identity (use your real name and GitHub email):
-```bash
-git config --global user.name "Your Full Name"
-git config --global user.email "your.email@example.com"
-```
-
-4. Clone the repository:
-```bash
-mkdir C:\Projects
-cd C:\Projects
-git clone https://github.com/derychris/umat-vle-enhanced.git
-cd umat-vle-enhanced
-```
-
-You now have the project at `C:\Projects\umat-vle-enhanced\`.
-
----
 
 ## Step 5: Install Moodle
 
@@ -243,11 +245,6 @@ mkdir C:\MoodleData
 
 Right-click `C:\MoodleData` → **Properties** → **Security** → **Edit** → select **Users** → check **Full control** → Apply.
 
-**Create Moodle's config file:**
-```bash
-cd C:\Projects\umat-vle-enhanced\moodle
-copy config.php.example config.php
-```
 
 Open `moodle/config.php` in VS Code and verify the database block matches your setup:
 ```php
