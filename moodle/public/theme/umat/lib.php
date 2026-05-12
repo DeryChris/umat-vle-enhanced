@@ -78,6 +78,9 @@ function theme_umat_get_extra_scss($theme) {
 
     $scss = '';
 
+    // Inject Inter font via CSS @import (SCSS @import fails in libSass)
+    $scss .= '@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");' . "\n";
+
     // Load our post.scss which contains UMaT-specific component styles
     $postscssfile = $CFG->dirroot . '/theme/umat/scss/post.scss';
     if (file_exists($postscssfile)) {
@@ -92,16 +95,3 @@ function theme_umat_get_extra_scss($theme) {
     return $scss;
 }
 
-/**
- * CSS tree post-processor.
- * Called after all SCSS is compiled to CSS.
- * Referenced by $THEME->csstreepostprocessor in config.php.
- * We delegate to Boost's own post-processor.
- *
- * @param css_tree $tree The CSS tree.
- * @param theme_config $theme The theme configuration.
- */
-function theme_umat_css_tree_post_processor($tree, $theme) {
-    $boost = theme_config::load('boost');
-    $boost->css_tree_post_processor($tree, $theme);
-}

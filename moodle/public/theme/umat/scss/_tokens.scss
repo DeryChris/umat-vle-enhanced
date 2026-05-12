@@ -1,0 +1,124 @@
+// ============================================================
+// DESIGN TOKENS — UMaT Precision Green Design System
+// ============================================================
+
+// ---- Surfaces (9 levels, light theme) ----
+$surface-dim:             #d5dcd1;
+$surface:                #f5fbf0;
+$surface-bright:         #f5fbf0;
+$surface-container-lowest:#ffffff;
+$surface-container-low:   #eff6eb;
+$surface-container:       #e9f0e5;
+$surface-container-high:  #e3eadf;
+$surface-container-highest: #dee5da;
+
+// ---- Brand colours ----
+$primary:        #006b2f;
+$primary-on:     #ffffff;
+$primary-container: #00873d;
+$primary-on-container: #f7fff3;
+$primary-fixed:   #81fb9c;
+$primary-fixed-dim: #64de83;
+$on-primary-fixed: #00210a;
+$on-primary-fixed-variant: #005323;
+$surface-tint:   #006d30;
+
+$secondary:       #3d6844;
+$secondary-on:    #ffffff;
+$secondary-container: #beefc1;
+$secondary-on-container: #436e4a;
+$secondary-fixed: #beefc1;
+$secondary-fixed-dim: #a3d2a6;
+$on-secondary-fixed: #00210a;
+$on-secondary-fixed-variant: #254f2e;
+
+$tertiary:       #a5304d;
+$tertiary-on:   #ffffff;
+$tertiary-container: #c64865;
+$tertiary-on-container: #fffbff;
+$tertiary-fixed: #ffd9dd;
+$tertiary-fixed-dim: #ffb2bd;
+$on-tertiary-fixed: #400013;
+$on-tertiary-fixed-variant: #891839;
+
+$error:         #ba1a1a;
+$error-on:      #ffffff;
+$error-container: #ffdad6;
+$error-on-container: #93000a;
+
+// ---- Semantic / base ----
+$on-surface:            #171d17;
+$on-surface-variant:    #3e4a3e;
+$inverse-surface:       #2b322b;
+$inverse-on-surface:    #ecf3e8;
+$inverse-primary:       #64de83;
+
+$outline:       #6e7a6d;
+$outline-variant: #bdcaba;
+$background:    #f5fbf0;
+$on-background: #171d17;
+
+// ---- Typography ----
+$font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+$display-lg-size:   2.25rem;
+$display-lg-height: 2.75rem;
+$display-lg-weight: 700;
+$display-lg-tracking: -0.02em;
+
+$headline-md-size:   1.5rem;
+$headline-md-height: 2rem;
+$headline-md-weight: 600;
+$headline-md-tracking: -0.01em;
+
+$headline-sm-size:   1.25rem;
+$headline-sm-height: 1.75rem;
+$headline-sm-weight: 600;
+
+$body-lg-size:   1.125rem;
+$body-lg-height: 1.75rem;
+
+$body-md-size:   1rem;
+$body-md-height: 1.5rem;
+
+$body-sm-size:   0.875rem;
+$body-sm-height: 1.25rem;
+
+$label-md-size:  0.875rem;
+$label-md-weight: 600;
+$label-md-height: 1rem;
+$label-md-tracking: 0.01em;
+
+$label-sm-size:  0.75rem;
+$label-sm-weight: 500;
+$label-sm-height: 1rem;
+
+// ---- Spacing (4px base) ----
+$space-4:  0.25rem;
+$space-8:  0.5rem;
+$space-12: 0.75rem;
+$space-16: 1rem;
+$space-24: 1.5rem;
+$space-32: 2rem;
+$space-40: 2.5rem;
+$space-48: 3rem;
+$space-64: 4rem;
+
+// ---- Shape ----
+$rounded-sm:  0.25rem;
+$rounded:     0.5rem;
+$rounded-md:   0.75rem;
+$rounded-lg:   1rem;
+$rounded-xl:   1.5rem;
+$rounded-full: 9999px;
+
+// ---- Elevation (shadows) ----
+$shadow-1: 0px 1px 3px rgba(0,0,0,0.08), 0px 1px 2px rgba(0,0,0,0.06);
+$shadow-2: 0px 4px 12px rgba(0, 152, 70, 0.08), 0px 2px 6px rgba(0,0,0,0.05);
+$shadow-3: 0px 10px 25px rgba(0,0,0,0.10), 0px 4px 10px rgba(0,0,0,0.06);
+$shadow-fab: 0px 10px 25px rgba(0, 107, 47, 0.30);
+
+// ---- Transitions ----
+$transition-fast: 150ms ease;
+$transition:     250ms ease;
+$transition-slow: 350ms ease;

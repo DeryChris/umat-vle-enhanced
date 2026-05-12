@@ -1,0 +1,158 @@
+// ============================================================
+// NAVIGATION — Top AppBar, SideNav, Bottom Nav
+// ============================================================
+
+// ---- Top AppBar ----
+.umat-topbar {
+    background-color: $surface-container-lowest;
+    border-bottom: 1px solid $outline-variant;
+    box-shadow: $shadow-1;
+    height: 64px;
+    display: flex;
+    align-items: center;
+
+    .umat-topbar-title {
+        font-size: $headline-md-size;
+        font-weight: 600;
+        color: $primary;
+        letter-spacing: $headline-md-tracking;
+    }
+
+    .umat-topbar-nav a {
+        font-size: $label-md-size;
+        font-weight: 600;
+        color: $on-surface-variant;
+        padding: $space-8 $space-12;
+        border-bottom: 2px solid transparent;
+        transition: color $transition-fast, border-color $transition-fast;
+        &:hover { color: $primary; }
+        &.active, &:focus {
+            color: $primary;
+            border-bottom-color: $primary;
+        }
+    }
+}
+
+// ---- Side NavBar ----
+.umat-sidenav {
+    background-color: $surface-container-low;
+    border-right: 1px solid $outline-variant;
+    width: 256px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+
+    .umat-sidenav-brand {
+        padding: $space-24 $space-16;
+        border-bottom: 1px solid $outline-variant;
+
+        .brand-name {
+            font-size: $headline-sm-size;
+            font-weight: 700;
+            color: $primary;
+        }
+        .brand-tagline {
+            font-size: $label-sm-size;
+            color: $on-surface-variant;
+        }
+    }
+
+    .umat-sidenav-links {
+        flex: 1;
+        padding: $space-16 $space-8;
+        display: flex;
+        flex-direction: column;
+        gap: $space-4;
+
+        a {
+            display: flex;
+            align-items: center;
+            gap: $space-12;
+            padding: $space-12 $space-16;
+            border-radius: $rounded;
+            color: $on-surface-variant;
+            font-size: $label-md-size;
+            font-weight: 600;
+            transition: background $transition-fast, color $transition-fast;
+            text-decoration: none;
+
+            .material-symbols-outlined { font-size: 20px; }
+
+            &:hover {
+                background-color: $surface-container-high;
+                color: $primary;
+            }
+
+            &.active {
+                background-color: rgba($primary-fixed, 0.15);
+                color: $primary;
+                border-right: 4px solid $primary;
+            }
+        }
+    }
+
+    .umat-sidenav-footer {
+        padding: $space-16;
+        border-top: 1px solid $outline-variant;
+
+        .umat-btn-new-session {
+            width: 100%;
+            background-color: $primary-container;
+            color: $on-primary-container;
+            border: none;
+            border-radius: $rounded-lg;
+            padding: $space-12 $space-16;
+            font-size: $label-md-size;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: $space-8;
+            transition: opacity $transition-fast;
+            cursor: pointer;
+
+            &:hover { opacity: 0.9; }
+            &:active { opacity: 0.75; }
+        }
+    }
+}
+
+// ---- Bottom NavBar (Mobile) ----
+.umat-bottomnav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background-color: $surface-container-lowest;
+    box-shadow: 0 -4px 12px rgba($primary, 0.08);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: $space-8 $space-16 (calc(#{$space-16} + env(safe-area-inset-bottom)));
+    border-radius: $rounded-xl $rounded-xl 0 0;
+
+    a, .umat-bottomnav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: $space-4;
+        padding: $space-8 $space-16;
+        border-radius: $rounded-lg;
+        color: $on-surface-variant;
+        font-size: $label-sm-size;
+        font-weight: 500;
+        text-decoration: none;
+        transition: color $transition-fast, background $transition-fast;
+
+        .material-symbols-outlined { font-size: 24px; }
+
+        &.active {
+            background-color: $secondary-container;
+            color: $on-secondary-container;
+        }
+    }
+}

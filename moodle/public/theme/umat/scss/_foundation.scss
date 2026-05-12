@@ -1,0 +1,40 @@
+// ============================================================
+// FOUNDATION — base HTML elements, Bootstrap overrides
+// ============================================================
+
+body {
+    background-color: $background;
+    color: $on-surface;
+    font-family: $font;
+    font-size: $body-md-size;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, .h1 { font-size: $display-lg-size; font-weight: $display-lg-weight; letter-spacing: $display-lg-tracking; }
+h2, .h2 { font-size: $headline-md-size; font-weight: $headline-md-weight; letter-spacing: $headline-md-tracking; }
+h3, .h3 { font-size: $headline-sm-size; font-weight: $headline-sm-weight; }
+h4, .h4 { font-size: $body-lg-size;    font-weight: $label-md-weight; }
+h5, .h5 { font-size: $body-md-size;    font-weight: $label-md-weight; }
+h6, .h6 { font-size: $body-sm-size;    font-weight: $label-md-weight; }
+
+a {
+    color: $primary;
+    text-decoration: none;
+    transition: color $transition-fast;
+    &:hover { color: $surface-tint; }
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: $outline-variant;
+    border-radius: $rounded-full;
+}
+
+::selection { background: rgba($primary, 0.2); color: $on-surface; }
+
+:focus-visible {
+    outline: 2px solid $primary;
+    outline-offset: 2px;
+}

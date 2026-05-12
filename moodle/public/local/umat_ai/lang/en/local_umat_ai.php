@@ -33,6 +33,10 @@ $string['materials_indexed'] = 'Course materials loaded';
 $string['no_materials']      = 'No materials indexed yet';
 $string['no_access']         = 'You do not have permission to use the AI assistant in this course.';
 
+// --- Approval ---
+$string['reject_btn']    = 'Reject';
+$string['approval_nav'] = 'Review AI Outputs';
+
 // --- AI Output ---
 $string['session_summary']  = 'Lecture Summary';
 $string['session_notes']    = 'Study Notes';

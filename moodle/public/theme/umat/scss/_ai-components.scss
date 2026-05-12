@@ -1,0 +1,519 @@
+// ============================================================
+// AI CHAT COMPONENTS — FAB, Overlay, Chat bubbles, Quick actions
+// ============================================================
+
+// ---- AI FAB (Floating Action Button) ----
+.umat-fab {
+    position: fixed;
+    bottom: 80px;       // above bottomnav
+    right: 24px;
+    z-index: 50;
+    width: 56px;
+    height: 56px;
+    border-radius: $rounded-full;
+    background-color: $primary;
+    color: $on-primary;
+    border: none;
+    box-shadow: $shadow-fab;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform $transition, box-shadow $transition;
+    ring: 4px solid rgba($surface-container-lowest, 0.5);
+
+    .material-symbols-outlined { font-size: 28px; }
+
+    &:hover {
+        transform: scale(1.08);
+        box-shadow: 0 12px 30px rgba($primary, 0.40);
+    }
+    &:active { transform: scale(0.95); }
+
+    // Pulse ring
+    &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background-color: rgba($primary, 0.3);
+        animation: fab-pulse 3s ease-in-out infinite;
+        pointer-events: none;
+    }
+
+    @keyframes fab-pulse {
+        0%, 100% { transform: scale(1); opacity: 0.6; }
+        50%       { transform: scale(1.35); opacity: 0; }
+    }
+}
+
+// ---- AI Slide-out Overlay ----
+.umat-ai-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+
+    .umat-ai-backdrop {
+        position: absolute;
+        inset: 0;
+        background-color: rgba($primary, 0.15);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+    }
+
+    .umat-ai-panel {
+        position: relative;
+        width: min(400px, 95vw);
+        max-height: 75vh;
+        background-color: $surface-container-lowest;
+        border-radius: $rounded-xl;
+        box-shadow: $shadow-3;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        margin: $space-16;
+    }
+
+    // Panel header with gradient
+    .umat-ai-panel-header {
+        background: linear-gradient(135deg, $primary 0%, $primary-container 100%);
+        padding: $space-24 $space-24;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $space-16;
+
+        .umat-ai-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: $rounded-full;
+            background-color: $secondary-container;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: $on-secondary-container;
+        }
+
+        .umat-ai-title {
+            color: #ffffff;
+            font-size: $label-md-size;
+            font-weight: 600;
+        }
+
+        .umat-ai-status {
+            display: flex;
+            align-items: center;
+            gap: $space-8;
+            font-size: $label-sm-size;
+            color: rgba(255,255,255,0.8);
+
+            .status-dot {
+                width: 8px;
+                height: 8px;
+                border-radius: $rounded-full;
+                background-color: #4ade80;
+                animation: status-blink 2s ease-in-out infinite;
+            }
+        }
+
+        .umat-ai-close-btn {
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.8);
+            cursor: pointer;
+            padding: $space-8;
+            border-radius: $rounded;
+            transition: color $transition-fast;
+            &:hover { color: #fff; }
+        }
+    }
+
+    // Chat message list
+    .umat-chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: $space-24;
+        display: flex;
+        flex-direction: column;
+        gap: $space-16;
+        background-color: $surface-container-low;
+
+        .chat-message {
+            display: flex;
+            flex-direction: column;
+            gap: $space-8;
+            max-width: 85%;
+
+            &.ai {
+                align-self: flex-start;
+
+                .chat-bubble {
+                    background-color: $surface-container-lowest;
+                    border-left: 4px solid $primary;
+                    border-radius: 0 $rounded-lg $rounded-lg 0;
+                    box-shadow: $shadow-1;
+                }
+            }
+
+            &.student {
+                align-self: flex-end;
+
+                .chat-bubble {
+                    background-color: $primary-fixed;
+                    color: $on-primary-fixed;
+                    border-radius: $rounded-lg 0 0 $rounded-lg;
+                }
+            }
+
+            .chat-bubble {
+                padding: $space-16;
+                font-size: $body-sm-size;
+                line-height: 1.5;
+
+                p { margin: 0; }
+            }
+
+            .chat-source-tags {
+                display: flex;
+                flex-wrap: wrap;
+                gap: $space-4;
+                margin-top: $space-8;
+
+                .source-tag {
+                    font-size: $label-sm-size;
+                    padding: $space-4 $space-8;
+                    background-color: $surface-container-high;
+                    color: $on-surface-variant;
+                    border-radius: $rounded-full;
+                    border: 1px solid $outline-variant;
+                    cursor: pointer;
+                    transition: background $transition-fast;
+                    &:hover { background-color: $primary-fixed; color: $on-primary-fixed; }
+                }
+            }
+        }
+    }
+
+    // Quick action chips grid
+    .umat-quick-actions {
+        padding: $space-16 $space-24;
+        border-top: 1px solid $outline-variant;
+        background-color: $surface-container-lowest;
+
+        .quick-actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: $space-8;
+        }
+
+        .quick-action-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: $space-8;
+            padding: $space-16;
+            background-color: $surface-container-lowest;
+            border: 1px solid $outline-variant;
+            border-radius: $rounded-lg;
+            cursor: pointer;
+            transition: border-color $transition-fast, background $transition-fast;
+            text-align: center;
+
+            .material-symbols-outlined { color: $primary; font-size: 24px; transition: transform $transition-fast; }
+
+            span {
+                font-size: $label-sm-size;
+                font-weight: 600;
+                color: $on-surface;
+            }
+
+            &:hover {
+                border-color: $primary;
+                background-color: rgba($primary-fixed, 0.08);
+                .material-symbols-outlined { transform: scale(1.1); }
+            }
+        }
+    }
+
+    // Typing indicator
+    .umat-typing-indicator {
+        display: flex;
+        gap: $space-4;
+        padding: $space-12 $space-16;
+        align-self: flex-start;
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: $rounded-full;
+            background-color: $on-surface-variant;
+            opacity: 0.4;
+            animation: typing-bounce 1.4s ease-in-out infinite;
+
+            &:nth-child(2) { animation-delay: 0.2s; }
+            &:nth-child(3) { animation-delay: 0.4s; }
+        }
+
+        @keyframes typing-bounce {
+            0%, 60%, 100% { transform: translateY(0);    opacity: 0.4; }
+            30%            { transform: translateY(-6px); opacity: 1;   }
+        }
+    }
+
+    // Input area
+    .umat-chat-input-area {
+        padding: $space-16 $space-24;
+        background-color: $surface-container-lowest;
+        border-top: 1px solid $outline-variant;
+        display: flex;
+        flex-direction: column;
+        gap: $space-8;
+
+        .umat-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+
+            textarea {
+                width: 100%;
+                background-color: $surface-container;
+                border: 1px solid $outline-variant;
+                border-radius: $rounded-lg;
+                padding: $space-16;
+                padding-right: 52px; // room for send button
+                font-size: $body-sm-size;
+                resize: none;
+                min-height: 80px;
+                transition: border-color $transition-fast, box-shadow $transition-fast;
+                color: $on-surface;
+                font-family: $font;
+
+                &::placeholder { color: $on-surface-variant; }
+                &:focus {
+                    outline: none;
+                    border-color: $primary;
+                    box-shadow: 0 0 0 3px rgba($primary, 0.15);
+                }
+            }
+
+            .umat-send-btn {
+                position: absolute;
+                bottom: $space-12;
+                right: $space-12;
+                width: 36px;
+                height: 36px;
+                border-radius: $rounded;
+                background-color: $primary-container;
+                color: $on-primary-container;
+                border: none;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: opacity $transition-fast;
+                &:hover { opacity: 0.85; }
+            }
+        }
+
+        .umat-input-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: $label-sm-size;
+            color: $on-surface-variant;
+            opacity: 0.7;
+
+            .umat-voice-btn {
+                display: flex;
+                align-items: center;
+                gap: $space-4;
+                background: none;
+                border: none;
+                color: $on-surface-variant;
+                cursor: pointer;
+                padding: $space-4;
+                border-radius: $rounded;
+                transition: color $transition-fast;
+                &:hover { color: $primary; }
+
+                .material-symbols-outlined { font-size: 20px; }
+            }
+        }
+    }
+}
+
+// ---- Expanded AI Workspace ----
+.umat-workspace {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    height: calc(100vh - 64px);
+    overflow: hidden;
+
+    @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+    }
+
+    .umat-workspace-video {
+        background-color: #000;
+        position: relative;
+
+        .video-player {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-overlay-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            padding: $space-16 $space-24;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #fff;
+        }
+    }
+
+    .umat-workspace-sidebar {
+        background-color: $surface-container-lowest;
+        border-left: 1px solid $outline-variant;
+        display: flex;
+        flex-direction: column;
+
+        .umat-workspace-tabs {
+            display: flex;
+            border-bottom: 1px solid $outline-variant;
+
+            button {
+                flex: 1;
+                padding: $space-16;
+                background: none;
+                border: none;
+                border-bottom: 2px solid transparent;
+                font-size: $label-md-size;
+                font-weight: 600;
+                color: $on-surface-variant;
+                cursor: pointer;
+                transition: color $transition-fast, border-color $transition-fast;
+
+                &.active {
+                    color: $primary;
+                    border-bottom-color: $primary;
+                }
+            }
+        }
+    }
+
+    .umat-transcript {
+        padding: $space-24;
+        background-color: $surface-container-lowest;
+
+        .transcript-search {
+            display: flex;
+            align-items: center;
+            gap: $space-8;
+            padding: $space-8 $space-16;
+            background-color: $surface-container;
+            border: 1px solid $outline-variant;
+            border-radius: $rounded;
+            margin-bottom: $space-16;
+
+            input {
+                flex: 1;
+                border: none;
+                background: transparent;
+                font-size: $label-md-size;
+                color: $on-surface;
+                &::placeholder { color: $outline; }
+                &:focus { outline: none; }
+            }
+        }
+
+        .transcript-entry {
+            display: flex;
+            gap: $space-16;
+            padding: $space-12;
+            border-radius: $rounded;
+            cursor: pointer;
+            transition: background $transition-fast;
+
+            .timestamp {
+                font-size: $label-sm-size;
+                font-weight: 600;
+                color: $primary;
+                min-width: 40px;
+                flex-shrink: 0;
+            }
+
+            p { font-size: $body-sm-size; color: $on-surface; margin: 0; }
+
+            &:hover, &.highlighted {
+                background-color: rgba($primary-fixed, 0.15);
+            }
+
+            &.highlighted .timestamp {
+                text-decoration: underline;
+            }
+        }
+    }
+}
+
+// ---- AI Hub (General) ----
+.umat-ai-hub {
+    padding: $space-32;
+
+    .umat-learning-pulse {
+        background-color: $surface-container-lowest;
+        border-radius: $rounded-lg;
+        padding: $space-24;
+        box-shadow: $shadow-1;
+
+        .topic-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: $space-8;
+
+            .topic-pill {
+                padding: $space-8 $space-16;
+                border-radius: $rounded-full;
+                font-size: $label-sm-size;
+                font-weight: 600;
+            }
+        }
+    }
+
+    .umat-session-log-card {
+        background-color: $surface-container-lowest;
+        border-radius: $rounded-lg;
+        padding: $space-16;
+        border: 1px solid $outline-variant;
+        box-shadow: $shadow-1;
+        cursor: pointer;
+        transition: box-shadow $transition, transform $transition;
+
+        &:hover {
+            box-shadow: $shadow-2;
+            transform: translateY(-2px);
+        }
+
+        .course-badge {
+            font-size: $label-sm-size;
+            font-weight: 700;
+            padding: $space-4 $space-8;
+            border-radius: $rounded;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        h4 { font-size: $label-md-size; color: $on-surface; }
+        p  { font-size: $body-sm-size; color: $on-surface-variant; }
+    }
+}

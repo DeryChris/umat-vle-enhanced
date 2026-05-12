@@ -1,26 +1,249 @@
 // ============================================================
-// UMaT brand colour overrides for Bootstrap/Boost variables
+// UMaT Design Tokens — loaded before Boost variable defaults
 // ============================================================
 
-// UMaT Brand Colors
-$primary:   #003580 !default;    // UMaT deep navy blue
-$secondary: #C8A951 !default;    // UMaT gold/yellow
-$success:   #28a745 !default;
-$danger:    #dc3545 !default;
-$warning:   #ffc107 !default;
-$info:      #17a2b8 !default;
-$light:     #f8f9fa !default;
-$dark:      #1a1a2e !default;
+// ---- Surfaces (9 levels, light theme) ----
+$umat-surface-dim:             #d5dcd1;
+$umat-surface:                #f5fbf0;
+$umat-surface-bright:         #f5fbf0;
+$umat-surface-container-lowest:#ffffff;
+$umat-surface-container-low:   #eff6eb;
+$umat-surface-container:       #e9f0e5;
+$umat-surface-container-high:  #e3eadf;
+$umat-surface-container-highest: #dee5da;
 
-// Typography
-$font-family-sans-serif: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !default;
-$font-size-base:         0.9375rem !default;
+// ---- Brand colours ----
+$umat-primary:        #006b2f;
+$umat-primary-on:     #ffffff;
+$umat-primary-container: #00873d;
+$umat-primary-on-container: #f7fff3;
+$umat-primary-fixed:   #81fb9c;
+$umat-primary-fixed-dim: #64de83;
+$umat-on-primary-fixed: #00210a;
+$umat-on-primary-fixed-variant: #005323;
+$umat-surface-tint:   #006d30;
 
-// Navigation
-$nav-header-bg:   $primary !default;
-$nav-link-color:  rgba(255, 255, 255, 0.85) !default;
+$umat-secondary:       #3d6844;
+$umat-secondary-on:    #ffffff;
+$umat-secondary-container: #beefc1;
+$umat-secondary-on-container: #436e4a;
+$umat-secondary-fixed: #beefc1;
+$umat-secondary-fixed-dim: #a3d2a6;
+$umat-on-secondary-fixed: #00210a;
+$umat-on-secondary-fixed-variant: #254f2e;
 
-// Navbar
-$navbar-light-color:        rgba(255, 255, 255, 0.85) !default;
-$navbar-light-hover-color:  #fff !default;
-$navbar-light-active-color: $secondary !default;
+$umat-tertiary:       #a5304d;
+$umat-tertiary-on:   #ffffff;
+$umat-tertiary-container: #c64865;
+$umat-tertiary-on-container: #fffbff;
+$umat-tertiary-fixed: #ffd9dd;
+$umat-tertiary-fixed-dim: #ffb2bd;
+$umat-on-tertiary-fixed: #400013;
+$umat-on-tertiary-fixed-variant: #891839;
+
+$umat-error:         #ba1a1a;
+$umat-error-on:      #ffffff;
+$umat-error-container: #ffdad6;
+$umat-error-on-container: #93000a;
+
+// ---- Semantic / base ----
+$umat-on-surface:            #171d17;
+$umat-on-surface-variant:    #3e4a3e;
+$umat-inverse-surface:       #2b322b;
+$umat-inverse-on-surface:    #ecf3e8;
+$umat-inverse-primary:       #64de83;
+
+$umat-outline:       #6e7a6d;
+$umat-outline-variant: #bdcaba;
+$umat-background:    #f5fbf0;
+$umat-on-background: #171d17;
+
+// ---- Typography ----
+$umat-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+$umat-display-lg-size:   2.25rem;
+$umat-display-lg-height: 2.75rem;
+$umat-display-lg-weight: 700;
+$umat-display-lg-tracking: -0.02em;
+
+$umat-headline-md-size:   1.5rem;
+$umat-headline-md-height: 2rem;
+$umat-headline-md-weight: 600;
+$umat-headline-md-tracking: -0.01em;
+
+$umat-headline-sm-size:   1.25rem;
+$umat-headline-sm-height: 1.75rem;
+$umat-headline-sm-weight: 600;
+
+$umat-body-lg-size:   1.125rem;
+$umat-body-lg-height: 1.75rem;
+
+$umat-body-md-size:   1rem;
+$umat-body-md-height: 1.5rem;
+
+$umat-body-sm-size:   0.875rem;
+$umat-body-sm-height: 1.25rem;
+
+$umat-label-md-size:  0.875rem;
+$umat-label-md-weight: 600;
+$umat-label-md-height: 1rem;
+$umat-label-md-tracking: 0.01em;
+
+$umat-label-sm-size:  0.75rem;
+$umat-label-sm-weight: 500;
+$umat-label-sm-height: 1rem;
+
+// ---- Spacing (4px base) ----
+$umat-space-4:  0.25rem;
+$umat-space-8:  0.5rem;
+$umat-space-12: 0.75rem;
+$umat-space-16: 1rem;
+$umat-space-24: 1.5rem;
+$umat-space-32: 2rem;
+$umat-space-40: 2.5rem;
+$umat-space-48: 3rem;
+$umat-space-64: 4rem;
+
+// ---- Shape ----
+$umat-rounded-sm:  0.25rem;
+$umat-rounded:     0.5rem;
+$umat-rounded-md:   0.75rem;
+$umat-rounded-lg:   1rem;
+$umat-rounded-xl:   1.5rem;
+$umat-rounded-full: 9999px;
+
+// ---- Elevation (shadows) ----
+$umat-shadow-1: 0px 1px 3px rgba(0,0,0,0.08), 0px 1px 2px rgba(0,0,0,0.06);
+$umat-shadow-2: 0px 4px 12px rgba(0, 152, 70, 0.08), 0px 2px 6px rgba(0,0,0,0.05);
+$umat-shadow-3: 0px 10px 25px rgba(0,0,0,0.10), 0px 4px 10px rgba(0,0,0,0.06);
+$umat-shadow-fab: 0px 10px 25px rgba(0, 107, 47, 0.30);
+
+// ---- Transitions ----
+$umat-transition-fast: 150ms ease;
+$umat-transition:     250ms ease;
+$umat-transition-slow: 350ms ease;
+
+// ---- Bootstrap variable overrides ----
+$primary:        $umat-primary;
+$secondary:      $umat-secondary;
+$success:        $umat-primary-container;
+$danger:         $umat-error;
+$warning:        $umat-tertiary;
+$info:           $umat-secondary;
+$light:          $umat-surface-container-low;
+$dark:           $umat-surface-container-highest;
+$body-bg:        $umat-background;
+$body-color:     $umat-on-surface;
+
+$font-family-sans-serif: $umat-font;
+$font-size-base:         $umat-body-md-size;
+$line-height-base:      1.5;
+$headings-font-family:  $umat-font;
+$headings-font-weight:  600;
+
+$border-radius:    $umat-rounded;
+$border-radius-lg: $umat-rounded-lg;
+$border-radius-sm: $umat-rounded-sm;
+
+$card-spacer-y:      $umat-space-16;
+$card-spacer-x:      $umat-space-16;
+$card-border-radius: $umat-rounded-lg;
+$card-border-color:  $umat-outline-variant;
+$card-cap-bg:        $umat-surface-container-low;
+$card-bg:            $umat-surface-container-lowest;
+$card-box-shadow:    $umat-shadow-1;
+
+$btn-border-radius: $umat-rounded;
+
+$badge-font-size:   $umat-label-sm-size;
+$badge-padding-y:   $umat-space-4;
+$badge-padding-x:   $umat-space-8;
+$badge-border-radius: $umat-rounded-full;
+
+$input-border-radius: $umat-rounded;
+$input-focus-border-color: $umat-primary;
+$input-focus-box-shadow: 0 0 0 3px rgba($umat-primary, 0.18);
+
+$navbar-light-color:      $umat-on-surface-variant;
+$navbar-light-hover-color: $umat-primary;
+$navbar-light-active-color: $umat-primary;
+
+$link-color:                $umat-primary;
+$link-hover-color:          $umat-surface-tint;
+$link-decoration:           none;
+$link-hover-decoration:    underline;
+
+// ---- Short aliases for partials ----
+// Bootstrap 5 uses $primary/$on-primary but our partials expect container variants
+$surface-container-lowest:  $umat-surface-container-lowest;
+$surface-container-low:      $umat-surface-container-low;
+$surface-container:          $umat-surface-container;
+$surface-container-high:    $umat-surface-container-high;
+$surface-container-highest: $umat-surface-container-highest;
+$primary-on:                $umat-primary-on;
+$primary-container:         $umat-primary-container;
+$primary-on-container:      $umat-primary-on-container;
+$primary-fixed:             $umat-primary-fixed;
+$on-primary-fixed:          $umat-on-primary-fixed;
+$secondary-on:              $umat-secondary-on;
+$secondary-container:       $umat-secondary-container;
+$secondary-on-container:    $umat-secondary-on-container;
+$secondary-fixed:           $umat-secondary-fixed;
+$on-secondary-fixed:        $umat-on-secondary-fixed;
+$tertiary:                  $umat-tertiary;
+$tertiary-on:               $umat-tertiary-on;
+$tertiary-container:        $umat-tertiary-container;
+$tertiary-on-container:     $umat-tertiary-on-container;
+$error:                     $umat-error;
+$on-surface:               $umat-on-surface;
+$on-surface-variant:       $umat-on-surface-variant;
+$outline:                  $umat-outline;
+$outline-variant:           $umat-outline-variant;
+$background:               $umat-background;
+$font:                     $umat-font;
+$display-lg-size:          $umat-display-lg-size;
+$display-lg-height:         $umat-display-lg-height;
+$display-lg-weight:         $umat-display-lg-weight;
+$display-lg-tracking:       $umat-display-lg-tracking;
+$headline-md-size:         $umat-headline-md-size;
+$headline-md-height:        $umat-headline-md-height;
+$headline-md-weight:        $umat-headline-md-weight;
+$headline-md-tracking:      $umat-headline-md-tracking;
+$headline-sm-size:          $umat-headline-sm-size;
+$headline-sm-height:        $umat-headline-sm-height;
+$headline-sm-weight:       $umat-headline-sm-weight;
+$body-lg-size:             $umat-body-lg-size;
+$body-lg-height:            $umat-body-lg-height;
+$body-md-size:             $umat-body-md-size;
+$body-md-height:           $umat-body-md-height;
+$body-sm-size:             $umat-body-sm-size;
+$body-sm-height:           $umat-body-sm-height;
+$label-md-size:             $umat-label-md-size;
+$label-md-weight:           $umat-label-md-weight;
+$label-md-height:          $umat-label-md-height;
+$label-md-tracking:        $umat-label-md-tracking;
+$label-sm-size:            $umat-label-sm-size;
+$label-sm-weight:           $umat-label-sm-weight;
+$label-sm-height:          $umat-label-sm-height;
+$space-4:  $umat-space-4;
+$space-8:  $umat-space-8;
+$space-12: $umat-space-12;
+$space-16: $umat-space-16;
+$space-24: $umat-space-24;
+$space-32: $umat-space-32;
+$space-40: $umat-space-40;
+$space-48: $umat-space-48;
+$space-64: $umat-space-64;
+$rounded-sm:   $umat-rounded-sm;
+$rounded:      $umat-rounded;
+$rounded-md:   $umat-rounded-md;
+$rounded-lg:   $umat-rounded-lg;
+$rounded-xl:   $umat-rounded-xl;
+$rounded-full: $umat-rounded-full;
+$shadow-1:     $umat-shadow-1;
+$shadow-2:     $umat-shadow-2;
+$shadow-3:     $umat-shadow-3;
+$shadow-fab:   $umat-shadow-fab;
+$transition-fast: $umat-transition-fast;
+$transition:      $umat-transition;
+$transition-slow: $umat-transition-slow;

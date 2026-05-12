@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.5);
+        }
+        /* Custom scrollbar for chat */
+        .chat-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .chat-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .chat-scroll::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+    </style>
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {background: "#fef9eb", "surface-container-lowest": "#ffffff", "on-secondary-fixed-variant": "#0a5228", "on-primary-fixed": "#00210a", "surface-dim": "#dedacc", "surface-tint": "#006d30", "tertiary-fixed": "#ffd9dd", "primary-fixed-dim": "#64de83", "on-tertiary-fixed-variant": "#891839", "inverse-surface": "#323127", "on-error-container": "#93000a", "on-secondary": "#ffffff", "primary-container": "#00873d", "primary-fixed": "#81fb9c", "error-container": "#ffdad6", outline: "#6e7a6d", "surface-container-high": "#ede8da", "on-tertiary-fixed": "#400013", "on-tertiary": "#ffffff", "on-primary": "#ffffff", "secondary-container": "#adf3ba", "on-error": "#ffffff", "on-secondary-fixed": "#00210c", "surface-container": "#f3eee0", secondary: "#296b3e", "on-tertiary-container": "#fffbff", "on-primary-fixed-variant": "#005323", "surface-container-low": "#f8f3e5", "on-background": "#1d1c13", "on-primary-container": "#f7fff3", "tertiary-container": "#c64865", primary: "#006b2f", "secondary-fixed-dim": "#92d69f", "on-surface": "#1d1c13", "surface-variant": "#e7e2d4", "secondary-fixed": "#adf3ba", "surface-container-highest": "#e7e2d4", tertiary: "#a5304d", "on-secondary-container": "#307143", "inverse-on-surface": "#f6f0e2", error: "#ba1a1a", "outline-variant": "#bdcaba", "surface-bright": "#fef9eb", "tertiary-fixed-dim": "#ffb2bd", "on-surface-variant": "#3e4a3e", "inverse-primary": "#64de83", surface: "#fef9eb"}, borderRadius: {DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px"}, spacing: {"margin-mobile": "16px", md: "16px", xs: "4px", base: "4px", xl: "32px", "margin-desktop": "40px", sm: "8px", gutter: "16px", lg: "24px"}, fontFamily: {"label-sm": ["Inter"], "display-lg": ["Inter"], "body-lg": ["Inter"], "headline-md": ["Inter"], "headline-sm": ["Inter"], "label-md": ["Inter"], "body-md": ["Inter"], "body-sm": ["Inter"], headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"]}, fontSize: {"label-sm": ["12px", {lineHeight: "16px", fontWeight: "500"}], "display-lg": ["36px", {lineHeight: "44px", letterSpacing: "-0.02em", fontWeight: "700"}], "body-lg": ["18px", {lineHeight: "28px", fontWeight: "400"}], "headline-md": ["24px", {lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600"}], "headline-sm": ["20px", {lineHeight: "28px", fontWeight: "600"}], "label-md": ["14px", {lineHeight: "16px", letterSpacing: "0.01em", fontWeight: "600"}], "body-md": ["16px", {lineHeight: "24px", fontWeight: "400"}], "body-sm": ["14px", {lineHeight: "20px", fontWeight: "400"}]}}}};</script>
+</head>
+<body class="bg-background text-on-surface">
+<div class="flex min-h-screen">
+<!-- SideNavBar Component -->
+<aside class="hidden md:flex flex-col h-screen sticky top-0 py-lg bg-surface-container-low dark:bg-surface-container-high shadow-sm w-64 border-r border-outline-variant/30">
+<div class="px-lg mb-xl">
+<h1 class="font-headline-sm text-headline-sm font-black text-primary">UMaT Moodle</h1>
+<p class="text-label-sm font-label-sm text-on-surface-variant">AI Enhanced Learning</p>
+</div>
+<nav class="flex-1 px-sm space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-variant transition-all scale-98 active:opacity-80" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-variant transition-all scale-98 active:opacity-80" href="#">
+<span class="material-symbols-outlined" data-icon="school">school</span>
+<span class="font-label-md text-label-md">My Courses</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-primary font-bold border-r-4 border-primary bg-primary-fixed/10 transition-all scale-98 active:opacity-80" href="#">
+<span class="material-symbols-outlined" data-icon="smart_toy">smart_toy</span>
+<span class="font-label-md text-label-md">AI Tutor</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-variant transition-all scale-98 active:opacity-80" href="#">
+<span class="material-symbols-outlined" data-icon="leaderboard">leaderboard</span>
+<span class="font-label-md text-label-md">Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-variant transition-all scale-98 active:opacity-80" href="#">
+<span class="material-symbols-outlined" data-icon="local_library">local_library</span>
+<span class="font-label-md text-label-md">Library</span>
+</a>
+</nav>
+<div class="px-sm mt-auto border-t border-outline-variant/30 pt-lg">
+<button class="w-full mb-lg flex items-center justify-center gap-2 bg-primary text-on-primary py-3 px-4 rounded-xl font-label-md text-label-md hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-[20px]" data-icon="add">add</span>
+                    New AI Session
+                </button>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-variant transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-label-md text-label-md">Help</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-variant transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-label-md text-label-md">Sign Out</span>
+</a>
+</div>
+</aside>
+<div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+<!-- TopAppBar Component -->
+<header class="bg-surface-container-lowest shadow-sm h-16 flex items-center sticky top-0 z-40">
+<div class="flex justify-between items-center px-lg w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-xl">
+<span class="font-headline-md text-headline-md font-bold text-primary">UMaT AI Assistant</span>
+<nav class="hidden lg:flex items-center gap-lg">
+<a class="font-label-md text-label-md text-primary border-b-2 border-primary pb-1" href="#">Dashboard</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors" href="#">Courses</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors" href="#">Session Logs</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors" href="#">Analytics</a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<div class="relative hidden sm:block">
+<input class="bg-surface-container-low border-none rounded-full px-4 py-1.5 text-body-sm w-64 focus:ring-2 focus:ring-primary/20" placeholder="Search sessions..." type="text"/>
+<span class="material-symbols-outlined absolute right-3 top-1.5 text-on-surface-variant text-[20px]" data-icon="search">search</span>
+</div>
+<button class="text-on-surface-variant p-2 hover:bg-surface-variant rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant p-2 hover:bg-surface-variant rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="Student Profile Avatar" data-alt="A professional headshot of a young university student wearing academic attire, captured in a brightly lit studio with a clean, light-grey background. The image is crisp and clear, reflecting a modern academic environment with soft, high-key lighting that emphasizes a focused and intelligent expression." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRtao7D_pujGjfUV99ptFZzz0Fakxdzcn-_matIfyPa8wamnfHVYUpi9JopaPHp2ximVAf9m5CUudEr-SVgCSdehsVuS26VF1SmU42sa666WxjMnJjqhGTZcRS92_IyHCa4uxJJO2ceR4r-GlDuMfelAMptiJcnG7ErNZ7aN7hzmeQFexb-VYCCu8gCWaFZWOw660RJ303JalPldFxb7taEknocr91rYGNNUYcAhHJHP6PTBng6f4OTrfhvsSDqycb_uWD9JdTP_0"/>
+</div>
+</div>
+</div>
+</header>
+<main class="flex-1 overflow-y-auto p-md md:p-xl">
+<div class="max-w-7xl mx-auto space-y-xl">
+<!-- Hero / Summary Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-lg">
+<!-- Stats Card -->
+<div class="md:col-span-4 bg-surface-container-lowest rounded-xl p-lg shadow-[0_4px_12px_rgba(0,51,153,0.05)] border border-outline-variant/30 flex flex-col justify-between h-full">
+<div>
+<div class="flex items-center justify-between mb-md">
+<h3 class="font-headline-sm text-headline-sm text-primary">Learning Pulse</h3>
+<span class="material-symbols-outlined text-secondary" data-icon="bolt">bolt</span>
+</div>
+<p class="text-body-sm text-on-surface-variant mb-xl">Your most focused topics this semester based on AI interactions.</p>
+</div>
+<div class="space-y-md">
+<div class="flex flex-wrap gap-2">
+<span class="bg-primary-fixed text-on-primary-fixed px-3 py-1 rounded-full text-label-sm font-label-sm">Mine Surveying</span>
+<span class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full text-label-sm font-label-sm">Calculus III</span>
+<span class="bg-tertiary-fixed text-on-tertiary-fixed-variant px-3 py-1 rounded-full text-label-sm font-label-sm">Mineral Proc.</span>
+<span class="bg-surface-container text-on-surface-variant px-3 py-1 rounded-full text-label-sm font-label-sm">Geology</span>
+</div>
+<div class="pt-md border-t border-outline-variant/20">
+<div class="flex justify-between text-label-sm mb-xs">
+<span>Study Goal Progress</span>
+<span class="font-bold">78%</span>
+</div>
+<div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-primary" style="width: 78%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- General Chat Area -->
+<div class="md:col-span-8 bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(0,51,153,0.05)] border border-outline-variant/30 flex flex-col h-[400px]">
+<div class="px-lg py-md border-b border-outline-variant/20 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="h-10 w-10 bg-primary/10 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="forum">forum</span>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface">General Assistant</h3>
+<p class="text-[10px] text-primary font-bold flex items-center gap-1">
+<span class="h-1.5 w-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                                            AI READY
+                                        </p>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="open_in_full">open_in_full</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-lg space-y-lg chat-scroll">
+<div class="flex justify-start">
+<div class="max-w-[80%] bg-surface-container-low text-on-surface p-lg rounded-xl rounded-tl-none border-l-4 border-primary">
+<p class="text-body-sm">Welcome back, Kwame. How can I assist with your engineering studies or UMaT campus inquiries today?</p>
+</div>
+</div>
+<div class="flex justify-end">
+<div class="max-w-[80%] bg-[#EBF0FF] text-on-surface p-lg rounded-xl rounded-tr-none">
+<p class="text-body-sm">Can you explain the main differences between open-pit and underground mining methods for gold extraction?</p>
+</div>
+</div>
+<div class="flex justify-start">
+<div class="max-w-[80%] bg-surface-container-low text-on-surface p-lg rounded-xl rounded-tl-none border-l-4 border-primary">
+<p class="text-body-sm">Certainly. Open-pit mining is used when mineral deposits are near the surface, while underground mining is used for deeper deposits. The choice depends on the ore body's shape, depth, and grade...</p>
+<button class="mt-md text-primary font-label-sm text-label-sm flex items-center gap-1 hover:underline">
+<span class="material-symbols-outlined text-[16px]" data-icon="source">source</span>
+                                            View Source Material
+                                        </button>
+</div>
+</div>
+</div>
+<div class="p-lg border-t border-outline-variant/20">
+<div class="relative">
+<input class="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-3 pr-12 text-body-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all" placeholder="Ask anything about your courses or campus..." type="text"/>
+<button class="absolute right-2 top-2 h-8 w-8 bg-primary text-on-primary rounded-lg flex items-center justify-center hover:opacity-90">
+<span class="material-symbols-outlined text-[18px]" data-icon="send">send</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Recent Sessions Grid -->
+<section>
+<div class="flex items-center justify-between mb-lg">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Recent Session Logs</h2>
+<button class="text-primary font-label-md text-label-md flex items-center gap-1 hover:gap-2 transition-all">
+                                View all logs
+                                <span class="material-symbols-outlined text-[18px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-lg">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest p-lg rounded-xl border border-outline-variant/30 shadow-[0_4px_12px_rgba(0,51,153,0.05)] hover:shadow-lg transition-all group cursor-pointer">
+<div class="flex items-center justify-between mb-md">
+<span class="text-[10px] uppercase tracking-wider font-bold text-on-secondary-container bg-secondary-container px-2 py-0.5 rounded">EL 251</span>
+<span class="text-label-sm text-on-surface-variant font-label-sm">2 hours ago</span>
+</div>
+<h4 class="font-label-md text-label-md mb-xs text-on-surface group-hover:text-primary transition-colors">Circuit Analysis AI Review</h4>
+<p class="text-body-sm text-on-surface-variant line-clamp-2 mb-lg">Discussed Kirchhoff's Laws and nodal analysis for complex mining equipment power systems.</p>
+<div class="flex items-center justify-between">
+<div class="flex -space-x-2">
+<div class="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-[10px] text-white border-2 border-surface-container-lowest">AI</div>
+<div class="h-6 w-6 rounded-full bg-secondary flex items-center justify-center text-[10px] text-white border-2 border-surface-container-lowest">MK</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest p-lg rounded-xl border border-outline-variant/30 shadow-[0_4px_12px_rgba(0,51,153,0.05)] hover:shadow-lg transition-all group cursor-pointer">
+<div class="flex items-center justify-between mb-md">
+<span class="text-[10px] uppercase tracking-wider font-bold text-on-tertiary-container bg-tertiary-container px-2 py-0.5 rounded text-white">MN 362</span>
+<span class="text-label-sm text-on-surface-variant font-label-sm">Yesterday</span>
+</div>
+<h4 class="font-label-md text-label-md mb-xs text-on-surface group-hover:text-primary transition-colors">Rock Mechanics Lab Prep</h4>
+<p class="text-body-sm text-on-surface-variant line-clamp-2 mb-lg">Summary of stress-strain relationships and Mohr's Circle applications in rock failure.</p>
+<div class="flex items-center justify-between">
+<div class="flex -space-x-2">
+<div class="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-[10px] text-white border-2 border-surface-container-lowest">AI</div>
+<div class="h-6 w-6 rounded-full bg-secondary flex items-center justify-center text-[10px] text-white border-2 border-surface-container-lowest">MK</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest p-lg rounded-xl border border-outline-variant/30 shadow-[0_4px_12px_rgba(0,51,153,0.05)] hover:shadow-lg transition-all group cursor-pointer">
+<div class="flex items-center justify-between mb-md">
+<span class="text-[10px] uppercase tracking-wider font-bold text-on-primary-container bg-primary-container px-2 py-0.5 rounded text-white">MA 151</span>
+<span class="text-label-sm text-on-surface-variant font-label-sm">3 days ago</span>
+</div>
+<h4 class="font-label-md text-label-md mb-xs text-on-surface group-hover:text-primary transition-colors">Calculus Problem Set</h4>
+<p class="text-body-sm text-on-surface-variant line-clamp-2 mb-lg">Step-by-step breakdown of triple integrals over cylindrical coordinates.</p>
+<div class="flex items-center justify-between">
+<div class="flex -space-x-2">
+<div class="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-[10px] text-white border-2 border-surface-container-lowest">AI</div>
+<div class="h-6 w-6 rounded-full bg-secondary flex items-center justify-center text-[10px] text-white border-2 border-surface-container-lowest">MK</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+</div>
+</div>
+<!-- BottomNavBar for Mobile -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-4 pt-2 bg-surface-container-lowest shadow-lg">
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-xl px-4 py-1" href="#">
+<span class="material-symbols-outlined" data-icon="chat_bubble">chat_bubble</span>
+<span class="font-label-sm text-label-sm">Chat</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-label-sm text-label-sm">Logs</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1" href="#">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span>
+<span class="font-label-sm text-label-sm">Stats</span>
+</a>
+</nav>
+</body></html>

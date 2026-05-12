@@ -32,7 +32,7 @@ class session_ended {
                 'sessionid'    => $bbbmeetingid,
                 'courseid'     => $courseid,
                 'cmid'         => $cmid,
-                'status'       => 'pending_recording', // Recording URL fetching not yet implemented
+                'status'       => 'waiting_recording',
                 'timecreated'  => time(),
                 'timemodified' => time(),
             ];

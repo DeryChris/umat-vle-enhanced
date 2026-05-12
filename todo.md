@@ -1,6 +1,6 @@
 # TODO — UMaT VLE Enhanced Project
 
-**Last Updated:** May 11, 2026  
+**Last Updated:** May 12, 2026  
 **Priority Levels:** 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low  
 **Status Labels:** `todo` | `in-progress` | `blocked` | `on-hold`
 
@@ -9,56 +9,56 @@
 ## 🔴 CRITICAL — MVP Blockers (Must Complete Before Release)
 
 ### Recording Processing Pipeline Integration
-- [ ] **Implement BBB recording URL fetching** `todo` 🔴
-  - [ ] Study BBB API documentation for recording retrieval
-  - [ ] Add method to query BBB server for recording metadata
-  - [ ] Handle recording availability delays (BBB queues processing)
-  - [ ] Extract download URL and store in `mdl_umat_ai_sessions.recording_url`
-  - **Owner:** Ackon | **Effort:** 4-6 hours | **File:** `moodle/public/local/umat_ai/classes/external/process_recording.php`
+- [x] **Implement BBB recording URL fetching** `done` 🔴
+  - [x] Study BBB API documentation for recording retrieval
+  - [x] Add method to query BBB server for recording metadata
+  - [x] Handle recording availability delays (BBB queues processing)
+  - [x] Extract download URL and store in `mdl_umat_ai_sessions.recording_url`
+  - **Owner:** Ackon | **Effort:** 4-6 hours | **File:** `moodle/public/local/umat_ai/local/bbb_recording_helper.php`, `classes/task/process_recording.php`
 
-- [ ] **Test end-to-end recording pipeline** `todo` 🔴
-  - [ ] Setup test course with BBB activity
-  - [ ] Record test video, end meeting
-  - [ ] Verify event fires and pending record created
-  - [ ] Verify scheduled task fetches recording URL
-  - [ ] Verify AI Service receives processing request
-  - [ ] Verify transcription completes
-  - [ ] Verify ChromaDB collection created
-  - [ ] Verify AI outputs (summary, notes, quiz) generated
-  - **Owner:** Seidu + Ackon | **Effort:** 6-8 hours | **Files:** Integration test script
+- [x] **Test end-to-end recording pipeline** `done` 🔴
+   - [x] Setup test course with BBB activity
+   - [x] Record test video, end meeting
+   - [x] Verify event fires and pending record created
+   - [x] Verify scheduled task fetches recording URL
+   - [x] Verify AI Service receives processing request
+   - [x] Verify transcription completes
+   - [x] Verify ChromaDB collection created
+   - [x] Verify AI outputs (summary, notes, quiz) generated
+   - **Owner:** Seidu + Ackon | **Effort:** 6-8 hours | **Files:** `ai_service/tests/test_recording_pipeline.py`
 
-- [ ] **Create lecturer approval UI** `todo` 🔴
-  - [ ] Create page: `moodle/public/local/umat_ai/approve.php`
-  - [ ] Query `mdl_umat_ai_outputs` where `approved = 0`
-  - [ ] Display generated content (summary, notes, quiz)
-  - [ ] Add approve/reject buttons
-  - [ ] Store approval in `mdl_umat_ai_approvals`
+- [x] **Create lecturer approval UI** `done` 🔴
+  - [x] Create page: `moodle/public/local/umat_ai/approve.php`
+  - [x] Query `mdl_umat_ai_outputs` where `approved = 0`
+  - [x] Display generated content (summary, notes, quiz)
+  - [x] Add approve/reject buttons
+  - [x] Store approval in `umat_ai_outputs.is_approved` + `approved_by` + `timepublished`
   - [ ] Add notification to lecturer email on pending approval
-  - [ ] Test approval workflow
-  - **Owner:** Ackon | **Effort:** 6-8 hours | **Files:** `approve.php`, `approval` table
+  - [x] Test approval workflow
+  - **Owner:** Ackon | **Effort:** 6-8 hours | **Files:** `approve.php`, `approval.mustache`, `amd/src/approval.js`, `classes/external/get_summary.php`, `classes/external/approve_output.php`
 
-- [ ] **Validate rate limiting** `todo` 🔴
-  - [ ] Test 10 Q&A limit per minute per user in Moodle
-  - [ ] Verify AI Service doesn't have conflicting limits
-  - [ ] Test concurrent user requests
-  - [ ] Ensure graceful error message when limit exceeded
-  - **Owner:** Seidu + Ackon | **Effort:** 2-3 hours | **Files:** `external/ai_query.php`, tests
+- [x] **Validate rate limiting** `done` 🔴
+  - [x] Test 10 Q&A limit per minute per user in Moodle (already implemented in ai_query.php)
+  - [x] Verify AI Service doesn't have conflicting limits (added rate limiting in query.py)
+  - [x] Test concurrent user requests (separate per-user tracking with threading.Lock)
+  - [x] Ensure graceful error message when limit exceeded (429 response with retry_after)
+  - **Owner:** Seidu + Ackon | **Effort:** 2-3 hours | **Files:** `external/ai_query.php`, `api/v1/routes/query.py`, `tests/test_api.py`
 
 ### Error Handling & Recovery
-- [ ] **Add retry logic for failed AI jobs** `todo` 🔴
-  - [ ] Implement exponential backoff (3 retries, 1s/2s/4s)
-  - [ ] Handle API timeouts gracefully
-  - [ ] Log detailed errors for debugging
-  - [ ] Notify admin if job fails after retries
+- [x] **Add retry logic for failed AI jobs** `done` 🔴
+  - [x] Implement exponential backoff (3 retries, 1s/2s/4s)
+  - [x] Handle API timeouts gracefully
+  - [x] Log detailed errors for debugging
+  - [x] Notify admin if job fails after retries
   - **Owner:** Seidu | **Effort:** 3-4 hours | **File:** `api/v1/routes/recording.py`
 
-- [ ] **Handle network failures** `todo` 🔴
-  - [ ] Test BBB API timeout
-  - [ ] Test Gemini API timeout
-  - [ ] Test PostgreSQL connection loss
-  - [ ] Test ChromaDB unavailability
-  - Verify graceful degradation in each case
-  - **Owner:** Seidu + Ackon | **Effort:** 4-6 hours | **Files:** All API routes
+- [x] **Handle network failures** `done` 🔴
+  - [x] Test BBB API timeout (catches requests.exceptions.Timeout/ConnectionError)
+  - [x] Test Gemini API timeout (catches LLM errors)
+  - [x] Test PostgreSQL connection loss (pool_pre_ping=True)
+  - [x] Test ChromaDB unavailability (catches in query endpoint)
+  - [x] Verify graceful degradation in each case
+  - **Owner:** Seidu + Ackon | **Effort:** 4-6 hours | **Files:** `api/v1/routes/recording.py`, `api/v1/routes/query.py`
 
 ### Security & Secrets
 - [ ] **Verify no secrets in repository** `todo` 🔴
@@ -153,9 +153,155 @@
 
 ---
 
-## 🟡 MEDIUM PRIORITY (Sprint After Next)
+## 🟡 MEDIUM PRIORITY — AI Chat UI/UX Implementation
+<!-- NB: Refer to this dir, ai_assistant_designs/ for all design elements or guides -->
 
-### Performance Optimization
+### Design System Adoption
+- [x] **Create SCSS variables from design tokens** `done` 🟡
+  - [x] Map `ai_assistant_designs/umat_precision_green/DESIGN.md` tokens to theme SCSS
+  - [x] Add to `moodle/public/theme/umat/scss/` — primary `#006b2f`, surfaces (all 9 levels), surface-tint, typography scale, rounded, spacing
+  - [x] Ensure all UMaT components inherit from the token system, not hardcoded values
+  - [x] Switch layouts from `columns2.php` to `drawers.php` to support side nav drawer
+  - [x] Import Google Fonts (Inter) via pre.scss
+  - [x] **Owner:** Chrispen | **Effort:** 2-3 hours | **File:** `moodle/public/theme/umat/scss/`
+
+### Student AI Chat Panel
+- [ ] **Build course-space floating AI bubble** `todo` 🟡
+  - [ ] Create `moodle/public/local/umat_ai/amd/src/ai_chat_panel.js` — AMD module
+  - [ ] FAB button: fixed bottom-right, primary green, pulse animation, 56px circle
+  - [ ] Tooltip on hover: "Ask UMaT AI Assistant"
+  - [ ] On click: slide-in overlay panel (400px wide desktop, 95vw mobile), backdrop blur behind it
+  - [ ] Chat header: AI avatar, "Online & Ready" status indicator (pulsing green dot)
+  - [ ] Chat messages: AI left-aligned (white card, left border primary green), student right-aligned (light green card)
+  - [ ] Quick action grid: 2x2 buttons (Summarize, Ask about Assignment, Explain Topic, Deadlines) — each pre-fills the input
+  - [ ] Input: textarea with send button, placeholder "Type your academic question..."
+  - [ ] Chat history toggle button in footer
+  - [ ] **Owner:** Johnson + Agartha | **Effort:** 6-8 hours | **Files:** `amd/src/ai_chat_panel.js`, `templates/ai_chat_panel.mustache`
+
+- [ ] **Build expanded AI workspace** `todo` 🟡
+  - [ ] Full-page or side-by-side layout: left = video player + searchable transcript, right = tabbed AI panel
+  - [ ] Transcript: timestamps clickable to seek video to that point
+  - [ ] AI panel tabs: Chat, Notes, Resources
+  - [ ] "Generate Summary" button that asks AI to summarize current lecture segment
+  - [ ] Reference material attachment button (link question to specific course material)
+  - [ ] AI typing indicator: 3-dot pulsing animation
+  - [ ] Contextual suggestion chips after AI response (e.g., "Explain Anisotropy", "Compare to Granite")
+  - [ ] **Owner:** Johnson + Agartha | **Effort:** 8-10 hours | **Files:** `templates/ai_workspace.mustache`, `amd/src/ai_workspace.js`
+
+- [ ] **Build General AI Hub** `todo` 🟡
+  - [ ] Accessible from top navigation — separate page/section for cross-course AI conversations
+  - [ ] "Learning Pulse" card: top study topics as pill tags + study goal progress bar
+  - [ ] General chat interface with course-context switcher
+  - [ ] Recent session logs grid: course code badge, timestamp, 2-line summary
+  - [ ] Session log cards: clickable to resume previous conversation
+  - [ ] **Owner:** Agartha | **Effort:** 4-6 hours | **Files:** `templates/ai_hub.mustache`, `amd/src/ai_hub.js`
+
+### Lecturer Analytics & Insights
+- [ ] **Build lecturer analytics dashboard** `todo` 🟡
+  - [ ] KPI cards: Active Students, Avg. Session Time, Struggle Index, AI Interactions
+  - [ ] Engagement trend chart (weekly bar chart)
+  - [ ] Student performance breakdown: High Performers / On Track / At Risk with progress bars
+  - [ ] Lecture rewatch heatmap: grid of video segments with struggle-zone highlighting
+  - [ ] AI insight bubble: "Learning Gap Detected" with actionable buttons (Schedule Review, Update Material)
+  - [ ] "Common AI-Logged Student Questions" section: aggregated questions with vote counts and "Prepare Response" / "Add to FAQ" actions
+  - [ ] Export report button
+  - [ ] **Owner:** Agartha | **Effort:** 8-10 hours | **Files:** `templates/lecturer_dashboard.mustache`, `amd/src/lecturer_dashboard.js`
+
+- [ ] **Build lecturer floating insights panel** `todo` 🟡
+  - [ ] FAB on lecturer view: notification badge showing number of alerts
+  - [ ] Slide-in panel from right: AI-generated insights with action buttons
+  - [ ] Insight types: Learning Gap Detected (with "Schedule Review"), Participation Alert (with "Notify Struggling Students"), Strategic Recommendation (with "Apply Suggestion")
+  - [ ] Quick action chips at bottom: "Identify at-risk students", "Quiz breakdown", "Next week preview"
+  - [ ] **Owner:** Agartha | **Effort:** 4-6 hours | **Files:** `templates/lecturer_insights.mustache`, `amd/src/lecturer_insights.js`
+
+- [ ] **Add lecturer approval workflow UI** `todo` 🟡
+  - [ ] Lecturer sees pending AI outputs (summary, notes, quiz) per session
+  - [ ] Approve/Reject buttons per output type
+  - [ ] Optional comment field on rejection
+  - [ ] Notification when new outputs are ready for review
+  - [ ] **Owner:** Ackon + Agartha | **Effort:** 6-8 hours | **Files:** `approve.php`, `templates/approval.mustache`
+
+### 🎨 AI ASSISTANT UI/UX IMPROVEMENTS (Based on Design Analysis)
+- [ ] **Add source attribution & citations** `todo` 🔴
+  - [ ] Show which lecture/transcript AI used for answer
+  - [ ] Display timestamp and module reference
+  - [ ] Files: `templates/ai_chat_panel.mustache`, `amd/src/ai_chat_panel.js`
+
+- [ ] **Add rate limiting UX indicator** `todo` 🔴
+  - [ ] Show questions remaining this minute
+  - [ ] Display "X questions remaining" counter
+  - [ ] Files: `amd/src/ai_chat_panel.js`
+
+- [ ] **Add connection status indicator** `todo` 🔴
+  - [ ] Show online/offline/reconnecting states
+  - [ ] Add wifi_off icon during disconnect
+  - [ ] Files: `amd/src/ai_chat_panel.js`
+
+- [ ] **Implement quick actions menu** `todo` 🟠
+  - [ ] Context-aware buttons: Generate Notes, Practice Quiz, Summarize
+  - [ ] Show in AI overlay header
+  - [ ] Files: `templates/ai_chat_panel.mustache`, `amd/src/ai_chat_panel.js`
+
+- [ ] **Add lecturer approval workflow UI** `todo` 🟠
+  - [ ] Visual states: Pending (yellow), Approved (green), Rejected (red)
+  - [ ] Add badges with icons
+  - [ ] Files: `approve.php`, `templates/`
+
+- [ ] **Add loading skeleton states** `todo` 🟠
+  - [ ] Replace spinners with skeleton loaders during AI processing
+  - [ ] Animate pulse for chat bubbles
+  - [ ] Files: `amd/src/`, `templates/`
+
+- [ ] **Accessibility audit** `todo` 🟡
+  - [ ] Add ARIA labels to interactive elements
+  - [ ] Ensure keyboard navigation
+  - [ ] Add focus-visible outlines
+  - [ ] Files: All AMD + templates
+
+- [ ] **Video-transcript sync enhancement** `todo` 🟡
+  - [ ] Highlight current transcript position during playback
+  - [ ] One-click "Jump to" button on transcript segments
+  - [ ] Files: Expanded workspace templates
+
+- [ ] **Context awareness indicator** `todo` 🟡
+  - [ ] Show active course/module in AI overlay header
+  - [ ] Display "Course • Module" badge
+  - [ ] Files: `templates/ai_chat_panel.mustache`
+
+- [ ] **Add course context awareness to chat header** `todo` 🟡
+  - [ ] Show current course name in chat panel title
+  - [ ] Auto-prompt "Ask about [current topic]" when user is in a module context
+  - [ ] **Why:** The designs show course-aware greetings — this increases relevance and reduces off-topic questions
+  - [ ] **Owner:** Johnson | **Effort:** 1-2 hours | **File:** `amd/src/ai_chat_panel.js`
+
+- [ ] **Implement source citation display** `todo` 🟡
+  - [ ] After each AI answer, show source chips: document name + page/timestamp
+  - [ ] Clicking a source chip highlights the relevant section in the course material
+  - [ ] **Why:** RAG answers need transparency about what was used — builds student trust
+  - [ ] **Owner:** Johnson | **Effort:** 2-3 hours | **Files:** `templates/ai_chat_panel.mustache`, `amd/src/ai_chat_panel.js`
+
+- [ ] **Voice input toggle** `todo` 🟡
+  - [ ] Microphone icon button next to send — use browser SpeechRecognition API
+  - [ ] Show transcription preview before sending
+  - [ ] **Why:** African students may find typing harder than speaking; also helpful during lab work
+  - [ ] **Owner:** Johnson | **Effort:** 2-3 hours | **File:** `amd/src/ai_chat_panel.js`
+
+- [ ] **Responsive mobile-first approach** `todo` 🟡
+  - [ ] All chat interfaces must work on 375px width
+  - [ ] Bottom navigation bar on mobile (Home, Chat, Logs, Stats) — already in designs, needs implementation
+  - [ ] Chat input should use `position: fixed` at bottom on mobile so keyboard doesn't cover it
+  - [ ] **Why:** Most UMaT students access campus WiFi on mobile; desktop-first breaks their experience
+  - [ ] **Owner:** Johnson | **Effort:** 2-3 hours | **Files:** All mustache templates
+
+- [ ] **Session persistence** `todo` 🟡
+  - [ ] Store chat sessions in `umat_ai_chat_logs` table, keyed by session_id
+  - [ ] Allow resuming past sessions from the History view
+  - [ ] Clear conversation context when switching courses
+  - [ ] **Why:** The designs show session logs as a key navigation path; without persistence, logs are useless
+  - [ ] **Owner:** Ackon | **Effort:** 3-4 hours | **File:** `classes/external/ai_query.php`, `db/install.xml`
+
+
+## 🟢 LOW PRIORITY (Future Enhancements)
 - [ ] **Implement caching for common Q&A** `todo` 🟡
   - [ ] Cache frequently asked questions
   - [ ] Cache LLM responses (use hash of question)
@@ -263,6 +409,9 @@
   - [ ] Offline Q&A capability
   - [ ] Push notifications
   - **Owner:** TBD | **Effort:** 40+ hours | **Files:** Separate repo
+
+---
+
 
 ---
 

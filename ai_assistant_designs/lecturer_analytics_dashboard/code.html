@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .heat-map-cell {
+            aspect-ratio: 1 / 1;
+        }
+    </style>
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {background: "#fef9eb", "surface-container-lowest": "#ffffff", "on-secondary-fixed-variant": "#0a5228", "on-primary-fixed": "#00210a", "surface-dim": "#dedacc", "surface-tint": "#006d30", "tertiary-fixed": "#ffd9dd", "primary-fixed-dim": "#64de83", "on-tertiary-fixed-variant": "#891839", "inverse-surface": "#323127", "on-error-container": "#93000a", "on-secondary": "#ffffff", "primary-container": "#00873d", "primary-fixed": "#81fb9c", "error-container": "#ffdad6", outline: "#6e7a6d", "surface-container-high": "#ede8da", "on-tertiary-fixed": "#400013", "on-tertiary": "#ffffff", "on-primary": "#ffffff", "secondary-container": "#adf3ba", "on-error": "#ffffff", "on-secondary-fixed": "#00210c", "surface-container": "#f3eee0", secondary: "#296b3e", "on-tertiary-container": "#fffbff", "on-primary-fixed-variant": "#005323", "surface-container-low": "#f8f3e5", "on-background": "#1d1c13", "on-primary-container": "#f7fff3", "tertiary-container": "#c64865", primary: "#006b2f", "secondary-fixed-dim": "#92d69f", "on-surface": "#1d1c13", "surface-variant": "#e7e2d4", "secondary-fixed": "#adf3ba", "surface-container-highest": "#e7e2d4", tertiary: "#a5304d", "on-secondary-container": "#307143", "inverse-on-surface": "#f6f0e2", error: "#ba1a1a", "outline-variant": "#bdcaba", "surface-bright": "#fef9eb", "tertiary-fixed-dim": "#ffb2bd", "on-surface-variant": "#3e4a3e", "inverse-primary": "#64de83", surface: "#fef9eb"}, borderRadius: {DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px"}, spacing: {"margin-mobile": "16px", md: "16px", xs: "4px", base: "4px", xl: "32px", "margin-desktop": "40px", sm: "8px", gutter: "16px", lg: "24px"}, fontFamily: {"label-sm": ["Inter"], "display-lg": ["Inter"], "body-lg": ["Inter"], "headline-md": ["Inter"], "headline-sm": ["Inter"], "label-md": ["Inter"], "body-md": ["Inter"], "body-sm": ["Inter"], headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"]}, fontSize: {"label-sm": ["12px", {lineHeight: "16px", fontWeight: "500"}], "display-lg": ["36px", {lineHeight: "44px", letterSpacing: "-0.02em", fontWeight: "700"}], "body-lg": ["18px", {lineHeight: "28px", fontWeight: "400"}], "headline-md": ["24px", {lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600"}], "headline-sm": ["20px", {lineHeight: "28px", fontWeight: "600"}], "label-md": ["14px", {lineHeight: "16px", letterSpacing: "0.01em", fontWeight: "600"}], "body-md": ["16px", {lineHeight: "24px", fontWeight: "400"}], "body-sm": ["14px", {lineHeight: "20px", fontWeight: "400"}]}}}};</script>
+</head>
+<body class="bg-background text-on-surface">
+<!-- TopAppBar -->
+<header class="bg-surface-container-lowest dark:bg-inverse-surface shadow-sm sticky top-0 z-40">
+<div class="flex justify-between items-center px-lg w-full max-w-7xl mx-auto h-16">
+<div class="flex items-center gap-md">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">UMaT AI Assistant</span>
+</div>
+<nav class="hidden md:flex items-center gap-xl">
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors" href="#">Dashboard</a>
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors" href="#">Courses</a>
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors" href="#">Session Logs</a>
+<a class="font-label-md text-label-md text-primary dark:text-primary-fixed-dim border-b-2 border-primary dark:border-primary-fixed-dim pb-1 transition-colors" href="#">Analytics</a>
+</nav>
+<div class="flex items-center gap-md">
+<div class="hidden md:flex bg-surface-container-low px-sm py-xs rounded-lg items-center border border-outline-variant">
+<span class="material-symbols-outlined text-outline" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-sm w-48" placeholder="Search analytics..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-on-surface-variant" data-icon="notifications">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant" data-icon="settings">settings</button>
+<img alt="Student Profile Avatar" class="w-8 h-8 rounded-full object-cover border-2 border-primary-fixed" data-alt="A professional close-up portrait of a university lecturer in a bright, modern office setting. The person is smiling confidently, wearing business casual attire. The lighting is soft and natural, emphasizing a high-end corporate aesthetic with a palette of soft whites and corporate blues." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGtVHO3AwZqrDyJM9niRoeGnejVPuo14wOOBymUZ2nvgG6Bco5cUNvBF9qIwxX1eF2Oteq2kjQ49yfdw0-maWUKkw5DN-qKKLR1INqJkCjuFiynfVAp4MvmWIRbQ0IGVYWlUeiSpToMBkFcHnp9l3mTTeyPsGMEjxy8KwGAnPVhuahr1Zuwad7uy8RAbtcdbdJ2yMa9QNO0Qzi4b0WWZuqPtHbaKHWtdRTIa67SXcGQrW1YVFCzcZT0T5PBmJegPJdxOk4fGRFzdM"/>
+</div>
+</div>
+</header>
+<div class="flex max-w-7xl mx-auto min-h-screen">
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col h-screen sticky top-16 py-lg bg-surface-container-low dark:bg-surface-container-high shadow-sm w-64 border-r border-outline-variant">
+<div class="px-md mb-xl">
+<div class="flex items-center gap-sm mb-xs">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="school">school</span>
+<span class="font-headline-sm text-headline-sm font-black text-primary dark:text-primary-fixed-dim">UMaT Moodle</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant ml-10">AI Enhanced Learning</span>
+</div>
+<div class="flex flex-col gap-xs px-sm flex-1">
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-variant dark:hover:bg-surface-dim transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-variant dark:hover:bg-surface-dim transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="school">school</span>
+<span class="font-label-md text-label-md">My Courses</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-variant dark:hover:bg-surface-dim transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="smart_toy">smart_toy</span>
+<span class="font-label-md text-label-md">AI Tutor</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-primary dark:text-primary-fixed-dim font-bold border-r-4 border-primary dark:border-primary-fixed-dim bg-primary-fixed/10 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="leaderboard">leaderboard</span>
+<span class="font-label-md text-label-md">Analytics</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-variant dark:hover:bg-surface-dim transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="local_library">local_library</span>
+<span class="font-label-md text-label-md">Library</span>
+</a>
+</div>
+<div class="px-sm mt-auto pb-xl">
+<button class="w-full bg-primary text-on-primary py-sm rounded-xl font-label-md text-label-md flex items-center justify-center gap-sm mb-lg shadow-sm">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+                    New AI Session
+                </button>
+<div class="flex flex-col gap-xs">
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-variant transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-label-md text-label-md">Help</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-variant transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-label-md text-label-md">Sign Out</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 p-md md:p-lg overflow-x-hidden">
+<div class="flex flex-col gap-lg max-w-6xl mx-auto">
+<!-- Dashboard Header -->
+<header class="flex justify-between items-end">
+<div>
+<h1 class="font-headline-md text-headline-md text-primary font-bold">Lecturer Analytics Dashboard</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">EL 452: Power Systems Analysis (2024 Semester 1)</p>
+</div>
+<div class="flex gap-sm">
+<button class="bg-surface-container-lowest border border-outline-variant px-md py-sm rounded-lg flex items-center gap-xs font-label-md">
+<span class="material-symbols-outlined" data-icon="calendar_today">calendar_today</span>
+                            Past 30 Days
+                        </button>
+<button class="bg-primary-container text-on-primary-container px-md py-sm rounded-lg flex items-center gap-xs font-label-md">
+<span class="material-symbols-outlined" data-icon="download">download</span>
+                            Export Report
+                        </button>
+</div>
+</header>
+<!-- KPI Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-md">
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-outline-variant">
+<div class="flex justify-between items-start mb-sm">
+<span class="material-symbols-outlined text-primary p-xs bg-primary-fixed/20 rounded-lg" data-icon="group">group</span>
+<span class="text-xs font-bold text-green-600 bg-green-100 px-xs py-0.5 rounded">+4%</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Active Students</p>
+<p class="font-headline-sm text-headline-sm font-bold">142 / 150</p>
+</div>
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-outline-variant">
+<div class="flex justify-between items-start mb-sm">
+<span class="material-symbols-outlined text-secondary p-xs bg-secondary-container/20 rounded-lg" data-icon="timer">timer</span>
+<span class="text-xs font-bold text-green-600 bg-green-100 px-xs py-0.5 rounded">+12m</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Avg. Session Time</p>
+<p class="font-headline-sm text-headline-sm font-bold">48.5 mins</p>
+</div>
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-outline-variant">
+<div class="flex justify-between items-start mb-sm">
+<span class="material-symbols-outlined text-error p-xs bg-error-container/20 rounded-lg" data-icon="psychology_alt">psychology_alt</span>
+<span class="text-xs font-bold text-error bg-error-container px-xs py-0.5 rounded">High</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Struggle Index</p>
+<p class="font-headline-sm text-headline-sm font-bold">Lecture 04</p>
+</div>
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-outline-variant">
+<div class="flex justify-between items-start mb-sm">
+<span class="material-symbols-outlined text-primary p-xs bg-primary-fixed/20 rounded-lg" data-icon="forum">forum</span>
+<span class="text-xs font-bold text-on-secondary-container bg-secondary-container px-xs py-0.5 rounded">24 New</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">AI Interactions</p>
+<p class="font-headline-sm text-headline-sm font-bold">1,248</p>
+</div>
+</div>
+<!-- Main Analysis Section -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-lg">
+<!-- Engagement Chart -->
+<div class="lg:col-span-2 bg-surface-container-lowest p-lg rounded-xl shadow-sm border border-outline-variant">
+<div class="flex justify-between items-center mb-lg">
+<h3 class="font-headline-sm text-headline-sm font-bold">Student Engagement Trends</h3>
+<div class="flex gap-sm">
+<span class="flex items-center gap-xs text-xs"><span class="w-3 h-3 bg-primary rounded-full"></span> Lectures</span>
+<span class="flex items-center gap-xs text-xs"><span class="w-3 h-3 bg-secondary-container rounded-full"></span> Quizzes</span>
+</div>
+</div>
+<div class="h-64 flex items-end justify-between gap-md border-b border-outline-variant pb-xs">
+<!-- Simulated Chart Bars -->
+<div class="flex flex-col items-center w-full gap-xs">
+<div class="w-full flex flex-col justify-end gap-1 h-full">
+<div class="bg-primary rounded-t-sm w-full h-[60%]"></div>
+<div class="bg-secondary-container rounded-t-sm w-full h-[30%]"></div>
+</div>
+<span class="font-label-sm text-label-sm">Mon</span>
+</div>
+<div class="flex flex-col items-center w-full gap-xs">
+<div class="w-full flex flex-col justify-end gap-1 h-full">
+<div class="bg-primary rounded-t-sm w-full h-[75%]"></div>
+<div class="bg-secondary-container rounded-t-sm w-full h-[40%]"></div>
+</div>
+<span class="font-label-sm text-label-sm">Tue</span>
+</div>
+<div class="flex flex-col items-center w-full gap-xs">
+<div class="w-full flex flex-col justify-end gap-1 h-full">
+<div class="bg-primary rounded-t-sm w-full h-[85%]"></div>
+<div class="bg-secondary-container rounded-t-sm w-full h-[20%]"></div>
+</div>
+<span class="font-label-sm text-label-sm">Wed</span>
+</div>
+<div class="flex flex-col items-center w-full gap-xs">
+<div class="w-full flex flex-col justify-end gap-1 h-full">
+<div class="bg-primary rounded-t-sm w-full h-[55%]"></div>
+<div class="bg-secondary-container rounded-t-sm w-full h-[60%]"></div>
+</div>
+<span class="font-label-sm text-label-sm">Thu</span>
+</div>
+<div class="flex flex-col items-center w-full gap-xs">
+<div class="w-full flex flex-col justify-end gap-1 h-full">
+<div class="bg-primary rounded-t-sm w-full h-[95%]"></div>
+<div class="bg-secondary-container rounded-t-sm w-full h-[15%]"></div>
+</div>
+<span class="font-label-sm text-label-sm">Fri</span>
+</div>
+</div>
+</div>
+<!-- Performance Levels -->
+<div class="bg-surface-container-lowest p-lg rounded-xl shadow-sm border border-outline-variant">
+<h3 class="font-headline-sm text-headline-sm font-bold mb-lg">Student Performance</h3>
+<div class="flex flex-col gap-lg">
+<div class="flex flex-col gap-xs">
+<div class="flex justify-between items-center">
+<span class="font-label-md text-label-md">High Performers</span>
+<span class="font-label-md text-label-md font-bold">88 Students</span>
+</div>
+<div class="w-full bg-surface-container h-3 rounded-full overflow-hidden">
+<div class="bg-green-500 h-full w-[62%]"></div>
+</div>
+</div>
+<div class="flex flex-col gap-xs">
+<div class="flex justify-between items-center">
+<span class="font-label-md text-label-md">On Track</span>
+<span class="font-label-md text-label-md font-bold">42 Students</span>
+</div>
+<div class="w-full bg-surface-container h-3 rounded-full overflow-hidden">
+<div class="bg-yellow-500 h-full w-[30%]"></div>
+</div>
+</div>
+<div class="flex flex-col gap-xs">
+<div class="flex justify-between items-center">
+<span class="font-label-md text-label-md">At Risk</span>
+<span class="font-label-md text-label-md font-bold">20 Students</span>
+</div>
+<div class="w-full bg-surface-container h-3 rounded-full overflow-hidden">
+<div class="bg-red-500 h-full w-[14%]"></div>
+</div>
+</div>
+<button class="mt-md text-primary font-label-md flex items-center justify-center gap-xs">
+                                View At-Risk Student List
+                                <span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Lecture Rewatch Heat Map -->
+<div class="lg:col-span-3 bg-surface-container-lowest p-lg rounded-xl shadow-sm border border-outline-variant">
+<div class="flex justify-between items-center mb-lg">
+<div>
+<h3 class="font-headline-sm text-headline-sm font-bold">Lecture Rewatch Heatmap</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Intensity of video segments re-watched or flagged by AI logs</p>
+</div>
+<div class="flex items-center gap-sm">
+<span class="text-xs">Less Rewatch</span>
+<div class="flex h-3 w-32 rounded-full overflow-hidden border border-outline-variant">
+<div class="bg-blue-50 w-1/4"></div>
+<div class="bg-blue-200 w-1/4"></div>
+<div class="bg-blue-400 w-1/4"></div>
+<div class="bg-primary w-1/4"></div>
+</div>
+<span class="text-xs">Struggle Zone</span>
+</div>
+</div>
+<div class="grid grid-cols-10 md:grid-cols-20 gap-1 border border-outline-variant p-2 rounded-lg bg-surface-container-low">
+<!-- Heatmap Cells (Simulated data) -->
+<div class="heat-map-cell bg-blue-50 rounded-sm" title="0-3 mins: Low engagement"></div>
+<div class="heat-map-cell bg-blue-100 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-200 rounded-sm"></div>
+<div class="heat-map-cell bg-primary rounded-sm" title="9-12 mins: CRITICAL - Multiple Rewatches"></div>
+<div class="heat-map-cell bg-blue-400 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-200 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-100 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-50 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-100 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-200 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-400 rounded-sm"></div>
+<div class="heat-map-cell bg-primary rounded-sm"></div>
+<div class="heat-map-cell bg-blue-600 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-400 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-200 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-100 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-50 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-100 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-200 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-100 rounded-sm"></div>
+<!-- Row 2 -->
+<div class="heat-map-cell bg-blue-100 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-200 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-400 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-600 rounded-sm"></div>
+<div class="heat-map-cell bg-primary rounded-sm"></div>
+<div class="heat-map-cell bg-primary rounded-sm"></div>
+<div class="heat-map-cell bg-blue-600 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-400 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-200 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-100 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-50 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-50 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-100 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-200 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-100 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-50 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-100 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-200 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-100 rounded-sm"></div>
+<div class="heat-map-cell bg-blue-50 rounded-sm"></div>
+</div>
+<div class="mt-md flex gap-lg">
+<div class="flex items-start gap-sm max-w-sm">
+<span class="material-symbols-outlined text-primary mt-1" data-icon="lightbulb">lightbulb</span>
+<div>
+<p class="font-label-md text-label-md font-bold">AI Insight: Complex Concept Detected</p>
+<p class="font-body-sm text-body-sm">Students are spending 3.4x more time on 'Admittance Matrix Construction' (12:04 - 15:30). Consider a recap session.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Frequently Asked Questions -->
+<div class="lg:col-span-3 bg-surface-container-lowest p-lg rounded-xl shadow-sm border border-outline-variant mb-xl">
+<div class="flex justify-between items-center mb-lg">
+<h3 class="font-headline-sm text-headline-sm font-bold">Common AI-Logged Student Questions</h3>
+<span class="font-label-sm text-label-sm px-sm py-xs bg-surface-container-high rounded-full">Aggregation of 240+ chats</span>
+</div>
+<div class="space-y-md">
+<div class="flex items-center justify-between p-md hover:bg-surface-container-low transition-colors rounded-lg border-b border-outline-variant/30">
+<div class="flex gap-md items-center">
+<div class="flex flex-col items-center justify-center min-w-[60px] bg-primary-fixed/30 p-xs rounded text-primary">
+<span class="text-lg font-bold">42</span>
+<span class="text-[10px] uppercase font-bold">Votes</span>
+</div>
+<div>
+<p class="font-label-md text-label-md">"How do I determine the reference bus in a multi-generator system?"</p>
+<p class="text-xs text-on-surface-variant">Related to: Lecture 03 - Power Flow Basics</p>
+</div>
+</div>
+<button class="text-primary font-label-md hover:underline">Prepare Response</button>
+</div>
+<div class="flex items-center justify-between p-md hover:bg-surface-container-low transition-colors rounded-lg border-b border-outline-variant/30">
+<div class="flex gap-md items-center">
+<div class="flex flex-col items-center justify-center min-w-[60px] bg-primary-fixed/30 p-xs rounded text-primary">
+<span class="text-lg font-bold">38</span>
+<span class="text-[10px] uppercase font-bold">Votes</span>
+</div>
+<div>
+<p class="font-label-md text-label-md">"Can the AI explain the Jacobian Matrix derivation more simply?"</p>
+<p class="text-xs text-on-surface-variant">Related to: Newton-Raphson Method</p>
+</div>
+</div>
+<button class="text-primary font-label-md hover:underline">Generate AI Summary</button>
+</div>
+<div class="flex items-center justify-between p-md hover:bg-surface-container-low transition-colors rounded-lg">
+<div class="flex gap-md items-center">
+<div class="flex flex-col items-center justify-center min-w-[60px] bg-primary-fixed/30 p-xs rounded text-primary">
+<span class="text-lg font-bold">25</span>
+<span class="text-[10px] uppercase font-bold">Votes</span>
+</div>
+<div>
+<p class="font-label-md text-label-md">"What is the difference between P-V and P-Q buses in real-world grid models?"</p>
+<p class="text-xs text-on-surface-variant">Related to: Real-world Applications</p>
+</div>
+</div>
+<button class="text-primary font-label-md hover:underline">Add to FAQ</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-4 pt-2 bg-surface-container-lowest dark:bg-inverse-surface shadow-lg">
+<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant px-4 py-1">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant px-4 py-1">
+<span class="material-symbols-outlined" data-icon="chat_bubble">chat_bubble</span>
+<span class="font-label-sm text-label-sm">Chat</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant px-4 py-1">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-label-sm text-label-sm">Logs</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary rounded-xl px-4 py-1">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span>
+<span class="font-label-sm text-label-sm">Stats</span>
+</div>
+</nav>
+<!-- Lecturer AI Bubble -->
+<div class="fixed bottom-24 right-8 z-50 md:bottom-8">
+<div class="relative">
+<!-- Notification Badge -->
+<div class="absolute -top-1 -right-1 bg-error text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-white font-bold">3</div>
+<button class="w-16 h-16 bg-primary text-on-primary rounded-full shadow-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform duration-200">
+<span class="material-symbols-outlined text-3xl" data-icon="smart_toy">smart_toy</span>
+</button>
+<div class="absolute bottom-20 right-0 bg-surface-container-lowest p-md rounded-xl shadow-lg border border-outline-variant w-64 hidden group-hover:block">
+<p class="font-label-sm text-label-sm font-bold text-primary mb-xs">Lecturer AI Assistant</p>
+<p class="font-body-sm text-body-sm">I've analyzed the latest quiz results. Would you like a summary of the 5 students who failed the 'Admittance' section?</p>
+</div>
+</div>
+</div>
+</body></html>

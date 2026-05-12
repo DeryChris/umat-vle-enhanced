@@ -25,39 +25,51 @@ defined('MOODLE_INTERNAL') || die();
  *
  * @param navigation_node $navigation The course navigation node.
  * @param stdClass $course The course record.
- * @param context_course $context Course context.
+ * @param \context_course $context Course context.
  */
-function local_umat_ai_extend_navigation_course(navigation_node $navigation, stdClass $course, context_course $context): void {
-    // Only for logged-in users.
+function local_umat_ai_extend_navigation_course(navigation_node $navigation, stdClass $course, \context_course $context): void {
     if (!isloggedin() || isguestuser()) {
         return;
     }
 
-    // Only allow users with capability to use AI features in this course.
-    if (!has_capability('local/umat_ai:chatwithai', $context)) {
+    if (!$context instanceof \context_course) {
         return;
     }
 
-    // If you haven't created /local/umat_ai/index.php yet, comment this out for now.
-    $url = new moodle_url('/local/umat_ai/index.php', ['courseid' => $course->id]);
+    // Link for users who can chat with the AI (students + teachers).
+    if (has_capability('local/umat_ai:chatwithai', $context)) {
+        $url = new \moodle_url('/local/umat_ai/index.php', ['courseid' => $course->id]);
+        $navigation->add(
+            get_string('pluginname', 'local_umat_ai'),
+            $url,
+            navigation_node::TYPE_CUSTOM,
+            null,
+            'local_umat_ai',
+            new \pix_icon('i/info', '')
+        );
+    }
 
-    $navigation->add(
-        get_string('pluginname', 'local_umat_ai'),
-        $url,
-        navigation_node::TYPE_CUSTOM,
-        null,
-        'local_umat_ai',
-        new pix_icon('i/info', '') // Uses core icon. Replace later with your own plugin pix if needed.
-    );
+    // Link for lecturers to review AI outputs.
+    if (has_capability('local/umat_ai:approveoutput', $context)) {
+        $approveurl = new \moodle_url('/local/umat_ai/approve.php', ['courseid' => $course->id]);
+        $navigation->add(
+            get_string('approval_nav', 'local_umat_ai'),
+            $approveurl,
+            navigation_node::TYPE_CUSTOM,
+            null,
+            'umat_ai_approve',
+            new \pix_icon('i/valid', '')
+        );
+    }
 }
 
 /**
  * Add plugin item under the course "More" / settings navigation.
  *
  * @param settings_navigation $settingsnav Settings navigation object.
- * @param context $context Current context.
+ * @param \context $context Current context.
  */
-function local_umat_ai_extend_settings_navigation(settings_navigation $settingsnav, context $context): void {
+function local_umat_ai_extend_settings_navigation(settings_navigation $settingsnav, \context $context): void {
     global $COURSE;
 
     // We only add course-level items.
@@ -82,7 +94,7 @@ function local_umat_ai_extend_settings_navigation(settings_navigation $settingsn
     }
 
     // If you haven't created /local/umat_ai/index.php yet, comment this out for now.
-    $url = new moodle_url('/local/umat_ai/index.php', ['courseid' => $COURSE->id]);
+    $url = new \moodle_url('/local/umat_ai/index.php', ['courseid' => $COURSE->id]);
 
     $coursenode->add(
         get_string('pluginname', 'local_umat_ai'),

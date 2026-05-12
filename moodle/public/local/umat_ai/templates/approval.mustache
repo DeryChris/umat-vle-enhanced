@@ -1,0 +1,105 @@
+{{!
+    Template: local/umat_ai/templates/approval.mustache
+    Displays AI-generated outputs for lecturer review.
+    Shows summary, notes, and quiz with approve/reject actions.
+
+    Context variables:
+    - courseid (int)
+    - coursename (string)
+    - sessions (array) — list of session groups
+    - str_approve (string)
+    - str_reject (string)
+    - str_summary (string)
+    - str_notes (string)
+    - str_quiz (string)
+    - str_pending (string)
+    - str_no_pending (string)
+}}
+
+<div class="umat-approval-page" id="umat-approval-page">
+    <div class="umat-approval-header">
+        <h2 class="text-primary">
+            <i class="fa fa-clipboard-check"></i>
+            AI Output Review
+        </h2>
+        <p class="text-muted">{{coursename}}</p>
+    </div>
+
+    {{#sessions}}
+    <div class="umat-approval-session card mb-3" data-session-id="{{session_id}}">
+
+        <div class="card-header bg-white d-flex align-items-center justify-content-between">
+            <div>
+                <span class="badge badge-secondary">{{bbb_sessionid}}</span>
+                <span class="text-muted ml-2" style="font-size:0.85rem">
+                    {{#userdate}}timecreated{{/userdate}}
+                </span>
+            </div>
+            <span class="badge badge-warning">
+                <i class="fa fa-clock-o"></i> Pending Review
+            </span>
+        </div>
+
+        <div class="card-body p-0">
+            {{#outputs}}
+            <div class="umat-approval-output border-bottom p-3"
+                 data-output-id="{{output_id}}"
+                 data-output-type="{{output_type}}">
+
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <h5 class="mb-0">
+                        <i class="fa fa-{{#compare output_type '==' 'summary'}}file-text-o{{/compare}}
+                                      {{#compare output_type '==' 'notes'}}list-alt{{/compare}}
+                                      {{#compare output_type '==' 'quiz'}}question-circle{{/compare}}"></i>
+                        {{output_type}}
+                    </h5>
+                </div>
+
+                <div class="umat-output-content bg-surface p-3 rounded mb-3"
+                     style="background:#f5fbf0; max-height:300px; overflow-y:auto;">
+                    <pre style="white-space:pre-wrap; font-family:inherit; margin:0; font-size:0.9rem;">{{{content}}}</pre>
+                </div>
+
+                <div class="umat-output-actions d-flex gap-2 flex-wrap">
+                    <button class="btn btn-success btn-sm umat-approve-btn"
+                            data-output-id="{{output_id}}"
+                            data-course-id="{{../courseid}}"
+                            data-action="approve">
+                        <i class="fa fa-check"></i> {{../str_approve}}
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm umat-reject-btn"
+                            data-output-id="{{output_id}}"
+                            data-course-id="{{../courseid}}"
+                            data-action="reject">
+                        <i class="fa fa-times"></i> {{../str_reject}}
+                    </button>
+                    <textarea class="umat-rejection-comment form-control mt-2 d-none"
+                              placeholder="Optional comment when rejecting..."
+                              rows="2"
+                              style="font-size:0.85rem;"></textarea>
+                </div>
+
+                <div class="umat-approval-feedback mt-2 d-none"></div>
+            </div>
+            {{/outputs}}
+        </div>
+
+    </div>
+    {{/sessions}}
+
+    {{^sessions}}
+    <div class="alert alert-success text-center">
+        <i class="fa fa-check-circle fa-2x mb-2"></i>
+        <h5>{{str_no_pending}}</h5>
+        <p class="mb-0 text-muted">All AI outputs have been reviewed. Check back after the next lecture.</p>
+    </div>
+    {{/sessions}}
+</div>
+
+{{#js}}
+require(['local_umat_ai/approval'], function(Approval) {
+    Approval.init({
+        courseId: {{courseid}}
+    });
+});
+{{/js}}

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Renewable Energy Systems - UMaT AI Assistant</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#006b2f",
+                        "on-surface": "#171d17",
+                        "on-tertiary-fixed-variant": "#891839",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-fixed-dim": "#a3d2a6",
+                        "inverse-primary": "#64de83",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed": "#81fb9c",
+                        "surface-variant": "#dee5da",
+                        "tertiary-container": "#c64865",
+                        "surface-container-high": "#e3eadf",
+                        "error-container": "#ffdad6",
+                        "on-surface-variant": "#3e4a3e",
+                        "inverse-on-surface": "#ecf3e8",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed": "#ffd9dd",
+                        "on-primary-container": "#f7fff3",
+                        "on-secondary-fixed-variant": "#254f2e",
+                        "surface": "#f5fbf0",
+                        "surface-container-highest": "#dee5da",
+                        "secondary-fixed": "#beefc1",
+                        "surface-tint": "#006d30",
+                        "surface-container-low": "#eff6eb",
+                        "error": "#ba1a1a",
+                        "on-secondary-container": "#436e4a",
+                        "surface-container": "#e9f0e5",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#f5fbf0",
+                        "primary-fixed-dim": "#64de83",
+                        "inverse-surface": "#2b322b",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#a5304d",
+                        "secondary-container": "#beefc1",
+                        "on-primary-fixed": "#00210a",
+                        "primary-container": "#00873d",
+                        "on-secondary-fixed": "#00210a",
+                        "on-secondary": "#ffffff",
+                        "background": "#f5fbf0",
+                        "on-background": "#171d17",
+                        "secondary": "#3d6844",
+                        "outline-variant": "#bdcaba",
+                        "on-tertiary-fixed": "#400013",
+                        "on-tertiary-container": "#fffbff",
+                        "outline": "#6e7a6d",
+                        "tertiary-fixed-dim": "#ffb2bd",
+                        "surface-dim": "#d5dcd1",
+                        "on-primary-fixed-variant": "#005323"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "md": "16px",
+                        "xl": "32px",
+                        "margin-mobile": "16px",
+                        "margin-desktop": "40px",
+                        "base": "4px",
+                        "sm": "8px",
+                        "gutter": "16px",
+                        "lg": "24px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Inter"],
+                        "label-md": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "label-md": ["14px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "display-lg": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f5fbf0;
+        }
+    </style>
+</head>
+<body class="text-on-surface">
+<div class="flex min-h-screen">
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col h-screen sticky top-0 py-lg bg-surface-container-low dark:bg-surface-container-high docked left-0 w-64 shadow-sm">
+<div class="px-lg mb-xl">
+<div class="font-headline-sm text-headline-sm font-black text-primary dark:text-primary-fixed-dim">UMaT Moodle</div>
+<div class="font-label-md text-label-md text-on-surface-variant">AI Enhanced Learning</div>
+</div>
+<nav class="flex-1 px-sm space-y-1">
+<a class="flex items-center px-md py-sm rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-variant dark:hover:bg-surface-dim transition-all group" href="#">
+<span class="material-symbols-outlined mr-md" data-icon="home">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-primary dark:text-primary-fixed-dim font-bold border-r-4 border-primary dark:border-primary-fixed-dim bg-primary-fixed/10 transition-all" href="#">
+<span class="material-symbols-outlined mr-md" data-icon="school">school</span>
+<span class="font-label-md text-label-md">My Courses</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-variant dark:hover:bg-surface-dim transition-all" href="#">
+<span class="material-symbols-outlined mr-md" data-icon="smart_toy">smart_toy</span>
+<span class="font-label-md text-label-md">AI Tutor</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-variant dark:hover:bg-surface-dim transition-all" href="#">
+<span class="material-symbols-outlined mr-md" data-icon="leaderboard">leaderboard</span>
+<span class="font-label-md text-label-md">Analytics</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-variant dark:hover:bg-surface-dim transition-all" href="#">
+<span class="material-symbols-outlined mr-md" data-icon="local_library">local_library</span>
+<span class="font-label-md text-label-md">Library</span>
+</a>
+</nav>
+<div class="px-md mt-auto space-y-1 pt-lg">
+<button class="w-full bg-primary text-white py-md rounded-xl font-label-md text-label-md mb-xl flex items-center justify-center gap-2 shadow-sm active:opacity-80 transition-all">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+                    New AI Session
+                </button>
+<a class="flex items-center px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-variant transition-all" href="#">
+<span class="material-symbols-outlined mr-md" data-icon="help">help</span>
+<span class="font-label-md text-label-md">Help</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-variant transition-all" href="#">
+<span class="material-symbols-outlined mr-md" data-icon="logout">logout</span>
+<span class="font-label-md text-label-md">Sign Out</span>
+</a>
+</div>
+</aside>
+<main class="flex-1 flex flex-col min-w-0">
+<!-- TopAppBar -->
+<header class="bg-surface-container-lowest dark:bg-inverse-surface shadow-sm docked full-width top-0 z-40">
+<div class="flex justify-between items-center px-lg w-full max-w-7xl mx-auto h-16">
+<div class="flex items-center gap-md">
+<span class="md:hidden material-symbols-outlined text-primary" data-icon="menu">menu</span>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">UMaT AI Assistant</h1>
+</div>
+<div class="hidden md:flex items-center gap-xl">
+<nav class="flex gap-lg">
+<a class="font-headline-sm text-headline-sm text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors duration-200" href="#">Dashboard</a>
+<a class="font-headline-sm text-headline-sm text-primary dark:text-primary-fixed-dim border-b-2 border-primary dark:border-primary-fixed-dim pb-1 transition-colors duration-200" href="#">Courses</a>
+<a class="font-headline-sm text-headline-sm text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors duration-200" href="#">Session Logs</a>
+<a class="font-headline-sm text-headline-sm text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors duration-200" href="#">Analytics</a>
+</nav>
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer" data-icon="settings">settings</span>
+<img alt="Student Profile Avatar" class="w-8 h-8 rounded-full bg-surface-container-high object-cover border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXThkbU40QJqBP4iQcomce56ga-pI4RxRzw2up0-rc7nV5ocQ_PDQEQj5O-zdy-Ur5Aii8Ny5EqddK0DboT71DDCXhSGEQfro29FkXOPe_vXAjVehQFxQ9WRTaZO-RiktjFPqGZiV4p0kuNfZkT9U4G2XxdsoIjsq1DfPD5lmaENGodxPqRA1cLH_2gWvdxUt4Ra3mf-PrvoEYJ39Z8K4h4D57LXDzPmIaLvDux6eEJj1mujNtGBh5oBxxUc5NW_hxto6aeAVMotA"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Course Content Area -->
+<div class="flex-1 p-md md:p-xl max-w-7xl mx-auto w-full">
+<!-- Course Header -->
+<div class="mb-xl">
+<nav class="flex items-center gap-xs text-on-surface-variant font-label-sm text-label-sm mb-sm">
+<span>Courses</span>
+<span class="material-symbols-outlined text-[16px]" data-icon="chevron_right">chevron_right</span>
+<span>Engineering</span>
+<span class="material-symbols-outlined text-[16px]" data-icon="chevron_right">chevron_right</span>
+<span class="text-primary font-bold">Renewable Energy Systems</span>
+</nav>
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-md">
+<div>
+<h2 class="font-display-lg text-display-lg text-on-surface">Renewable Energy Systems</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Course Code: EL 452 | Semester II, 2024</p>
+</div>
+<button class="flex items-center gap-sm px-lg py-sm bg-primary text-white rounded-lg font-label-md text-label-md shadow-sm">
+<span class="material-symbols-outlined" data-icon="auto_awesome" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+                            Smart Summary
+                        </button>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+<!-- Course Modules (Main Content) -->
+<div class="md:col-span-8 space-y-gutter">
+<section>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-md flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary" data-icon="view_module">view_module</span>
+                                Course Modules
+                            </h3>
+<div class="space-y-md">
+<!-- Module Card 1 -->
+<div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_4px_12px_rgba(0,152,70,0.05)] border border-outline-variant hover:border-primary/30 transition-all cursor-pointer group">
+<div class="flex gap-lg">
+<div class="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Close up of a high-efficiency solar panel with reflective blue silicon cells under bright, clear sunlight. The lighting is crisp and detailed, highlighting the professional engineering and technical precision. The background is a soft, out-of-focus azure sky, creating a clean academic and sustainable energy vibe consistent with a modern corporate aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXiVm62LDaCc2HM_GqunlfT1Vvwf3dfSkaeaR_MATyq-qyjbKsofdIakNZ3l2EY9h5TAHnlCFMJSKRZXKF0DzMk2gd-qK_SewGr-upoSmXTsHKCcetsC_9GOg9wMTKQgcmW7r9d42dHXEpnbOfWuKnH4U-0THK6FsgMrmio-9ECFvzZj9Rk89PdaVD-gBsHcdCFNpOM3WrHGN7rDtSmkbCQmjMJKyM3uXHBuVdrRnutn7UgppQmjpcUIOo7ByXrjE803-nIsAhj28"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<div>
+<span class="font-label-sm text-label-sm text-primary font-bold">MODULE 01</span>
+<h4 class="font-headline-sm text-headline-sm text-on-surface mt-xs group-hover:text-primary transition-colors">Solar Photovoltaics</h4>
+</div>
+<span class="bg-secondary-container text-on-secondary-container px-sm py-xs rounded font-label-sm text-label-sm">85% Complete</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-sm">Introduction to PV effect, solar cell characteristics, and system design for grid-tied and off-grid configurations.</p>
+<div class="mt-md flex gap-md">
+<button class="text-primary font-label-md text-label-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]" data-icon="description">description</span>
+                                                    3 Resources
+                                                </button>
+<button class="text-primary font-label-md text-label-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]" data-icon="play_circle">play_circle</span>
+                                                    2 Lectures
+                                                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Module Card 2 -->
+<div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_4px_12px_rgba(0,152,70,0.05)] border border-outline-variant hover:border-primary/30 transition-all cursor-pointer group">
+<div class="flex gap-lg">
+<div class="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="A landscape view of several white modern wind turbines standing tall against a bright morning sky. The scene is illuminated by soft, natural dawn light that creates a serene and professional atmosphere. The composition emphasizes engineering excellence and sustainable infrastructure in a clean, high-contrast academic setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBC1ZSte4Hqis6YwiuGky4WbIGRncwwBCjKFsPOsiht1JRvEuk05nd_U__V2KvfJ9clTqyWMBK8QXXXuK85DZxF_iDXjRH7zmpZoPw9K4dg0RBD5o7nyTAfgZAjd5FbPs7E1GmgeLwL5yZOtJMSaoaG0huguTnCt3yyht2CRgdcVeoHbHvzHedqZQwLUEGOP8P2_70J7NE5a8r56HBwVGG4b7R04P5S-ySDJyBowSa4qSuOccDNTFW47W_wn18rymQ0IReLuQ2tk1s"/>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<div>
+<span class="font-label-sm text-label-sm text-primary font-bold">MODULE 02</span>
+<h4 class="font-headline-sm text-headline-sm text-on-surface mt-xs group-hover:text-primary transition-colors">Wind Energy</h4>
+</div>
+<span class="bg-surface-variant text-on-surface-variant px-sm py-xs rounded font-label-sm text-label-sm">Not Started</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-sm">Aerodynamics of wind turbines, power curves, wind resource assessment, and site selection criteria.</p>
+<div class="mt-md flex gap-md">
+<button class="text-primary font-label-md text-label-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]" data-icon="lock">lock</span>
+                                                    Unlocks July 15
+                                                </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-md flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary" data-icon="video_library">video_library</span>
+                                Recent Lecture Recordings
+                            </h3>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
+<div class="bg-surface-container-lowest rounded-xl overflow-hidden border border-outline-variant group cursor-pointer shadow-sm">
+<div class="aspect-video relative">
+<img class="w-full h-full object-cover" data-alt="A sharp, clear still frame of an online engineering lecture showing a whiteboard with complex mathematical equations and a digital interface overlay. The scene is lit by professional, cool-toned indoor studio lighting. The aesthetic is highly focused, academic, and modern, utilizing a primary green and white palette to maintain brand cohesion." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBiTAzCl4oXCgeHdtZK_WwFjVE7Z2YXiKytZM34oWOLYDz8tZvgkPP_MvEqRUDPK8EIwu0wqEr8T-3F-5h4jNfgH5yNQMXP34apSlmEX0WOF9Fk-kidmi2Ut4YfIW-tamZqRIR6SfDMZH2-b5jmAy3PW51CJwNFdY7nILlzsQUZ2zaUkrs-8ylD45raFqJn1uWe5AOJAMJ00loRCIwLkQ8so1Vxkc10AIr5JUzOh3c_DK1aBg2lm8x643GCEIR3U5HvuVeGqdkO7Jg"/>
+<div class="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-all">
+<span class="material-symbols-outlined text-white text-[48px]" data-icon="play_circle" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+</div>
+<div class="absolute bottom-2 right-2 bg-black/70 text-white px-xs rounded text-label-sm">45:12</div>
+</div>
+<div class="p-md">
+<h5 class="font-label-md text-label-md text-on-surface mb-xs">Lec 14: Grid Synchronization</h5>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Recorded yesterday</p>
+</div>
+</div>
+<div class="bg-surface-container-lowest rounded-xl overflow-hidden border border-outline-variant group cursor-pointer shadow-sm">
+<div class="aspect-video relative">
+<img class="w-full h-full object-cover" data-alt="A focused professional video frame capturing a laboratory environment where solar battery systems are being tested. The lighting is clinical and high-key, highlighting technical equipment and digital monitoring screens. The style is professional and academic, featuring the university's green accents in a clean, minimal UI design." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_wAd4KwkBemd_2rc9neseqadhDqDDKCaN52Riw9uAzzJsSEYDJ3Daj5_z28CNVgTKoZPRwJc2Wmj2NIXsQRh6ho9JdfLQW1EiZk9NGC6IN7I1TOsaEBF9JlQTelft8XxG5s-sheOEwgMemOhg06feS7N4s5bOsE6qcFYqDw03HI8uW_r7p2mjbajsAepgy2mR2RreRKvLwfegPHK83EjU82e1ek3-CWyplEFImUj7WyKNJIF6S7coGBs-H0bFs-jgFAuPxs3tl98"/>
+<div class="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-all">
+<span class="material-symbols-outlined text-white text-[48px]" data-icon="play_circle" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+</div>
+<div class="absolute bottom-2 right-2 bg-black/70 text-white px-xs rounded text-label-sm">52:05</div>
+</div>
+<div class="p-md">
+<h5 class="font-label-md text-label-md text-on-surface mb-xs">Lec 13: Battery Storage Systems</h5>
+<p class="font-label-sm text-label-sm text-on-surface-variant">3 days ago</p>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Side Widgets -->
+<div class="md:col-span-4 space-y-gutter">
+<!-- Upcoming Deadlines -->
+<div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_4px_12px_rgba(0,152,70,0.05)] border border-outline-variant">
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-md flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary" data-icon="event">event</span>
+                                Upcoming
+                            </h3>
+<div class="space-y-md">
+<div class="flex gap-md">
+<div class="flex-shrink-0 w-12 h-12 rounded-lg bg-error-container flex flex-col items-center justify-center">
+<span class="font-label-sm text-label-sm text-on-error-container uppercase">Jul</span>
+<span class="font-headline-sm text-headline-sm text-on-error-container">12</span>
+</div>
+<div>
+<h5 class="font-label-md text-label-md text-on-surface">PV System Design Quiz</h5>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Due at 11:59 PM</p>
+</div>
+</div>
+<div class="flex gap-md">
+<div class="flex-shrink-0 w-12 h-12 rounded-lg bg-secondary-container flex flex-col items-center justify-center">
+<span class="font-label-sm text-label-sm text-on-secondary-container uppercase">Jul</span>
+<span class="font-headline-sm text-headline-sm text-on-secondary-container">18</span>
+</div>
+<div>
+<h5 class="font-label-md text-label-md text-on-surface">Lab Report: Inverter Efficiency</h5>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Project submission</p>
+</div>
+</div>
+</div>
+<button class="w-full mt-lg py-sm border border-outline text-primary rounded-lg font-label-md text-label-md hover:bg-primary-fixed/10 transition-all">
+                                View Full Schedule
+                            </button>
+</div>
+<!-- Course Stats -->
+<div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_4px_12px_rgba(0,152,70,0.05)] border border-outline-variant">
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-md flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary" data-icon="analytics">analytics</span>
+                                Your Progress
+                            </h3>
+<div class="space-y-md">
+<div>
+<div class="flex justify-between mb-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Course Completion</span>
+<span class="font-label-sm text-label-sm text-primary font-bold">42%</span>
+</div>
+<div class="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[42%]"></div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-md pt-sm">
+<div class="p-sm bg-surface rounded-lg text-center">
+<div class="font-headline-sm text-headline-sm text-primary">A-</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Avg. Quiz</div>
+</div>
+<div class="p-sm bg-surface rounded-lg text-center">
+<div class="font-headline-sm text-headline-sm text-primary">12h</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Study Time</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Course Announcements -->
+<div class="bg-primary text-on-primary-container p-lg rounded-xl shadow-lg">
+<div class="flex items-center gap-sm mb-sm">
+<span class="material-symbols-outlined" data-icon="campaign" style="font-variation-settings: 'FILL' 1;">campaign</span>
+<h4 class="font-label-md text-label-md uppercase tracking-wider">Announcement</h4>
+</div>
+<p class="font-body-md text-body-md mb-md">Guest lecture by Dr. S. K. Boateng from Bui Power Authority this Friday at 2:00 PM.</p>
+<a class="font-label-md text-label-md underline" href="#">Read more details</a>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- BottomNavBar (Mobile) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-4 pt-2 bg-surface-container-lowest dark:bg-inverse-surface shadow-lg">
+<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary rounded-xl px-4 py-1" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant px-4 py-1" href="#">
+<span class="material-symbols-outlined" data-icon="chat_bubble">chat_bubble</span>
+<span class="font-label-sm text-label-sm">Chat</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant px-4 py-1" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-label-sm text-label-sm">Logs</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant px-4 py-1" href="#">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span>
+<span class="font-label-sm text-label-sm">Stats</span>
+</a>
+</nav>
+<!-- AI Assistant Floating Action Button -->
+<div class="fixed bottom-20 md:bottom-10 right-6 md:right-10 z-50 group">
+<!-- Tooltip -->
+<div class="absolute bottom-full right-0 mb-4 px-md py-sm bg-inverse-surface text-inverse-on-surface rounded-lg font-label-md text-label-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-xl">
+            Ask UMaT AI Assistant
+        </div>
+<!-- FAB Bubble -->
+<button class="w-14 h-14 md:w-16 md:h-16 bg-primary text-white rounded-full flex items-center justify-center shadow-[0px_10px_25px_rgba(0,107,47,0.3)] hover:scale-110 active:scale-95 transition-all duration-300 ring-4 ring-white/10">
+<span class="material-symbols-outlined text-[28px] md:text-[32px]" data-icon="smart_toy" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</button>
+<!-- Pulse effect -->
+<div class="absolute inset-0 w-14 h-14 md:w-16 md:h-16 bg-primary/30 rounded-full animate-ping pointer-events-none" style="animation-duration: 3s;"></div>
+</div>
+</body></html>
