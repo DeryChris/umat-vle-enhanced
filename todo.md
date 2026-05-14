@@ -166,35 +166,35 @@
   - [x] **Owner:** Chrispen | **Effort:** 2-3 hours | **File:** `moodle/public/theme/umat/scss/`
 
 ### Student AI Chat Panel
-- [ ] **Build course-space floating AI bubble** `todo` 🟡
-  - [ ] Create `moodle/public/local/umat_ai/amd/src/ai_chat_panel.js` — AMD module
-  - [ ] FAB button: fixed bottom-right, primary green, pulse animation, 56px circle
-  - [ ] Tooltip on hover: "Ask UMaT AI Assistant"
-  - [ ] On click: slide-in overlay panel (400px wide desktop, 95vw mobile), backdrop blur behind it
-  - [ ] Chat header: AI avatar, "Online & Ready" status indicator (pulsing green dot)
-  - [ ] Chat messages: AI left-aligned (white card, left border primary green), student right-aligned (light green card)
-  - [ ] Quick action grid: 2x2 buttons (Summarize, Ask about Assignment, Explain Topic, Deadlines) — each pre-fills the input
-  - [ ] Input: textarea with send button, placeholder "Type your academic question..."
-  - [ ] Chat history toggle button in footer
-  - [ ] **Owner:** Johnson + Agartha | **Effort:** 6-8 hours | **Files:** `amd/src/ai_chat_panel.js`, `templates/ai_chat_panel.mustache`
+- [x] **Build course-space floating AI bubble** `done` 🟡
+  - [x] Create `moodle/public/local/umat_ai/amd/src/ai_chat_panel.js` — AMD module
+  - [x] FAB button: fixed bottom-right, primary green, pulse animation, 56px circle
+  - [x] Tooltip on hover: "Ask UMaT AI Assistant"
+  - [x] On click: slide-in overlay panel (400px wide desktop, 95vw mobile), backdrop blur behind it
+  - [x] Chat header: AI avatar, "Online & Ready" status indicator (pulsing green dot)
+  - [x] Chat messages: AI left-aligned (white card, left border primary green), student right-aligned (light green card)
+  - [x] Quick action grid: 2x2 buttons (Summarize, Ask about Assignment, Explain Topic, Deadlines) — each pre-fills the input
+  - [x] Input: textarea with send button, placeholder "Type your academic question..."
+  - [x] Rate limiting display: show questions remaining per minute
+  - [x] **Owner:** Johnson + Agartha | **Effort:** 6-8 hours | **Files:** `amd/src/ai_chat_panel.js`, `templates/ai_chat_panel.mustache`
 
-- [ ] **Build expanded AI workspace** `todo` 🟡
-  - [ ] Full-page or side-by-side layout: left = video player + searchable transcript, right = tabbed AI panel
-  - [ ] Transcript: timestamps clickable to seek video to that point
-  - [ ] AI panel tabs: Chat, Notes, Resources
-  - [ ] "Generate Summary" button that asks AI to summarize current lecture segment
-  - [ ] Reference material attachment button (link question to specific course material)
-  - [ ] AI typing indicator: 3-dot pulsing animation
-  - [ ] Contextual suggestion chips after AI response (e.g., "Explain Anisotropy", "Compare to Granite")
-  - [ ] **Owner:** Johnson + Agartha | **Effort:** 8-10 hours | **Files:** `templates/ai_workspace.mustache`, `amd/src/ai_workspace.js`
+- [x] **Build expanded AI workspace** `done` 🟡
+  - [x] Full-page or side-by-side layout: left = video player + searchable transcript, right = tabbed AI panel
+  - [x] Transcript: timestamps clickable to seek video to that point
+  - [x] AI panel tabs: Chat, Notes, Resources
+  - [x] "Generate Summary" button that asks AI to summarize current lecture segment
+  - [x] Reference material attachment button (link question to specific course material)
+  - [x] AI typing indicator: 3-dot pulsing animation
+  - [x] Contextual suggestion chips after AI response (e.g., "Explain Anisotropy", "Compare to Granite")
+  - [x] **Owner:** Johnson + Agartha | **Effort:** 8-10 hours | **Files:** `templates/ai_workspace.mustache`, `amd/src/ai_workspace.js`
 
-- [ ] **Build General AI Hub** `todo` 🟡
-  - [ ] Accessible from top navigation — separate page/section for cross-course AI conversations
-  - [ ] "Learning Pulse" card: top study topics as pill tags + study goal progress bar
-  - [ ] General chat interface with course-context switcher
-  - [ ] Recent session logs grid: course code badge, timestamp, 2-line summary
-  - [ ] Session log cards: clickable to resume previous conversation
-  - [ ] **Owner:** Agartha | **Effort:** 4-6 hours | **Files:** `templates/ai_hub.mustache`, `amd/src/ai_hub.js`
+- [x] **Build General AI Hub** `done` 🟡
+  - [x] Accessible from top navigation — separate page/section for cross-course AI conversations
+  - [x] "Learning Pulse" card: top study topics as pill tags + study goal progress bar
+  - [x] General chat interface with course-context switcher
+  - [x] Recent session logs grid: course code badge, timestamp, 2-line summary
+  - [x] Session log cards: clickable to resume previous conversation
+  - [x] **Owner:** Agartha | **Effort:** 4-6 hours | **Files:** `hub.php`, `templates/ai_hub.mustache`
 
 ### Lecturer Analytics & Insights
 - [ ] **Build lecturer analytics dashboard** `todo` 🟡

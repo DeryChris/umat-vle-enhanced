@@ -1,0 +1,578 @@
+{{!
+    Template: local/umat_ai/templates/ai_fab.mustache
+    Global FAB accessible from any course page.
+
+    Context variables:
+    - courseid (int)
+    - coursename (string)
+    - has_capability (bool)
+}}
+
+<!-- Material Symbols Font -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+
+<style>
+/* FAB Button - Always visible */
+.umat-global-fab {
+    position: fixed;
+    bottom: 80px;
+    right: 24px;
+    z-index: 9999;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #006b2f 0%, #00873d 100%);
+    color: white;
+    border: none;
+    box-shadow: 0 6px 20px rgba(0,107,47,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.umat-global-fab:hover {
+    transform: scale(1.1);
+    box-shadow: 0 10px 30px rgba(0,107,47,0.5);
+}
+.umat-global-fab .material-symbols-outlined {
+    font-size: 32px;
+}
+.umat-global-fab .fab-icon-close {
+    display: none;
+}
+.umat-global-fab.open .fab-icon-chat { display: none; }
+.umat-global-fab.open .fab-icon-close { display: block; }
+
+/* Full Workspace Overlay */
+.umat-workspace-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: none;
+    background-color: rgba(0,0,0,0.5);
+    backdrop-filter: blur(8px);
+}
+.umat-workspace-overlay.show { display: flex; }
+
+/* Workspace Panel - Full height */
+.umat-workspace-panel {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 600px;
+    max-width: 95vw;
+    background-color: #f8faf7;
+    box-shadow: -10px 0 40px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.umat-workspace-overlay.show .umat-workspace-panel {
+    transform: translateX(0);
+}
+
+/* Workspace Header */
+.umat-workspace-header {
+    background: linear-gradient(135deg, #006b2f 0%, #00873d 100%);
+    padding: 20px 24px;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.umat-workspace-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.umat-workspace-avatar .material-symbols-outlined {
+    font-size: 28px;
+}
+.umat-workspace-title {
+    flex: 1;
+}
+.umat-workspace-title h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+}
+.umat-workspace-title .course-name {
+    font-size: 13px;
+    opacity: 0.85;
+    margin-top: 2px;
+}
+.umat-workspace-close {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.umat-workspace-close:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+/* Workspace Tabs */
+.umat-workspace-tabs {
+    display: flex;
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+}
+.umat-workspace-tab {
+    flex: 1;
+    padding: 14px;
+    background: none;
+    border: none;
+    font-size: 14px;
+    font-weight: 500;
+    color: #6b7280;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+.umat-workspace-tab:hover {
+    color: #006b2f;
+    background: #f3f4f6;
+}
+.umat-workspace-tab.active {
+    color: #006b2f;
+    border-bottom-color: #006b2f;
+}
+
+/* Workspace Content Area */
+.umat-workspace-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+/* Chat Tab */
+.umat-chat-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    height: 100%;
+}
+.umat-chat-messages-ws {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    min-height: 200px;
+}
+.chat-message-ws {
+    max-width: 85%;
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+.chat-message-ws.ai {
+    align-self: flex-start;
+    background: white;
+    border-left: 3px solid #006b2f;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.chat-message-ws.student {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    color: #064e3b;
+}
+
+/* Quick Actions */
+.umat-quick-actions-ws {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px;
+    background: white;
+    border-radius: 10px;
+    margin-bottom: 12px;
+}
+.quick-action-ws {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.quick-action-ws:hover {
+    background: #d1fae5;
+    border-color: #006b2f;
+    color: #006b2f;
+}
+.quick-action-ws .material-symbols-outlined {
+    font-size: 18px;
+    color: #006b2f;
+}
+
+/* Chat Input */
+.umat-chat-input-ws {
+    display: flex;
+    gap: 10px;
+    padding: 16px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.umat-chat-input-ws textarea {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    resize: none;
+    font-family: inherit;
+}
+.umat-chat-input-ws textarea:focus {
+    outline: none;
+    border-color: #006b2f;
+}
+.umat-send-ws {
+    width: 46px;
+    height: 46px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #006b2f 0%, #00873d 100%);
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.umat-send-ws:hover {
+    transform: scale(1.05);
+}
+.umat-send-ws .material-symbols-outlined {
+    font-size: 22px;
+}
+
+/* Notes Tab */
+.umat-notes-ws {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+}
+.umat-notes-ws h4 {
+    margin: 0 0 16px 0;
+    color: #1f2937;
+    font-size: 16px;
+}
+.umat-notes-content {
+    color: #4b5563;
+    line-height: 1.7;
+}
+.umat-notes-empty {
+    text-align: center;
+    padding: 40px;
+    color: #9ca3af;
+}
+
+/* Resources Tab */
+.umat-resources-ws {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+}
+.umat-resources-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.resource-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.resource-item:hover {
+    background: #e5e7eb;
+}
+.resource-item .material-symbols-outlined {
+    color: #006b2f;
+}
+</style>
+
+<!-- Global FAB -->
+<button
+    class="umat-global-fab"
+    id="umat-global-fab"
+    aria-label="Open AI Assistant"
+    data-courseid="{{courseid}}"
+>
+    <span class="material-symbols-outlined fab-icon-chat">smart_toy</span>
+    <span class="material-symbols-outlined fab-icon-close">close</span>
+</button>
+
+<!-- Full Workspace Overlay -->
+<div class="umat-workspace-overlay" id="umat-workspace-overlay">
+    <div class="umat-workspace-panel" role="dialog" aria-modal="true">
+        <!-- Header -->
+        <div class="umat-workspace-header">
+            <div class="umat-workspace-avatar">
+                <span class="material-symbols-outlined">smart_toy</span>
+            </div>
+            <div class="umat-workspace-title">
+                <h2>AI Learning Assistant</h2>
+                <div class="course-name">{{coursename}}</div>
+            </div>
+            <button class="umat-workspace-close" id="umat-workspace-close" aria-label="Close">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="umat-workspace-tabs">
+            <button class="umat-workspace-tab active" data-tab="chat">
+                <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px">chat</span>
+                Chat
+            </button>
+            <button class="umat-workspace-tab" data-tab="notes">
+                <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px">note</span>
+                Notes
+            </button>
+            <button class="umat-workspace-tab" data-tab="resources">
+                <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px">folder</span>
+                Resources
+            </button>
+        </div>
+
+        <!-- Content: Chat -->
+        <div class="umat-workspace-content" id="tab-chat">
+            <div class="umat-chat-container">
+                <!-- Quick Actions -->
+                <div class="umat-quick-actions-ws">
+                    <button class="quick-action-ws" data-action="summarize">
+                        <span class="material-symbols-outlined">summarize</span>
+                        Summarize
+                    </button>
+                    <button class="quick-action-ws" data-action="explain">
+                        <span class="material-symbols-outlined">lightbulb</span>
+                        Explain
+                    </button>
+                    <button class="quick-action-ws" data-action="quiz">
+                        <span class="material-symbols-outlined">quiz</span>
+                        Quiz
+                    </button>
+                    <button class="quick-action-ws" data-action="review">
+                        <span class="material-symbols-outlined">fact_check</span>
+                        Review
+                    </button>
+                </div>
+
+                <!-- Messages -->
+                <div class="umat-chat-messages-ws" id="chat-messages">
+                    <div class="chat-message-ws ai">
+                        Hello! I'm your AI learning assistant for this course. Ask me anything about the lecture materials, or use the quick actions above to get started.
+                    </div>
+                </div>
+
+                <!-- Input -->
+                <div class="umat-chat-input-ws">
+                    <textarea
+                        id="workspace-input"
+                        placeholder="Ask a question about this course..."
+                        rows="2"
+                    ></textarea>
+                    <button class="umat-send-ws" id="send-message">
+                        <span class="material-symbols-outlined">send</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content: Notes -->
+        <div class="umat-workspace-content" id="tab-notes" style="display:none;">
+            <div class="umat-notes-ws">
+                <h4>Study Notes</h4>
+                <div class="umat-notes-content" id="notes-content">
+                    <div class="umat-notes-empty">
+                        <span class="material-symbols-outlined" style="font-size:48px;color:#d1d5db">description</span>
+                        <p>No notes generated yet. Ask the AI to create notes from your course materials.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content: Resources -->
+        <div class="umat-workspace-content" id="tab-resources" style="display:none;">
+            <div class="umat-resources-ws">
+                <h4>Course Materials</h4>
+                <div class="umat-resources-list" id="resources-list">
+                    <div class="umat-notes-empty">
+                        <span class="material-symbols-outlined" style="font-size:48px;color:#d1d5db">folder_open</span>
+                        <p>No materials uploaded yet.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    var fab = document.getElementById('umat-global-fab');
+    var overlay = document.getElementById('umat-workspace-overlay');
+    var closeBtn = document.getElementById('umat-workspace-close');
+    var input = document.getElementById('workspace-input');
+    var sendBtn = document.getElementById('send-message');
+    var messagesContainer = document.getElementById('chat-messages');
+    var tabs = document.querySelectorAll('.umat-workspace-tab');
+    var courseId = {{courseid}};
+
+    if (!fab || !overlay) return;
+
+    // Toggle workspace
+    fab.addEventListener('click', function() {
+        var isOpen = fab.classList.toggle('open');
+        if (isOpen) {
+            overlay.classList.add('show');
+            setTimeout(function() { if (input) input.focus(); }, 300);
+        } else {
+            overlay.classList.remove('show');
+        }
+    });
+
+    // Close buttons
+    closeBtn.addEventListener('click', function() {
+        fab.classList.remove('open');
+        overlay.classList.remove('show');
+    });
+
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) {
+            fab.classList.remove('open');
+            overlay.classList.remove('show');
+        }
+    });
+
+    // Tab switching
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            tabs.forEach(function(t) { t.classList.remove('active'); });
+            tab.classList.add('active');
+
+            var tabName = tab.dataset.tab;
+            document.querySelectorAll('.umat-workspace-content').forEach(function(content) {
+                content.style.display = (content.id === 'tab-' + tabName) ? 'block' : 'none';
+            });
+        });
+    });
+
+    // Quick actions
+    document.querySelectorAll('.quick-action-ws').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var action = btn.dataset.action;
+            var questions = {
+                'summarize': 'Can you summarize the main topics from this week\'s lecture material?',
+                'explain': 'Can you explain the key concepts from this course?',
+                'quiz': 'Create a quick quiz with 5 questions on the recent course material.',
+                'review': 'What are the most important points I should remember from this course?'
+            };
+            if (questions[action] && input) {
+                input.value = questions[action];
+                input.focus();
+            }
+        });
+    });
+
+    // Send message function
+    function sendMessage() {
+        var question = input ? input.value.trim() : '';
+        if (!question) return;
+
+        // Add user message
+        var userMsg = document.createElement('div');
+        userMsg.className = 'chat-message-ws student';
+        userMsg.textContent = question;
+        messagesContainer.appendChild(userMsg);
+
+        // Clear input
+        if (input) input.value = '';
+
+        // Show typing
+        var typing = document.createElement('div');
+        typing.className = 'chat-message-ws ai';
+        typing.id = 'typing-indicator';
+        typing.innerHTML = '<em>Thinking...</em>';
+        messagesContainer.appendChild(typing);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+        // Call Moodle web service
+        require(['core/ajax'], function(Ajax) {
+            Ajax.call([{
+                methodname: 'local_umat_ai_ask_question',
+                args: {
+                    courseid: courseId,
+                    question: question
+                }
+            }])[0].done(function(response) {
+                var indicator = document.getElementById('typing-indicator');
+                if (indicator) indicator.remove();
+
+                if (response.success) {
+                    var aiMsg = document.createElement('div');
+                    aiMsg.className = 'chat-message-ws ai';
+                    aiMsg.textContent = response.answer || 'Got a response';
+                    messagesContainer.appendChild(aiMsg);
+                } else {
+                    var errMsg = document.createElement('div');
+                    errMsg.className = 'chat-message-ws ai';
+                    errMsg.textContent = 'Sorry, something went wrong. Please try again.';
+                    messagesContainer.appendChild(errMsg);
+                }
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }).fail(function(err) {
+                var indicator = document.getElementById('typing-indicator');
+                if (indicator) indicator.remove();
+
+                var errMsg = document.createElement('div');
+                errMsg.className = 'chat-message-ws ai';
+                errMsg.textContent = 'Error connecting to AI service. Make sure the AI service is running.';
+                messagesContainer.appendChild(errMsg);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            });
+        });
+    }
+
+    // Send button and enter key
+    if (sendBtn) {
+        sendBtn.addEventListener('click', sendMessage);
+    }
+    if (input) {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    }
+
+    console.log('UMaT AI FAB loaded for course:', courseId);
+})();
+</script>

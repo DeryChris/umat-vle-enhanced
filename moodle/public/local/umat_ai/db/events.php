@@ -18,4 +18,4 @@ $observers = [
         'priority'    => 200,
         'internal'    => false,
     ],
-];
+    ];

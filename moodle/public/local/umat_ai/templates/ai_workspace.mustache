@@ -1,0 +1,177 @@
+{{!
+    Template: local/umat_ai/templates/ai_workspace.mustache
+    Full-page expanded AI workspace with video player, transcript, and tabbed AI panel.
+
+    Context variables:
+    - courseid (int)
+    - coursefullname (string)
+    - sessionid (int)
+    - sessiontitle (string)
+    - video_url (string)
+    - transcript (array) - [{timestamp, text}]
+    - has_capability (bool)
+}}
+
+{{#has_capability}}
+<div class="umat-ai-workspace" data-courseid="{{courseid}}" data-sessionid="{{sessionid}}">
+    <!-- Left Panel: Video + Transcript -->
+    <div class="workspace-video-panel">
+        <!-- Video Player -->
+        <div class="video-container">
+            <video id="umat-lecture-video" controls preload="metadata">
+                <source src="{{video_url}}" type="video/mp4">
+                {{#str}}video_error, local_umat_ai{{/str}}
+            </video>
+            <div class="video-controls">
+                <button class="video-btn" data-action="rewind-30" aria-label="Rewind 30s">
+                    <span class="material-symbols-outlined">replay_30</span>
+                </button>
+                <button class="video-btn" data-action="play-pause" aria-label="Play/Pause">
+                    <span class="material-symbols-outlined">play_arrow</span>
+                </button>
+                <button class="video-btn" data-action="forward-30" aria-label="Forward 30s">
+                    <span class="material-symbols-outlined">forward_30</span>
+                </button>
+                <div class="video-time">
+                    <span id="current-time">0:00</span> / <span id="duration">0:00</span>
+                </div>
+                <input type="range" class="video-progress" id="video-progress" min="0" max="100" value="0">
+            </div>
+        </div>
+
+        <!-- Session Info -->
+        <div class="session-info">
+            <h3 class="session-title">{{sessiontitle}}</h3>
+            <span class="course-badge">{{coursefullname}}</span>
+        </div>
+
+        <!-- Searchable Transcript -->
+        <div class="transcript-panel">
+            <div class="transcript-header">
+                <h4>{{#str}}transcript, local_umat_ai{{/str}}</h4>
+                <div class="transcript-search">
+                    <span class="material-symbols-outlined">search</span>
+                    <input type="text" id="transcript-search" placeholder="{{#str}}search_transcript, local_umat_ai{{/str}}">
+                </div>
+            </div>
+            <div class="transcript-content" id="transcript-content">
+                {{#transcript}}
+                <div class="transcript-segment" data-timestamp="{{timestamp}}" data-start="{{start}}" data-end="{{end}}">
+                    <button class="timestamp-btn" aria-label="Jump to {{timestamp}}">
+                        <span class="timestamp">{{timestamp}}</span>
+                    </button>
+                    <p class="transcript-text">{{text}}</p>
+                </div>
+                {{/transcript}}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel: Tabbed AI -->
+    <div class="workspace-ai-panel">
+        <!-- Panel Header -->
+        <div class="ai-workspace-header">
+            <div class="ai-header-info">
+                <span class="material-symbols-outlined">smart_toy</span>
+                <div>
+                    <span class="ai-title">{{#str}}ai_assistant, local_umat_ai{{/str}}</span>
+                    <span class="course-context">{{coursefullname}}</span>
+                </div>
+            </div>
+            <div class="ai-header-actions">
+                <button class="action-btn" data-action="generate-summary" title="{{#str}}generate_summary, local_umat_ai{{/str}}">
+                    <span class="material-symbols-outlined">summarize</span>
+                </button>
+                <button class="action-btn" data-action="attach-material" title="{{#str}}attach_material, local_umat_ai{{/str}}">
+                    <span class="material-symbols-outlined">attach_file</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="ai-tabs">
+            <button class="tab-btn active" data-tab="chat">{{#str}}tab_chat, local_umat_ai{{/str}}</button>
+            <button class="tab-btn" data-tab="notes">{{#str}}tab_notes, local_umat_ai{{/str}}</button>
+            <button class="tab-btn" data-tab="resources">{{#str}}tab_resources, local_umat_ai{{/str}}</button>
+        </div>
+
+        <!-- Tab Content: Chat -->
+        <div class="tab-content active" id="tab-chat">
+            <div class="chat-messages" id="workspace-chat-messages">
+                <div class="chat-message ai">
+                    <div class="chat-bubble">
+                        <p>{{#str}}workspace_greeting, local_umat_ai{{/str}}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div class="ai-typing-indicator" id="workspace-typing" style="display: none;">
+                <div class="typing-dots">
+                    <span></span><span></span><span></span>
+                </div>
+                <span class="typing-label">{{#str}}ai_thinking, local_umat_ai{{/str}}</span>
+            </div>
+
+            <!-- Contextual Suggestions -->
+            <div class="suggestion-chips" id="suggestion-chips" style="display: none;">
+                <button class="suggestion-chip" data-suggestion="explain">{{#str}}suggest_explain, local_umat_ai{{/str}}</button>
+                <button class="suggestion-chip" data-suggestion="elaborate">{{#str}}suggest_elaborate, local_umat_ai{{/str}}</button>
+                <button class="suggestion-chip" data-suggestion="compare">{{#str}}suggest_compare, local_umat_ai{{/str}}</button>
+            </div>
+
+            <!-- Chat Input -->
+            <div class="chat-input-area">
+                <textarea
+                    id="workspace-question-input"
+                    placeholder="{{#str}}ask_about_video, local_umat_ai{{/str}}"
+                    rows="2"
+                    maxlength="500"
+                ></textarea>
+                <button class="send-btn" id="workspace-send-btn" aria-label="{{#str}}send, local_umat_ai{{/str}}">
+                    <span class="material-symbols-outlined">send</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Content: Notes -->
+        <div class="tab-content" id="tab-notes">
+            <div class="notes-panel">
+                <div class="notes-header">
+                    <h4>{{#str}}generated_notes, local_umat_ai{{/str}}</h4>
+                    <button class="download-btn">
+                        <span class="material-symbols-outlined">download</span>
+                        {{#str}}download, local_umat_ai{{/str}}
+                    </button>
+                </div>
+                <div class="notes-content" id="notes-content">
+                    <p class="empty-state">{{#str}}no_notes_yet, local_umat_ai{{/str}}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content: Resources -->
+        <div class="tab-content" id="tab-resources">
+            <div class="resources-panel">
+                <div class="resources-header">
+                    <h4>{{#str}}course_resources, local_umat_ai{{/str}}</h4>
+                </div>
+                <div class="resources-list" id="resources-list">
+                    <p class="empty-state">{{#str}}no_resources, local_umat_ai{{/str}}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{{/has_capability}}
+
+{{#js}}
+require(['local_umat_ai/ai_workspace'], function(AiWorkspace) {
+    AiWorkspace.init({
+        courseId: {{courseid}},
+        courseName: '{{coursefullname}}',
+        sessionId: {{sessionid}},
+        hasCapability: {{#has_capability}}true{{/has_capability}}{{^has_capability}}false{{/has_capability}}
+    });
+});
+{{/js}}

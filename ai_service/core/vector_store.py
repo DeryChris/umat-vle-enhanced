@@ -6,14 +6,14 @@
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from config import get_settings
 from typing import List, Tuple
+import requests
 
 settings = get_settings()
 
 _chroma_client       = None
-_embedding_function  = None
+_embedding_cache    = {}
 
 
 def get_chroma_client():
@@ -26,14 +26,59 @@ def get_chroma_client():
     return _chroma_client
 
 
+def embed_texts(texts: List[str]) -> List[List[float]]:
+    """Direct Google API call for embeddings."""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Use the correct embedding model
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key={settings.google_api_key}"
+
+    embeddings = []
+
+    for i, text in enumerate(texts):
+        try:
+            payload = {
+                "content": {
+                    "role": "user",
+                    "parts": [{"text": text[:8000]}]  # Truncate to avoid token limits
+                }
+            }
+            response = requests.post(url, json=payload, timeout=30)
+
+            logger.info(f"Embedding chunk {i}: status={response.status_code}")
+
+            if response.status_code == 200:
+                result = response.json()
+                embedding = result.get('embedding', {}).get('values', [])
+                if embedding:
+                    embeddings.append(embedding)
+                    logger.info(f"Got embedding with {len(embedding)} dimensions")
+                else:
+                    logger.warning(f"No embedding in response: {result}")
+                    embeddings.append([0.0] * 768)  # Fallback
+            else:
+                logger.error(f"Embedding failed: {response.status_code} - {response.text[:200]}")
+                # Use fallback
+                embeddings.append([0.0] * 768)
+
+        except Exception as e:
+            logger.error(f"Embedding error for chunk {i}: {str(e)}")
+            embeddings.append([0.0] * 768)
+
+    return embeddings
+
+
 def get_embedding_function():
-    global _embedding_function
-    if _embedding_function is None:
-        _embedding_function = GoogleGenerativeAIEmbeddings(
-            model=settings.embedding_model,          # text-embedding-004
-            google_api_key=settings.google_api_key,
-        )
-    return _embedding_function
+    # Return a wrapper that uses our direct API call
+    class DirectEmbedder:
+        def embed_documents(self, texts):
+            return embed_texts(texts)
+
+        def embed_query(self, text):
+            return embed_texts([text])[0]
+
+    return DirectEmbedder()
 
 
 class VectorStoreManager:

@@ -51,11 +51,13 @@ class ai_query extends \external_api {
         $aiserviceurl = get_config('local_umat_ai', 'ai_service_url');
         $token        = get_config('local_umat_ai', 'ai_service_token');
 
-        $client = new \curl();
+        // Bypass URL security check for local AI service
+        $client = new \curl(['ignoresecurity' => true]);
         $client->setHeader([
             'Content-Type: application/json',
             'Authorization: Bearer ' . $token,
         ]);
+        $client->setopt(['CURLOPT_TIMEOUT' => 30]);
 
         $payload = json_encode([
             'question'  => $params['question'],

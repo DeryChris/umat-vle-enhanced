@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     # OpenAI
     google_api_key: str    
-    llm_model: str = "gemini-1.5-flash"
+    llm_model: str = "gemini-2.0-flash"
     embedding_model: str = "text-embedding-004"
 
     # Database
