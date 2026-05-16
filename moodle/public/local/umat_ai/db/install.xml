@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!-- Creates all PostgreSQL tables for the UMaT AI plugin -->
+<!-- Creates all PostgreSQL/MySQL tables for the UMaT AI plugin -->
 
-<XMLDB PATH="local/umat_ai/db" VERSION="20241201" COMMENT="Tables for UMaT AI plugin">
+<XMLDB PATH="local/umat_ai/db" VERSION="20260517" COMMENT="Tables for UMaT AI plugin v1.1">
   <TABLES>
 
     <!-- Tracks AI processing status per BBB session -->
@@ -44,6 +44,9 @@
         <KEY NAME="sessionrecord_fk" TYPE="foreign" FIELDS="sessionrecordid"
              REFTABLE="umat_ai_sessions" REFFIELDS="id"/>
       </KEYS>
+      <INDEXES>
+        <INDEX NAME="courseid_approved" UNIQUE="false" FIELDS="courseid, is_approved"/>
+      </INDEXES>
     </TABLE>
 
     <!-- Tracks lecturer-uploaded materials indexed for RAG -->
@@ -60,17 +63,42 @@
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
       </KEYS>
+      <INDEXES>
+        <INDEX NAME="courseid" UNIQUE="false" FIELDS="courseid"/>
+      </INDEXES>
     </TABLE>
 
-    <!-- Student Q&A interactions with AI -->
+    <!-- Student Q&A interactions with AI — supports session grouping -->
     <TABLE NAME="umat_ai_chat_logs" COMMENT="Student Q&amp;A interactions with AI">
+      <FIELDS>
+        <FIELD NAME="id"            TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid"        TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="courseid"      TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="session_key"   TYPE="char" LENGTH="64"  NOTNULL="false"/>
+        <FIELD NAME="role"          TYPE="char" LENGTH="20"  NOTNULL="true" DEFAULT="student"/>
+        <FIELD NAME="question"      TYPE="text" NOTNULL="true"/>
+        <FIELD NAME="answer"        TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="sources"       TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="timecreated"   TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="userid_courseid"  UNIQUE="false" FIELDS="userid, courseid"/>
+        <INDEX NAME="session_key"      UNIQUE="false" FIELDS="session_key"/>
+        <INDEX NAME="timecreated"      UNIQUE="false" FIELDS="timecreated"/>
+      </INDEXES>
+    </TABLE>
+
+    <!-- Stores lecturer AI notes and quick interactions -->
+    <TABLE NAME="umat_ai_lecturer_notes" COMMENT="Lecturer-AI interaction log for analytics">
       <FIELDS>
         <FIELD NAME="id"          TYPE="int"  LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="userid"      TYPE="int"  LENGTH="10" NOTNULL="true"/>
         <FIELD NAME="courseid"    TYPE="int"  LENGTH="10" NOTNULL="true"/>
-        <FIELD NAME="question"    TYPE="text" NOTNULL="true"/>
-        <FIELD NAME="answer"      TYPE="text" NOTNULL="false"/>
-        <FIELD NAME="sources"     TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="query"       TYPE="text" NOTNULL="true"/>
+        <FIELD NAME="response"    TYPE="text" NOTNULL="false"/>
         <FIELD NAME="timecreated" TYPE="int"  LENGTH="10" NOTNULL="true" DEFAULT="0"/>
       </FIELDS>
       <KEYS>

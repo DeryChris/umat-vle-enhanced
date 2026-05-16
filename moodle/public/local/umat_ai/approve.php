@@ -1,82 +1,88 @@
 <?php
-// ============================================================
-// Lecturer approval page: /local/umat_ai/approve.php?courseid=XX
-// Lists AI-generated outputs pending review for the current course.
-// Only accessible by users with approveoutput capability.
-// ============================================================
+/**
+ * Lecturer AI Output Approval page.
+ *
+ * Lists all AI-generated outputs (summary, notes, quiz) for a course
+ * that are pending lecturer approval before becoming visible to students.
+ *
+ * Accessible at: /local/umat_ai/approve.php?courseid=X
+ *
+ * @package    local_umat_ai
+ * @copyright  2026 UMaT
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
 require_once(__DIR__ . '/../../config.php');
-require_once(__DIR__ . '/../../lib/weblib.php');
-require_once(__DIR__ . '/../../lib/outputrenderers.php');
+require_once($CFG->dirroot . '/local/umat_ai/lib.php');
 
 $courseid = required_param('courseid', PARAM_INT);
-
-// Load course and check access.
 $course = get_course($courseid);
-require_login($courseid);
+require_login($course);
+
 $context = context_course::instance($courseid);
 require_capability('local/umat_ai:approveoutput', $context);
 
-// Page setup.
+// ---- Page setup --------------------------------------------------------- //
 $PAGE->set_context($context);
 $PAGE->set_url('/local/umat_ai/approve.php', ['courseid' => $courseid]);
 $PAGE->set_pagelayout('standard');
-$PAGE->set_title(get_string('pluginname', 'local_umat_ai') . ': AI Output Review');
+$PAGE->set_title(get_string('approval_title', 'local_umat_ai'));
+$PAGE->set_heading($course->fullname);
 
-// Load pending sessions from the database.
-$sessions = $DB->get_records_sql(
-    "SELECT DISTINCT s.id    AS session_id,
-                    s.sessionid,
-                    s.timecreated,
-                    o.id          AS output_id,
-                    o.output_type,
-                    o.content
-               FROM {umat_ai_sessions} s
-               JOIN {umat_ai_outputs} o ON o.sessionrecordid = s.id
-              WHERE s.courseid = :courseid
-                AND (:require_approval = 0 OR o.is_approved = 0)
-           ORDER BY s.timecreated DESC",
-    [
-        'courseid'        => $courseid,
-        'require_approval' => (int) get_config('local_umat_ai', 'require_approval'),
-    ]
+// ---- Load sessions with pending outputs --------------------------------- //
+$sessionRecords = $DB->get_records_sql(
+    "SELECT s.*, COUNT(o.id) AS pending_count
+       FROM {umat_ai_sessions} s
+       JOIN {umat_ai_outputs} o ON o.sessionrecordid = s.id
+      WHERE s.courseid = :courseid AND o.is_approved = 0
+   GROUP BY s.id
+   ORDER BY s.timecreated DESC",
+    ['courseid' => $courseid]
 );
 
-// Group outputs by session.
-$grouped = [];
-foreach ($sessions as $row) {
-    $sid = $row->session_id;
-    if (!isset($grouped[$sid])) {
-        $grouped[$sid] = [
-            'session_id'    => (int) $sid,
-            'bbb_sessionid' => $row->sessionid,
-            'timecreated'   => (int) $row->timecreated,
-            'outputs'       => [],
+$sessions = [];
+foreach ($sessionRecords as $sess) {
+    $outputs = $DB->get_records(
+        'umat_ai_outputs',
+        ['sessionrecordid' => $sess->id, 'is_approved' => 0],
+        'output_type ASC'
+    );
+
+    $outputData = [];
+    foreach ($outputs as $out) {
+        $outputData[] = [
+            'output_id' => (int) $out->id,
+            'output_type' => $out->output_type,
+            'content' => format_text($out->content, FORMAT_PLAIN),
+            'timecreated' => userdate($out->timecreated),
         ];
     }
-    $grouped[$sid]['outputs'][] = [
-        'output_id'   => (int) $row->output_id,
-        'output_type' => $row->output_type,
-        'content'     => $row->content,
-    ];
-}
-$grouped = array_values($grouped);
 
-// Build template context.
-$templatecontext = [
-    'courseid'    => $courseid,
-    'coursename'  => $course->fullname,
-    'sessions'     => $grouped,
-    'str_approve'  => get_string('approve_btn', 'local_umat_ai'),
-    'str_reject'   => get_string('reject_btn',   'local_umat_ai'),
-    'str_summary' => get_string('session_summary', 'local_umat_ai'),
-    'str_notes'    => get_string('session_notes',   'local_umat_ai'),
-    'str_quiz'     => get_string('session_quiz',     'local_umat_ai'),
-    'str_pending'  => get_string('pending_approval', 'local_umat_ai'),
-    'str_no_pending' => 'No outputs pending review',
+    if (!empty($outputData)) {
+        $sessions[] = [
+            'session_id' => (int) $sess->id,
+            'bbb_sessionid' => htmlspecialchars($sess->sessionid, ENT_QUOTES, 'UTF-8'),
+            'timecreated' => userdate($sess->timecreated),
+            'courseid' => $courseid,
+            'outputs' => $outputData,
+        ];
+    }
+}
+
+// ---- Template context --------------------------------------------------- //
+$tctx = [
+    'courseid' => $courseid,
+    'coursename' => format_string($course->fullname, true, ['context' => $context]),
+    'sessions' => $sessions,
+    'str_approve' => get_string('str_approve', 'local_umat_ai'),
+    'str_reject' => get_string('str_reject', 'local_umat_ai'),
+    'str_summary' => get_string('str_summary', 'local_umat_ai'),
+    'str_notes' => get_string('str_notes', 'local_umat_ai'),
+    'str_quiz' => get_string('str_quiz', 'local_umat_ai'),
+    'str_no_pending' => get_string('str_no_pending', 'local_umat_ai'),
+    'dashboard_url' => (new moodle_url('/local/umat_ai/lecturer_dashboard.php', ['courseid' => $courseid]))->out(false),
 ];
 
-// Render using the approval template.
 echo $OUTPUT->header();
-echo $OUTPUT->render_from_template('local_umat_ai/approval', $templatecontext);
+echo $OUTPUT->render_from_template('local_umat_ai/approval', $tctx);
 echo $OUTPUT->footer();

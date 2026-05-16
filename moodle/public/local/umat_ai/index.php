@@ -1,8 +1,9 @@
 <?php
 /**
- * Page to display the AI Chat Panel.
+ * Expanded AI Workspace page.
  *
- * Students access this from course navigation to chat with AI about course materials.
+ * Full-page view: video player + synchronized transcript (left) + AI chat (right).
+ * Accessible at: /local/umat_ai/index.php?courseid=X[&sessionid=Y]
  *
  * @package    local_umat_ai
  * @copyright  2026 UMaT
@@ -12,39 +13,75 @@
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/local/umat_ai/lib.php');
 
-$courseid = required_param('courseid', PARAM_INT);
+$courseid  = required_param('courseid', PARAM_INT);
+$sessionid = optional_param('sessionid', 0, PARAM_INT);
+
 $course = get_course($courseid);
+require_login($course);
 
-require_login($course, true);
-$context = context_course::instance($course->id);
+$context = context_course::instance($courseid);
+require_capability('local/umat_ai:chatwithai', $context);
 
-// Check capability - allow if has capability OR for testing, show UI anyway
-$hasCapability = has_capability('local/umat_ai:chatwithai', $context);
-// TEMP: Force true for testing UI
-$hasCapability = true;
-
+// ---- Page setup --------------------------------------------------------- //
 $PAGE->set_context($context);
-$PAGE->set_title(get_string('chatpanel_title', 'local_umat_ai'));
-$PAGE->set_heading($course->fullname);
 $PAGE->set_url('/local/umat_ai/index.php', ['courseid' => $courseid]);
+$PAGE->set_pagelayout('standard');
+$PAGE->set_title(get_string('ai_assistant', 'local_umat_ai') . ': ' . $course->fullname);
+$PAGE->set_heading($course->fullname);
 
-// Prepare template data
-$hasCapability = true;
-$coursename = format_string($course->fullname, true, ['context' => $context]);
+// ---- Load session data -------------------------------------------------- //
+$session     = null;
+$sessionRec  = null;
+$transcripts = [];
+$videoUrl    = '';
 
-// Check if course materials are indexed
-$indexed = false;
-// TODO: Check if materials exist in ChromaDB for this course
+if ($sessionid) {
+    $sessionRec = $DB->get_record('umat_ai_sessions', ['id' => $sessionid, 'courseid' => $courseid]);
+    if ($sessionRec) {
+        $videoUrl = $sessionRec->recording_url ?? '';
+    }
+}
 
-$templateData = [
-    'courseid' => $courseid,
-    'coursename' => $coursename,
-    'has_capability' => $hasCapability,
-    'indexed' => $indexed,
-    'is_global' => false,
-    'wwwroot' => $CFG->wwwroot,
+// If no specific session, try to get the most recent one.
+if (!$sessionRec) {
+    $sessionRec = $DB->get_record_sql(
+        "SELECT * FROM {umat_ai_sessions}
+          WHERE courseid = :cid AND status = 'complete'
+          ORDER BY timecreated DESC",
+        ['cid' => $courseid],
+        IGNORE_MULTIPLE
+    );
+}
+
+$sessionTitle   = $sessionRec ? 'Session ' . date('d M Y', $sessionRec->timecreated) : get_string('ai_assistant', 'local_umat_ai');
+$sessionDbId    = $sessionRec ? (int) $sessionRec->id : 0;
+
+// ---- Template context --------------------------------------------------- //
+$tctx = [
+    'courseid'       => $courseid,
+    'coursefullname' => format_string($course->fullname, true, ['context' => $context]),
+    'sessionid'      => $sessionDbId,
+    'sessiontitle'   => $sessionTitle,
+    'video_url'      => $videoUrl,
+    'has_video'      => !empty($videoUrl),
+    'transcript'     => [],
+    'has_capability' => true,
+    'hub_url'        => (new moodle_url('/local/umat_ai/hub.php'))->out(false),
+    'wwwroot'        => $CFG->wwwroot,
 ];
 
+// Load the AMD workspace module.
+$PAGE->requires->js_amd_inline("
+    require(['local_umat_ai/ai_workspace'], function(Workspace) {
+        Workspace.init({
+            courseId:      {$courseid},
+            sessionId:     {$sessionDbId},
+            courseName:    " . json_encode($course->fullname) . ",
+            hasCapability: true,
+        });
+    });
+");
+
 echo $OUTPUT->header();
-echo $OUTPUT->render_from_template('local_umat_ai/ai_chat_panel', $templateData);
+echo $OUTPUT->render_from_template('local_umat_ai/ai_workspace', $tctx);
 echo $OUTPUT->footer();

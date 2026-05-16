@@ -60,8 +60,8 @@
 
 2. **Plan the work**
    - [ ] Break into 3-5 small, testable chunks
-   - [ ] Create a todo list with `manage_todo_list`
-   - [ ] Save plan to `/memories/session/` for reference
+   - [ ] Create a todo list with `TaskCreate` / `TaskUpdate`
+   - [ ] Save plan to `memory/` for reference
    - [ ] Ask clarifying questions if intent is unclear
 
 3. **Explore before coding**
@@ -80,7 +80,7 @@
    - [ ] Make one change at a time
    - [ ] Mark todo as in-progress, then completed
    - [ ] Test/validate after EACH change
-   - [ ] Use `multi_replace_string_in_file` for bulk edits
+   - [ ] Use `Edit` tool for modifications, `Write` for new files
 
 6. **Validate thoroughly**
    - [ ] Run tests (`pytest tests/ -v` for AI service)
@@ -101,8 +101,9 @@
 | `moodle/public/local/umat_ai/classes/` | PHP backend: events, tasks, external services | Ackon |
 | `moodle/public/local/umat_ai/templates/` | Mustache templates | Agartha |
 | `moodle/public/theme/umat/` | Theme (extends Boost, navy #003580, gold #C8A951) | Chrispen |
-| `moodle/public/local/umat_ai/amd/src/` | AMD JavaScript modules | Johnson |
+| `moodle/public/local/umat_ai/amd/src/` | AMD JavaScript modules (define/require pattern) | Johnson |
 | `moodle/public/local/umat_ai/lang/` | Language strings | Johnson |
+| `moodle/public/local/umat_ai/lib.php` | PHP entry point - loads AMD modules | Johnson |
 | `ai_service/.env` | Secrets (API keys, tokens) — contact Chrispen | Chrispen |
 
 ---
@@ -125,7 +126,7 @@ python main.py
 
 # 4. Terminal 2: Moodle cron (keep running)
 cd C:\Projects\umat-vle-enhanced
-.\cron.bat
+.\cron.bat  # Or: php moodle/admin/cli/cron.php
 ```
 
 **Key endpoints** (verify these work):
@@ -191,19 +192,20 @@ Before implementing, consider:
 
 **Use agent memory to maintain context and avoid repeated work:**
 
-### Session Memory (`/memories/session/`)
+### Session Memory (`memory/session/`)
 - **When**: Use during this conversation only
 - **What**: Task plans, current progress, findings
 - **Example**: `planning.md` - tracks which files need changes
 - **Benefit**: Keeps work visible if conversation is long
+- **Location**: `C:\Users\amkch\.claude\projects\umat-vle-enhanced\memory\`
 
-### User Memory (`/memories/`)
+### User Memory (`memory/`)
 - **When**: Use for patterns that recur across projects
 - **What**: Common errors, debugging tricks, best practices
 - **Example**: `debugging.md` - "PostgreSQL connection issues resolution"
 - **Benefit**: Build a knowledge base; avoid repeating mistakes
 
-### Repository Memory (`/memories/repo/`)
+### Repository Memory (`memory/repo/`)
 - **When**: Use for project-specific facts
 - **What**: Build commands, database schema, API contracts
 - **Example**: `api_contracts.md` - endpoint params and responses
@@ -283,11 +285,18 @@ pytest tests/ -v
 ### Cross-Component
 
 **Before committing**:
+- [ ] Run `php -l` on any modified PHP files
 - [ ] `get_errors` shows no lint/syntax issues
 - [ ] No secrets in code (check for API keys, tokens)
 - [ ] File paths use forward slashes or `\` consistently
 - [ ] Commit message is clear and descriptive
 - [ ] No large files committed (keep < 50MB)
+
+**Integration testing checklist**:
+1. Start Apache + PostgreSQL + AI Service
+2. Visit a course page and verify FAB loads
+3. Test a simple AI question via the chat panel
+4. Check browser console for AMD module errors
 
 ---
 
@@ -404,11 +413,37 @@ git push origin main
 ## 🎯 AI Agent Quick Reference
 
 When you're stuck:
-1. **Check memory**: `/memories/session/` (current task), `/memories/` (lessons learned)
+1. **Check memory**: `memory/session/` (current task), `memory/` (lessons learned)
 2. **Read docs**: [docs/](docs/) folder has troubleshooting & architecture
-3. **Check examples**: `grep_search` for similar patterns in codebase
+3. **Check examples**: `Grep` for similar patterns in codebase
 4. **Verify endpoints**: Test with Swagger: `http://localhost:8000/docs`
 5. **Run tests**: `pytest tests/ -v` to catch regressions
-6. **Ask questions**: Use `vscode_askQuestions` if task is ambiguous
+6. **Ask questions**: Use `AskUserQuestion` if task is ambiguous
 
 **Remember**: Think deeply, plan before coding, test after changes, document lessons learned.
+
+---
+
+## 🛠️ Moodle AMD Module Pattern
+
+Moodle uses RequireJS for AMD modules. Structure:
+```javascript
+define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
+    'use strict';
+
+    function init(options) {
+        // Your code here
+    }
+
+    return { init: init };
+});
+```
+
+**Loading from PHP** (`lib.php`):
+```php
+$PAGE->requires->js_amd_inline("
+    require(['local_umat_ai/ai_fab'], function(Fab) {
+        Fab.init($courseid, '$coursename');
+    });
+");
+```

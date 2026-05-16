@@ -1,14 +1,30 @@
 <?php
-// ============================================================
-// Admin settings page: Site Admin → Plugins → Local plugins → UMaT AI
-// ============================================================
+/**
+ * Admin settings for the UMaT AI plugin.
+ *
+ * @package    local_umat_ai
+ * @copyright  2026 UMaT
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
 defined('MOODLE_INTERNAL') || die();
 
 if ($hassiteconfig) {
-    $settings = new admin_settingpage('local_umat_ai', get_string('pluginname', 'local_umat_ai'));
+    $settings = new admin_settingpage(
+        'local_umat_ai',
+        get_string('pluginname', 'local_umat_ai')
+    );
+
     $ADMIN->add('localplugins', $settings);
 
+    /* ---- Section heading ---- */
+    $settings->add(new admin_setting_heading(
+        'local_umat_ai/heading',
+        get_string('settings_heading', 'local_umat_ai'),
+        ''
+    ));
+
+    /* ---- AI service URL ---- */
     $settings->add(new admin_setting_configtext(
         'local_umat_ai/ai_service_url',
         get_string('ai_service_url', 'local_umat_ai'),
@@ -17,6 +33,7 @@ if ($hassiteconfig) {
         PARAM_URL
     ));
 
+    /* ---- API token ---- */
     $settings->add(new admin_setting_configpasswordunmask(
         'local_umat_ai/ai_service_token',
         get_string('ai_service_token', 'local_umat_ai'),
@@ -24,30 +41,36 @@ if ($hassiteconfig) {
         ''
     ));
 
-    // Gemini API Key (Google AI Studio).
-    $settings->add(new admin_setting_configpasswordunmask(
-        'local_umat_ai/google_api_key',
-        get_string('google_api_key', 'local_umat_ai'),
-        get_string('google_api_key_desc', 'local_umat_ai'),
-        ''
+    /* ---- Rate limit ---- */
+    $settings->add(new admin_setting_configtext(
+        'local_umat_ai/rate_limit',
+        get_string('rate_limit', 'local_umat_ai'),
+        get_string('rate_limit_desc', 'local_umat_ai'),
+        '10',
+        PARAM_INT
     ));
 
-    // Gemini model selection.
-    $settings->add(new admin_setting_configselect(
-        'local_umat_ai/llm_model',
-        get_string('llm_model', 'local_umat_ai'),
-        get_string('llm_model_desc', 'local_umat_ai'),
-        'gemini-1.5-flash',
-        [
-            'gemini-1.5-flash' => 'Gemini 1.5 Flash (Recommended)',
-            'gemini-1.5-pro'   => 'Gemini 1.5 Pro (More capable)',
-        ]
-    ));
-
+    /* ---- Enable Student FAB ---- */
     $settings->add(new admin_setting_configcheckbox(
-        'local_umat_ai/require_approval',
-        get_string('require_approval', 'local_umat_ai'),
-        get_string('require_approval_desc', 'local_umat_ai'),
-        1
+        'local_umat_ai/enable_student_fab',
+        get_string('enable_student_fab', 'local_umat_ai'),
+        get_string('enable_student_fab_desc', 'local_umat_ai'),
+        '1'
+    ));
+
+    /* ---- Enable Lecturer FAB ---- */
+    $settings->add(new admin_setting_configcheckbox(
+        'local_umat_ai/enable_lecturer_fab',
+        get_string('enable_lecturer_fab', 'local_umat_ai'),
+        get_string('enable_lecturer_fab_desc', 'local_umat_ai'),
+        '1'
+    ));
+
+    /* ---- Enable Hub FAB ---- */
+    $settings->add(new admin_setting_configcheckbox(
+        'local_umat_ai/enable_hub_fab',
+        get_string('enable_hub_fab', 'local_umat_ai'),
+        get_string('enable_hub_fab_desc', 'local_umat_ai'),
+        '1'
     ));
 }

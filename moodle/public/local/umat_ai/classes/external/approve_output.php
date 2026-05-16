@@ -1,7 +1,11 @@
 <?php
-// ============================================================
-// External API: approve or reject an AI-generated output
-// ============================================================
+/**
+ * External API: Lecturer approves or rejects an AI-generated output.
+ *
+ * @package    local_umat_ai
+ * @copyright  2026 UMaT
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
 namespace local_umat_ai\external;
 
@@ -13,10 +17,10 @@ class approve_output extends \external_api {
 
     public static function approve_parameters() {
         return new \external_function_parameters([
-            'outputid'    => new \external_value(PARAM_INT,  'umat_ai_outputs record id'),
-            'courseid'    => new \external_value(PARAM_INT,  'Moodle course id'),
-            'action'      => new \external_value(PARAM_ALPHA, 'approve or reject'),
-            'comment'     => new \external_value(PARAM_TEXT, 'Optional rejection comment', VALUE_DEFAULT, ''),
+            'outputid' => new \external_value(PARAM_INT,  'Output record ID'),
+            'courseid' => new \external_value(PARAM_INT,  'Course ID for context verification'),
+            'action'   => new \external_value(PARAM_ALPHA, 'approve or reject'),
+            'comment'  => new \external_value(PARAM_TEXT, 'Optional rejection comment', VALUE_DEFAULT, ''),
         ]);
     }
 
@@ -25,58 +29,52 @@ class approve_output extends \external_api {
 
         $params = self::validate_parameters(
             self::approve_parameters(),
-            [
-                'outputid'  => $outputid,
-                'courseid'  => $courseid,
-                'action'    => $action,
-                'comment'   => $comment,
-            ]
+            ['outputid' => $outputid, 'courseid' => $courseid, 'action' => $action, 'comment' => $comment]
         );
 
         $context = \context_course::instance($params['courseid']);
         self::validate_context($context);
         require_capability('local/umat_ai:approveoutput', $context);
 
-        if (!in_array($params['action'], ['approve', 'reject'])) {
-            throw new \invalid_parameter_exception('Action must be "approve" or "reject"');
-        }
+        // Verify the output belongs to this course.
+        $output = $DB->get_record_sql(
+            "SELECT o.* FROM {umat_ai_outputs} o
+             JOIN {umat_ai_sessions} s ON s.id = o.sessionrecordid
+             WHERE o.id = :oid AND s.courseid = :cid",
+            ['oid' => $params['outputid'], 'cid' => $params['courseid']]
+        );
 
-        $output = $DB->get_record('umat_ai_outputs', ['id' => $params['outputid']], '*', MUST_EXIST);
+        if (!$output) {
+            return [
+                'success' => false,
+                'message' => 'Output not found or does not belong to this course.',
+            ];
+        }
 
         if ($params['action'] === 'approve') {
-            $DB->update_record('umat_ai_outputs', (object)[
-                'id'          => $output->id,
-                'is_approved'  => 1,
-                'approved_by'  => $USER->id,
-                'timepublished' => time(),
-            ]);
+            $DB->set_field('umat_ai_outputs', 'is_approved',   1,      ['id' => $output->id]);
+            $DB->set_field('umat_ai_outputs', 'approved_by',   $USER->id, ['id' => $output->id]);
+            $DB->set_field('umat_ai_outputs', 'timepublished', time(), ['id' => $output->id]);
+            $message = get_string('approved_message', 'local_umat_ai');
 
-            return [
-                'success' => true,
-                'message' => 'Output approved and published successfully.',
-            ];
+        } elseif ($params['action'] === 'reject') {
+            // Soft-delete: mark as approved = -1 so it's excluded from student queries
+            // without losing the record for audit purposes.
+            $DB->set_field('umat_ai_outputs', 'is_approved',   -1,     ['id' => $output->id]);
+            $DB->set_field('umat_ai_outputs', 'approved_by',   $USER->id, ['id' => $output->id]);
+            $message = get_string('rejected_message', 'local_umat_ai');
+
         } else {
-            // Rejection: store a log entry in chat_logs for debugging/audit.
-            $DB->insert_record('umat_ai_chat_logs', (object)[
-                'userid'      => $USER->id,
-                'courseid'    => $params['courseid'],
-                'question'    => "REJECTED output #{$output->id} ({$output->output_type})",
-                'answer'      => $params['comment'],
-                'sources'     => 'rejection_log',
-                'timecreated' => time(),
-            ]);
-
-            return [
-                'success' => true,
-                'message' => 'Output rejected. A comment has been recorded.',
-            ];
+            return ['success' => false, 'message' => 'Invalid action.'];
         }
+
+        return ['success' => true, 'message' => $message];
     }
 
     public static function approve_returns() {
         return new \external_single_structure([
-            'success' => new \external_value(PARAM_BOOL),
-            'message' => new \external_value(PARAM_TEXT),
+            'success' => new \external_value(PARAM_BOOL, 'Whether the action succeeded'),
+            'message' => new \external_value(PARAM_TEXT, 'Feedback message'),
         ]);
     }
 }

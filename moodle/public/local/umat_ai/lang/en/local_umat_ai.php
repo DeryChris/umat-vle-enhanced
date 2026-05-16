@@ -1,133 +1,127 @@
 <?php
-// ============================================================
-// All English language strings for the plugin
-// ============================================================
+/**
+ * Language strings for local_umat_ai.
+ *
+ * @package    local_umat_ai
+ * @copyright  2026 UMaT
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
 defined('MOODLE_INTERNAL') || die();
 
-$string['pluginname']      = 'UMaT AI Academic Support';
-$string['pluginname_desc'] = 'Generative AI-enhanced academic support for UMaT VLE';
+/* ---- Plugin metadata ---- */
+$string['pluginname']            = 'UMaT AI Learning Assistant';
 
-// --- Settings ---
-$string['ai_service_url']        = 'AI Service URL';
-$string['ai_service_url_desc']   = 'The URL of the Python FastAPI AI processing service';
-$string['ai_service_token']      = 'AI Service Token';
-$string['ai_service_token_desc'] = 'Bearer token for authenticating with the AI service';
+/* ---- Capabilities ---- */
+$string['umat_ai:viewsummary']   = 'View AI-generated summaries and notes';
+$string['umat_ai:approveoutput'] = 'Approve AI-generated content';
+$string['umat_ai:chatwithai']    = 'Chat with the AI assistant';
+$string['umat_ai:viewanalytics'] = 'View lecturer analytics dashboard';
 
-$string['google_api_key']        = 'Gemini API Key';
-$string['google_api_key_desc']   = 'Your Google Gemini API key (Google AI Studio) for LLM processing';
+/* ---- General ---- */
+$string['ai_assistant']          = 'UMaT AI Assistant';
+$string['ai_hub_title']          = 'AI Learning Hub';
+$string['send']                  = 'Send';
+$string['na']                    = 'N/A';
+$string['error_message']         = 'An error occurred. Please try again.';
+$string['connection_error']      = 'Cannot connect to the AI service. Please try again later.';
+$string['ai_unavailable']        = 'The AI service is currently unavailable. Please try again shortly.';
 
-$string['llm_model']             = 'LLM Model';
-$string['llm_model_desc']        = 'The Gemini model to use for content generation';
+/* ---- FAB tooltips ---- */
+$string['open_ai_assistant']     = 'Open AI Assistant';
+$string['open_analytics']        = 'Open Analytics Dashboard';
+$string['open_hub']              = 'Open AI Learning Hub';
 
-$string['require_approval']      = 'Require Lecturer Approval';
-$string['require_approval_desc'] = 'AI-generated content must be approved by the lecturer before students can view it';
+/* ---- Student FAB / panel ---- */
+$string['ask_placeholder']       = 'Type your academic question…';
+$string['quick_summarize']       = 'Summarize Lecture';
+$string['quick_assignment']      = 'About Assignment';
+$string['quick_explain']         = 'Explain Concept';
+$string['quick_deadlines']       = 'Deadlines';
+$string['rate_limit_hit']        = 'You\'ve reached the question limit for this minute. Please wait a moment and try again.';
+$string['rate_remaining']        = '{$a} questions remaining this minute';
+$string['online_ready']          = 'Online & Ready';
+$string['expand']                = 'Expand';
+$string['past_sessions']         = 'Past Sessions';
+$string['tab_chat']              = 'Chat';
+$string['tab_notes']             = 'Notes';
+$string['tab_resources']         = 'Resources';
+$string['no_notes_yet']          = 'AI-generated notes will appear here after the lecturer processes a lecture recording and approves the content.';
+$string['no_resources']          = 'Course materials indexed for AI will appear here once they are uploaded by your lecturer.';
 
-// --- Chat UI ---
-$string['chatpanel_title']   = 'UMaT AI Assistant';
-$string['chatpanel_tooltip'] = 'Ask UMaT AI Assistant';
-$string['ai_greeting']       = 'Hello! I can answer questions about your course materials and lecture content. How can I help you today?';
-$string['ai_online']         = 'Online & Ready';
-$string['ask_placeholder']   = 'Type your academic question...';
-$string['send']              = 'Send';
-$string['close']             = 'Close';
-$string['ai_disclaimer']     = 'Answers are based on your course materials only. Always verify with your lecturer.';
-$string['materials_indexed'] = 'Course materials loaded';
-$string['no_materials']      = 'No materials indexed yet';
-$string['no_access']         = 'You do not have permission to use the AI assistant in this course.';
+/* ---- Workspace ---- */
+$string['workspace_greeting']    = 'Welcome to the AI Workspace! I can see your current lecture. Ask me anything about the content, or click a suggestion above.';
+$string['ask_about_video']       = 'Ask about this lecture…';
+$string['transcript']            = 'Lecture Transcript';
+$string['search_transcript']     = 'Search transcript…';
+$string['generate_summary']      = 'Generate Notes';
+$string['attach_material']       = 'Attach Material';
+$string['video_error']           = 'Your browser does not support the video element.';
 
-// --- Quick Actions ---
-$string['action_summarize']  = 'Summarize';
-$string['action_assignment'] = 'Assignment';
-$string['action_explain']    = 'Explain Topic';
-$string['action_deadlines']  = 'Deadlines';
-$string['quick_summarize']   = 'Can you summarize the main points from this week\'s lecture?';
-$string['quick_assignment'] = 'What are the requirements for the current assignment?';
-$string['quick_explain']     = 'Can you explain the key concept from this week?';
-$string['quick_deadlines']  = 'What are the upcoming deadlines in this course?';
+/* ---- Lecturer panel ---- */
+$string['lecturer_analytics']    = 'Lecturer Analytics';
+$string['open_full_dashboard']   = 'Open Full Analytics Dashboard';
+$string['review_ai_outputs']     = 'Review AI Outputs';
+$string['common_questions']      = 'Common Student Questions';
+$string['ai_insights']           = 'AI Insights';
+$string['loading_analytics']     = 'Loading analytics data…';
+$string['ask_ai_placeholder']    = 'Ask AI about your course…';
+$string['struggle_areas']        = 'Struggle areas';
+$string['weekly_summary']        = 'Weekly summary';
+$string['at_risk_students']      = 'At-risk students';
 
-// --- Status ---
-$string['questions_remaining'] = 'questions remaining';
-$string['error_ai']            = 'Sorry, something went wrong. Please try again.';
+/* ---- Analytics dashboard ---- */
+$string['analytics_dashboard_title'] = 'Course Analytics Dashboard';
+$string['active_students']       = 'Active Students';
+$string['enrolled']              = 'enrolled';
+$string['ai_interactions']       = 'AI Interactions';
+$string['thirty_days']           = '30 days';
+$string['struggle_index']        = 'Struggle Index';
+$string['most_questioned']       = 'Most-questioned session';
+$string['pending_approvals']     = 'Pending Approvals';
+$string['needs_review']          = 'Needs review';
+$string['all_clear']             = 'All clear';
+$string['engagement_trends']     = 'Student Engagement Trends';
+$string['fourteen_days']         = '14 days';
+$string['performance_breakdown'] = 'Student Performance Breakdown';
+$string['high_engagement']       = 'High Engagement';
+$string['on_track']              = 'On Track';
+$string['at_risk']               = 'At Risk (inactive)';
+$string['export_report']         = 'Export Report';
 
-// --- Approval ---
-$string['reject_btn']    = 'Reject';
-$string['approval_nav'] = 'Review AI Outputs';
+/* ---- Hub ---- */
+$string['general_chat']          = 'General AI Chat';
+$string['all_courses']           = 'All Courses';
+$string['recent_sessions']       = 'Recent Sessions';
+$string['new_session']           = 'New Conversation';
+$string['sessions_this_week']    = 'Sessions this week';
+$string['questions_asked']       = 'Questions asked';
+$string['learning_pulse']        = 'Learning Pulse';
+$string['study_goal']            = 'Weekly study goal';
+$string['hub_greeting']          = 'Hello! I\'m your AI learning companion. I can help with any subject from your enrolled courses. What would you like to explore today?';
 
-// --- AI Output ---
-$string['session_summary']  = 'Lecture Summary';
-$string['session_notes']    = 'Study Notes';
-$string['session_quiz']     = 'Practice Questions';
-$string['pending_approval'] = 'Awaiting lecturer approval';
-$string['approve_btn']      = 'Approve and Publish';
-$string['what_you_missed']  = 'What You Missed';
+/* ---- Approval page ---- */
+$string['approval_title']        = 'Review AI-Generated Content';
+$string['str_approve']           = 'Approve & Publish';
+$string['str_reject']            = 'Reject';
+$string['str_summary']           = 'Summary';
+$string['str_notes']             = 'Notes';
+$string['str_quiz']              = 'Practice Quiz';
+$string['str_no_pending']        = 'There are no AI-generated outputs awaiting your review for this course. Check back after the next lecture session.';
+$string['approved_message']      = 'Content approved and published to students.';
+$string['rejected_message']      = 'Content rejected and removed from the queue.';
 
-// --- Scheduled tasks ---
-$string['task_process_recording'] = 'Process BBB lecture recordings';
-$string['task_sync_transcripts']  = 'Sync AI-generated transcripts and summaries';
-$string['task_index_materials']   = 'Index new course materials for AI';
-
-// --- Materials ---
-$string['upload_materials'] = 'Upload Materials';
-$string['upload_material_desc'] = 'Upload course materials for AI indexing';
-$string['material_uploaded'] = 'File uploaded successfully';
-$string['material_indexed'] = 'Material indexed and ready for AI Q&A';
-
-// --- Privacy ---
-$string['privacy:metadata:umat_ai_chat_logs']             = 'Stores your AI chat interactions within course contexts';
-$string['privacy:metadata:umat_ai_chat_logs:userid']      = 'Your Moodle user ID';
-$string['privacy:metadata:umat_ai_chat_logs:question']    = 'Questions you ask the AI assistant';
-$string['privacy:metadata:umat_ai_chat_logs:answer']      = 'Answers provided by the AI';
-$string['privacy:metadata:umat_ai_chat_logs:timecreated'] = 'When you asked the question';
-
-// --- Workspace ---
-$string['ai_assistant']         = 'AI Assistant';
-$string['transcript']           = 'Transcript';
-$string['search_transcript']     = 'Search transcript...';
-$string['video_error']          = 'Your browser does not support the video tag.';
-$string['generate_summary']     = 'Generate Summary';
-$string['generate_summary_prompt'] = 'Can you summarize the key points from this lecture segment?';
-$string['attach_material']      = 'Attach Reference Material';
-$string['tab_chat']             = 'Chat';
-$string['tab_notes']            = 'Notes';
-$string['tab_resources']        = 'Resources';
-$string['workspace_greeting']   = 'I can help you understand this lecture. Ask me about specific concepts, or use "Generate Summary" to get a quick overview.';
-$string['ai_thinking']          = 'AI is thinking...';
-$string['suggest_explain']      = 'Explain this';
-$string['suggest_elaborate']    = 'Tell me more';
-$string['suggest_compare']      = 'Compare to...';
-$string['suggest_explain_text'] = 'Can you explain this concept in more detail?';
-$string['suggest_elaborate_text'] = 'Can you elaborate on this with more examples?';
-$string['suggest_compare_text'] = 'How does this compare to what we covered earlier?';
-$string['ask_about_video']      = 'Ask about this lecture...';
-$string['generated_notes']       = 'Generated Notes';
-$string['download']             = 'Download';
-$string['no_notes_yet']         = 'No notes generated yet. Click "Generate Summary" to create study notes.';
-$string['course_resources']     = 'Course Resources';
-$string['no_resources']         = 'No resources available for this session.';
-$string['material_picker_coming'] = 'Material picker coming soon!';
-
-// External processor disclosure:
-$string['privacy:metadata:google_gemini_api'] = 'Questions you ask may be sent to the Gemini API for processing.';
-
-// --- AI Hub ---
-$string['ai_hub_title']      = 'AI Learning Hub';
-$string['ai_hub_subtitle']   = 'Your cross-course AI assistant and session history';
-$string['learning_pulse']    = 'Learning Pulse';
-$string['pulse_description'] = 'Your most focused topics this semester based on AI interactions.';
-$string['study_goal']        = 'Study Goal Progress';
-$string['general_chat']     = 'General Chat';
-$string['all_courses']       = 'All Courses';
-$string['hub_greeting']      = 'Hello! I\'m your AI learning assistant. Ask me anything about your courses or select a previous session to continue.';
-$string['recent_sessions']  = 'Recent Sessions';
-$string['new_session']       = 'New Session';
-$string['ai_thinking']       = 'AI is thinking...';
-$string['error_message']     = 'Sorry, something went wrong. Please try again.';
-$string['connection_error'] = 'Error connecting to AI service. Make sure it\'s running.';
-$string['expand']           = 'Expand to full page';
-$string['open_in_full']     = 'Open in full';
-$string['close_fullscreen'] = 'Close full screen';
-$string['open_hub']        = 'Open AI Hub';
-$string['sessions_this_week'] = 'Sessions this week';
-$string['questions_asked']   = 'Questions asked';
-$string['search_sessions']   = 'Search sessions...';
+/* ---- Settings ---- */
+$string['settings_heading']      = 'UMaT AI Configuration';
+$string['ai_service_url']        = 'AI Service Base URL';
+$string['ai_service_url_desc']   = 'The base URL for the AI backend service (e.g. http://localhost:8000). No trailing slash.';
+$string['ai_service_token']      = 'API Token';
+$string['ai_service_token_desc'] = 'Bearer token used to authenticate requests to the AI backend.';
+$string['rate_limit']            = 'Rate Limit (questions per minute)';
+$string['rate_limit_desc']       = 'Maximum number of AI questions a student can ask per minute. Default: 10.';
+$string['enable_student_fab']    = 'Enable Student AI FAB';
+$string['enable_student_fab_desc'] = 'Show the floating AI assistant button on all student course pages.';
+$string['enable_lecturer_fab']   = 'Enable Lecturer Analytics FAB';
+$string['enable_lecturer_fab_desc'] = 'Show the floating analytics button on all lecturer course pages.';
+$string['enable_hub_fab']        = 'Enable Hub FAB (non-course pages)';
+$string['enable_hub_fab_desc']   = 'Show a compact AI Hub button on non-course pages for enrolled students.';

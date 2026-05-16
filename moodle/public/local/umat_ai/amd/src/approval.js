@@ -1,107 +1,153 @@
 // ============================================================
-// AMD module for the AI output approval page
-// Handles approve/reject actions via the Moodle web service
+// AMD module: local_umat_ai/approval
+// Handles approve / reject button logic on the approval page.
 // ============================================================
 
-define([
-    'core/ajax',
-    'core/notification',
-    'core/str',
-], function(Ajax, Notification, Str) {
+define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
     'use strict';
 
-    const init = function(options) {
-        const courseId = options.courseId;
+    /**
+     * Wire approve/reject buttons to the external API.
+     * Called from the approval.mustache {{#js}} block.
+     */
+    function init() {
 
-        // --- Approve button handler ---
+        // ---- approve buttons ---- //
         document.querySelectorAll('.umat-approve-btn').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                const outputId = btn.dataset.outputId;
-                handleAction(outputId, 'approve', '', btn);
+                var outputId = parseInt(btn.dataset.outputId);
+                var courseId = parseInt(btn.dataset.courseId);
+                handleAction(outputId, courseId, 'approve', '');
             });
         });
 
-        // --- Reject button handler ---
+        // ---- reject buttons — show comment field first ---- //
         document.querySelectorAll('.umat-reject-btn').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                const outputId = btn.dataset.outputId;
-                const outputEl = btn.closest('.umat-approval-output');
-                const commentEl = outputEl ? outputEl.querySelector('.umat-rejection-comment') : null;
+                var outputId = parseInt(btn.dataset.outputId);
+                var courseId = parseInt(btn.dataset.courseId);
+                var commentEl = document.getElementById('comment-' + outputId);
 
-                // Toggle comment textarea visibility on first click.
-                if (commentEl && commentEl.classList.contains('d-none')) {
-                    commentEl.classList.remove('d-none');
-                    commentEl.focus();
+                if (!commentEl) {
+                    handleAction(outputId, courseId, 'reject', '');
                     return;
                 }
 
-                // Second click submits the rejection.
-                const comment = commentEl ? commentEl.value.trim() : '';
-                handleAction(outputId, 'reject', comment, btn);
+                // First click: reveal the comment box.
+                if (commentEl.style.display === 'none' || commentEl.style.display === '') {
+                    commentEl.style.display = 'block';
+                    commentEl.focus();
+                    btn.innerHTML = '<span class="material-symbols-outlined">send</span> Confirm Rejection';
+                    return;
+                }
+
+                // Second click: submit the rejection.
+                handleAction(outputId, courseId, 'reject', commentEl.value);
             });
         });
-    };
+    }
 
     /**
-     * Call the web service and update the UI on success/failure.
+     * Call the external API and update the UI.
      *
      * @param {number} outputId
-     * @param {string} action   'approve' or 'reject'
-     * @param {string} comment   Rejection comment (may be empty)
-     * @param {HTMLElement} btn  The button that triggered the action
+     * @param {number} courseId
+     * @param {string} action  - 'approve' or 'reject'
+     * @param {string} comment - optional rejection comment
      */
-    function handleAction(outputId, action, comment, btn) {
-        // Disable button to prevent double-submit.
-        btn.disabled = true;
+    function handleAction(outputId, courseId, action, comment) {
+        var actionsEl   = document.getElementById('actions-' + outputId);
+        var feedbackEl  = document.getElementById('feedback-' + outputId);
+        var statusBadge = document.getElementById('status-badge-' + outputId);
+
+        // Disable buttons during request.
+        if (actionsEl) {
+            actionsEl.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
+        }
 
         Ajax.call([{
             methodname: 'local_umat_ai_approve_output',
             args: {
-                outputid: parseInt(outputId, 10),
-                courseid: parseInt(btn.dataset.courseId, 10),
+                outputid: outputId,
+                courseid: courseId,
                 action:   action,
-                comment:  comment,
+                comment:  comment || '',
             },
         }])[0].done(function(response) {
-            const outputEl = btn.closest('.umat-approval-output');
-            const feedbackEl = outputEl ? outputEl.querySelector('.umat-approval-feedback') : null;
-
             if (response.success) {
-                // Show success message on the row.
+                // Show feedback.
                 if (feedbackEl) {
-                    feedbackEl.classList.remove('d-none');
+                    feedbackEl.textContent = response.message;
+                    feedbackEl.className   = 'umat-action-feedback feedback-ok';
+                    feedbackEl.style.display = 'block';
+                }
+
+                // Update status badge.
+                if (statusBadge) {
                     if (action === 'approve') {
-                        feedbackEl.innerHTML =
-                            '<span class="text-success"><i class="fa fa-check-circle"></i> ' +
-                            response.message + '</span>';
+                        statusBadge.textContent = '✅ Approved & Published';
+                        statusBadge.className   = 'umat-status-badge status-approved';
                     } else {
-                        feedbackEl.innerHTML =
-                            '<span class="text-muted"><i class="fa fa-info-circle"></i> ' +
-                            response.message + '</span>';
+                        statusBadge.textContent = '❌ Rejected';
+                        statusBadge.className   = 'umat-status-badge status-rejected';
                     }
                 }
 
-                // Hide action buttons on this output row.
-                const actionsEl = outputEl ? outputEl.querySelector('.umat-output-actions') : null;
+                // Fade out action buttons.
                 if (actionsEl) {
-                    actionsEl.style.display = 'none';
+                    actionsEl.style.opacity = '0.4';
+                    actionsEl.style.pointerEvents = 'none';
                 }
 
-                // Hide the entire output card if all outputs for this session are handled.
-                // Check if any visible approve/reject buttons remain for this session.
-                const sessionEl = outputEl ? outputEl.closest('.umat-approval-session') : null;
-                if (sessionEl) {
-                    const remainingBtns = sessionEl.querySelectorAll('.umat-output-actions:not([style*="none"])');
-                    if (remainingBtns.length === 0) {
-                        sessionEl.style.opacity = '0.5';
-                        sessionEl.style.pointerEvents = 'none';
-                    }
+                // If all outputs on the page are resolved, show the "all done" banner
+                // after a short delay.
+                setTimeout(checkAllDone, 600);
+
+            } else {
+                showError(feedbackEl, 'Action failed. Please try again.');
+                if (actionsEl) {
+                    actionsEl.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
                 }
             }
         }).fail(function(ex) {
-            btn.disabled = false;
+            showError(feedbackEl, 'Network error. Please check your connection.');
+            if (actionsEl) {
+                actionsEl.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
+            }
             Notification.exception(ex);
         });
+    }
+
+    function showError(el, msg) {
+        if (!el) return;
+        el.textContent    = msg;
+        el.className      = 'umat-action-feedback feedback-err';
+        el.style.display  = 'block';
+    }
+
+    function checkAllDone() {
+        var allResolved = true;
+        document.querySelectorAll('.umat-output-card').forEach(function(card) {
+            var badge = card.querySelector('.umat-status-badge');
+            if (badge && badge.classList.contains('status-pending')) {
+                allResolved = false;
+            }
+        });
+        if (allResolved) {
+            var wrap = document.querySelector('.umat-approve-wrap');
+            if (wrap) {
+                var blocks = wrap.querySelectorAll('.umat-session-block');
+                blocks.forEach(function(b) { b.style.display = 'none'; });
+                // Insert success banner.
+                var banner = document.createElement('div');
+                banner.className = 'umat-all-done';
+                banner.innerHTML =
+                    '<span class="material-symbols-outlined">check_circle</span>' +
+                    '<h3>All caught up!</h3>' +
+                    '<p>All AI outputs have been reviewed. Check back after the next lecture session.</p>';
+                wrap.appendChild(banner);
+            }
+        }
     }
 
     return { init: init };

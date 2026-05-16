@@ -1,177 +1,322 @@
 {{!
     Template: local/umat_ai/templates/ai_workspace.mustache
-    Full-page expanded AI workspace with video player, transcript, and tabbed AI panel.
+    Full-page expanded AI workspace — video player + transcript + AI sidebar.
 
-    Context variables:
-    - courseid (int)
-    - coursefullname (string)
-    - sessionid (int)
-    - sessiontitle (string)
-    - video_url (string)
-    - transcript (array) - [{timestamp, text}]
-    - has_capability (bool)
+    Context:
+      courseid, coursefullname, sessionid, sessiontitle
+      video_url (string), has_video (bool)
+      transcript (array: timestamp, start, end, text)
+      has_capability (bool)
+      hub_url, wwwroot
 }}
 
 {{#has_capability}}
-<div class="umat-ai-workspace" data-courseid="{{courseid}}" data-sessionid="{{sessionid}}">
-    <!-- Left Panel: Video + Transcript -->
-    <div class="workspace-video-panel">
-        <!-- Video Player -->
-        <div class="video-container">
-            <video id="umat-lecture-video" controls preload="metadata">
-                <source src="{{video_url}}" type="video/mp4">
-                {{#str}}video_error, local_umat_ai{{/str}}
-            </video>
-            <div class="video-controls">
-                <button class="video-btn" data-action="rewind-30" aria-label="Rewind 30s">
-                    <span class="material-symbols-outlined">replay_30</span>
-                </button>
-                <button class="video-btn" data-action="play-pause" aria-label="Play/Pause">
-                    <span class="material-symbols-outlined">play_arrow</span>
-                </button>
-                <button class="video-btn" data-action="forward-30" aria-label="Forward 30s">
-                    <span class="material-symbols-outlined">forward_30</span>
-                </button>
-                <div class="video-time">
-                    <span id="current-time">0:00</span> / <span id="duration">0:00</span>
-                </div>
-                <input type="range" class="video-progress" id="video-progress" min="0" max="100" value="0">
-            </div>
-        </div>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
 
-        <!-- Session Info -->
-        <div class="session-info">
-            <h3 class="session-title">{{sessiontitle}}</h3>
-            <span class="course-badge">{{coursefullname}}</span>
-        </div>
+<style>
+:root{--p:#006b2f;--pb:#00873d;--op:#fff;--sf:#f5fbf0;--sfl:#eff6eb;--sflo:#fff;--ons:#171d17;--onsv:#3e4a3e;--ol:#6e7a6d;--olv:#bdcaba;--sec:#3d6844;--secc:#beefc1;--ter:#a5304d;--r8:8px;--r12:12px;--r16:16px;}
+.umat-ws{display:flex;height:calc(100vh - 60px);overflow:hidden;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ons);}
+@media(max-width:900px){.umat-ws{flex-direction:column;height:auto;}}
 
-        <!-- Searchable Transcript -->
-        <div class="transcript-panel">
-            <div class="transcript-header">
-                <h4>{{#str}}transcript, local_umat_ai{{/str}}</h4>
-                <div class="transcript-search">
-                    <span class="material-symbols-outlined">search</span>
-                    <input type="text" id="transcript-search" placeholder="{{#str}}search_transcript, local_umat_ai{{/str}}">
-                </div>
-            </div>
-            <div class="transcript-content" id="transcript-content">
-                {{#transcript}}
-                <div class="transcript-segment" data-timestamp="{{timestamp}}" data-start="{{start}}" data-end="{{end}}">
-                    <button class="timestamp-btn" aria-label="Jump to {{timestamp}}">
-                        <span class="timestamp">{{timestamp}}</span>
-                    </button>
-                    <p class="transcript-text">{{text}}</p>
-                </div>
-                {{/transcript}}
-            </div>
-        </div>
+/* ---- Left panel ---- */
+.umat-ws-left{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--sf);}
+.umat-ws-left-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--olv);background:var(--sflo);}
+.umat-ws-back{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r8);border:1px solid var(--olv);background:none;cursor:pointer;font-size:13px;color:var(--ol);font-family:inherit;text-decoration:none;transition:all .2s;}
+.umat-ws-back:hover{border-color:var(--p);color:var(--p);}
+.umat-ws-back .material-symbols-outlined{font-size:16px;}
+.umat-ws-course-badge{padding:5px 12px;border-radius:999px;background:var(--secc);color:var(--sec);font-size:12px;font-weight:700;}
+
+/* Video container */
+.umat-video-wrap{position:relative;background:#000;flex-shrink:0;}
+.umat-video-wrap video{width:100%;display:block;max-height:280px;object-fit:contain;}
+.umat-video-no-video{aspect-ratio:16/9;max-height:280px;display:flex;align-items:center;justify-content:center;color:#666;flex-direction:column;gap:8px;font-size:14px;}
+.umat-video-no-video .material-symbols-outlined{font-size:48px;color:#444;}
+
+/* Video controls overlay */
+.umat-video-controls{display:flex;align-items:center;gap:12px;padding:10px 16px;background:linear-gradient(0deg,rgba(0,0,0,.8),transparent);position:absolute;bottom:0;left:0;right:0;}
+.umat-vc-btn{background:none;border:none;color:#fff;cursor:pointer;display:flex;align-items:center;padding:4px;}
+.umat-vc-btn .material-symbols-outlined{font-size:22px;}
+.umat-vc-time{color:#fff;font-size:13px;font-family:inherit;}
+.umat-vc-progress{flex:1;height:4px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,.3);border-radius:2px;cursor:pointer;}
+.umat-vc-progress::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--op);cursor:pointer;}
+
+/* Transcript */
+.umat-transcript{flex:1;display:flex;flex-direction:column;overflow:hidden;margin:12px 16px;background:var(--sflo);border:1px solid var(--olv);border-radius:var(--r12);}
+.umat-transcript-header{padding:12px 16px;border-bottom:1px solid var(--olv);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.umat-transcript-title{margin:0;font-size:14px;font-weight:700;color:var(--ons);}
+.umat-transcript-search{display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--olv);border-radius:var(--r8);background:var(--sf);}
+.umat-transcript-search .material-symbols-outlined{font-size:16px;color:var(--ol);}
+.umat-transcript-search input{border:none;background:none;outline:none;font-size:13px;width:140px;font-family:inherit;color:var(--ons);}
+.umat-transcript-body{flex:1;overflow-y:auto;padding:8px;}
+.umat-transcript-body::-webkit-scrollbar{width:4px;}
+.umat-transcript-body::-webkit-scrollbar-thumb{background:var(--olv);border-radius:2px;}
+.umat-ts-segment{display:flex;gap:10px;padding:8px 10px;border-radius:var(--r8);cursor:pointer;transition:background .15s;align-items:flex-start;}
+.umat-ts-segment:hover{background:var(--sfl);}
+.umat-ts-segment.active{background:rgba(0,107,47,.1);border-left:3px solid var(--p);padding-left:7px;}
+.umat-ts-btn{background:none;border:none;cursor:pointer;padding:0;flex-shrink:0;}
+.umat-ts-time{font-size:11px;font-weight:700;color:var(--p);white-space:nowrap;}
+.umat-ts-text{font-size:13px;color:var(--ons);line-height:1.5;margin:0;}
+.umat-ts-empty{text-align:center;padding:32px;color:var(--ol);font-size:13px;}
+
+/* ---- Right panel (AI) ---- */
+.umat-ws-right{width:420px;display:flex;flex-direction:column;background:var(--sflo);border-left:1px solid var(--olv);box-shadow:-4px 0 20px rgba(0,0,0,.08);flex-shrink:0;}
+@media(max-width:900px){.umat-ws-right{width:100%;border-left:none;border-top:1px solid var(--olv);}}
+
+.umat-ws-ai-header{background:linear-gradient(135deg,var(--p),var(--pb));padding:16px 18px;color:var(--op);display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.umat-ws-ai-avatar{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;position:relative;}
+.umat-ws-ai-avatar .material-symbols-outlined{font-size:22px;}
+.umat-ai-dot{position:absolute;bottom:1px;right:1px;width:10px;height:10px;border-radius:50%;background:#4ade80;border:2px solid var(--p);}
+.umat-ws-ai-info{flex:1;min-width:0;}
+.umat-ws-ai-info h3{margin:0;font-size:15px;font-weight:700;}
+.umat-ws-ai-info span{font-size:11px;opacity:.85;}
+.umat-ws-action-btns{display:flex;gap:6px;}
+.umat-ws-action-btn{background:rgba(255,255,255,.2);border:none;color:var(--op);width:32px;height:32px;border-radius:var(--r8);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+.umat-ws-action-btn .material-symbols-outlined{font-size:18px;}
+.umat-ws-action-btn:hover{background:rgba(255,255,255,.3);}
+
+/* AI tabs */
+.umat-ws-tabs{display:flex;border-bottom:1px solid var(--olv);flex-shrink:0;}
+.umat-ws-tab{flex:1;padding:11px 8px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;color:var(--ol);border-bottom:2.5px solid transparent;transition:all .2s;font-family:inherit;}
+.umat-ws-tab:hover{color:var(--p);background:var(--sf);}
+.umat-ws-tab.active{color:var(--p);border-bottom-color:var(--p);font-weight:700;}
+
+/* Tab panes */
+.umat-ws-pane{display:none;flex:1;flex-direction:column;overflow:hidden;}
+.umat-ws-pane.active{display:flex;}
+
+/* Chat */
+.umat-ws-messages{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--sf);}
+.umat-ws-messages::-webkit-scrollbar{width:4px;}
+.umat-ws-messages::-webkit-scrollbar-thumb{background:var(--olv);border-radius:2px;}
+.umat-ws-msg-ai{display:flex;gap:8px;align-items:flex-start;}
+.umat-ws-msg-ai-icon{width:28px;height:28px;border-radius:50%;background:rgba(0,107,47,.12);color:var(--p);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.umat-ws-msg-ai-icon .material-symbols-outlined{font-size:15px;}
+.umat-ws-bubble-ai{background:var(--sflo);border-left:2.5px solid var(--p);padding:10px 12px;border-radius:0 var(--r8) var(--r8) var(--r8);font-size:13px;line-height:1.55;box-shadow:0 1px 6px rgba(0,0,0,.05);}
+.umat-ws-bubble-ai p{margin:0;}
+.umat-ws-msg-student{display:flex;justify-content:flex-end;}
+.umat-ws-bubble-student{background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#052e16;padding:10px 12px;border-radius:var(--r8) 0 var(--r8) var(--r8);font-size:13px;max-width:86%;}
+.umat-ws-bubble-student p{margin:0;}
+.umat-ws-sources{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px;padding-left:36px;}
+.umat-ws-source{padding:2px 8px;border-radius:999px;background:var(--secc);color:var(--sec);font-size:11px;font-weight:600;}
+
+/* Suggestions */
+.umat-ws-chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-bottom:1px solid var(--olv);flex-shrink:0;}
+.umat-ws-chip{padding:5px 12px;border-radius:999px;border:1.5px solid var(--olv);background:none;color:var(--onsv);font-size:12px;cursor:pointer;transition:all .2s;font-family:inherit;}
+.umat-ws-chip:hover{border-color:var(--p);color:var(--p);background:rgba(0,107,47,.05);}
+
+/* Typing */
+@keyframes ws-bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+.umat-ws-typing{display:flex;gap:4px;padding:8px 0;}
+.umat-ws-typing span{width:7px;height:7px;border-radius:50%;background:var(--p);animation:ws-bounce 1.2s infinite;}
+.umat-ws-typing span:nth-child(2){animation-delay:.2s;}
+.umat-ws-typing span:nth-child(3){animation-delay:.4s;}
+
+/* Input */
+.umat-ws-input-area{padding:12px 14px;border-top:1px solid var(--olv);flex-shrink:0;}
+.umat-ws-input-row{display:flex;gap:8px;align-items:flex-end;}
+.umat-ws-textarea{flex:1;padding:9px 12px;border:1.5px solid var(--olv);border-radius:var(--r8);font-size:13px;font-family:inherit;resize:none;outline:none;line-height:1.45;color:var(--ons);background:var(--sf);transition:border-color .2s;}
+.umat-ws-textarea:focus{border-color:var(--p);}
+.umat-ws-send{width:38px;height:38px;border-radius:var(--r8);background:var(--p);color:var(--op);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s;}
+.umat-ws-send .material-symbols-outlined{font-size:18px;}
+.umat-ws-send:hover{background:var(--pb);}
+.umat-ws-input-footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+.umat-ws-input-footer button{background:none;border:none;color:var(--p);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:3px;font-family:inherit;}
+.umat-ws-input-footer button .material-symbols-outlined{font-size:14px;}
+
+/* Notes & Resources panes */
+.umat-ws-empty{text-align:center;padding:32px 20px;color:var(--ol);font-size:13px;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;}
+.umat-ws-empty .material-symbols-outlined{font-size:44px;color:var(--olv);}
+</style>
+
+<div class="umat-ai-workspace umat-ws"
+     data-courseid="{{courseid}}"
+     data-sessionid="{{sessionid}}">
+
+  <!-- ================================================================ -->
+  <!-- LEFT: Video + Transcript                                          -->
+  <!-- ================================================================ -->
+  <div class="umat-ws-left">
+
+    <!-- Top nav -->
+    <div class="umat-ws-left-header">
+      <a href="{{hub_url}}" class="umat-ws-back">
+        <span class="material-symbols-outlined">arrow_back</span>
+        AI Hub
+      </a>
+      <span class="umat-ws-course-badge">{{coursefullname}}</span>
     </div>
 
-    <!-- Right Panel: Tabbed AI -->
-    <div class="workspace-ai-panel">
-        <!-- Panel Header -->
-        <div class="ai-workspace-header">
-            <div class="ai-header-info">
-                <span class="material-symbols-outlined">smart_toy</span>
-                <div>
-                    <span class="ai-title">{{#str}}ai_assistant, local_umat_ai{{/str}}</span>
-                    <span class="course-context">{{coursefullname}}</span>
-                </div>
-            </div>
-            <div class="ai-header-actions">
-                <button class="action-btn" data-action="generate-summary" title="{{#str}}generate_summary, local_umat_ai{{/str}}">
-                    <span class="material-symbols-outlined">summarize</span>
-                </button>
-                <button class="action-btn" data-action="attach-material" title="{{#str}}attach_material, local_umat_ai{{/str}}">
-                    <span class="material-symbols-outlined">attach_file</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Tabs -->
-        <div class="ai-tabs">
-            <button class="tab-btn active" data-tab="chat">{{#str}}tab_chat, local_umat_ai{{/str}}</button>
-            <button class="tab-btn" data-tab="notes">{{#str}}tab_notes, local_umat_ai{{/str}}</button>
-            <button class="tab-btn" data-tab="resources">{{#str}}tab_resources, local_umat_ai{{/str}}</button>
-        </div>
-
-        <!-- Tab Content: Chat -->
-        <div class="tab-content active" id="tab-chat">
-            <div class="chat-messages" id="workspace-chat-messages">
-                <div class="chat-message ai">
-                    <div class="chat-bubble">
-                        <p>{{#str}}workspace_greeting, local_umat_ai{{/str}}</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Typing Indicator -->
-            <div class="ai-typing-indicator" id="workspace-typing" style="display: none;">
-                <div class="typing-dots">
-                    <span></span><span></span><span></span>
-                </div>
-                <span class="typing-label">{{#str}}ai_thinking, local_umat_ai{{/str}}</span>
-            </div>
-
-            <!-- Contextual Suggestions -->
-            <div class="suggestion-chips" id="suggestion-chips" style="display: none;">
-                <button class="suggestion-chip" data-suggestion="explain">{{#str}}suggest_explain, local_umat_ai{{/str}}</button>
-                <button class="suggestion-chip" data-suggestion="elaborate">{{#str}}suggest_elaborate, local_umat_ai{{/str}}</button>
-                <button class="suggestion-chip" data-suggestion="compare">{{#str}}suggest_compare, local_umat_ai{{/str}}</button>
-            </div>
-
-            <!-- Chat Input -->
-            <div class="chat-input-area">
-                <textarea
-                    id="workspace-question-input"
-                    placeholder="{{#str}}ask_about_video, local_umat_ai{{/str}}"
-                    rows="2"
-                    maxlength="500"
-                ></textarea>
-                <button class="send-btn" id="workspace-send-btn" aria-label="{{#str}}send, local_umat_ai{{/str}}">
-                    <span class="material-symbols-outlined">send</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Tab Content: Notes -->
-        <div class="tab-content" id="tab-notes">
-            <div class="notes-panel">
-                <div class="notes-header">
-                    <h4>{{#str}}generated_notes, local_umat_ai{{/str}}</h4>
-                    <button class="download-btn">
-                        <span class="material-symbols-outlined">download</span>
-                        {{#str}}download, local_umat_ai{{/str}}
-                    </button>
-                </div>
-                <div class="notes-content" id="notes-content">
-                    <p class="empty-state">{{#str}}no_notes_yet, local_umat_ai{{/str}}</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tab Content: Resources -->
-        <div class="tab-content" id="tab-resources">
-            <div class="resources-panel">
-                <div class="resources-header">
-                    <h4>{{#str}}course_resources, local_umat_ai{{/str}}</h4>
-                </div>
-                <div class="resources-list" id="resources-list">
-                    <p class="empty-state">{{#str}}no_resources, local_umat_ai{{/str}}</p>
-                </div>
-            </div>
-        </div>
+    <!-- Video player -->
+    <div class="umat-video-wrap">
+      {{#has_video}}
+      <video id="umat-lecture-video" preload="metadata">
+        <source src="{{video_url}}" type="video/mp4">
+        {{#str}}video_error, local_umat_ai{{/str}}
+      </video>
+      <div class="umat-video-controls">
+        <button class="umat-vc-btn" data-action="rewind-30" title="Rewind 30s">
+          <span class="material-symbols-outlined">replay_30</span>
+        </button>
+        <button class="umat-vc-btn" data-action="play-pause" title="Play / Pause" id="ws-play-btn">
+          <span class="material-symbols-outlined">play_arrow</span>
+        </button>
+        <button class="umat-vc-btn" data-action="forward-30" title="Forward 30s">
+          <span class="material-symbols-outlined">forward_30</span>
+        </button>
+        <span class="umat-vc-time">
+          <span id="current-time">0:00</span> / <span id="duration">0:00</span>
+        </span>
+        <input type="range" id="video-progress" class="umat-vc-progress" min="0" max="100" value="0">
+      </div>
+      {{/has_video}}
+      {{^has_video}}
+      <div class="umat-video-no-video">
+        <span class="material-symbols-outlined">videocam_off</span>
+        <span>No recording available for this session yet.</span>
+      </div>
+      {{/has_video}}
     </div>
-</div>
+
+    <!-- Session info -->
+    <div style="padding:10px 16px 0;display:flex;align-items:center;gap:10px;">
+      <h3 style="margin:0;font-size:15px;font-weight:700;color:var(--ons);">{{sessiontitle}}</h3>
+    </div>
+
+    <!-- Transcript panel -->
+    <div class="umat-transcript">
+      <div class="umat-transcript-header">
+        <h4 class="umat-transcript-title">
+          <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;color:var(--p);margin-right:4px;">subtitles</span>
+          {{#str}}transcript, local_umat_ai{{/str}}
+        </h4>
+        <div class="umat-transcript-search">
+          <span class="material-symbols-outlined">search</span>
+          <input type="text" id="transcript-search" placeholder="{{#str}}search_transcript, local_umat_ai{{/str}}">
+        </div>
+      </div>
+
+      <div class="umat-transcript-body" id="transcript-content">
+        {{#transcript}}
+        <div class="umat-ts-segment" data-start="{{start}}" data-end="{{end}}">
+          <button class="umat-ts-btn timestamp-btn" aria-label="Jump to {{timestamp}}">
+            <span class="umat-ts-time">{{timestamp}}</span>
+          </button>
+          <p class="umat-ts-text transcript-text">{{text}}</p>
+        </div>
+        {{/transcript}}
+        {{^transcript}}
+        <div class="umat-ts-empty">
+          <span class="material-symbols-outlined" style="font-size:36px;color:var(--olv);display:block;margin-bottom:8px;">article</span>
+          Transcript will appear here once the recording has been processed by the AI service.
+        </div>
+        {{/transcript}}
+      </div>
+    </div>
+
+  </div><!-- /ws-left -->
+
+  <!-- ================================================================ -->
+  <!-- RIGHT: AI Sidebar                                                 -->
+  <!-- ================================================================ -->
+  <div class="umat-ws-right">
+
+    <!-- AI header -->
+    <div class="umat-ws-ai-header">
+      <div class="umat-ws-ai-avatar">
+        <span class="material-symbols-outlined">smart_toy</span>
+        <span class="umat-ai-dot"></span>
+      </div>
+      <div class="umat-ws-ai-info">
+        <h3>{{#str}}ai_assistant, local_umat_ai{{/str}}</h3>
+        <span>Online &amp; Ready</span>
+      </div>
+      <div class="umat-ws-action-btns">
+        <button class="umat-ws-action-btn action-btn" data-action="generate-summary" title="{{#str}}generate_summary, local_umat_ai{{/str}}">
+          <span class="material-symbols-outlined">summarize</span>
+        </button>
+        <button class="umat-ws-action-btn action-btn" data-action="attach-material" title="{{#str}}attach_material, local_umat_ai{{/str}}">
+          <span class="material-symbols-outlined">attach_file</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="umat-ws-tabs" role="tablist">
+      <button class="umat-ws-tab active tab-btn" data-tab="chat" role="tab" type="button">{{#str}}tab_chat, local_umat_ai{{/str}}</button>
+      <button class="umat-ws-tab tab-btn" data-tab="notes" role="tab" type="button">{{#str}}tab_notes, local_umat_ai{{/str}}</button>
+      <button class="umat-ws-tab tab-btn" data-tab="resources" role="tab" type="button">{{#str}}tab_resources, local_umat_ai{{/str}}</button>
+    </div>
+
+    <!-- Chat pane -->
+    <div class="umat-ws-pane active tab-content" id="tab-chat">
+      <!-- Context-aware suggestion chips -->
+      <div class="umat-ws-chips" id="suggestion-chips">
+        <button class="umat-ws-chip suggestion-chip" data-suggestion="explain">Explain this concept</button>
+        <button class="umat-ws-chip suggestion-chip" data-suggestion="elaborate">Tell me more</button>
+        <button class="umat-ws-chip suggestion-chip" data-suggestion="compare">Compare to earlier topic</button>
+      </div>
+
+      <div class="umat-ws-messages tab-content active" id="workspace-chat-messages">
+        <div class="umat-ws-msg-ai">
+          <div class="umat-ws-msg-ai-icon"><span class="material-symbols-outlined">smart_toy</span></div>
+          <div class="umat-ws-bubble-ai">
+            <p>{{#str}}workspace_greeting, local_umat_ai{{/str}}</p>
+          </div>
+        </div>
+        <!-- Typing indicator (hidden) -->
+        <div id="workspace-typing" style="display:none;" class="umat-ws-msg-ai">
+          <div class="umat-ws-msg-ai-icon"><span class="material-symbols-outlined">smart_toy</span></div>
+          <div class="umat-ws-bubble-ai">
+            <div class="umat-ws-typing"><span></span><span></span><span></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="umat-ws-input-area">
+        <div class="umat-ws-input-row">
+          <textarea id="workspace-question-input" class="umat-ws-textarea" placeholder="{{#str}}ask_about_video, local_umat_ai{{/str}}" rows="2" maxlength="800"></textarea>
+          <button class="umat-ws-send" id="workspace-send-btn" type="button">
+            <span class="material-symbols-outlined">send</span>
+          </button>
+        </div>
+        <div class="umat-ws-input-footer">
+          <button type="button">
+            <span class="material-symbols-outlined">attachment</span>
+            {{#str}}attach_material, local_umat_ai{{/str}}
+          </button>
+          <button type="button" id="ws-mic-btn">
+            <span class="material-symbols-outlined">mic</span>
+            Voice
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes pane -->
+    <div class="umat-ws-pane tab-content" id="tab-notes">
+      <div class="umat-ws-empty" id="notes-content">
+        <span class="material-symbols-outlined">description</span>
+        <p>{{#str}}no_notes_yet, local_umat_ai{{/str}}</p>
+        <button
+          class="action-btn"
+          data-action="generate-summary"
+          style="padding:8px 18px;border-radius:8px;background:var(--p);color:#fff;border:none;cursor:pointer;font-size:13px;font-family:inherit;"
+          type="button"
+        >Generate Notes</button>
+      </div>
+    </div>
+
+    <!-- Resources pane -->
+    <div class="umat-ws-pane tab-content" id="tab-resources">
+      <div class="umat-ws-empty">
+        <span class="material-symbols-outlined">folder_open</span>
+        <p id="resources-list">{{#str}}no_resources, local_umat_ai{{/str}}</p>
+      </div>
+    </div>
+
+  </div><!-- /ws-right -->
+
+</div><!-- /umat-ws -->
 {{/has_capability}}
-
-{{#js}}
-require(['local_umat_ai/ai_workspace'], function(AiWorkspace) {
-    AiWorkspace.init({
-        courseId: {{courseid}},
-        courseName: '{{coursefullname}}',
-        sessionId: {{sessionid}},
-        hasCapability: {{#has_capability}}true{{/has_capability}}{{^has_capability}}false{{/has_capability}}
-    });
-});
-{{/js}}

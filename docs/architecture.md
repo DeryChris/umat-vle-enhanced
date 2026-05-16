@@ -30,11 +30,24 @@ A Moodle local plugin located at `moodle/public/local/umat_ai/`. It handles:
 A Moodle theme at `moodle/public/theme/umat/`. It:
 
 - Extends Boost (the default Moodle theme)
-- Applies UMaT brand colours (navy blue `#003580`, gold `#C8A951`) via SCSS variables
+- Applies UMaT brand colours (green `#009846`, soft tinted bg `#F5FBF0`) via SCSS variables
 - Overrides specific layout files for the login page and main columns
 - Adds no functionality — purely visual
 
-### 4. BigBlueButton Integration
+### 4. AI Assistant Design Assets
+
+Design and prototype files live in the repository root under `ai_assistant_designs/`. This directory contains UI concepts, interaction flows, and static HTML/visual mockups for the AI chat panel, student overlay, workspace, lecturer dashboards, and other AI-enhanced learning experiences.
+
+The current design system uses an AI-friendly UMaT palette from `ai_assistant_designs/`:
+
+- **Primary:** `#009846` (UMaT Green) for primary actions and AI-ready states
+- **Secondary / Accent:** `#FFCC00` (UMaT Gold) for highlights, alerts, and progress indicators
+- **Surface:** `#F5FBF0` for soft tinted backgrounds
+- **Surface container:** `#FFFFFF` for cards and elevated UI panels
+
+These assets are used as design guidance only; they do not execute as part of Moodle or the Python service. The directory helps keep the implementation aligned with the intended user experience.
+
+### 5. BigBlueButton Integration
 
 The existing BigBlueButtonBN Moodle plugin (`moodle/mod/bigbluebuttonbn/`) connects Moodle to a BBB server. We do not modify this plugin. Our `local_umat_ai` plugin listens for events that BBB fires (`meeting_ended`) and triggers AI processing in response.
 

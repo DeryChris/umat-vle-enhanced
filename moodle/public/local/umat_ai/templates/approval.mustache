@@ -1,105 +1,300 @@
 {{!
     Template: local/umat_ai/templates/approval.mustache
-    Displays AI-generated outputs for lecturer review.
-    Shows summary, notes, and quiz with approve/reject actions.
+    Lecturer AI Output Review page.
 
-    Context variables:
-    - courseid (int)
-    - coursename (string)
-    - sessions (array) — list of session groups
-    - str_approve (string)
-    - str_reject (string)
-    - str_summary (string)
-    - str_notes (string)
-    - str_quiz (string)
-    - str_pending (string)
-    - str_no_pending (string)
+    Context:
+      courseid, coursename
+      sessions (array: session_id, bbb_sessionid, timecreated, outputs[])
+      str_approve, str_reject, str_summary, str_notes, str_quiz
+      str_no_pending
 }}
 
-<div class="umat-approval-page" id="umat-approval-page">
-    <div class="umat-approval-header">
-        <h2 class="text-primary">
-            <i class="fa fa-clipboard-check"></i>
-            AI Output Review
-        </h2>
-        <p class="text-muted">{{coursename}}</p>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+
+<style>
+:root {
+  --p:#006b2f;--pb:#00873d;--op:#ffffff;
+  --sf:#f5fbf0;--sflo:#ffffff;--sfl:#eff6eb;
+  --ons:#171d17;--onsv:#3e4a3e;--ol:#6e7a6d;--olv:#bdcaba;
+  --sec:#3d6844;--secc:#beefc1;--ter:#a5304d;
+  --r8:8px;--r12:12px;--r16:16px;
+}
+.umat-approve-wrap {
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  max-width:900px;
+  margin:0 auto;
+  padding:24px 20px 60px;
+  color:var(--ons);
+}
+.umat-approve-header {
+  margin-bottom:28px;
+}
+.umat-approve-header h2 {
+  margin:0 0 4px;
+  font-size:24px;
+  font-weight:800;
+  color:var(--p);
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.umat-approve-header h2 .material-symbols-outlined { font-size:28px; }
+.umat-approve-header p { margin:0;font-size:13px;color:var(--onsv); }
+
+/* Session block */
+.umat-session-block {
+  background:var(--sflo);
+  border:1px solid var(--olv);
+  border-radius:var(--r16);
+  overflow:hidden;
+  margin-bottom:20px;
+  box-shadow:0 2px 10px rgba(0,0,0,.05);
+}
+.umat-session-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 20px;
+  background:var(--sf);
+  border-bottom:1px solid var(--olv);
+}
+.umat-session-id {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px 12px;
+  border-radius:999px;
+  background:var(--secc);
+  color:var(--sec);
+  font-size:12px;
+  font-weight:700;
+}
+.umat-session-id .material-symbols-outlined { font-size:15px; }
+.umat-session-time { font-size:12px;color:var(--ol); }
+.umat-session-pending {
+  padding:4px 10px;
+  border-radius:999px;
+  background:#fef3c7;
+  color:#92400e;
+  font-size:11px;
+  font-weight:700;
+}
+.umat-session-approved {
+  padding:4px 10px;
+  border-radius:999px;
+  background:#d1fae5;
+  color:#065f46;
+  font-size:11px;
+  font-weight:700;
+}
+
+/* Output card */
+.umat-output-card {
+  padding:20px;
+  border-bottom:1px solid var(--sfl);
+}
+.umat-output-card:last-child { border-bottom:none; }
+.umat-output-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:14px;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.umat-output-type {
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  font-size:14px;
+  font-weight:700;
+  color:var(--ons);
+}
+.umat-output-type .material-symbols-outlined {
+  font-size:20px;
+  padding:5px;
+  border-radius:var(--r8);
+}
+.type-summary  .material-symbols-outlined { background:rgba(0,107,47,.1);color:var(--p); }
+.type-notes    .material-symbols-outlined { background:rgba(61,104,68,.1);color:var(--sec); }
+.type-quiz     .material-symbols-outlined { background:rgba(165,48,77,.1);color:var(--ter); }
+
+.umat-status-badge {
+  padding:4px 12px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:700;
+}
+.status-pending  { background:#fef3c7;color:#78350f; }
+.status-approved { background:#d1fae5;color:#065f46; }
+.status-rejected { background:#fee2e2;color:#991b1b; }
+
+.umat-output-content {
+  background:var(--sf);
+  border:1px solid var(--olv);
+  border-radius:var(--r8);
+  padding:16px;
+  max-height:280px;
+  overflow-y:auto;
+  margin-bottom:14px;
+  font-size:13px;
+  line-height:1.65;
+  color:var(--ons);
+  white-space:pre-wrap;
+  font-family:inherit;
+}
+.umat-output-content::-webkit-scrollbar { width:5px; }
+.umat-output-content::-webkit-scrollbar-thumb { background:var(--olv);border-radius:4px; }
+
+.umat-output-actions { display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start; }
+
+.umat-approve-btn {
+  display:inline-flex;align-items:center;gap:6px;
+  padding:9px 18px;border-radius:var(--r8);
+  font-size:13px;font-weight:700;cursor:pointer;border:none;
+  background:var(--p);color:var(--op);
+  transition:all .2s;font-family:inherit;
+}
+.umat-approve-btn .material-symbols-outlined { font-size:16px; }
+.umat-approve-btn:hover { background:var(--pb); }
+.umat-approve-btn:disabled { opacity:.5;cursor:not-allowed; }
+
+.umat-reject-btn {
+  display:inline-flex;align-items:center;gap:6px;
+  padding:9px 18px;border-radius:var(--r8);
+  font-size:13px;font-weight:700;cursor:pointer;
+  border:1.5px solid var(--ter);background:none;color:var(--ter);
+  transition:all .2s;font-family:inherit;
+}
+.umat-reject-btn .material-symbols-outlined { font-size:16px; }
+.umat-reject-btn:hover { background:#fee2e2; }
+
+.umat-reject-comment {
+  display:none;
+  width:100%;
+  margin-top:8px;
+  padding:10px 12px;
+  border:1.5px solid var(--olv);
+  border-radius:var(--r8);
+  font-size:13px;
+  font-family:inherit;
+  resize:vertical;
+  color:var(--ons);
+  background:var(--sflo);
+  outline:none;
+}
+.umat-reject-comment:focus { border-color:var(--ter); }
+
+.umat-action-feedback {
+  display:none;
+  padding:10px 14px;
+  border-radius:var(--r8);
+  font-size:13px;
+  font-weight:600;
+  margin-top:10px;
+}
+.feedback-ok  { background:#d1fae5;color:#065f46; }
+.feedback-err { background:#fee2e2;color:#991b1b; }
+
+/* No-sessions banner */
+.umat-all-done {
+  text-align:center;
+  padding:60px 20px;
+  background:var(--sflo);
+  border:1px solid var(--olv);
+  border-radius:var(--r16);
+}
+.umat-all-done .material-symbols-outlined { font-size:56px;color:var(--secc);display:block;margin-bottom:12px; }
+.umat-all-done h3 { margin:0 0 8px;font-size:20px;color:var(--p); }
+.umat-all-done p  { margin:0;font-size:13px;color:var(--onsv); }
+</style>
+
+<div class="umat-approve-wrap">
+
+  <div class="umat-approve-header">
+    <h2>
+      <span class="material-symbols-outlined">fact_check</span>
+      AI Output Review
+    </h2>
+    <p>{{coursename}} — Review and approve AI-generated summaries, notes, and quizzes before students see them.</p>
+  </div>
+
+  {{#sessions}}
+  <div class="umat-session-block" data-session-id="{{session_id}}">
+
+    <div class="umat-session-head">
+      <div class="umat-session-id">
+        <span class="material-symbols-outlined">videocam</span>
+        Session {{bbb_sessionid}}
+      </div>
+      <span class="umat-session-time">{{timecreated}}</span>
+      <span class="umat-session-pending">⏳ Pending Review</span>
     </div>
 
-    {{#sessions}}
-    <div class="umat-approval-session card mb-3" data-session-id="{{session_id}}">
+    {{#outputs}}
+    <div class="umat-output-card" data-output-id="{{output_id}}" data-output-type="{{output_type}}">
 
-        <div class="card-header bg-white d-flex align-items-center justify-content-between">
-            <div>
-                <span class="badge badge-secondary">{{bbb_sessionid}}</span>
-                <span class="text-muted ml-2" style="font-size:0.85rem">
-                    {{#userdate}}timecreated{{/userdate}}
-                </span>
-            </div>
-            <span class="badge badge-warning">
-                <i class="fa fa-clock-o"></i> Pending Review
-            </span>
+      <div class="umat-output-header">
+        <div class="umat-output-type type-{{output_type}}">
+          {{#compare}}{{output_type}}{{/compare}}
+          {{output_type}}
         </div>
+        <span class="umat-status-badge status-pending" id="status-badge-{{output_id}}">⏳ Pending</span>
+      </div>
 
-        <div class="card-body p-0">
-            {{#outputs}}
-            <div class="umat-approval-output border-bottom p-3"
-                 data-output-id="{{output_id}}"
-                 data-output-type="{{output_type}}">
+      <div class="umat-output-content">{{content}}</div>
 
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <h5 class="mb-0">
-                        <i class="fa fa-{{#compare output_type '==' 'summary'}}file-text-o{{/compare}}
-                                      {{#compare output_type '==' 'notes'}}list-alt{{/compare}}
-                                      {{#compare output_type '==' 'quiz'}}question-circle{{/compare}}"></i>
-                        {{output_type}}
-                    </h5>
-                </div>
+      <div class="umat-output-actions" id="actions-{{output_id}}">
+        <button
+          class="umat-approve-btn"
+          data-output-id="{{output_id}}"
+          data-course-id="{{../courseid}}"
+          data-action="approve"
+          type="button"
+        >
+          <span class="material-symbols-outlined">check_circle</span>
+          {{../str_approve}}
+        </button>
 
-                <div class="umat-output-content bg-surface p-3 rounded mb-3"
-                     style="background:#f5fbf0; max-height:300px; overflow-y:auto;">
-                    <pre style="white-space:pre-wrap; font-family:inherit; margin:0; font-size:0.9rem;">{{{content}}}</pre>
-                </div>
-
-                <div class="umat-output-actions d-flex gap-2 flex-wrap">
-                    <button class="btn btn-success btn-sm umat-approve-btn"
-                            data-output-id="{{output_id}}"
-                            data-course-id="{{../courseid}}"
-                            data-action="approve">
-                        <i class="fa fa-check"></i> {{../str_approve}}
-                    </button>
-                    <button class="btn btn-outline-danger btn-sm umat-reject-btn"
-                            data-output-id="{{output_id}}"
-                            data-course-id="{{../courseid}}"
-                            data-action="reject">
-                        <i class="fa fa-times"></i> {{../str_reject}}
-                    </button>
-                    <textarea class="umat-rejection-comment form-control mt-2 d-none"
-                              placeholder="Optional comment when rejecting..."
-                              rows="2"
-                              style="font-size:0.85rem;"></textarea>
-                </div>
-
-                <div class="umat-approval-feedback mt-2 d-none"></div>
-            </div>
-            {{/outputs}}
+        <div style="display:flex;flex-direction:column;gap:6px;flex:1;">
+          <button
+            class="umat-reject-btn"
+            data-output-id="{{output_id}}"
+            data-course-id="{{../courseid}}"
+            data-action="reject"
+            type="button"
+          >
+            <span class="material-symbols-outlined">cancel</span>
+            {{../str_reject}}
+          </button>
+          <textarea
+            class="umat-reject-comment"
+            id="comment-{{output_id}}"
+            placeholder="Optional: describe why you are rejecting this output…"
+            rows="2"
+          ></textarea>
         </div>
+      </div>
 
+      <div class="umat-action-feedback" id="feedback-{{output_id}}"></div>
     </div>
-    {{/sessions}}
+    {{/outputs}}
 
-    {{^sessions}}
-    <div class="alert alert-success text-center">
-        <i class="fa fa-check-circle fa-2x mb-2"></i>
-        <h5>{{str_no_pending}}</h5>
-        <p class="mb-0 text-muted">All AI outputs have been reviewed. Check back after the next lecture.</p>
-    </div>
-    {{/sessions}}
+  </div>
+  {{/sessions}}
+
+  {{^sessions}}
+  <div class="umat-all-done">
+    <span class="material-symbols-outlined">check_circle</span>
+    <h3>All caught up!</h3>
+    <p>{{str_no_pending}}</p>
+  </div>
+  {{/sessions}}
+
 </div>
 
 {{#js}}
 require(['local_umat_ai/approval'], function(Approval) {
-    Approval.init({
-        courseId: {{courseid}}
-    });
+    Approval.init();
 });
 {{/js}}

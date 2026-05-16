@@ -1,323 +1,232 @@
 // ============================================================
-// AMD module for the AI workspace — full-page video + transcript + AI panel
+// AMD module: local_umat_ai/ai_workspace
+// Powers the expanded AI workspace page (index.php).
+// Handles: video sync, transcript highlighting, tabs,
+//          chat Q&A, suggestion chips, generate-summary action.
 // ============================================================
 
-define([
-    'core/ajax',
-    'core/notification',
-    'core/str',
-    'core/templates',
-], function(Ajax, Notification, Str, Templates) {
+define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
     'use strict';
 
-    const SELECTORS = {
-        WORKSPACE: '.umat-ai-workspace',
-        VIDEO: '#umat-lecture-video',
-        VIDEO_PROGRESS: '#video-progress',
-        CURRENT_TIME: '#current-time',
-        DURATION: '#duration',
-        TRANSCRIPT_SEARCH: '#transcript-search',
-        TRANSCRIPT_CONTENT: '#transcript-content',
-        TRANSCRIPT_SEGMENT: '.transcript-segment',
-        TIMESTAMP_BTN: '.timestamp-btn',
-        TAB_BTN: '.tab-btn',
-        TAB_CONTENT: '.tab-content',
-        CHAT_MESSAGES: '#workspace-chat-messages',
-        QUESTION_INPUT: '#workspace-question-input',
-        SEND_BTN: '#workspace-send-btn',
-        TYPING_INDICATOR: '#workspace-typing',
-        SUGGESTION_CHIPS: '#suggestion-chips',
-        SUGGESTION_CHIP: '.suggestion-chip',
-        ACTION_BTN: '.action-btn',
-        NOTES_CONTENT: '#notes-content',
-        RESOURCES_LIST: '#resources-list',
-    };
+    var courseId   = 0;
+    var sessionId  = 0;
+    var courseName = '';
+    var sessionKey = '';
 
-    let courseId = null;
-    let sessionId = null;
-    let courseName = '';
-    let currentVideoTime = 0;
-    let questionsRemaining = 10;
-    let lastQuestionTime = 0;
+    // ---- Video player ------------------------------------------------- //
 
-    const escapeHtml = function(text) {
-        const div = document.createElement('div');
-        div.appendChild(document.createTextNode(text));
-        return div.innerHTML;
-    };
+    function initVideo() {
+        var video    = document.getElementById('umat-lecture-video');
+        var playBtn  = document.getElementById('ws-play-btn');
+        var progress = document.getElementById('video-progress');
+        var curTime  = document.getElementById('current-time');
+        var durEl    = document.getElementById('duration');
 
-    // Format seconds to MM:SS
-    const formatTime = function(seconds) {
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return mins + ':' + (secs < 10 ? '0' : '') + secs;
-    };
-
-    // Video Controls
-    const setupVideoPlayer = function() {
-        const video = document.querySelector(SELECTORS.VIDEO);
         if (!video) return;
 
+        function fmtTime(s) {
+            var m = Math.floor(s / 60);
+            var sec = Math.floor(s % 60);
+            return m + ':' + (sec < 10 ? '0' : '') + sec;
+        }
+
+        video.addEventListener('loadedmetadata', function() {
+            if (durEl) durEl.textContent = fmtTime(video.duration);
+            if (progress) progress.max = Math.floor(video.duration);
+        });
+
         video.addEventListener('timeupdate', function() {
-            currentVideoTime = video.currentTime;
-            const progress = document.querySelector(SELECTORS.VIDEO_PROGRESS);
-            if (progress) {
-                progress.value = (video.currentTime / video.duration) * 100 || 0;
-            }
-            const timeDisplay = document.querySelector(SELECTORS.CURRENT_TIME);
-            if (timeDisplay) {
-                timeDisplay.textContent = formatTime(video.currentTime);
-            }
+            if (curTime)  curTime.textContent = fmtTime(video.currentTime);
+            if (progress) progress.value = Math.floor(video.currentTime);
             highlightTranscriptSegment(video.currentTime);
         });
 
-        video.addEventListener('loadedmetadata', function() {
-            const durationDisplay = document.querySelector(SELECTORS.DURATION);
-            if (durationDisplay) {
-                durationDisplay.textContent = formatTime(video.duration);
-            }
-        });
-
-        // Custom controls
-        document.querySelectorAll('[data-action="play-pause"]').forEach(function(btn) {
-            btn.addEventListener('click', function() {
+        if (playBtn) {
+            playBtn.addEventListener('click', function() {
                 if (video.paused) {
                     video.play();
-                    btn.querySelector('span').textContent = 'pause';
+                    playBtn.querySelector('.material-symbols-outlined').textContent = 'pause';
                 } else {
                     video.pause();
-                    btn.querySelector('span').textContent = 'play_arrow';
+                    playBtn.querySelector('.material-symbols-outlined').textContent = 'play_arrow';
+                }
+            });
+        }
+
+        if (progress) {
+            progress.addEventListener('input', function() {
+                video.currentTime = parseInt(progress.value);
+            });
+        }
+
+        // Control buttons (rewind / forward).
+        document.querySelectorAll('.umat-vc-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var action = btn.dataset.action;
+                if (action === 'rewind-30')  video.currentTime = Math.max(0, video.currentTime - 30);
+                if (action === 'forward-30') video.currentTime = Math.min(video.duration, video.currentTime + 30);
+                if (action === 'play-pause') {
+                    if (video.paused) video.play(); else video.pause();
                 }
             });
         });
+    }
 
-        document.querySelectorAll('[data-action="rewind-30"]').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                video.currentTime = Math.max(0, video.currentTime - 30);
-            });
-        });
+    // ---- Transcript --------------------------------------------------- //
 
-        document.querySelectorAll('[data-action="forward-30"]').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                video.currentTime = Math.min(video.duration, video.currentTime + 30);
-            });
-        });
-
-        const progressBar = document.querySelector(SELECTORS.VIDEO_PROGRESS);
-        if (progressBar) {
-            progressBar.addEventListener('input', function() {
-                video.currentTime = (this.value / 100) * video.duration;
-            });
-        }
-    };
-
-    // Highlight current transcript segment based on video time
-    const highlightTranscriptSegment = function(currentTime) {
-        document.querySelectorAll(SELECTORS.TRANSCRIPT_SEGMENT).forEach(function(segment) {
-            const start = parseFloat(segment.dataset.start) || 0;
-            const end = parseFloat(segment.dataset.end) || Infinity;
-            if (currentTime >= start && currentTime < end) {
-                segment.classList.add('active');
+    function highlightTranscriptSegment(currentTime) {
+        document.querySelectorAll('.umat-ts-segment').forEach(function(seg) {
+            var start = parseFloat(seg.dataset.start) || 0;
+            var end   = parseFloat(seg.dataset.end) || 0;
+            if (currentTime >= start && currentTime <= end) {
+                seg.classList.add('active');
+                seg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } else {
-                segment.classList.remove('active');
+                seg.classList.remove('active');
             }
         });
-    };
+    }
 
-    // Transcript: click timestamp to seek video
-    const setupTranscript = function() {
-        const video = document.querySelector(SELECTORS.VIDEO);
-
-        document.querySelectorAll(SELECTORS.TIMESTAMP_BTN).forEach(function(btn) {
+    function initTranscript() {
+        // Timestamp click → seek video.
+        document.querySelectorAll('.timestamp-btn').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                const segment = btn.closest(SELECTORS.TRANSCRIPT_SEGMENT);
-                const startTime = parseFloat(segment.dataset.start) || 0;
+                var seg   = btn.closest('.umat-ts-segment');
+                var start = parseFloat(seg.dataset.start) || 0;
+                var video = document.getElementById('umat-lecture-video');
                 if (video) {
-                    video.currentTime = startTime;
+                    video.currentTime = start;
                     video.play();
                 }
             });
         });
 
-        // Search transcript
-        const searchInput = document.querySelector(SELECTORS.TRANSCRIPT_SEARCH);
+        // Search filter.
+        var searchInput = document.getElementById('transcript-search');
         if (searchInput) {
             searchInput.addEventListener('input', function() {
-                const query = this.value.toLowerCase();
-                document.querySelectorAll(SELECTORS.TRANSCRIPT_SEGMENT).forEach(function(segment) {
-                    const text = segment.querySelector('.transcript-text').textContent.toLowerCase();
-                    if (query === '' || text.includes(query)) {
-                        segment.style.display = '';
+                var q = searchInput.value.toLowerCase().trim();
+                document.querySelectorAll('.umat-ts-segment').forEach(function(seg) {
+                    var text = seg.querySelector('.umat-ts-text');
+                    if (!q || (text && text.textContent.toLowerCase().includes(q))) {
+                        seg.style.display = '';
                     } else {
-                        segment.style.display = 'none';
+                        seg.style.display = 'none';
                     }
                 });
             });
         }
-    };
+    }
 
-    // Tab switching
-    const setupTabs = function() {
-        document.querySelectorAll(SELECTORS.TAB_BTN).forEach(function(btn) {
+    // ---- Tab switching ------------------------------------------------ //
+
+    function initTabs() {
+        document.querySelectorAll('.tab-btn').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                const tab = this.dataset.tab;
-
-                // Update buttons
-                document.querySelectorAll(SELECTORS.TAB_BTN).forEach(function(b) {
-                    b.classList.remove('active');
-                });
-                this.classList.add('active');
-
-                // Update content
-                document.querySelectorAll(SELECTORS.TAB_CONTENT).forEach(function(content) {
-                    content.classList.remove('active');
-                });
-                document.getElementById('tab-' + tab).classList.add('active');
+                var name = btn.dataset.tab;
+                document.querySelectorAll('.umat-ws-tab').forEach(function(t) { t.classList.remove('active'); });
+                document.querySelectorAll('.umat-ws-pane').forEach(function(p) { p.classList.remove('active'); });
+                btn.classList.add('active');
+                var pane = document.getElementById('tab-' + name);
+                if (pane) pane.classList.add('active');
             });
         });
-    };
+    }
 
-    // Chat functions
-    const appendChatMessage = function(role, text, sources) {
-        const container = document.querySelector(SELECTORS.CHAT_MESSAGES);
-        if (!container) return;
+    // ---- Chat --------------------------------------------------------- //
 
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'chat-message ' + role;
+    function escHtml(s) {
+        var d = document.createElement('div');
+        d.appendChild(document.createTextNode(s));
+        return d.innerHTML;
+    }
 
-        let bubbleHtml = '<div class="chat-bubble"><p>' + escapeHtml(text) + '</p></div>';
-        messageDiv.innerHTML = bubbleHtml;
+    function appendAiBubble(text, sources) {
+        var msgs = document.getElementById('workspace-chat-messages');
+        if (!msgs) return;
 
-        if (sources && sources.length > 0 && role === 'ai') {
-            const tagsHtml = sources.map(function(s) {
-                return '<span class="source-tag">' + escapeHtml(s) + '</span>';
-            }).join('');
-            messageDiv.innerHTML += '<div class="chat-source-tags">' + tagsHtml + '</div>';
+        var typing = document.getElementById('workspace-typing');
+        if (typing) msgs.removeChild(typing);
+
+        var sourcesHtml = '';
+        if (sources && sources.length > 0) {
+            sourcesHtml = '<div class="umat-ws-sources">' +
+                sources.map(function(s) {
+                    return '<span class="umat-ws-source">' + escHtml(s) + '</span>';
+                }).join('') + '</div>';
         }
 
-        container.appendChild(messageDiv);
-        container.scrollTop = container.scrollHeight;
-    };
+        var div = document.createElement('div');
+        div.innerHTML =
+            '<div class="umat-ws-msg-ai">' +
+              '<div class="umat-ws-msg-ai-icon"><span class="material-symbols-outlined">smart_toy</span></div>' +
+              '<div class="umat-ws-bubble-ai"><p>' + escHtml(text) + '</p></div>' +
+            '</div>' + sourcesHtml;
+        msgs.appendChild(div);
 
-    const showTypingIndicator = function() {
-        const indicator = document.querySelector(SELECTORS.TYPING_INDICATOR);
-        if (indicator) {
-            indicator.style.display = 'flex';
-            const container = document.querySelector(SELECTORS.CHAT_MESSAGES);
-            if (container) container.scrollTop = container.scrollHeight;
-        }
-    };
+        // Re-append typing indicator at the bottom.
+        if (typing) msgs.appendChild(typing);
+        msgs.scrollTop = msgs.scrollHeight;
+    }
 
-    const hideTypingIndicator = function() {
-        const indicator = document.querySelector(SELECTORS.TYPING_INDICATOR);
-        if (indicator) {
-            indicator.style.display = 'none';
-        }
-    };
+    function appendUserBubble(text) {
+        var msgs = document.getElementById('workspace-chat-messages');
+        if (!msgs) return;
+        var div = document.createElement('div');
+        div.className = 'umat-ws-msg-student';
+        div.innerHTML = '<div class="umat-ws-bubble-student"><p>' + escHtml(text) + '</p></div>';
+        msgs.appendChild(div);
+        msgs.scrollTop = msgs.scrollHeight;
+    }
 
-    const showSuggestions = function(suggestions) {
-        const container = document.querySelector(SELECTORS.SUGGESTION_CHIPS);
-        if (!container || !suggestions || suggestions.length === 0) return;
+    function showTyping() {
+        var el = document.getElementById('workspace-typing');
+        if (el) el.style.display = '';
+        var msgs = document.getElementById('workspace-chat-messages');
+        if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    }
 
-        container.innerHTML = suggestions.map(function(s) {
-            return '<button class="suggestion-chip" data-suggestion="' + s.action + '">' + s.label + '</button>';
-        }).join('');
-        container.style.display = 'flex';
+    function hideTyping() {
+        var el = document.getElementById('workspace-typing');
+        if (el) el.style.display = 'none';
+    }
 
-        container.querySelectorAll(SELECTORS.SUGGESTION_CHIP).forEach(function(chip) {
-            chip.addEventListener('click', function() {
-                handleSuggestion(this.dataset.suggestion);
-            });
-        });
-    };
+    function sendQuestion(q) {
+        q = (q || '').trim();
+        if (!q || !courseId) return;
 
-    const hideSuggestions = function() {
-        const container = document.querySelector(SELECTORS.SUGGESTION_CHIPS);
-        if (container) {
-            container.style.display = 'none';
-        }
-    };
+        appendUserBubble(q);
+        showTyping();
 
-    const handleSuggestion = function(action) {
-        const suggestions = {
-            'explain': '{{#str}}suggest_explain_text, local_umat_ai{{/str}}',
-            'elaborate': '{{#str}}suggest_elaborate_text, local_umat_ai{{/str}}',
-            'compare': '{{#str}}suggest_compare_text, local_umat_ai{{/str}}'
-        };
-        const question = suggestions[action] || action;
-        sendQuestion(question);
-    };
-
-    const sendQuestion = function(question) {
-        if (!question.trim() || questionsRemaining <= 0) return;
-
-        hideSuggestions();
-        appendChatMessage('student', question, []);
-        questionsRemaining--;
-        lastQuestionTime = Date.now();
-
-        const input = document.querySelector(SELECTORS.QUESTION_INPUT);
-        if (input) input.value = '';
-
-        showTypingIndicator();
+        var inputEl = document.getElementById('workspace-question-input');
+        if (inputEl) inputEl.value = '';
 
         Ajax.call([{
             methodname: 'local_umat_ai_ask_question',
             args: {
-                courseid: courseId,
-                question: question,
-                context: {
-                    sessionid: sessionId,
-                    video_time: currentVideoTime
-                }
+                courseid:    courseId,
+                question:    q,
+                session_key: sessionKey,
             },
-        }])[0].done(function(response) {
-            hideTypingIndicator();
-            if (response.success) {
-                appendChatMessage('ai', response.answer, response.sources);
-
-                // Show contextual suggestions
-                if (response.suggestions && response.suggestions.length > 0) {
-                    showSuggestions(response.suggestions);
-                }
+        }])[0].done(function(r) {
+            hideTyping();
+            if (r.success) {
+                appendAiBubble(r.answer, r.sources || []);
             } else {
-                appendChatMessage('ai', response.error || '{{#str}}error_ai, local_umat_ai{{/str}}', []);
+                appendAiBubble('Sorry, something went wrong. Please try again.', []);
             }
         }).fail(function(ex) {
-            hideTypingIndicator();
-            appendChatMessage('ai', '{{#str}}error_ai, local_umat_ai{{/str}}', []);
+            hideTyping();
+            appendAiBubble('Error connecting to the AI service. Please check your connection.', []);
             Notification.exception(ex);
         });
-    };
+    }
 
-    // Header action buttons
-    const setupHeaderActions = function() {
-        document.querySelectorAll(SELECTORS.ACTION_BTN).forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                const action = this.dataset.action;
+    function initChat() {
+        var input   = document.getElementById('workspace-question-input');
+        var sendBtn = document.getElementById('workspace-send-btn');
 
-                if (action === 'generate-summary') {
-                    const question = '{{#str}}generate_summary_prompt, local_umat_ai{{/str}}';
-                    sendQuestion(question);
-                } else if (action === 'attach-material') {
-                    // TODO: Open material picker modal
-                    Notification.alert('{{#str}}attach_material, local_umat_ai{{/str}}', '{{#str}}material_picker_coming, local_umat_ai{{/str}}');
-                }
-            });
-        });
-    };
-
-    // Chat input handlers
-    const setupChatInput = function() {
-        const input = document.querySelector(SELECTORS.QUESTION_INPUT);
-        const sendBtn = document.querySelector(SELECTORS.SEND_BTN);
-
-        if (sendBtn) {
-            sendBtn.addEventListener('click', function() {
-                if (input) sendQuestion(input.value);
-            });
-        }
-
+        if (sendBtn) sendBtn.addEventListener('click', function() { sendQuestion(input.value); });
         if (input) {
             input.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -326,44 +235,97 @@ define([
                 }
             });
         }
-    };
 
-    // Notes tab - generate from video context
-    const loadNotes = function() {
-        // TODO: Load existing notes from API
-        const notesContent = document.querySelector(SELECTORS.NOTES_CONTENT);
-        if (notesContent && notesContent.querySelector('.empty-state')) {
-            // Notes will be loaded via API
+        // Suggestion chips.
+        var chipMap = {
+            'explain':   'Can you explain the concept that was just discussed in the video?',
+            'elaborate': 'Can you elaborate on that topic with more detail and examples?',
+            'compare':   'How does this concept compare to what was covered earlier in the course?',
+        };
+        document.querySelectorAll('.suggestion-chip').forEach(function(chip) {
+            chip.addEventListener('click', function() {
+                var key = chip.dataset.suggestion;
+                if (chipMap[key]) sendQuestion(chipMap[key]);
+            });
+        });
+    }
+
+    // ---- Action buttons (header) -------------------------------------- //
+
+    function initActions() {
+        document.querySelectorAll('.action-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var action = btn.dataset.action;
+                if (action === 'generate-summary') generateSummary();
+                if (action === 'attach-material')  handleAttachMaterial();
+            });
+        });
+    }
+
+    function generateSummary() {
+        var notesPane = document.getElementById('tab-notes');
+        var notesContent = document.getElementById('notes-content');
+
+        // Switch to notes tab.
+        document.querySelectorAll('.umat-ws-tab').forEach(function(t) { t.classList.remove('active'); });
+        document.querySelectorAll('.umat-ws-pane').forEach(function(p) { p.classList.remove('active'); });
+        var notesTab = document.querySelector('[data-tab="notes"]');
+        if (notesTab) notesTab.classList.add('active');
+        if (notesPane) notesPane.classList.add('active');
+
+        if (notesContent) {
+            notesContent.innerHTML =
+                '<div class="umat-ws-msg-ai" style="max-width:100%;">' +
+                  '<div class="umat-ws-msg-ai-icon"><span class="material-symbols-outlined">smart_toy</span></div>' +
+                  '<div class="umat-ws-bubble-ai" style="flex:1;">' +
+                    '<div class="umat-ws-typing"><span></span><span></span><span></span></div>' +
+                    '<p style="font-size:12px;color:var(--ol);margin:6px 0 0;">Generating notes…</p>' +
+                  '</div>' +
+                '</div>';
         }
-    };
 
-    // Resources tab - load course materials
-    const loadResources = function() {
-        // TODO: Load course resources from API
-        const resourcesList = document.querySelector(SELECTORS.RESOURCES_LIST);
-        if (resourcesList && resourcesList.querySelector('.empty-state')) {
-            // Resources will be loaded via API
-        }
-    };
+        Ajax.call([{
+            methodname: 'local_umat_ai_get_session_outputs',
+            args: { sessionid: sessionId, courseid: courseId },
+        }])[0].done(function(r) {
+            if (notesContent && r.outputs && r.outputs.length > 0) {
+                var html = '';
+                r.outputs.forEach(function(o) {
+                    html +=
+                        '<div style="background:var(--sflo);border:1px solid var(--olv);border-radius:var(--r12);padding:16px;margin-bottom:12px;">' +
+                          '<h4 style="margin:0 0 10px;font-size:13px;font-weight:700;color:var(--p);text-transform:capitalize;">' + o.type + '</h4>' +
+                          '<div style="font-size:13px;line-height:1.65;color:var(--ons);white-space:pre-wrap;">' + escHtml(o.content) + '</div>' +
+                        '</div>';
+                });
+                notesContent.innerHTML = html;
+            } else if (notesContent) {
+                notesContent.innerHTML = '<div style="text-align:center;padding:32px;color:var(--ol);font-size:13px;">No AI notes are available for this session yet. They will appear once the lecturer approves the AI-generated content.</div>';
+            }
+        }).fail(function() {
+            if (notesContent) {
+                notesContent.innerHTML = '<div style="text-align:center;padding:32px;color:var(--ter);font-size:13px;">Failed to load notes. Please try again.</div>';
+            }
+        });
+    }
 
-    return {
-        init: function(options) {
-            courseId = options.courseId;
-            sessionId = options.sessionId;
-            courseName = options.courseName || '';
-            questionsRemaining = 10;
+    function handleAttachMaterial() {
+        appendAiBubble('To attach materials for AI indexing, please ask your lecturer to upload course documents through the course admin area.', []);
+    }
 
-            if (!options.hasCapability) return;
+    // ---- Entry point -------------------------------------------------- //
 
-            setupVideoPlayer();
-            setupTranscript();
-            setupTabs();
-            setupHeaderActions();
-            setupChatInput();
+    function init(cfg) {
+        courseId   = cfg.courseId   || 0;
+        sessionId  = cfg.sessionId  || 0;
+        courseName = cfg.courseName || '';
+        sessionKey = 'ws_' + Math.random().toString(36).substr(2, 16);
 
-            // Initial load for Notes/Resources tabs
-            loadNotes();
-            loadResources();
-        }
-    };
+        initVideo();
+        initTranscript();
+        initTabs();
+        initChat();
+        initActions();
+    }
+
+    return { init: init };
 });
