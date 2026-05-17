@@ -16,7 +16,7 @@ require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/local/umat_ai/lib.php');
 
 $courseid = required_param('courseid', PARAM_INT);
-$course = get_course($courseid);
+$course   = get_course($courseid);
 require_login($course);
 
 $context = context_course::instance($courseid);
@@ -51,36 +51,36 @@ foreach ($sessionRecords as $sess) {
     $outputData = [];
     foreach ($outputs as $out) {
         $outputData[] = [
-            'output_id' => (int) $out->id,
+            'output_id'   => (int) $out->id,
             'output_type' => $out->output_type,
-            'content' => format_text($out->content, FORMAT_PLAIN),
+            'content'     => format_text($out->content, FORMAT_PLAIN),
             'timecreated' => userdate($out->timecreated),
         ];
     }
 
     if (!empty($outputData)) {
         $sessions[] = [
-            'session_id' => (int) $sess->id,
+            'session_id'    => (int) $sess->id,
             'bbb_sessionid' => htmlspecialchars($sess->sessionid, ENT_QUOTES, 'UTF-8'),
-            'timecreated' => userdate($sess->timecreated),
-            'courseid' => $courseid,
-            'outputs' => $outputData,
+            'timecreated'   => userdate($sess->timecreated),
+            'courseid'      => $courseid,
+            'outputs'       => $outputData,
         ];
     }
 }
 
 // ---- Template context --------------------------------------------------- //
 $tctx = [
-    'courseid' => $courseid,
-    'coursename' => format_string($course->fullname, true, ['context' => $context]),
-    'sessions' => $sessions,
-    'str_approve' => get_string('str_approve', 'local_umat_ai'),
-    'str_reject' => get_string('str_reject', 'local_umat_ai'),
-    'str_summary' => get_string('str_summary', 'local_umat_ai'),
-    'str_notes' => get_string('str_notes', 'local_umat_ai'),
-    'str_quiz' => get_string('str_quiz', 'local_umat_ai'),
+    'courseid'       => $courseid,
+    'coursename'     => format_string($course->fullname, true, ['context' => $context]),
+    'sessions'       => $sessions,
+    'str_approve'    => get_string('str_approve', 'local_umat_ai'),
+    'str_reject'     => get_string('str_reject', 'local_umat_ai'),
+    'str_summary'    => get_string('str_summary', 'local_umat_ai'),
+    'str_notes'      => get_string('str_notes', 'local_umat_ai'),
+    'str_quiz'       => get_string('str_quiz', 'local_umat_ai'),
     'str_no_pending' => get_string('str_no_pending', 'local_umat_ai'),
-    'dashboard_url' => (new moodle_url('/local/umat_ai/lecturer_dashboard.php', ['courseid' => $courseid]))->out(false),
+    'dashboard_url'  => (new moodle_url('/local/umat_ai/lecturer_dashboard.php', ['courseid' => $courseid]))->out(false),
 ];
 
 echo $OUTPUT->header();

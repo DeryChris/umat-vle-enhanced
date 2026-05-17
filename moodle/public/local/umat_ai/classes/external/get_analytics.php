@@ -1,16 +1,14 @@
 <?php
 /**
- * External API: Get course analytics for the lecturer dashboard.
+ * External API: course analytics for the lecturer.
+ * Bug fixes: replaced count_records_sql + GROUP BY → get_field_sql with subquery.
  *
  * @package    local_umat_ai
- * @copyright  2026 UMaT
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 namespace local_umat_ai\external;
 
 defined('MOODLE_INTERNAL') || die();
-
 require_once($CFG->libdir . '/externallib.php');
 
 class get_analytics extends \external_api {
@@ -34,118 +32,125 @@ class get_analytics extends \external_api {
         self::validate_context($context);
         require_capability('local/umat_ai:viewanalytics', $context);
 
-        $since = time() - ($params['days'] * 86400);
+        $since = time() - ($params['days'] * DAYSECS);
+        $cid   = (int) $params['courseid'];
 
-        // ---- 1. Total enrolled students --------------------------------- //
-        $enrolled = count_enrolled_users($context, '', 0, true);
+        // 1. Enrolled students count.
+        $enrolledCount = (int) count_enrolled_users($context, '', 0, true);
 
-        // ---- 2. Active students in period (unique users who asked AI) --- //
-        $activeStudents = $DB->count_records_sql(
-            "SELECT COUNT(DISTINCT userid)
-               FROM {umat_ai_chat_logs}
-              WHERE courseid = :courseid AND timecreated > :since AND role = :role",
-            ['courseid' => $params['courseid'], 'since' => $since, 'role' => 'student']
-        );
+        // 2. Active students (unique AI users in period).
+        $activeStudents = (int) $DB->get_field_sql(
+            "SELECT COUNT(DISTINCT userid) FROM {umat_ai_chat_logs}
+             WHERE courseid = :cid AND timecreated > :since AND role = 'student'",
+            ['cid' => $cid, 'since' => $since]
+        ) ?: 0;
 
-        // ---- 3. Total AI interactions in period ------------------------- //
-        $totalInteractions = $DB->count_records_select(
+        // 3. Total AI interactions.
+        $totalInteractions = (int) $DB->count_records_select(
             'umat_ai_chat_logs',
-            'courseid = :courseid AND timecreated > :since',
-            ['courseid' => $params['courseid'], 'since' => $since]
+            'courseid = :cid AND timecreated > :since',
+            ['cid' => $cid, 'since' => $since]
         );
 
-        // ---- 4. Pending approvals --------------------------------------- //
-        $pendingApprovals = $DB->count_records_sql(
-            "SELECT COUNT(o.id)
-               FROM {umat_ai_outputs} o
-               JOIN {umat_ai_sessions} s ON s.id = o.sessionrecordid
-              WHERE s.courseid = :courseid AND o.is_approved = 0",
-            ['courseid' => $params['courseid']]
-        );
+        // 4. Pending approvals.
+        $pendingApprovals = (int) $DB->get_field_sql(
+            "SELECT COUNT(o.id) FROM {umat_ai_outputs} o
+             JOIN {umat_ai_sessions} s ON s.id = o.sessionrecordid
+             WHERE s.courseid = :cid AND o.is_approved = 0",
+            ['cid' => $cid]
+        ) ?: 0;
 
-        // ---- 5. Daily interaction counts (last 7 days for chart) -------- //
+        // 5. Daily counts — last 14 days.
         $dailyCounts = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $dayStart = strtotime('today') - ($i * 86400);
-            $dayEnd   = $dayStart + 86400;
-            $count    = $DB->count_records_select(
+        $maxDaily    = 0;
+        for ($i = 13; $i >= 0; $i--) {
+            $dayStart = mktime(0, 0, 0) - ($i * DAYSECS);
+            $dayEnd   = $dayStart + DAYSECS;
+            $count    = (int) $DB->count_records_select(
                 'umat_ai_chat_logs',
-                'courseid = :courseid AND timecreated >= :from AND timecreated < :to',
-                ['courseid' => $params['courseid'], 'from' => $dayStart, 'to' => $dayEnd]
+                'courseid = :cid AND timecreated >= :from AND timecreated < :to',
+                ['cid' => $cid, 'from' => $dayStart, 'to' => $dayEnd]
             );
-            $dailyCounts[] = [
-                'label' => date('D', $dayStart),
-                'count' => (int) $count,
-            ];
+            $dailyCounts[] = ['label' => date('D', $dayStart), 'count' => $count];
+            if ($count > $maxDaily) $maxDaily = $count;
         }
 
-        // ---- 6. Top 5 most asked questions (by similarity grouping) ----- //
-        // Simple approach: return the 5 most recent unique questions.
-        $topQuestions = $DB->get_records_sql(
+        // 6. Top 10 questions (grouped + ranked).
+        $rawQuestions = $DB->get_records_sql(
             "SELECT question, COUNT(*) AS ask_count
                FROM {umat_ai_chat_logs}
-              WHERE courseid = :courseid AND timecreated > :since AND role = :role
+              WHERE courseid = :cid AND timecreated > :since AND role = 'student'
            GROUP BY question
            ORDER BY ask_count DESC",
-            ['courseid' => $params['courseid'], 'since' => $since, 'role' => 'student'],
-            0,
-            5
+            ['cid' => $cid, 'since' => $since],
+            0, 10
         );
 
-        $questions = [];
-        foreach ($topQuestions as $q) {
-            $text = strlen($q->question) > 100
-                ? substr($q->question, 0, 97) . '...'
+        $topQuestions = array_values(array_map(function ($q) {
+            $text = mb_strlen($q->question) > 110
+                ? mb_substr($q->question, 0, 107) . '…'
                 : $q->question;
-            $questions[] = [
-                'text'      => $text,
-                'ask_count' => (int) $q->ask_count,
-            ];
-        }
+            return ['text' => $text, 'ask_count' => (int) $q->ask_count];
+        }, (array) $rawQuestions));
 
-        // ---- 7. Struggle index — lecture with most questions ------------ //
-        // For now: which unique session_key had the highest question count.
+        // 7. Struggle index — session_key with highest question count.
         $struggleIndex = 'N/A';
-        $struggleRaw   = $DB->get_records_sql(
+        $struggleCount = 0;
+        $struggleRow = $DB->get_record_sql(
             "SELECT session_key, COUNT(*) AS cnt
                FROM {umat_ai_chat_logs}
-              WHERE courseid = :courseid AND timecreated > :since AND role = :role
+              WHERE courseid = :cid AND timecreated > :since AND role = 'student'
                 AND session_key IS NOT NULL AND session_key != ''
            GROUP BY session_key
            ORDER BY cnt DESC",
-            ['courseid' => $params['courseid'], 'since' => $since, 'role' => 'student'],
-            0, 1
+            ['cid' => $cid, 'since' => $since],
+            IGNORE_MULTIPLE
         );
-        if (!empty($struggleRaw)) {
-            $top = array_values($struggleRaw)[0];
-            // Use a trimmed label from the session key.
-            $struggleIndex = 'Session ' . strtoupper(substr($top->session_key, 0, 6));
+        if ($struggleRow) {
+            $struggleIndex = 'Session ' . strtoupper(substr($struggleRow->session_key, 0, 6));
+            $struggleCount = (int) $struggleRow->cnt;
         }
 
-        // ---- 8. Average session length (rough: questions per session) --- //
-        $sessionsWithCount = $DB->get_records_sql(
+        // 8. Avg questions per session.
+        $avgQPS = 0.0;
+        $sessRows = $DB->get_records_sql(
             "SELECT session_key, COUNT(*) AS q_count
                FROM {umat_ai_chat_logs}
-              WHERE courseid = :courseid AND timecreated > :since AND role = :role
+              WHERE courseid = :cid AND timecreated > :since AND role = 'student'
                 AND session_key IS NOT NULL AND session_key != ''
            GROUP BY session_key",
-            ['courseid' => $params['courseid'], 'since' => $since, 'role' => 'student']
+            ['cid' => $cid, 'since' => $since]
         );
-        $avgQuestionsPerSession = 0;
-        if (!empty($sessionsWithCount)) {
-            $total = array_sum(array_column((array) $sessionsWithCount, 'q_count'));
-            $avgQuestionsPerSession = round($total / count($sessionsWithCount), 1);
+        if (!empty($sessRows)) {
+            $totQs = array_sum(array_column((array)$sessRows, 'q_count'));
+            $avgQPS = round($totQs / count($sessRows), 1);
         }
 
+        // 9. High performers: users with >= 10 interactions.
+        //    FIX: use get_field_sql with subquery instead of count_records_sql + GROUP BY.
+        $highPerformers = (int) $DB->get_field_sql(
+            "SELECT COUNT(*) FROM (
+                SELECT userid
+                  FROM {umat_ai_chat_logs}
+                 WHERE courseid = :cid AND timecreated > :since AND role = 'student'
+              GROUP BY userid
+                HAVING COUNT(*) >= 10
+             ) hp_subq",
+            ['cid' => $cid, 'since' => $since]
+        ) ?: 0;
+
         return [
-            'enrolled_students'       => (int) $enrolled,
-            'active_students'         => (int) $activeStudents,
-            'total_interactions'      => (int) $totalInteractions,
-            'pending_approvals'       => (int) $pendingApprovals,
-            'struggle_index'          => $struggleIndex,
-            'avg_questions_per_session' => (float) $avgQuestionsPerSession,
-            'daily_counts'            => $dailyCounts,
-            'top_questions'           => $questions,
+            'enrolled_students'          => $enrolledCount,
+            'active_students'            => $activeStudents,
+            'total_interactions'         => $totalInteractions,
+            'pending_approvals'          => $pendingApprovals,
+            'struggle_index'             => $struggleIndex,
+            'struggle_count'             => $struggleCount,
+            'avg_questions_per_session'  => (float) $avgQPS,
+            'high_performers'            => $highPerformers,
+            'max_daily'                  => $maxDaily,
+            'daily_counts'               => $dailyCounts,
+            'top_questions'              => $topQuestions,
         ];
     }
 
@@ -156,14 +161,17 @@ class get_analytics extends \external_api {
             'total_interactions'        => new \external_value(PARAM_INT),
             'pending_approvals'         => new \external_value(PARAM_INT),
             'struggle_index'            => new \external_value(PARAM_TEXT),
+            'struggle_count'            => new \external_value(PARAM_INT),
             'avg_questions_per_session' => new \external_value(PARAM_FLOAT),
+            'high_performers'           => new \external_value(PARAM_INT),
+            'max_daily'                 => new \external_value(PARAM_INT),
             'daily_counts'              => new \external_multiple_structure(
                 new \external_single_structure([
                     'label' => new \external_value(PARAM_TEXT),
                     'count' => new \external_value(PARAM_INT),
                 ])
             ),
-            'top_questions'             => new \external_multiple_structure(
+            'top_questions' => new \external_multiple_structure(
                 new \external_single_structure([
                     'text'      => new \external_value(PARAM_TEXT),
                     'ask_count' => new \external_value(PARAM_INT),

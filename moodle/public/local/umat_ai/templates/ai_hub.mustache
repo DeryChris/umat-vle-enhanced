@@ -1,366 +1,407 @@
-{{!
-    Template: local/umat_ai/templates/ai_hub.mustache
-    General AI Learning Hub — cross-course AI conversations and session logs.
-
-    Context:
-      wwwroot, userid, username
-      goalprogress (int 0-100)
-      week_sessions, week_questions
-      courses (array: id, fullname, shortname)
-      recent_sessions (array: session_key, courseid, course_name, course_short, time_label, msg_count, preview)
-      pulse_topics (array: label, count)
-      has_sessions (bool), has_courses (bool)
-}}
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
+{{! AI Learning Hub — matches general_hub.png design }}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
 
 <style>
-:root{--p:#006b2f;--pb:#00873d;--op:#ffffff;--sf:#f5fbf0;--sfl:#eff6eb;--sflo:#ffffff;--ons:#171d17;--onsv:#3e4a3e;--ol:#6e7a6d;--olv:#bdcaba;--sec:#3d6844;--secc:#beefc1;--ter:#a5304d;--r8:8px;--r12:12px;--r16:16px;--r20:20px;}
-.umat-hub{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:1280px;margin:0 auto;padding:24px 20px 80px;color:var(--ons);}
+:root{--p:#006b2f;--pb:#00873d;--op:#fff;--sf:#f5fbf0;--sfl:#eff6eb;--sflo:#fff;--ons:#171d17;--onsv:#3e4a3e;--ol:#6e7a6d;--olv:#bdcaba;--sec:#3d6844;--secc:#beefc1;--ter:#a5304d;--r8:8px;--r12:12px;--r16:16px;--r20:20px;--rp:9999px;--sb-col:64px;--sb-exp:240px;--topnav:56px;}
+*,*::before,*::after{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;}
+.hub-root{display:flex;flex-direction:column;height:100vh;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ons);background:var(--sf);}
 
-/* Header */
-.umat-hub-header{margin-bottom:28px;}
-.umat-hub-header h1{margin:0 0 4px;font-size:26px;font-weight:800;color:var(--p);}
-.umat-hub-header p{margin:0;font-size:14px;color:var(--onsv);}
+/* Top nav */
+.hub-topnav{height:var(--topnav);background:var(--sflo);border-bottom:1px solid var(--olv);display:flex;align-items:center;padding:0 20px;gap:18px;flex-shrink:0;}
+.hub-brand{font-size:15px;font-weight:800;color:var(--p);display:flex;flex-direction:column;line-height:1.1;white-space:nowrap;}
+.hub-brand span{font-size:11px;font-weight:500;color:var(--ol);}
+.hub-nav-tabs{display:flex;gap:2px;flex:1;}
+.hub-nav-tab{padding:6px 14px;border-radius:var(--rp);border:none;background:none;font-size:13px;font-weight:500;color:var(--ol);cursor:pointer;transition:all .2s;font-family:inherit;text-decoration:none;white-space:nowrap;}
+.hub-nav-tab:hover{color:var(--ons);background:var(--sfl);}
+.hub-nav-tab.active{color:var(--p);background:rgba(0,107,47,.08);font-weight:700;}
+.hub-search{display:flex;align-items:center;gap:7px;padding:7px 13px;background:var(--sfl);border:1px solid var(--olv);border-radius:var(--rp);min-width:200px;}
+.hub-search .material-symbols-outlined{font-size:16px;color:var(--ol);}
+.hub-search input{border:none;background:none;outline:none;font-size:13px;color:var(--ons);font-family:inherit;width:140px;}
+.hub-icon-btn{width:34px;height:34px;border-radius:50%;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ol);transition:all .2s;}
+.hub-icon-btn .material-symbols-outlined{font-size:20px;}
+.hub-icon-btn:hover{background:var(--sfl);color:var(--ons);}
+.hub-avatar-pill{width:32px;height:32px;border-radius:50%;background:var(--p);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;cursor:pointer;}
 
-/* Week stats strip */
-.umat-week-strip{display:flex;gap:12px;margin-bottom:28px;flex-wrap:wrap;}
-.umat-week-card{background:var(--sflo);border:1px solid var(--olv);border-radius:var(--r12);padding:14px 20px;display:flex;align-items:center;gap:12px;flex:1;min-width:160px;}
-.umat-week-card .icon{width:36px;height:36px;border-radius:var(--r8);background:rgba(0,107,47,.1);color:var(--p);display:flex;align-items:center;justify-content:center;}
-.umat-week-card .icon .material-symbols-outlined{font-size:20px;}
-.umat-week-card .val{font-size:22px;font-weight:800;color:var(--ons);line-height:1;}
-.umat-week-card .lbl{font-size:11px;color:var(--ol);margin-top:2px;}
+/* Body */
+.hub-body{display:flex;flex:1;overflow:hidden;}
+
+/* Sidebar (identical to overlay sidebar) */
+.hub-sb{width:var(--sb-col);background:var(--sflo);border-right:1px solid var(--olv);display:flex;flex-direction:column;overflow:hidden;transition:width .32s cubic-bezier(.4,0,.2,1);flex-shrink:0;}
+.hub-sb:hover{width:var(--sb-exp);}
+.hub-sb-logo{display:flex;align-items:center;gap:12px;padding:16px;overflow:hidden;border-bottom:1px solid var(--olv);min-height:72px;flex-shrink:0;}
+.hub-sb-logo-icon{width:32px;height:32px;border-radius:var(--r8);background:linear-gradient(135deg,var(--p),var(--pb));color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.hub-sb-logo-text{white-space:nowrap;overflow:hidden;opacity:0;transition:opacity .2s;}
+.hub-sb:hover .hub-sb-logo-text{opacity:1;}
+.hub-sb-logo-text strong{display:block;font-size:13px;font-weight:700;color:var(--p);}
+.hub-sb-logo-text span{font-size:11px;color:var(--ol);}
+.hub-sb-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0;display:flex;flex-direction:column;}
+.hub-sb-item{display:flex;align-items:center;gap:14px;padding:11px 16px;cursor:pointer;transition:background .18s;white-space:nowrap;overflow:hidden;text-decoration:none;color:var(--onsv);border-left:3px solid transparent;}
+.hub-sb-item:hover{background:var(--sfl);color:var(--ons);}
+.hub-sb-item.active{background:rgba(0,107,47,.08);color:var(--p);border-left-color:var(--p);font-weight:600;}
+.hub-sb-item .material-symbols-outlined{font-size:22px;flex-shrink:0;}
+.hub-sb-item-lbl{font-size:13px;font-weight:500;opacity:0;transition:opacity .18s;overflow:hidden;}
+.hub-sb:hover .hub-sb-item-lbl{opacity:1;}
+.hub-sb-divider{height:1px;background:var(--olv);margin:6px 12px;}
+.hub-sb-new{display:flex;align-items:center;gap:12px;margin:8px;padding:10px 12px;background:var(--p);color:#fff;border-radius:var(--r8);cursor:pointer;border:none;font-family:inherit;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;transition:background .2s;flex-shrink:0;}
+.hub-sb-new:hover{background:var(--pb);}
+.hub-sb-new .material-symbols-outlined{font-size:18px;flex-shrink:0;}
+.hub-sb-new-lbl{opacity:0;transition:opacity .18s;overflow:hidden;}
+.hub-sb:hover .hub-sb-new-lbl{opacity:1;}
+.hub-sb-footer{padding:8px 0 10px;border-top:1px solid var(--olv);flex-shrink:0;}
+
+/* Main content */
+.hub-main{flex:1;overflow-y:auto;padding:24px;background:var(--sf);}
+.hub-main::-webkit-scrollbar{width:5px;}
+.hub-main::-webkit-scrollbar-thumb{background:var(--olv);border-radius:3px;}
+
+/* Week stats */
+.hub-stats{display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap;}
+.hub-stat-card{background:var(--sflo);border:1px solid var(--olv);border-radius:var(--r12);padding:14px 18px;display:flex;align-items:center;gap:12px;flex:1;min-width:160px;}
+.hub-stat-icon{width:36px;height:36px;border-radius:var(--r8);display:flex;align-items:center;justify-content:center;}
+.hub-stat-icon .material-symbols-outlined{font-size:20px;}
+.hub-stat-val{font-size:22px;font-weight:800;color:var(--ons);line-height:1;}
+.hub-stat-lbl{font-size:11px;color:var(--ol);margin-top:2px;}
 
 /* Bento grid */
-.umat-hub-grid{display:grid;grid-template-columns:320px 1fr;gap:20px;margin-bottom:28px;}
-@media(max-width:900px){.umat-hub-grid{grid-template-columns:1fr;}}
+.hub-bento{display:grid;grid-template-columns:320px 1fr;gap:18px;margin-bottom:24px;}
+@media(max-width:960px){.hub-bento{grid-template-columns:1fr;}}
 
-/* Card */
-.umat-hub-card{background:var(--sflo);border:1px solid var(--olv);border-radius:var(--r16);overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.05);}
-.umat-hub-card-header{padding:14px 20px;border-bottom:1px solid var(--olv);display:flex;align-items:center;justify-content:space-between;}
-.umat-hub-card-title{margin:0;font-size:15px;font-weight:700;color:var(--ons);display:flex;align-items:center;gap:7px;}
-.umat-hub-card-title .material-symbols-outlined{font-size:18px;color:var(--p);}
-.umat-hub-card-body{padding:20px;}
+/* Cards */
+.hub-card{background:var(--sflo);border:1px solid var(--olv);border-radius:var(--r16);overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.04);}
+.hub-card-hdr{padding:14px 18px;border-bottom:1px solid var(--olv);display:flex;align-items:center;justify-content:space-between;}
+.hub-card-title{margin:0;font-size:15px;font-weight:700;color:var(--ons);display:flex;align-items:center;gap:8px;}
+.hub-card-title .material-symbols-outlined{font-size:18px;color:var(--p);}
+.hub-card-body{padding:18px;}
 
-/* Topic pills */
-.umat-topic-tags{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;}
-.umat-topic-tag{padding:5px 13px;border-radius:999px;background:var(--secc);color:var(--sec);font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;}
-.umat-topic-tag .material-symbols-outlined{font-size:13px;}
+/* Topic tags */
+.hub-topic-tags{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;}
+.hub-topic-tag{padding:5px 12px;border-radius:var(--rp);background:var(--secc);color:var(--sec);font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;}
+.hub-topic-tag .material-symbols-outlined{font-size:13px;}
 
 /* Goal bar */
-.umat-goal-section{border-top:1px solid var(--olv);padding-top:14px;}
-.umat-goal-label{display:flex;justify-content:space-between;font-size:12px;color:var(--onsv);margin-bottom:6px;}
-.umat-goal-label strong{color:var(--p);}
-.umat-goal-bar{height:8px;background:var(--sfl);border-radius:4px;overflow:hidden;}
-.umat-goal-fill{height:100%;background:linear-gradient(90deg,var(--p),var(--pb));border-radius:4px;transition:width .5s ease;}
+.hub-goal-section{border-top:1px solid var(--olv);padding-top:14px;}
+.hub-goal-row{display:flex;justify-content:space-between;font-size:12px;color:var(--onsv);margin-bottom:6px;}
+.hub-goal-row strong{color:var(--p);}
+.hub-goal-bar{height:8px;background:var(--sfl);border-radius:4px;overflow:hidden;}
+.hub-goal-fill{height:100%;background:linear-gradient(90deg,var(--p),var(--pb));border-radius:4px;transition:width .5s ease;}
+.hub-goal-sub{font-size:11px;color:var(--ol);margin-top:6px;}
 
 /* Chat area */
-.umat-hub-chat{display:flex;flex-direction:column;height:500px;}
-.umat-hub-chat-header{padding:14px 20px;border-bottom:1px solid var(--olv);display:flex;align-items:center;gap:12px;background:var(--sflo);}
-.umat-hub-chat-icon{width:36px;height:36px;background:rgba(0,107,47,.1);border-radius:var(--r8);display:flex;align-items:center;justify-content:center;color:var(--p);}
-.umat-hub-chat-icon .material-symbols-outlined{font-size:20px;}
-.umat-course-select{margin-left:auto;padding:7px 11px;border:1px solid var(--olv);border-radius:var(--r8);font-size:13px;color:var(--ons);background:var(--sflo);cursor:pointer;font-family:inherit;}
-.umat-hub-messages{flex:1;overflow-y:auto;padding:18px;background:var(--sf);display:flex;flex-direction:column;gap:14px;}
-.umat-hub-messages::-webkit-scrollbar{width:5px;}
-.umat-hub-messages::-webkit-scrollbar-thumb{background:var(--olv);border-radius:4px;}
-.umat-hub-msg{max-width:80%;}
-.umat-hub-msg.user{align-self:flex-end;}
-.umat-hub-msg.ai{align-self:flex-start;}
-.umat-hub-bubble{padding:12px 16px;border-radius:var(--r12);font-size:14px;line-height:1.55;}
-.umat-hub-msg.user .umat-hub-bubble{background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#052e16;border-bottom-right-radius:4px;}
-.umat-hub-msg.ai .umat-hub-bubble{background:var(--sflo);border-left:3px solid var(--p);border-bottom-left-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.05);}
-.umat-hub-bubble p{margin:0;}
-.umat-hub-input-area{padding:14px 18px;border-top:1px solid var(--olv);background:var(--sflo);}
-.umat-hub-input-row{display:flex;gap:10px;}
-.umat-hub-input{flex:1;padding:10px 14px;border:1.5px solid var(--olv);border-radius:var(--r8);font-size:14px;font-family:inherit;color:var(--ons);background:var(--sf);outline:none;transition:border-color .2s;}
-.umat-hub-input:focus{border-color:var(--p);}
-.umat-hub-send{padding:10px 20px;background:var(--p);color:var(--op);border:none;border-radius:var(--r8);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .2s;font-family:inherit;}
-.umat-hub-send .material-symbols-outlined{font-size:18px;}
-.umat-hub-send:hover{background:var(--pb);}
+.hub-chat{display:flex;flex-direction:column;height:460px;}
+.hub-chat-hdr{padding:14px 18px;border-bottom:1px solid var(--olv);display:flex;align-items:center;gap:10px;background:var(--sflo);}
+.hub-chat-icon{width:36px;height:36px;background:rgba(0,107,47,.1);border-radius:var(--r8);display:flex;align-items:center;justify-content:center;color:var(--p);}
+.hub-chat-icon .material-symbols-outlined{font-size:20px;}
+.hub-chat-title{font-size:14px;font-weight:700;flex:1;}
+.hub-chat-sub{font-size:11px;color:var(--p);font-weight:600;display:flex;align-items:center;gap:4px;}
+.hub-chat-expand{background:none;border:none;cursor:pointer;padding:4px;color:var(--ol);border-radius:var(--r8);transition:all .2s;}
+.hub-chat-expand:hover{background:var(--sfl);color:var(--ons);}
+.hub-chat-expand .material-symbols-outlined{font-size:18px;}
+.hub-course-sel{margin-left:auto;padding:6px 10px;border:1px solid var(--olv);border-radius:var(--rp);font-size:12px;color:var(--ons);background:var(--sflo);cursor:pointer;font-family:inherit;max-width:160px;}
+.hub-msgs{flex:1;overflow-y:auto;padding:16px;background:var(--sf);display:flex;flex-direction:column;gap:12px;}
+.hub-msgs::-webkit-scrollbar{width:4px;}
+.hub-msgs::-webkit-scrollbar-thumb{background:var(--olv);border-radius:2px;}
+.hub-msg{display:flex;flex-direction:column;max-width:82%;}
+.hub-msg.user{align-self:flex-end;}
+.hub-msg.ai{align-self:flex-start;}
+.hub-bubble{padding:12px 14px;border-radius:var(--r12);font-size:13px;line-height:1.55;}
+.hub-msg.user .hub-bubble{background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#052e16;border-bottom-right-radius:4px;}
+.hub-msg.ai  .hub-bubble{background:var(--sflo);border-left:2.5px solid var(--p);border-bottom-left-radius:4px;box-shadow:0 1px 6px rgba(0,0,0,.04);}
+.hub-msg-label{font-size:10px;font-weight:700;color:var(--p);letter-spacing:.05em;margin-bottom:3px;}
+.hub-bubble p{margin:0;}
+.hub-input-area{padding:12px 16px;border-top:1px solid var(--olv);background:var(--sflo);}
+.hub-input-row{display:flex;gap:8px;}
+.hub-input{flex:1;padding:10px 13px;border:1.5px solid var(--olv);border-radius:var(--r8);font-size:13px;font-family:inherit;color:var(--ons);background:var(--sfl);outline:none;transition:border-color .2s;}
+.hub-input:focus{border-color:var(--p);}
+.hub-send{padding:10px 18px;background:var(--p);color:#fff;border:none;border-radius:var(--r8);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .2s;font-family:inherit;}
+.hub-send .material-symbols-outlined{font-size:18px;}
+.hub-send:hover{background:var(--pb);}
 
-/* Typing */
 @keyframes hub-bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
-.hub-typing{display:flex;gap:4px;padding:6px 0;}
-.hub-typing span{width:7px;height:7px;border-radius:50%;background:var(--p);animation:hub-bounce 1.2s infinite;}
+.hub-typing{display:flex;gap:4px;padding:4px 0;}
+.hub-typing span{width:6px;height:6px;border-radius:50%;background:var(--p);animation:hub-bounce 1.2s infinite;}
 .hub-typing span:nth-child(2){animation-delay:.2s;}
 .hub-typing span:nth-child(3){animation-delay:.4s;}
 
-/* Session cards */
-.umat-sessions-section{margin-top:8px;}
-.umat-sessions-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-.umat-sessions-title{margin:0;font-size:18px;font-weight:700;color:var(--ons);}
-.umat-sessions-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
-.umat-session-card{background:var(--sflo);border:1px solid var(--olv);border-radius:var(--r12);padding:18px;cursor:pointer;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,.04);}
-.umat-session-card:hover{border-color:var(--p);box-shadow:0 4px 16px rgba(0,107,47,.15);transform:translateY(-2px);}
-.umat-session-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-.umat-course-badge{padding:4px 10px;border-radius:999px;background:var(--secc);color:var(--sec);font-size:11px;font-weight:700;}
-.umat-session-time{font-size:11px;color:var(--ol);}
-.umat-session-preview{font-size:13px;color:var(--onsv);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:8px;}
-.umat-session-meta{font-size:11px;color:var(--ol);display:flex;align-items:center;gap:4px;}
-.umat-session-meta .material-symbols-outlined{font-size:14px;}
-
-.umat-btn-new{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--p);color:var(--op);border:none;border-radius:var(--r8);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s;}
-.umat-btn-new .material-symbols-outlined{font-size:16px;}
-.umat-btn-new:hover{background:var(--pb);}
-
-.umat-no-sessions{text-align:center;padding:40px;background:var(--sflo);border:1px solid var(--olv);border-radius:var(--r16);color:var(--ol);}
-.umat-no-sessions .material-symbols-outlined{font-size:48px;color:var(--olv);display:block;margin-bottom:10px;}
+/* Sessions section */
+.hub-sessions-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.hub-sessions-hdr h2{margin:0;font-size:17px;font-weight:700;color:var(--ons);}
+.hub-view-all{color:var(--p);font-size:13px;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:3px;}
+.hub-view-all .material-symbols-outlined{font-size:15px;}
+.hub-sessions-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.hub-session-card{background:var(--sflo);border:1px solid var(--olv);border-radius:var(--r12);padding:16px;cursor:pointer;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,.04);display:flex;flex-direction:column;gap:8px;}
+.hub-session-card:hover{border-color:var(--p);box-shadow:0 4px 16px rgba(0,107,47,.14);transform:translateY(-2px);}
+.hub-session-card-hdr{display:flex;align-items:center;justify-content:space-between;}
+.hub-course-badge{padding:3px 9px;border-radius:var(--rp);background:var(--secc);color:var(--sec);font-size:11px;font-weight:700;}
+.hub-session-time{font-size:11px;color:var(--ol);}
+.hub-session-title{font-size:14px;font-weight:700;color:var(--ons);line-height:1.3;}
+.hub-session-preview{font-size:12px;color:var(--onsv);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.hub-session-footer{display:flex;align-items:center;justify-content:space-between;}
+.hub-session-meta{font-size:11px;color:var(--ol);display:flex;align-items:center;gap:4px;}
+.hub-session-meta .material-symbols-outlined{font-size:13px;}
+.hub-session-avatars{display:flex;gap:3px;}
+.hub-session-av{width:20px;height:20px;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;color:#fff;border:2px solid var(--sflo);}
+.hub-av-ai{background:var(--p);}
+.hub-av-user{background:var(--sec);}
+.hub-session-arrow{color:var(--ol);}
+.hub-session-arrow .material-symbols-outlined{font-size:16px;}
+.hub-new-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;background:var(--p);color:#fff;border:none;border-radius:var(--r8);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s;}
+.hub-new-btn .material-symbols-outlined{font-size:16px;}
+.hub-new-btn:hover{background:var(--pb);}
+.hub-empty{text-align:center;padding:40px;color:var(--ol);background:var(--sflo);border:1px solid var(--olv);border-radius:var(--r16);}
+.hub-empty .material-symbols-outlined{font-size:44px;color:var(--olv);display:block;margin-bottom:10px;}
 </style>
 
-<div class="umat-hub">
+<div class="hub-root">
 
-  <!-- ================================================================ -->
-  <!-- Header                                                            -->
-  <!-- ================================================================ -->
-  <div class="umat-hub-header">
-    <h1>{{#str}}ai_hub_title, local_umat_ai{{/str}}</h1>
-    <p>Welcome back, <strong>{{username}}</strong> — your AI learning companion across all courses.</p>
+  <!-- Top nav -->
+  <div class="hub-topnav">
+    <div class="hub-brand">UMaT Moodle<span>AI Enhanced Learning</span></div>
+    <div style="font-size:16px;font-weight:800;color:var(--p);white-space:nowrap;">UMaT AI Assistant</div>
+    <div class="hub-nav-tabs">
+      <a class="hub-nav-tab active" href="{{wwwroot}}/local/umat_ai/hub.php">Dashboard</a>
+      <a class="hub-nav-tab" href="{{wwwroot}}/my/">Courses</a>
+      <a class="hub-nav-tab" href="{{wwwroot}}/local/umat_ai/hub.php#logs">Session Logs</a>
+      <a class="hub-nav-tab" href="{{wwwroot}}/my/">Analytics</a>
+    </div>
+    <div class="hub-search">
+      <span class="material-symbols-outlined">search</span>
+      <input type="text" id="hub-search-input" placeholder="Search sessions…">
+    </div>
+    <button class="hub-icon-btn" type="button"><span class="material-symbols-outlined">notifications</span></button>
+    <button class="hub-icon-btn" type="button"><span class="material-symbols-outlined">settings</span></button>
+    <div class="hub-avatar-pill">{{user_initials}}</div>
   </div>
 
-  <!-- ================================================================ -->
-  <!-- Week stats strip                                                  -->
-  <!-- ================================================================ -->
-  <div class="umat-week-strip">
-    <div class="umat-week-card">
-      <div class="icon"><span class="material-symbols-outlined">forum</span></div>
-      <div>
-        <div class="val">{{week_sessions}}</div>
-        <div class="lbl">{{#str}}sessions_this_week, local_umat_ai{{/str}}</div>
+  <div class="hub-body">
+    <!-- Sidebar -->
+    <div class="hub-sb">
+      <div class="hub-sb-logo">
+        <div class="hub-sb-logo-icon"><span class="material-symbols-outlined">school</span></div>
+        <div class="hub-sb-logo-text"><strong>UMaT Moodle</strong><span>AI Enhanced Learning</span></div>
+      </div>
+      <nav class="hub-sb-nav">
+        <a class="hub-sb-item" href="{{wwwroot}}"><span class="material-symbols-outlined">home</span><span class="hub-sb-item-lbl">Home</span></a>
+        <a class="hub-sb-item" href="{{wwwroot}}/my/"><span class="material-symbols-outlined">menu_book</span><span class="hub-sb-item-lbl">My Courses</span></a>
+        <a class="hub-sb-item active" href="{{wwwroot}}/local/umat_ai/hub.php"><span class="material-symbols-outlined">smart_toy</span><span class="hub-sb-item-lbl">AI Tutor</span></a>
+        <a class="hub-sb-item" href="{{wwwroot}}/my/"><span class="material-symbols-outlined">bar_chart</span><span class="hub-sb-item-lbl">Analytics</span></a>
+        <a class="hub-sb-item" href="{{wwwroot}}/my/"><span class="material-symbols-outlined">local_library</span><span class="hub-sb-item-lbl">Library</span></a>
+      </nav>
+      <div class="hub-sb-divider"></div>
+      <button class="hub-sb-new" id="hub-new-session-btn" type="button">
+        <span class="material-symbols-outlined">add</span>
+        <span class="hub-sb-new-lbl">New AI Session</span>
+      </button>
+      <div class="hub-sb-footer">
+        <a class="hub-sb-item" href="{{wwwroot}}"><span class="material-symbols-outlined">help_outline</span><span class="hub-sb-item-lbl">Help</span></a>
+        <a class="hub-sb-item" href="{{wwwroot}}/login/logout.php"><span class="material-symbols-outlined">logout</span><span class="hub-sb-item-lbl">Sign Out</span></a>
       </div>
     </div>
-    <div class="umat-week-card">
-      <div class="icon" style="background:rgba(61,104,68,.1);color:var(--sec);">
-        <span class="material-symbols-outlined">help</span>
-      </div>
-      <div>
-        <div class="val">{{week_questions}}</div>
-        <div class="lbl">{{#str}}questions_asked, local_umat_ai{{/str}}</div>
-      </div>
-    </div>
-    <div class="umat-week-card">
-      <div class="icon" style="background:rgba(165,48,77,.1);color:var(--ter);">
-        <span class="material-symbols-outlined">bolt</span>
-      </div>
-      <div>
-        <div class="val">{{goalprogress}}%</div>
-        <div class="lbl">Weekly goal progress</div>
-      </div>
-    </div>
-  </div>
 
-  <!-- ================================================================ -->
-  <!-- Bento grid: Learning Pulse | General Chat                         -->
-  <!-- ================================================================ -->
-  <div class="umat-hub-grid">
+    <!-- Main scrollable -->
+    <div class="hub-main">
 
-    <!-- ---- Learning Pulse ---- -->
-    <div class="umat-hub-card">
-      <div class="umat-hub-card-header">
-        <h2 class="umat-hub-card-title">
-          <span class="material-symbols-outlined">bolt</span>
-          {{#str}}learning_pulse, local_umat_ai{{/str}}
-        </h2>
-      </div>
-      <div class="umat-hub-card-body">
-        <p style="font-size:13px;color:var(--onsv);margin:0 0 14px;">Your most active subjects this semester.</p>
-
-        <div class="umat-topic-tags" id="hub-topic-tags">
-          {{#pulse_topics}}
-          <span class="umat-topic-tag">
-            <span class="material-symbols-outlined">school</span>
-            {{label}}
-          </span>
-          {{/pulse_topics}}
-          {{^pulse_topics}}
-          <span style="font-size:13px;color:var(--ol);">Start asking AI questions to see your top topics here.</span>
-          {{/pulse_topics}}
+      <!-- Stats strip -->
+      <div class="hub-stats">
+        <div class="hub-stat-card">
+          <div class="hub-stat-icon" style="background:rgba(0,107,47,.1);color:var(--p);"><span class="material-symbols-outlined">forum</span></div>
+          <div><div class="hub-stat-val">{{week_sessions}}</div><div class="hub-stat-lbl">Sessions this week</div></div>
         </div>
-
-        <div class="umat-goal-section">
-          <div class="umat-goal-label">
-            <span>{{#str}}study_goal, local_umat_ai{{/str}}</span>
-            <strong>{{goalprogress}}%</strong>
-          </div>
-          <div class="umat-goal-bar">
-            <div class="umat-goal-fill" style="width:{{goalprogress}}%;"></div>
-          </div>
-          <p style="font-size:11px;color:var(--ol);margin:8px 0 0;">Goal: 20 AI interactions per week</p>
+        <div class="hub-stat-card">
+          <div class="hub-stat-icon" style="background:rgba(61,104,68,.1);color:var(--sec);"><span class="material-symbols-outlined">help</span></div>
+          <div><div class="hub-stat-val">{{week_questions}}</div><div class="hub-stat-lbl">Questions asked</div></div>
+        </div>
+        <div class="hub-stat-card">
+          <div class="hub-stat-icon" style="background:rgba(165,48,77,.1);color:var(--ter);"><span class="material-symbols-outlined">bolt</span></div>
+          <div><div class="hub-stat-val">{{goalprogress}}%</div><div class="hub-stat-lbl">Weekly goal</div></div>
         </div>
       </div>
-    </div>
 
-    <!-- ---- General Chat ---- -->
-    <div class="umat-hub-card">
-      <div class="umat-hub-chat">
-        <div class="umat-hub-chat-header">
-          <div class="umat-hub-chat-icon">
-            <span class="material-symbols-outlined">forum</span>
+      <!-- Bento grid -->
+      <div class="hub-bento">
+        <!-- Learning Pulse -->
+        <div class="hub-card">
+          <div class="hub-card-hdr">
+            <h2 class="hub-card-title"><span class="material-symbols-outlined">bolt</span>Learning Pulse</h2>
+            <span class="material-symbols-outlined" style="color:var(--p);cursor:pointer;">bolt</span>
           </div>
-          <span style="font-size:15px;font-weight:700;">{{#str}}general_chat, local_umat_ai{{/str}}</span>
-          <select class="umat-course-select" id="hub-course-select">
-            <option value="0">{{#str}}all_courses, local_umat_ai{{/str}}</option>
-            {{#courses}}
-            <option value="{{id}}">{{shortname}} — {{fullname}}</option>
-            {{/courses}}
-          </select>
-        </div>
-
-        <div class="umat-hub-messages" id="hub-messages">
-          <div class="umat-hub-msg ai">
-            <div class="umat-hub-bubble">
-              <p>{{#str}}hub_greeting, local_umat_ai{{/str}}</p>
+          <div class="hub-card-body">
+            <p style="font-size:13px;color:var(--onsv);margin:0 0 12px;">Your most focused topics this semester based on AI interactions.</p>
+            <div class="hub-topic-tags">
+              {{#pulse_topics}}
+              <span class="hub-topic-tag"><span class="material-symbols-outlined">school</span>{{label}}</span>
+              {{/pulse_topics}}
+              {{^pulse_topics}}
+              <span style="font-size:13px;color:var(--ol);">Start using the AI assistant to see your top topics here.</span>
+              {{/pulse_topics}}
+            </div>
+            <div class="hub-goal-section">
+              <div class="hub-goal-row"><span>Study Goal Progress</span><strong>{{goalprogress}}%</strong></div>
+              <div class="hub-goal-bar"><div class="hub-goal-fill" style="width:{{goalprogress}}%;"></div></div>
+              <div class="hub-goal-sub">Goal: 20 AI interactions per week</div>
             </div>
           </div>
         </div>
 
-        <div class="umat-hub-input-area">
-          <div class="umat-hub-input-row">
-            <input
-              type="text"
-              id="hub-question-input"
-              class="umat-hub-input"
-              placeholder="{{#str}}ask_placeholder, local_umat_ai{{/str}}"
-              maxlength="600"
-              autocomplete="off"
-            >
-            <button class="umat-hub-send" id="hub-send-btn" type="button">
-              <span class="material-symbols-outlined">send</span>
-              {{#str}}send, local_umat_ai{{/str}}
-            </button>
+        <!-- General Assistant Chat -->
+        <div class="hub-card">
+          <div class="hub-chat">
+            <div class="hub-chat-hdr">
+              <div class="hub-chat-icon"><span class="material-symbols-outlined">forum</span></div>
+              <div>
+                <div class="hub-chat-title">General Assistant</div>
+                <div class="hub-chat-sub"><span style="width:6px;height:6px;border-radius:50%;background:#4ade80;display:inline-block;"></span>AI READY</div>
+              </div>
+              <select class="hub-course-sel" id="hub-course-sel">
+                <option value="{{first_courseid}}">All Courses</option>
+                {{#courses}}<option value="{{id}}">{{shortname}} — {{fullname}}</option>{{/courses}}
+              </select>
+              <button class="hub-chat-expand" title="Expand" type="button"><span class="material-symbols-outlined">open_in_full</span></button>
+            </div>
+            <div class="hub-msgs" id="hub-msgs">
+              <div class="hub-msg ai">
+                <div class="hub-msg-label">AI TUTOR</div>
+                <div class="hub-bubble"><p>Welcome back, <strong>{{username}}</strong>. How can I assist with your engineering studies or UMaT campus inquiries today?</p></div>
+              </div>
+            </div>
+            <div class="hub-input-area">
+              <div class="hub-input-row">
+                <input type="text" id="hub-chat-input" class="hub-input" placeholder="Ask anything about your courses or campus…" maxlength="600" autocomplete="off">
+                <button class="hub-send" id="hub-chat-send" type="button">
+                  <span class="material-symbols-outlined">send</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      </div><!-- /bento -->
 
-  </div><!-- /bento grid -->
-
-  <!-- ================================================================ -->
-  <!-- Recent Sessions                                                   -->
-  <!-- ================================================================ -->
-  <div class="umat-sessions-section">
-    <div class="umat-sessions-header">
-      <h2 class="umat-sessions-title">{{#str}}recent_sessions, local_umat_ai{{/str}}</h2>
-      <button class="umat-btn-new" id="hub-new-session" type="button">
-        <span class="material-symbols-outlined">add</span>
-        {{#str}}new_session, local_umat_ai{{/str}}
-      </button>
-    </div>
-
-    {{#has_sessions}}
-    <div class="umat-sessions-grid" id="hub-sessions-grid">
-      {{#recent_sessions}}
-      <div class="umat-session-card" data-session-key="{{session_key}}" data-courseid="{{courseid}}">
-        <div class="umat-session-card-head">
-          <span class="umat-course-badge">{{course_short}}</span>
-          <span class="umat-session-time">{{time_label}}</span>
+      <!-- Recent Session Logs -->
+      <div id="recent-sessions-section">
+        <div class="hub-sessions-hdr">
+          <h2>Recent Session Logs</h2>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <a href="{{wwwroot}}/local/umat_ai/hub.php" class="hub-view-all">View all logs<span class="material-symbols-outlined">arrow_forward</span></a>
+            <button class="hub-new-btn" id="hub-new-btn" type="button"><span class="material-symbols-outlined">add</span>New AI Session</button>
+          </div>
         </div>
-        <div class="umat-session-preview">{{preview}}</div>
-        <div class="umat-session-meta">
-          <span class="material-symbols-outlined">chat</span>
-          {{msg_count}} messages
+
+        {{#has_sessions}}
+        <div class="hub-sessions-grid" id="hub-sessions-grid">
+          {{#recent_sessions}}
+          <div class="hub-session-card" data-session="{{session_key}}" data-course="{{courseid}}">
+            <div class="hub-session-card-hdr">
+              <span class="hub-course-badge">{{course_short}}</span>
+              <span class="hub-session-time">{{time_label}}</span>
+            </div>
+            <div class="hub-session-title">{{course_name}} AI Review</div>
+            <div class="hub-session-preview">{{preview}}</div>
+            <div class="hub-session-footer">
+              <div class="hub-session-meta"><span class="material-symbols-outlined">chat</span>{{msg_count}} messages</div>
+              <div class="hub-session-avatars">
+                <div class="hub-session-av hub-av-ai">AI</div>
+                <div class="hub-session-av hub-av-user">MK</div>
+              </div>
+              <div class="hub-session-arrow"><span class="material-symbols-outlined">arrow_forward_ios</span></div>
+            </div>
+          </div>
+          {{/recent_sessions}}
         </div>
+        {{/has_sessions}}
+        {{^has_sessions}}
+        <div class="hub-empty">
+          <span class="material-symbols-outlined">history</span>
+          <p>No past sessions yet. Start a conversation above to get going!</p>
+        </div>
+        {{/has_sessions}}
       </div>
-      {{/recent_sessions}}
-    </div>
-    {{/has_sessions}}
 
-    {{^has_sessions}}
-    <div class="umat-no-sessions">
-      <span class="material-symbols-outlined">history</span>
-      <p>No past sessions yet. Start a conversation above to get going!</p>
-    </div>
-    {{/has_sessions}}
-  </div>
-
-</div><!-- /umat-hub -->
+    </div><!-- /hub-main -->
+  </div><!-- /hub-body -->
+</div><!-- /hub-root -->
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+(function() {
   'use strict';
+  var firstCourseId = {{first_courseid}};
+  var sel           = document.getElementById('hub-course-sel');
+  var msgs          = document.getElementById('hub-msgs');
 
-  var sendBtn     = document.getElementById('hub-send-btn');
-  var input       = document.getElementById('hub-question-input');
-  var messages    = document.getElementById('hub-messages');
-  var courseSelect= document.getElementById('hub-course-select');
-  var wwwroot     = '{{wwwroot}}';
+  function esc(s) { var d=document.createElement('div');d.appendChild(document.createTextNode(s));return d.innerHTML; }
 
-  function escHtml(s) {
+  function appendMsg(text, isUser) {
     var d = document.createElement('div');
-    d.appendChild(document.createTextNode(s));
-    return d.innerHTML;
-  }
-
-  function addMessage(text, isUser) {
-    var div = document.createElement('div');
-    div.className = 'umat-hub-msg ' + (isUser ? 'user' : 'ai');
-    div.innerHTML = '<div class="umat-hub-bubble"><p>' + escHtml(text) + '</p></div>';
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+    if (isUser) {
+      d.innerHTML = '<div class="hub-msg user"><div class="hub-bubble"><p>'+esc(text)+'</p></div></div>';
+    } else {
+      d.innerHTML = '<div class="hub-msg ai"><div class="hub-msg-label">AI TUTOR</div><div class="hub-bubble"><p>'+esc(text)+'</p></div></div>';
+    }
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
   }
 
   function showTyping() {
-    var div = document.createElement('div');
-    div.id  = 'hub-typing';
-    div.className = 'umat-hub-msg ai';
-    div.innerHTML = '<div class="umat-hub-bubble"><div class="hub-typing"><span></span><span></span><span></span></div></div>';
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+    var d = document.createElement('div');
+    d.id = 'hub-typing-el';
+    d.innerHTML = '<div class="hub-msg ai"><div class="hub-msg-label">AI TUTOR</div><div class="hub-bubble"><div class="hub-typing"><span></span><span></span><span></span></div></div></div>';
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
   }
-  function hideTyping() {
-    var el = document.getElementById('hub-typing');
-    if (el) el.parentNode.removeChild(el);
-  }
+  function hideTyping() { var el=document.getElementById('hub-typing-el');if(el)el.parentNode.removeChild(el); }
 
-  function sendQuestion(q) {
-    q = (q || '').trim();
+  function sendMsg(q) {
+    q = (q||'').trim();
     if (!q) return;
-    addMessage(q, true);
-    input.value = '';
+    appendMsg(q, true);
+    document.getElementById('hub-chat-input').value = '';
     showTyping();
 
-    var selectedCourse = parseInt(courseSelect.value) || 0;
-    // Fall back to the first enrolled course if "All Courses" is selected.
-    var courseId = selectedCourse > 0 ? selectedCourse : ({{#has_courses}}{{#courses}}{{id}}{{/courses}}{{/has_courses}}0);
+    var cid = parseInt((sel && sel.value) || firstCourseId) || 0;
+    if (!cid) { hideTyping(); appendMsg('Please select a course first.', false); return; }
 
     require(['core/ajax'], function(Ajax) {
-      Ajax.call([{
-        methodname: 'local_umat_ai_ask_question',
-        args: { courseid: courseId, question: q, session_key: '' }
-      }])[0].done(function(r) {
-        hideTyping();
-        addMessage(r.success ? r.answer : '{{#str}}error_message, local_umat_ai{{/str}}', false);
-      }).fail(function() {
-        hideTyping();
-        addMessage('{{#str}}connection_error, local_umat_ai{{/str}}', false);
+      Ajax.call([{ methodname:'local_umat_ai_ask_question', args:{courseid:cid, question:q, session_key:''} }])[0]
+        .done(function(r){ hideTyping(); appendMsg(r.success?r.answer:'Sorry, an error occurred. Please try again.', false); })
+        .fail(function(){ hideTyping(); appendMsg('Connection error. Please check your network.', false); });
+    });
+  }
+
+  var sendBtn = document.getElementById('hub-chat-send');
+  var chatInput = document.getElementById('hub-chat-input');
+  if (sendBtn) sendBtn.addEventListener('click', function(){ sendMsg(chatInput.value); });
+  if (chatInput) chatInput.addEventListener('keypress', function(e){ if(e.key==='Enter'){e.preventDefault();sendMsg(this.value);} });
+
+  /* New session */
+  var newBtn = document.getElementById('hub-new-btn');
+  var newSbBtn = document.getElementById('hub-new-session-btn');
+  function newSession() {
+    msgs.innerHTML = '<div class="hub-msg ai"><div class="hub-msg-label">AI TUTOR</div><div class="hub-bubble"><p>New conversation started! What would you like to explore?</p></div></div>';
+    if (chatInput) chatInput.focus();
+  }
+  if (newBtn) newBtn.addEventListener('click', newSession);
+  if (newSbBtn) newSbBtn.addEventListener('click', newSession);
+
+  /* Session card click — resume session */
+  document.querySelectorAll('.hub-session-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      var cid = parseInt(card.dataset.course)||0;
+      if (sel && cid) sel.value = cid;
+      msgs.innerHTML = '<div class="hub-msg ai"><div class="hub-msg-label">AI TUTOR</div><div class="hub-bubble"><p>Resuming your previous session. What would you like to continue exploring?</p></div></div>';
+      if (chatInput) chatInput.focus();
+    });
+  });
+
+  /* Search filter for session cards */
+  var searchInput = document.getElementById('hub-search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      var q = this.value.toLowerCase();
+      document.querySelectorAll('.hub-session-card').forEach(function(card) {
+        var text = card.textContent.toLowerCase();
+        card.style.display = !q || text.includes(q) ? '' : 'none';
       });
     });
   }
-
-  if (sendBtn) sendBtn.addEventListener('click', function() { sendQuestion(input.value); });
-  if (input)   input.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); sendQuestion(input.value); }
-  });
-
-  /* New session button — clear messages and focus */
-  var newBtn = document.getElementById('hub-new-session');
-  if (newBtn) {
-    newBtn.addEventListener('click', function() {
-      messages.innerHTML = '<div class="umat-hub-msg ai"><div class="umat-hub-bubble"><p>New conversation started! What would you like to explore?</p></div></div>';
-      if (input) input.focus();
-    });
-  }
-
-  /* Session card click — resume in chat */
-  document.querySelectorAll('.umat-session-card').forEach(function(card) {
-    card.addEventListener('click', function() {
-      var sessionKey = card.dataset.sessionKey;
-      var courseId   = parseInt(card.dataset.courseid) || 0;
-      if (courseId) courseSelect.value = courseId;
-      messages.innerHTML = '<div class="umat-hub-msg ai"><div class="umat-hub-bubble"><p>Resuming previous session. Ask your next question to continue.</p></div></div>';
-      if (input) { input.focus(); input.setAttribute('data-session-key', sessionKey); }
-    });
-  });
-});
+})();
 </script>
