@@ -45,7 +45,8 @@ if ($sessionid) {
 // If no specific session, try to get the most recent one.
 if (!$sessionRec) {
     $sessionRec = $DB->get_record_sql(
-        "SELECT * FROM {umat_ai_sessions}
+        "SELECT id, sessionid, timecreated, recording_url
+           FROM {umat_ai_sessions}
           WHERE courseid = :cid AND status = 'complete'
           ORDER BY timecreated DESC",
         ['cid' => $courseid],

@@ -40,23 +40,41 @@ $sessionRecords = $DB->get_records_sql(
     ['courseid' => $courseid]
 );
 
-$sessions = [];
+$sessionIds = [];
 foreach ($sessionRecords as $sess) {
-    $outputs = $DB->get_records(
-        'umat_ai_outputs',
-        ['sessionrecordid' => $sess->id, 'is_approved' => 0],
-        'output_type ASC'
+    $sessionIds[] = (int)$sess->id;
+}
+
+// Bulk-load all pending outputs for the sessions shown on this page (avoids N+1 queries).
+$outputsBySession = [];
+if (!empty($sessionIds)) {
+    list($insql, $params) = $DB->get_in_or_equal($sessionIds, SQL_PARAMS_NAMED);
+    $outputs = $DB->get_records_sql(
+        "SELECT id, sessionrecordid, output_type, content, timecreated
+           FROM {umat_ai_outputs}
+          WHERE sessionrecordid {$insql} AND is_approved = 0
+       ORDER BY output_type ASC, timecreated ASC",
+        $params
     );
 
-    $outputData = [];
     foreach ($outputs as $out) {
-        $outputData[] = [
+        $sid = (int)$out->sessionrecordid;
+        if (!isset($outputsBySession[$sid])) {
+            $outputsBySession[$sid] = [];
+        }
+        $outputsBySession[$sid][] = [
             'output_id'   => (int) $out->id,
             'output_type' => $out->output_type,
             'content'     => format_text($out->content, FORMAT_PLAIN),
             'timecreated' => userdate($out->timecreated),
         ];
     }
+}
+
+$sessions = [];
+foreach ($sessionRecords as $sess) {
+    $sid = (int)$sess->id;
+    $outputData = $outputsBySession[$sid] ?? [];
 
     if (!empty($outputData)) {
         $sessions[] = [
@@ -68,6 +86,7 @@ foreach ($sessionRecords as $sess) {
         ];
     }
 }
+
 
 // ---- Template context --------------------------------------------------- //
 $tctx = [
