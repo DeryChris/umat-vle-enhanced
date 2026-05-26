@@ -11,6 +11,23 @@ require_once($CFG->libdir . '/externallib.php');
 
 class course_data extends \external_api {
 
+    /**
+     * Compute relative time string from a Unix timestamp.
+     */
+    private static function time_ago(int $ts): string {
+        if (!$ts) return '';
+        $now = time();
+        $diff = $now - $ts;
+        if ($diff < 60)  return 'just now';
+        if ($diff < 3600) return floor($diff / 60) . 'm ago';
+        if ($diff < 86400) return floor($diff / 3600) . 'h ago';
+        $days = floor($diff / 86400);
+        if ($days < 30)   return $days . 'd ago';
+        $months = floor($days / 30);
+        if ($months < 12) return $months . 'mo ago';
+        return floor($months / 12) . 'y ago';
+    }
+
     /* ------------------------------------------------------------------ */
     /* get_my_courses                                                       */
     /* ------------------------------------------------------------------ */
@@ -23,7 +40,18 @@ class course_data extends \external_api {
     public static function get_my_courses($role = 'student') {
         global $USER, $DB;
         self::validate_parameters(self::get_my_courses_parameters(), ['role' => $role]);
-        $courses = enrol_get_users_courses($USER->id, true, 'id,fullname,shortname');
+        $courses = enrol_get_users_courses($USER->id, false, 'id,fullname,shortname');
+        if ($role === 'lecturer' && empty($courses)) {
+            $courses = $DB->get_records_sql(
+                "SELECT DISTINCT c.id, c.fullname, c.shortname
+                   FROM {course} c
+                   JOIN {context} ctx ON ctx.instanceid = c.id AND ctx.contextlevel = 50
+                   JOIN {role_assignments} ra ON ra.contextid = ctx.id
+                   JOIN {role} r ON r.id = ra.roleid
+                  WHERE ra.userid = :uid AND r.shortname IN ('editingteacher','teacher','manager')",
+                ['uid' => $USER->id]
+            );
+        }
         $list = [];
         $courseIds = [];
         foreach ($courses as $c) {
@@ -179,6 +207,7 @@ class course_data extends \external_api {
                         'filesize' => (int)$f->get_filesize(),
                         'url'      => $url->out(false),
                         'timemodified' => (int)$f->get_timemodified(),
+                        'time_ago' => self::time_ago((int)$f->get_timemodified()),
                     ];
                     if (count($materials) >= 100) break 3;
                 }
@@ -197,6 +226,7 @@ class course_data extends \external_api {
                 'filesize'     => new \external_value(PARAM_INT),
                 'url'          => new \external_value(PARAM_URL),
                 'timemodified' => new \external_value(PARAM_INT),
+                'time_ago'     => new \external_value(PARAM_TEXT, 'Relative time string'),
             ])
         )]);
     }
@@ -276,6 +306,20 @@ class course_data extends \external_api {
                 }
             }
 
+            // Compute duration from segments (max end time).
+            $duration = '';
+            if (!empty($segments)) {
+                $maxEnd = 0;
+                foreach ($segments as $seg) {
+                    if (($seg['end'] ?? 0) > $maxEnd) $maxEnd = $seg['end'];
+                }
+                if ($maxEnd > 0) {
+                    $m = floor($maxEnd / 60);
+                    $s = floor($maxEnd % 60);
+                    $duration = $m . ':' . str_pad($s, 2, '0', STR_PAD_LEFT);
+                }
+            }
+
             $recordings[] = [
                 'id'          => (int)$sess->id,
                 'session_key' => $sess->sessionid,
@@ -283,8 +327,10 @@ class course_data extends \external_api {
                 'title'       => $title,
                 'description' => $desc,
                 'url'         => $sess->recording_url,
+                'timecreated' => (int)$sess->timecreated,
                 'date'        => date('d M Y', $sess->timecreated),
-                'duration'    => '',   // AI service could return this in future
+                'duration'    => $duration,
+                'time_ago'    => self::time_ago((int)$sess->timecreated),
                 'segments'    => $segments,
             ];
         }
@@ -301,8 +347,10 @@ class course_data extends \external_api {
                 'title'       => new \external_value(PARAM_TEXT),
                 'description' => new \external_value(PARAM_TEXT),
                 'url'         => new \external_value(PARAM_URL),
+                'timecreated' => new \external_value(PARAM_INT, 'Unix timestamp'),
                 'date'        => new \external_value(PARAM_TEXT),
                 'duration'    => new \external_value(PARAM_TEXT),
+                'time_ago'    => new \external_value(PARAM_TEXT, 'Relative time string'),
                 'segments'    => new \external_multiple_structure(
                     new \external_single_structure([
                         'timestamp' => new \external_value(PARAM_TEXT),

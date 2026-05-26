@@ -11,6 +11,7 @@
 Before you start ANY task:
 
 - [ ] **Read the request completely** — understand scope and requirements
+   - [ ] **Load Agent Skills** - Analyse this dir "C:\Users\amkch\ruflo-main\.agents\skills" and pick the best agent skill or skills for the task and load and use it in the project. 
 - [ ] **Check team ownership** (see "Team Work Areas" below) — coordinate with owner if needed
 - [ ] **Review docs/** folder — existing patterns, architecture, setup
 - [ ] **Ask clarifying questions** if task is ambiguous (use `vscode_askQuestions`)

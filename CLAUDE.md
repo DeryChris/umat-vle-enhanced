@@ -56,6 +56,7 @@
    - [ ] Read the request completely
    - [ ] Identify the component (Moodle UI / PHP backend / AI Service / Vector store / Theme)
    - [ ] Check AGENTS.md for team ownership (avoid conflicts)
+   - [ ] Analyse this dir "C:\Users\amkch\ruflo-main\.agents\skills" and pick the best agent skill or skills for the task and load and use it in the project. 
    - [ ] Review existing docs/ folder for context
 
 2. **Plan the work**
