@@ -21,7 +21,17 @@ settings     = get_settings()
 doc_loader   = DocumentLoader()
 vector_store = VectorStoreManager()
 
-ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md"}
+ALLOWED_EXTENSIONS = {
+    ".pdf", ".txt", ".md", ".markdown",
+    ".docx", ".pptx", ".xlsx", ".csv",
+    ".py", ".js", ".ts", ".jsx", ".tsx", ".php", ".rb", ".go", ".rs",
+    ".java", ".kt", ".swift", ".c", ".cpp", ".h", ".hpp", ".cs",
+    ".sql", ".sh", ".bash", ".ps1", ".bat", ".pl", ".lua", ".r",
+    ".html", ".htm", ".css", ".scss", ".less", ".json", ".xml",
+    ".yaml", ".yml", ".toml", ".ini", ".cfg",
+    ".mp3", ".wav", ".ogg", ".flac", ".m4a",
+    ".mp4", ".webm", ".mov", ".avi", ".mkv",
+}
 
 
 @router.post("/index", response_model=IndexMaterialResponse)

@@ -65,6 +65,23 @@ class ChatLog(Base):
     created_at       = Column(DateTime, default=datetime.utcnow)
 
 
+class MaterialAnalysis(Base):
+    __tablename__ = "material_analyses"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    material_id     = Column(Integer, nullable=False, index=True)
+    file_id         = Column(Integer, nullable=False)
+    course_id       = Column(Integer, nullable=False, index=True)
+    analysis_type   = Column(String(50), nullable=False)   # full_analysis|summary|key_concepts|quiz|custom
+    scope           = Column(String(50), default="full")    # full|partial:pages=2-5|partial:sections=...
+    content         = Column(Text, nullable=False)          # JSON-structured analysis output
+    model_version   = Column(String(100), nullable=True)
+    token_count     = Column(Integer, nullable=True)
+    user_request    = Column(Text, nullable=True)           # Original user prompt (for custom analyses)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+    updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 

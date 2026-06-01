@@ -62,6 +62,16 @@ $functions = [
         'description' => 'Get unapproved AI outputs for lecturer review', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:approveoutput',
     ],
+    'local_umat_ai_get_analysis_status' => [
+        'classname'   => '\local_umat_ai\external\analysis', 'methodname' => 'get_analysis_status',
+        'description' => 'Get analysis status for course materials', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_request_analysis' => [
+        'classname'   => '\local_umat_ai\external\analysis', 'methodname' => 'request_analysis',
+        'description' => 'Trigger material analysis on AI service', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
 ];
 
 $services = [

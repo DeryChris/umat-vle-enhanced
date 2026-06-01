@@ -53,10 +53,40 @@
         <FIELD NAME="fileid"      TYPE="int"  LENGTH="10"  NOTNULL="true"/>
         <FIELD NAME="filename"    TYPE="char" LENGTH="255" NOTNULL="true"/>
         <FIELD NAME="is_indexed"  TYPE="int"  LENGTH="1"   NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="is_analyzed" TYPE="int"  LENGTH="1"   NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timeindexed" TYPE="int"  LENGTH="10"  NOTNULL="false"/>
+        <FIELD NAME="timeanalyzed" TYPE="int" LENGTH="10" NOTNULL="false"/>
         <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
       </FIELDS>
       <KEYS><KEY NAME="primary" TYPE="primary" FIELDS="id"/></KEYS>
       <INDEXES><INDEX NAME="courseid" UNIQUE="false" FIELDS="courseid"/></INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_analysis" COMMENT="Mirrored metadata from AI service material analyses for fast Moodle-side status checks">
+      <FIELDS>
+        <FIELD NAME="id"            TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid"      TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="materialid"    TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="fileid"        TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="analysis_type" TYPE="char" LENGTH="50"  NOTNULL="true"/>
+        <FIELD NAME="scope"         TYPE="char" LENGTH="50"  NOTNULL="true" DEFAULT="full"/>
+        <FIELD NAME="status"        TYPE="char" LENGTH="20"  NOTNULL="true" DEFAULT="pending"/>
+        <FIELD NAME="ai_analysis_id" TYPE="int" LENGTH="10"  NOTNULL="false"/>
+        <FIELD NAME="model_version" TYPE="char" LENGTH="100" NOTNULL="false"/>
+        <FIELD NAME="token_count"   TYPE="int"  LENGTH="10"  NOTNULL="false"/>
+        <FIELD NAME="summary"       TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="timecreated"   TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timemodified"  TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary"    TYPE="primary" FIELDS="id"/>
+        <KEY NAME="material_fk" TYPE="foreign" FIELDS="materialid" REFTABLE="umat_ai_materials" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="courseid"        UNIQUE="false" FIELDS="courseid"/>
+        <INDEX NAME="materialid"      UNIQUE="false" FIELDS="materialid"/>
+        <INDEX NAME="material_type"   UNIQUE="false" FIELDS="materialid,analysis_type"/>
+      </INDEXES>
     </TABLE>
 
     <TABLE NAME="umat_ai_chat_logs" COMMENT="Student Q&amp;A interactions — session-keyed for conversation grouping">

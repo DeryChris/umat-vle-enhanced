@@ -30,4 +30,14 @@ $tasks = [
         'dayofweek'   => '*',
         'disabled'    => 0,
     ],
+    [
+        'classname'   => '\local_umat_ai\task\index_course_materials',
+        'blocking'    => 0,
+        'minute'      => '*/30',   // Every 30 minutes.
+        'hour'        => '*',
+        'day'         => '*',
+        'month'       => '*',
+        'dayofweek'   => '*',
+        'disabled'    => 0,
+    ],
 ];

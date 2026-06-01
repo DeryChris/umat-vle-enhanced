@@ -64,3 +64,83 @@ class HealthResponse(BaseModel):
     version:       str
     whisper_model: str
     llm_model:     str
+
+
+# ── Material Analysis ───────────────────────────────────
+
+class AnalysisType(str, Enum):
+    FULL_ANALYSIS = "full_analysis"
+    SUMMARY       = "summary"
+    KEY_CONCEPTS  = "key_concepts"
+    QUIZ          = "quiz"
+    CUSTOM        = "custom"
+
+
+class AnalyzeRequest(BaseModel):
+    material_id:   int          = Field(..., description="umat_ai_materials.id")
+    course_id:     int          = Field(...)
+    file_url:      str          = Field(..., description="pluginfile URL to fetch content")
+    filename:      str          = Field(..., description="Original filename with extension")
+    analysis_type: AnalysisType = Field(default=AnalysisType.FULL_ANALYSIS)
+    force:         bool         = Field(default=False, description="Skip cache, force re-analysis")
+    scope:         Optional[str] = Field(default=None, description="null=full, or 'pages:2-5', 'sections:...', 'time:1:30-5:00'")
+
+
+class AnalyzeResponse(BaseModel):
+    analysis_id:   int
+    cached:        bool
+    material_id:   int
+    file_id:       Optional[int] = None
+    course_id:     int
+    analysis_type: str
+    scope:         str
+    content:       dict
+    model_version: str
+    token_count:   int
+    created_at:    str
+
+
+class AnalysisListItem(BaseModel):
+    id:            int
+    analysis_type: str
+    scope:         str
+    status:        str
+    model_version: Optional[str]
+    token_count:   Optional[int]
+    created_at:    str
+
+
+class AnalysisListResponse(BaseModel):
+    analyses: List[AnalysisListItem]
+
+
+class BatchAnalyzeRequest(BaseModel):
+    course_id:    int           = Field(...)
+    material_ids: Optional[List[int]] = Field(default=None, description="null=all unanalyzed in course")
+
+
+class BatchAnalyzeItem(BaseModel):
+    material_id: int
+    filename:    str
+    status:      str       # queued|cached|failed
+    analysis_id: Optional[int] = None
+    error:       Optional[str] = None
+
+
+class BatchAnalyzeResponse(BaseModel):
+    total:  int
+    items:  List[BatchAnalyzeItem]
+
+
+class SyncAnalysisRequest(BaseModel):
+    """Internal: called by Moodle web service to mirror analysis metadata."""
+    material_id:   int
+    fileid:        int
+    courseid:      int
+    ai_analysis_id: int
+    analysis_type: str
+    scope:         str
+    status:        str
+    model_version: Optional[str]
+    token_count:   Optional[int]
+    summary:       Optional[str]

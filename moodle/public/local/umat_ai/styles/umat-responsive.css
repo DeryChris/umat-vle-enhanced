@@ -1,0 +1,79 @@
+
+/* ---- Tablet (640-1023px) ---- */
+@media(max-width:1023px){
+  .umat-sb{pointer-events:auto;}
+  .umat-an-kpi-row{grid-template-columns:repeat(2,1fr);}
+  .umat-an-2col{grid-template-columns:1fr;}
+  .umat-player-right{display:none;}
+  .umat-an-scroll{padding:14px;}
+  .umat-home-wrap{padding:16px;}
+  .umat-metrics-row{grid-template-columns:repeat(2,1fr);}
+  .umat-quick-actions-grid{grid-template-columns:1fr 1fr;}
+}
+/* ---- Mobile (< 640px) ---- */
+@media(max-width:639px){
+  /* FAB position */
+  .umat-fab{bottom:80px!important;right:16px!important;}
+  /* Compact panel full-screen on mobile */
+  .umat-cp{width:100vw;max-width:100vw;height:100%;}
+  /* Hide sidebar, show bottom tab bar */
+  .umat-sb{display:none!important;}
+  .umat-mob-tabbar{display:flex!important;}
+  /* Content fills height minus bottom tab bar */
+  .umat-ov{flex-direction:column;}
+  .umat-ov-body{flex-direction:column-reverse;flex:1;overflow:hidden;}
+  .umat-ov-content{flex:1;overflow:hidden;}
+  /* Grids */
+  .umat-an-kpi-row{grid-template-columns:1fr 1fr;}
+  .umat-an-2col{grid-template-columns:1fr;}
+  .umat-video-grid{grid-template-columns:1fr;padding:12px;}
+  .umat-lib-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));padding:12px;}
+  .umat-courses-grid{grid-template-columns:1fr;padding:12px;}
+  .umat-metrics-row{grid-template-columns:1fr 1fr;}
+  .umat-quick-actions-grid{grid-template-columns:1fr 1fr;}
+  .umat-home-hero{padding:20px 18px;}
+  .umat-home-hero h1{font-size:18px;}
+  .umat-sessions-list{padding:12px;}
+  /* Player adjustments */
+  .umat-player-body{flex-direction:column;}
+  .umat-player-right{display:none;}
+  .umat-player-left{border-right:none;}
+  /* Attachment drawer full-width */
+  .umat-attach-drawer{border-radius:var(--u-r16) var(--u-r16) 0 0;}
+  /* Home hero on mobile */
+  .umat-home-wrap{padding:12px;}
+  .umat-home-section h3{font-size:13px;}
+}
+/* ---- Very small (< 380px) ---- */
+@media(max-width:380px){
+  .umat-an-kpi-row{grid-template-columns:1fr;}
+  .umat-metrics-row{grid-template-columns:1fr;}
+  .umat-quick-actions-grid{grid-template-columns:1fr;}
+  .umat-video-grid,.umat-lib-grid,.umat-courses-grid{grid-template-columns:1fr;padding:8px;}
+  .umat-lib-tile{flex-direction:column;align-items:stretch;padding:8px;}
+  .umat-lib-tile-icon{width:100%;height:40px;}
+  .umat-lib-tile-actions{justify-content:stretch;}
+  .umat-lib-btn{flex:1;justify-content:center;}
+}
+/* ---- Mobile tab bar base styles ---- */
+.umat-mob-tabbar{display:none;position:sticky;bottom:0;left:0;right:0;height:60px;
+  background:var(--u-sflo);border-top:1px solid var(--u-olv);z-index:100;flex-shrink:0;}
+.umat-mob-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;cursor:pointer;border:none;background:none;color:var(--u-ol);font-size:10px;
+  font-family:Inter,sans-serif;padding:6px 2px;transition:all .18s;
+  border-top:2.5px solid transparent;}
+.umat-mob-tab .material-symbols-outlined{font-size:22px;}
+.umat-mob-tab.active{color:var(--u-p);border-top-color:var(--u-p);}
+/* ---- Hover only on devices that support hover ---- */
+@media(hover:hover){
+  .umat-sb:hover{width:var(--u-sb-exp);}
+  .umat-sb:hover .umat-sb-brand,.umat-sb:hover .umat-sb-item-lbl,
+  .umat-sb:hover .umat-sb-new-lbl,.umat-sb:hover .umat-sb-close-btn{opacity:1;}
+}
+/* ---- Touch devices: keep sidebar collapsed ---- */
+@media(hover:none){
+  .umat-sb{width:var(--u-sb-col);}
+  .umat-sb-brand,.umat-sb-item-lbl,.umat-sb-new-lbl{opacity:0!important;transform:none!important;}
+  .umat-sb-close-btn{opacity:1!important;}
+}
+

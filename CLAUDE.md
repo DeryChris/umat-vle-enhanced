@@ -212,6 +212,8 @@ Before implementing, consider:
 - **Example**: `api_contracts.md` - endpoint params and responses
 - **Benefit**: Single source of truth for the team
 
+**Store memory**: Document your memories after each chat/conversation in `memory/session/` and/or `memory/`
+
 ---
 
 ## 🐛 Common Issues & Troubleshooting
@@ -420,6 +422,8 @@ When you're stuck:
 4. **Verify endpoints**: Test with Swagger: `http://localhost:8000/docs`
 5. **Run tests**: `pytest tests/ -v` to catch regressions
 6. **Ask questions**: Use `AskUserQuestion` if task is ambiguous
+7. **Store memory**: Document your memories after each chat/conversation in `memory/session/` and/or `memory/`
+
 
 **Remember**: Think deeply, plan before coding, test after changes, document lessons learned.
 

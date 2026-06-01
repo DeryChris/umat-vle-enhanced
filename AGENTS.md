@@ -17,6 +17,8 @@ Before you start ANY task:
 - [ ] **Ask clarifying questions** if task is ambiguous (use `vscode_askQuestions`)
 - [ ] **Plan with `manage_todo_list`** — break into 3-5 small chunks
 - [ ] **Save plan to `/memories/session/`** — make progress visible
+- [ ] **Store memory**: Document your memories after each chat/conversation in `memory/session/` and/or `memory/`
+
 
 ---
 
