@@ -3,6 +3,7 @@
 **AI Agent Instructions** | For: Claude Code, Copilot, OpenCode  
 **When to use this**: Working on features, fixes, or improvements in the codebase  
 **Key principle**: Think deeply, ask questions, break work into chunks, validate thoroughly
+**Comments**: Add comments to codebase for easy reference professionally.
 
 ---
 

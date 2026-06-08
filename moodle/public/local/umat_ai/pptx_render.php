@@ -80,13 +80,19 @@ if ($action === 'slides') {
         'slides' => $slides,
     ];
 
-    // Build slide URLs from $CFG->wwwroot (prevents Host header injection)
     $base = rtrim($CFG->wwwroot, '/') . '/local/umat_ai/pptx_render.php';
     $qurl = urlencode($url);
-    foreach ($result['slides'] as &$s) {
-        $s['src'] = $base . '?action=slide&url=' . $qurl . '&slide=' . $s['slide'];
+
+    if ($result['mode'] === 'html') {
+        $result['width'] = $GLOBALS['_pptx_width'] ?? 960;
+        $result['height'] = $GLOBALS['_pptx_height'] ?? 540;
+        $result['imgBase'] = $base . '?action=slideimg&url=' . $qurl . '&img=';
+    } else {
+        foreach ($result['slides'] as &$s) {
+            $s['src'] = $base . '?action=slide&url=' . $qurl . '&slide=' . $s['slide'];
+        }
+        unset($s);
     }
-    unset($s);
 
     file_put_contents($cachejson, json_encode($result));
     echo json_encode($result);
@@ -106,6 +112,25 @@ if ($action === 'slide') {
     header('Content-Length: ' . filesize($slidepath));
     header('Cache-Control: public, max-age=86400');
     readfile($slidepath);
+    exit;
+}
+
+// ═══════════════════════════════════════════════════
+// 6. ACTION: slideimg — serve extracted image
+// ═══════════════════════════════════════════════════
+if ($action === 'slideimg') {
+    $img = required_param('img', PARAM_INT);
+    $ext = optional_param('ext', 'png', PARAM_ALPHA);
+    $imgpath = $cachedir . '/img_' . $img . '.' . $ext;
+    if (!file_exists($imgpath)) {
+        http_response_code(404);
+        die('Image not found');
+    }
+    $mime = ($ext === 'png') ? 'image/png' : (($ext === 'jpg' || $ext === 'jpeg') ? 'image/jpeg' : 'image/' . $ext);
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . filesize($imgpath));
+    header('Cache-Control: public, max-age=86400');
+    readfile($imgpath);
     exit;
 }
 
@@ -203,8 +228,8 @@ function build_result(?stored_file $file, int $courseid, string $filename, ?stri
 }
 
 /**
- * Main render dispatch — tries LibreOffice first, falls back to GD.
- * Returns array of [ ['slide' => N] ... ] or false on failure.
+ * Main render dispatch — tries LibreOffice first, falls back to HTML extraction.
+ * Returns array of slides or false on failure.
  */
 function render_pptx(string $path, string $cachedir): array|false {
     if (!file_exists($path)) return false;
@@ -216,10 +241,10 @@ function render_pptx(string $path, string $cachedir): array|false {
         return $slides;
     }
 
-    // Fallback to GD renderer (text-only extraction)
-    $slides = render_via_gd($path, $cachedir);
+    // Fallback to HTML extraction
+    $slides = render_via_html($path, $cachedir);
     if ($slides !== false) {
-        $GLOBALS['_pptx_mode'] = 'text';
+        $GLOBALS['_pptx_mode'] = 'html';
         return $slides;
     }
 
@@ -334,271 +359,259 @@ function render_via_libreoffice(string $path, string $cachedir): array|false {
 }
 
 // ═══════════════════════════════════════════════════
-//  GD FALLBACK RENDERER
+//  HTML EXTRACTION RENDERER
+//  Extracts text runs + images from PPTX XML for
+//  client-side HTML/CSS rendering.
 // ═══════════════════════════════════════════════════
 
-function render_via_gd(string $path, string $cachedir): array|false {
-    if (!extension_loaded('zip') || !extension_loaded('gd')) return false;
-    if (!extension_loaded('dom') || !extension_loaded('libxml')) return false;
+function render_via_html(string $path, string $cachedir): array|false {
+    if (!extension_loaded('zip') || !extension_loaded('dom') || !extension_loaded('libxml')) return false;
 
     $zip = new ZipArchive();
     if ($zip->open($path) !== true) return false;
 
-    // Get slide files sorted
-    $slides = [];
-    for ($i = 1; $i <= 100; $i++) {
-        $name = "ppt/slides/slide{$i}.xml";
-        $rel  = "ppt/slides/_rels/slide{$i}.xml.rels";
-        if ($zip->locateName($name) === false) break;
+    // Slide dimensions from presentation.xml
+    $slideW = 960;
+    $slideH = 540;
+    $presXml = $zip->getFromName('ppt/presentation.xml');
+    if ($presXml) {
+        $presDom = new DOMDocument();
+        $presDom->loadXML($presXml);
+        $sldSz = $presDom->getElementsByTagNameNS('http://schemas.openxmlformats.org/presentationml/2006/main', 'sldSz')->item(0);
+        if ($sldSz) {
+            $cx = (int)$sldSz->getAttribute('cx');
+            $cy = (int)$sldSz->getAttribute('cy');
+            if ($cx && $cy) {
+                $slideW = max(640, (int)round($cx / 9525));
+                $slideH = max(360, (int)round($cy / 9525));
+            }
+        }
+    }
 
-        $xmlContent = $zip->getFromName($name);
-        $relsContent = $zip->locateName($rel) !== false ? $zip->getFromName($rel) : '';
-
-        // Slide dimensions from presentation.xml
-        $presXml = $zip->getFromName('ppt/presentation.xml');
-        $slideW = 960;
-        $slideH = 540;
-        if ($presXml) {
-            $presDom = new DOMDocument();
-            $presDom->loadXML($presXml);
-            $xpath = new DOMXPath($presDom);
-            $xpath->registerNamespace('p', 'http://schemas.openxmlformats.org/presentationml/2006/main');
-            $ns = $presDom->documentElement->getAttribute('xmlns:p');
-            // Try to find slide size from presentation.xml <p:sldSz>
-            $sldSz = $presDom->getElementsByTagNameNS('http://schemas.openxmlformats.org/presentationml/2006/main', 'sldSz')->item(0);
-            if ($sldSz) {
-                $cx = $sldSz->getAttribute('cx');
-                $cy = $sldSz->getAttribute('cy');
-                if ($cx && $cy) {
-                    $slideW = (int)round($cx / 914400 * 25.4 * 4); // EMU → px at ~150 DPI → actually 96 DPI
-                    $slideH = (int)round($cy / 914400 * 25.4 * 4);
-                    // Better: EMU → inches → pixels at 96 DPI
-                    $slideW = max(640, (int)round($cx / 914400 * 96));
-                    $slideH = max(360, (int)round($cy / 914400 * 96));
+    // Build ordered slide file list
+    $slideFiles = [];
+    $relsXml = $zip->getFromName('ppt/_rels/presentation.xml.rels');
+    if ($relsXml) {
+        $rDom = new DOMDocument();
+        $rDom->loadXML($relsXml);
+        foreach ($rDom->getElementsByTagName('Relationship') as $rel) {
+            $type = $rel->getAttribute('Type');
+            if (strpos($type, '/slide') !== false) {
+                $target = $rel->getAttribute('Target');
+                if (preg_match('/slide(\d+)\.xml$/', $target, $m)) {
+                    $slideFiles[(int)$m[1]] = 'ppt/' . ltrim(str_replace('\\', '/', $target), '/');
                 }
             }
         }
+    }
+    ksort($slideFiles);
+    if (empty($slideFiles)) {
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = $zip->getNameIndex($i);
+            if (preg_match('#^ppt/slides/slide(\d+)\.xml$#i', $name, $m)) {
+                $slideFiles[(int)$m[1]] = $name;
+            }
+        }
+        ksort($slideFiles);
+    }
 
-        $imgW = min($slideW, 1280);
-        $imgH = (int)round($imgW * $slideH / $slideW);
+    $aNs = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+    $pNs = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+    $rNs = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
-        $im = imagecreatetruecolor($imgW, $imgH);
-        imagefill($im, 0, 0, imagecolorallocate($im, 255, 255, 255));
+    $result = [];
+    $globalImgIdx = 0;
 
-        // Parse slide XML
+    foreach ($slideFiles as $slideNum => $slidePath) {
+        $slideXml = $zip->getFromName($slidePath);
+        if (!$slideXml) continue;
+
         $dom = new DOMDocument();
-        @$dom->loadXML($xmlContent);
-        $xpathSl = new DOMXPath($dom);
-        $xpathSl->registerNamespace('a', 'http://schemas.openxmlformats.org/drawingml/2006/main');
-        $xpathSl->registerNamespace('p', 'http://schemas.openxmlformats.org/presentationml/2006/main');
-        $xpathSl->registerNamespace('r', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships');
+        $dom->loadXML($slideXml);
+        $xpath = new DOMXPath($dom);
+        $xpath->registerNamespace('a', $aNs);
+        $xpath->registerNamespace('p', $pNs);
+        $xpath->registerNamespace('r', $rNs);
 
-        // Get slide background color
-        $bgColor = null;
-        $bgEls = $xpathSl->query('//p:bg//a:srgbClr');
-        if ($bgEls && $bgEls->length > 0) {
-            $bgColor = '#' . $bgEls->item(0)->getAttribute('val');
+        $cSld = $dom->getElementsByTagNameNS($pNs, 'cSld')->item(0);
+        if (!$cSld) continue;
+
+        // Background color
+        $bg = '#ffffff';
+        $bgEl = $xpath->query('//p:cSld/p:bg//a:srgbClr')->item(0);
+        if ($bgEl) {
+            $v = $bgEl->getAttribute('val');
+            if ($v) $bg = '#' . $v;
         }
 
-        if ($bgColor) {
-            $bgRgb = hex2rgb($bgColor);
-            if ($bgRgb) imagefill($im, 0, 0, imagecolorallocate($im, $bgRgb[0], $bgRgb[1], $bgRgb[2]));
-        }
-
-        // Find font
-        $font = find_font();
-        $noFont = empty($font);
-
-        // Render text shapes
-        $textEls = $xpathSl->query('//a:t');
-        $scaleX = $imgW / $slideW;
-        $scaleY = $imgH / $slideH;
-
-        // Process text runs with position
-        $txBodies = $xpathSl->query('//p:sp/p:txBody/a:p');
-        foreach ($txBodies as $para) {
-            $txSp = $para->parentNode->parentNode->parentNode;
-            $spPr = $xpathSl->query('.//a:xfrm', $txSp)->item(0);
-
-            $px = 0; $py = 0; $pw = $slideW; $ph = $slideH;
-            if ($spPr) {
-                $off = $spPr->getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main', 'off')->item(0);
-                $ext = $spPr->getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main', 'ext')->item(0);
-                if ($off) {
-                    $px = (float)$off->getAttribute('x') * $scaleX / 914400 * 96;
-                    $py = (float)$off->getAttribute('y') * $scaleY / 914400 * 96;
-                }
-                if ($ext) {
-                    $pw = (float)$ext->getAttribute('x') * $scaleX / 914400 * 96;
-                    $ph = (float)$ext->getAttribute('y') * $scaleY / 914400 * 96;
+        // Build image map from slide-level rels
+        $slideImgMap = [];
+        $slideRelsPath = dirname($slidePath) . '/_rels/' . basename($slidePath) . '.rels';
+        $slideRelsXml = $zip->getFromName($slideRelsPath);
+        if ($slideRelsXml) {
+            $rDom = new DOMDocument();
+            $rDom->loadXML($slideRelsXml);
+            foreach ($rDom->getElementsByTagName('Relationship') as $rel) {
+                if (strpos($rel->getAttribute('Type'), '/image') !== false) {
+                    $t = str_replace('\\', '/', $rel->getAttribute('Target'));
+                    $t = ltrim($t, '/');
+                    if (strpos($t, 'ppt/') !== 0) $t = 'ppt/' . $t;
+                    $slideImgMap[$rel->getAttribute('Id')] = $t;
                 }
             }
+        }
 
-            $paraText = '';
-            $runs = $xpathSl->query('.//a:r', $para);
-            $fontSize = 14;
-            $bold = false;
-            $italic = false;
-            $color = [0, 0, 0];
+        $elements = [];
+        $spTree = $cSld->getElementsByTagNameNS($pNs, 'spTree')->item(0);
+        if ($spTree) {
+            foreach ($spTree->childNodes as $shape) {
+                if ($shape->nodeType !== XML_ELEMENT_NODE) continue;
+                $tag = $shape->localName;
+                if ($tag !== 'sp' && $tag !== 'pic') continue;
 
-            foreach ($runs as $run) {
-                $rPr = $xpathSl->query('a:rPr', $run)->item(0);
-                if ($rPr) {
-                    $sz = $rPr->getAttribute('sz');
-                    if ($sz) $fontSize = (int)$sz / 100 * $scaleY;
-                    if ($rPr->getAttribute('b') === '1') $bold = true;
-                    if ($rPr->getAttribute('i') === '1') $italic = true;
-                    $clr = $xpathSl->query('.//a:srgbClr', $rPr)->item(0);
-                    if ($clr) {
-                        $hex = $clr->getAttribute('val');
-                        $rgb = hex2rgb('#' . $hex);
-                        if ($rgb) $color = $rgb;
+                $spPr = null;
+                if ($tag === 'sp') {
+                    $spPr = $shape->getElementsByTagNameNS($pNs, 'spPr')->item(0);
+                } elseif ($tag === 'pic') {
+                    $spPr = $shape->getElementsByTagNameNS($aNs, 'spPr')->item(0);
+                }
+                if (!$spPr) continue;
+
+                $xfrm = $spPr->getElementsByTagNameNS($aNs, 'xfrm')->item(0);
+                if (!$xfrm) continue;
+
+                $off = $xfrm->getElementsByTagNameNS($aNs, 'off')->item(0);
+                $extN = $xfrm->getElementsByTagNameNS($aNs, 'ext')->item(0);
+                if (!$off || !$extN) continue;
+
+                $x = (int)round((int)$off->getAttribute('x') / 9525);
+                $y = (int)round((int)$off->getAttribute('y') / 9525);
+                $w = (int)round((int)$extN->getAttribute('cx') / 9525);
+                $h = (int)round((int)$extN->getAttribute('cy') / 9525);
+                if ($w < 1 || $h < 1) continue;
+
+                if ($tag === 'pic') {
+                    $blipFill = $shape->getElementsByTagNameNS($aNs, 'blipFill')->item(0);
+                    if ($blipFill) {
+                        $blip = $blipFill->getElementsByTagNameNS($aNs, 'blip')->item(0);
+                        if ($blip) {
+                            $rId = $blip->getAttributeNS($rNs, 'embed');
+                            if ($rId && isset($slideImgMap[$rId])) {
+                                $imgData = $zip->getFromName($slideImgMap[$rId]);
+                                if ($imgData) {
+                                    $globalImgIdx++;
+                                    $ext = strtolower(pathinfo($slideImgMap[$rId], PATHINFO_EXTENSION));
+                                    if (!in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'])) $ext = 'png';
+                                    file_put_contents($cachedir . '/img_' . $globalImgIdx . '.' . $ext, $imgData);
+
+                                    $elements[] = [
+                                        'type' => 'image',
+                                        'x' => $x, 'y' => $y,
+                                        'w' => $w, 'h' => $h,
+                                        'img' => $globalImgIdx,
+                                        'ext' => $ext,
+                                    ];
+                                }
+                            }
+                        }
                     }
+                } elseif ($tag === 'sp') {
+                    $txBody = $shape->getElementsByTagNameNS($aNs, 'txBody')->item(0);
+                    if (!$txBody) continue;
+
+                    $lines = [];
+                    foreach ($txBody->getElementsByTagNameNS($aNs, 'p') as $para) {
+                        // Default paragraph-level formatting
+                        $defSize = 18;
+                        $defColor = '#000000';
+                        $defBold = false;
+                        $defItalic = false;
+                        $defFont = 'Calibri';
+
+                        $pPr = $para->getElementsByTagNameNS($aNs, 'pPr')->item(0);
+                        if ($pPr) {
+                            $dRPr = $pPr->getElementsByTagNameNS($aNs, 'defRPr')->item(0);
+                            if ($dRPr) {
+                                $sz = $dRPr->getAttribute('sz');
+                                if ($sz) $defSize = (int)$sz / 100;
+                                $c = $dRPr->getElementsByTagNameNS($aNs, 'srgbClr')->item(0);
+                                if ($c) $defColor = '#' . $c->getAttribute('val');
+                                if ($dRPr->getAttribute('b') === '1') $defBold = true;
+                                if ($dRPr->getAttribute('i') === '1') $defItalic = true;
+                                $rf = $dRPr->getElementsByTagNameNS($aNs, 'rFont')->item(0);
+                                if ($rf) {
+                                    $l = $rf->getAttribute('latin') ?: $rf->getAttribute('ea') ?: '';
+                                    if ($l) $defFont = $l;
+                                }
+                            }
+                        }
+
+                        $runTexts = [];
+                        foreach ($para->getElementsByTagNameNS($aNs, 'r') as $run) {
+                            $tNode = $run->getElementsByTagNameNS($aNs, 't')->item(0);
+                            if (!$tNode) continue;
+
+                            $text = $tNode->textContent;
+                            $size = $defSize;
+                            $color = $defColor;
+                            $bold = $defBold;
+                            $italic = $defItalic;
+                            $font = $defFont;
+
+                            $rPr = $run->getElementsByTagNameNS($aNs, 'rPr')->item(0);
+                            if ($rPr) {
+                                $sz = $rPr->getAttribute('sz');
+                                if ($sz) $size = (int)$sz / 100;
+                                $c = $rPr->getElementsByTagNameNS($aNs, 'srgbClr')->item(0);
+                                if ($c) $color = '#' . $c->getAttribute('val');
+                                if ($rPr->getAttribute('b') === '1') $bold = true;
+                                if ($rPr->getAttribute('i') === '1') $italic = true;
+                                $rf = $rPr->getElementsByTagNameNS($aNs, 'rFont')->item(0);
+                                if ($rf) {
+                                    $l = $rf->getAttribute('latin') ?: $rf->getAttribute('ea') ?: '';
+                                    if ($l) $font = $l;
+                                }
+                            }
+
+                            $runTexts[] = [
+                                'text' => $text,
+                                'size' => $size,
+                                'color' => $color,
+                                'bold' => $bold,
+                                'italic' => $italic,
+                                'font' => $font,
+                            ];
+                        }
+
+                        if (!empty($runTexts)) {
+                            $lines[] = $runTexts;
+                        }
+                    }
+
+                    if (empty($lines)) continue;
+
+                    $elements[] = [
+                        'type' => 'text',
+                        'x' => $x, 'y' => $y,
+                        'w' => $w, 'h' => $h,
+                        'lines' => $lines,
+                    ];
                 }
-                $tNode = $xpathSl->query('a:t', $run)->item(0);
-                if ($tNode) $paraText .= $tNode->textContent;
-            }
-
-            $paraText = trim($paraText);
-            if ($paraText === '') continue;
-
-            $fontFile = $font;
-            if (!$noFont && $bold) {
-                // Try common bold variants: arialbd.ttf, arialb.ttf, arial-bold.ttf
-                $base = substr($font, 0, -4);
-                $boldVariants = [
-                    $base . 'bd.ttf',
-                    $base . 'b.ttf',
-                    $base . '-bold.ttf',
-                ];
-                foreach ($boldVariants as $bf) {
-                    if (file_exists($bf)) { $fontFile = $bf; break; }
-                }
-            }
-
-            $fsize = max(8, min(48, $fontSize));
-            $lines = explode("\n", wordwrap($paraText, max(20, (int)($pw / ($fsize * 0.5))), "\n", true));
-
-            if ($noFont) {
-                // No TrueType font available — skip text rendering (can't use imagestring for non-ASCII well)
-                continue;
-            }
-
-            foreach ($lines as $li => $line) {
-                $ty = (int)($py + $li * $fsize * 1.4);
-                if ($ty > $imgH - 10) break;
-                imagettftext($im, $fsize, 0, (int)$px, $ty, imagecolorallocate($im, $color[0], $color[1], $color[2]), $fontFile, $line);
             }
         }
 
-        // Render embedded images
-        $imgEls = $xpathSl->query('//p:pic');
-        foreach ($imgEls as $picEl) {
-            $blip = $xpathSl->query('.//a:blip', $picEl)->item(0);
-            if (!$blip) continue;
-            $embedId = $blip->getAttribute('r:embed');
-            if (!$embedId) continue;
-
-            // Resolve image from relationships
-            $imgPath = resolve_image($zip, $relsContent, $embedId, $i);
-            if (!$imgPath) continue;
-
-            // Position
-            $xfrm = $xpathSl->query('.//a:xfrm', $picEl)->item(0);
-            $ix = 0; $iy = 0; $iw = 100; $ih = 100;
-            if ($xfrm) {
-                $off = $xfrm->getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main', 'off')->item(0);
-                $ext = $xfrm->getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main', 'ext')->item(0);
-                if ($off) {
-                    $ix = (int)((float)$off->getAttribute('x') * $scaleX / 914400 * 96);
-                    $iy = (int)((float)$off->getAttribute('y') * $scaleY / 914400 * 96);
-                }
-                if ($ext) {
-                    $iw = (int)((float)$ext->getAttribute('x') * $scaleX / 914400 * 96);
-                    $ih = (int)((float)$ext->getAttribute('y') * $scaleY / 914400 * 96);
-                }
-            }
-
-            if ($iw > 0 && $ih > 0) {
-                $srcIm = @imagecreatefromstring($imgPath);
-                if ($srcIm) {
-                    imagecopyresampled($im, $srcIm, $ix, $iy, 0, 0, $iw, $ih, imagesx($srcIm), imagesy($srcIm));
-                    imagedestroy($srcIm);
-                }
-            }
-        }
-
-        $slidePath = $cachedir . '/slide_' . $i . '.png';
-        imagepng($im, $slidePath, 6);
-        imagedestroy($im);
-        $slides[] = ['slide' => $i];
+        $result[] = [
+            'slide' => $slideNum,
+            'bg' => $bg,
+            'elements' => $elements,
+        ];
     }
 
     $zip->close();
-    return count($slides) ? $slides : false;
-}
 
-function hex2rgb(string $hex): ?array {
-    $hex = ltrim($hex, '#');
-    if (strlen($hex) !== 6) return null;
-    return [hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2))];
-}
+    $GLOBALS['_pptx_mode'] = 'html';
+    $GLOBALS['_pptx_width'] = $slideW;
+    $GLOBALS['_pptx_height'] = $slideH;
 
-function find_font(): string {
-    $candidates = [];
-    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-        $windir = getenv('WINDIR') ?: 'C:\\Windows';
-        $candidates = [
-            "$windir\\Fonts\\arial.ttf",
-            "$windir\\Fonts\\calibri.ttf",
-            "$windir\\Fonts\\segoeui.ttf",
-            "$windir\\Fonts\\tahoma.ttf",
-            "$windir\\Fonts\\verdana.ttf",
-            "$windir\\Fonts\\times.ttf",
-        ];
-    } else {
-        $candidates = [
-            '/usr/share/fonts/truetype/msttcorefonts/Arial.ttf',
-            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-            '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
-            '/usr/share/fonts/TTF/DejaVuSans.ttf',
-        ];
-    }
-    foreach ($candidates as $f) {
-        if (file_exists($f)) return $f;
-    }
-    // Final fallback: try any .ttf in system font dir
-    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-        $search = getenv('WINDIR') ?: 'C:\\Windows';
-        $ttfs = glob("$search\\Fonts\\*.ttf");
-        if (!empty($ttfs)) return $ttfs[0];
-    }
-    return '';
-}
-
-function resolve_image(ZipArchive $zip, string $relsXml, string $embedId, int $slideNum): ?string {
-    if (empty($relsXml)) {
-        // Try direct path
-        $path = "ppt/media/image{$embedId}.png";
-        if ($zip->locateName($path) !== false) return $zip->getFromName($path);
-        $path = "ppt/media/image{$embedId}.jpeg";
-        if ($zip->locateName($path) !== false) return $zip->getFromName($path);
-        $path = "ppt/media/image{$embedId}.jpg";
-        if ($zip->locateName($path) !== false) return $zip->getFromName($path);
-        return null;
-    }
-
-    $relsDom = new DOMDocument();
-    @$relsDom->loadXML($relsXml);
-    $xpath = new DOMXPath($relsDom);
-    $xpath->registerNamespace('r', 'http://schemas.openxmlformats.org/package/2006/relationships');
-    $nodes = $xpath->query("//r:Relationship[@Id='$embedId']");
-    if (!$nodes || $nodes->length === 0) return null;
-    $target = $nodes->item(0)->getAttribute('Target');
-    $fullPath = "ppt/slides/$target";
-    if ($zip->locateName($fullPath) === false) {
-        $fullPath = "ppt/$target";
-    }
-    if ($zip->locateName($fullPath) === false) return null;
-    return $zip->getFromName($fullPath);
+    return count($result) ? $result : false;
 }

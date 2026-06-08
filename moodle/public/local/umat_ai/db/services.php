@@ -67,6 +67,11 @@ $functions = [
         'description' => 'Get analysis status for course materials', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
+    'local_umat_ai_get_struggle_insights' => [
+        'classname'   => '\local_umat_ai\external\get_struggle_insights', 'methodname' => 'get_struggle_insights',
+        'description' => 'Get detailed struggle insights for a course', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
     'local_umat_ai_request_analysis' => [
         'classname'   => '\local_umat_ai\external\analysis', 'methodname' => 'request_analysis',
         'description' => 'Trigger material analysis on AI service', 'type' => 'write', 'ajax' => true,

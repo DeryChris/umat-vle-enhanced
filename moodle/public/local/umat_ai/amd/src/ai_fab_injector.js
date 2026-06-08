@@ -8,12 +8,6 @@ define(['core/ajax'], function(Ajax) {
             return;
         }
 
-        // Add Material Symbols font
-        var fontLink = document.createElement('link');
-        fontLink.rel = 'stylesheet';
-        fontLink.href = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0';
-        document.head.appendChild(fontLink);
-
         // FAB Button
         var fab = document.createElement('button');
         fab.id = 'umat-fab-btn';

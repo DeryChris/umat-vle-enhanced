@@ -652,6 +652,78 @@
     </div>
   </div>
 
+  <!-- ================================================================ -->
+  <!-- Struggle Insights Section (AJAX-loaded)                           -->
+  <!-- ================================================================ -->
+  <div class="umat-section-divider"></div>
+
+  <div class="umat-dash-struggle">
+    <div class="umat-card-header" style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border:1px solid var(--olv);border-radius:var(--r16) var(--r16) 0 0;background:var(--sflo);">
+      <h3 class="umat-card-title" style="margin:0;font-size:15px;font-weight:700;display:flex;align-items:center;gap:7px;">
+        <span class="material-symbols-outlined" style="font-size:18px;color:var(--p);">psychology</span>
+        Struggle Insights
+      </h3>
+      <span class="umat-pill pill-info" id="dash-stru-mode">PHP Engine</span>
+    </div>
+    <div style="border:1px solid var(--olv);border-top:none;border-radius:0 0 var(--r16) var(--r16);padding:20px;background:var(--sflo);">
+
+      <!-- Loading -->
+      <div id="dash-stru-loading" class="umat-empty" style="padding:20px;">
+        <span class="material-symbols-outlined">hourglass_empty</span>
+        <p>Loading struggle insights…</p>
+      </div>
+
+      <!-- Error -->
+      <div id="dash-stru-error" class="umat-empty" style="display:none;padding:20px;">
+        <span class="material-symbols-outlined">error_outline</span>
+        <p id="dash-stru-error-text">Could not load struggle insights.</p>
+      </div>
+
+      <!-- Content -->
+      <div id="dash-stru-content" style="display:none;">
+
+        <!-- Summary -->
+        <div class="struggle-summary-bar" style="border:1px solid var(--olv);">
+          <span><strong id="dash-stru-total-q">0</strong> questions from <strong id="dash-stru-total-s">0</strong> students</span>
+          <span class="struggle-worst-topic">Worst topic: <strong id="dash-stru-worst">—</strong></span>
+        </div>
+
+        <!-- Topic Matrix -->
+        <div class="struggle-section">
+          <div class="struggle-section-header">
+            <h3><span class="material-symbols-outlined" style="font-size:18px;color:var(--p);">leaderboard</span> Topic Struggle Matrix</h3>
+            <span class="umat-pill pill-info">Score 0-100</span>
+          </div>
+          <div id="dash-stru-topics" class="struggle-topic-grid">
+            <div class="umat-empty"><span class="material-symbols-outlined">search</span><p>Loading…</p></div>
+          </div>
+        </div>
+
+        <!-- Material Breakdown -->
+        <div class="struggle-section">
+          <div class="struggle-section-header">
+            <h3><span class="material-symbols-outlined" style="font-size:18px;color:var(--p);">folder</span> Material Breakdown</h3>
+          </div>
+          <div id="dash-stru-materials" class="struggle-material-list">
+            <div class="umat-empty"><span class="material-symbols-outlined">inventory_2</span><p>Loading…</p></div>
+          </div>
+        </div>
+
+        <!-- At-Risk Students -->
+        <div class="struggle-section">
+          <div class="struggle-section-header">
+            <h3><span class="material-symbols-outlined" style="font-size:18px;color:var(--p);">warning</span> At-Risk Students</h3>
+            <span class="umat-pill pill-info">Risk score 0-100</span>
+          </div>
+          <div id="dash-stru-students" class="struggle-student-list">
+            <div class="umat-empty"><span class="material-symbols-outlined">person_search</span><p>Loading…</p></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
 </div><!-- /umat-dash-wrap -->
 
 <script>
@@ -702,6 +774,81 @@
     last7.map(function(d) {
       return '<div class="umat-heat-label">' + d.label.substring(0, 3) + '</div>';
     }).join('');
+  }
+
+  /* ---- Struggle Insights (AJAX) ---- */
+  var courseId = {{courseid}};
+  if (courseId) {
+    M.util.js_pending('dash-struggle');
+    require(['core/ajax'], function(ajax) {
+      var request = ajax.call([{
+        methodname: 'local_umat_ai_get_struggle_insights',
+        args: { courseid: courseId, days: 60 }
+      }]);
+      request[0].done(function(data) {
+        var loading = document.getElementById('dash-stru-loading');
+        var error = document.getElementById('dash-stru-error');
+        var content = document.getElementById('dash-stru-content');
+        if (loading) loading.style.display = 'none';
+        if (error) error.style.display = 'none';
+        if (content) content.style.display = 'block';
+
+        var qEl = document.getElementById('dash-stru-total-q');
+        if (qEl && data.summary) qEl.textContent = data.summary.total_questions;
+        var sEl = document.getElementById('dash-stru-total-s');
+        if (sEl && data.summary) sEl.textContent = data.summary.total_students;
+        var wEl = document.getElementById('dash-stru-worst');
+        if (wEl && data.summary) wEl.textContent = data.summary.worst_topic || '\u2014';
+        var mEl = document.getElementById('dash-stru-mode');
+        if (mEl && data.summary) mEl.textContent = data.summary.ai_service_used ? 'AI Engine' : 'PHP Engine';
+
+        // Render Topic Matrix
+        var topicGrid = document.getElementById('dash-stru-topics');
+        if (topicGrid && data.topic_matrix && data.topic_matrix.length) {
+          topicGrid.innerHTML = data.topic_matrix.map(function(t) {
+            var pct = Math.min(100, t.struggle_score);
+            var sev = pct >= 60 ? 'high' : (pct >= 30 ? 'medium' : 'low');
+            var trendHtml = t.trend === 'up'
+              ? '<span style="color:var(--ter);font-size:12px;font-weight:600;">\u25B2 +' + t.trend_pct + '%</span>'
+              : t.trend === 'down'
+                ? '<span style="color:var(--p);font-size:12px;font-weight:600;">\u25BC ' + t.trend_pct + '%</span>'
+                : '<span style="color:var(--ol);font-size:12px;">\u25C6</span>';
+            var mats = (t.materials || []).slice(0, 4).map(function(m) {
+              return '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;background:var(--sfl);border:1px solid var(--olv);font-size:10px;color:var(--onsv);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;">' +
+                escapeHtml(m.name) + (m.question_count ? ' (' + m.question_count + ')' : '') + '</span>';
+            }).join('');
+            return '<div style="border:1px solid var(--olv);border-radius:12px;padding:14px;background:var(--sflo);' +
+              (sev === 'high' ? 'border-left:4px solid var(--ter);' : sev === 'medium' ? 'border-left:4px solid #f59e0b;' : 'border-left:4px solid var(--p);') + '">' +
+              '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">' +
+                '<div style="display:flex;align-items:center;gap:6px;min-width:0;"><strong style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(t.topic) + '</strong></div>' +
+                '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">' +
+                  '<span style="display:inline-flex;align-items:center;justify-content:center;min-width:32px;padding:2px 7px;border-radius:999px;font-size:12px;font-weight:800;' +
+                    (sev === 'high' ? 'background:#fee2e2;color:#991b1b;' : sev === 'medium' ? 'background:#fef3c7;color:#92400e;' : 'background:#dcfce7;color:#065f46;') +
+                  '">' + t.struggle_score + '</span>' + trendHtml +
+                '</div>' +
+              '</div>' +
+              '<div style="display:flex;gap:14px;margin-bottom:8px;font-size:12px;color:var(--onsv);"><strong style="color:var(--ons);">' + t.question_count + '</strong> questions <strong style="color:var(--ons);">' + t.student_count + '</strong> students</div>' +
+              (mats ? '<div style="display:flex;flex-wrap:wrap;gap:4px;">' + mats + '</div>' : '') +
+            '</div>';
+          }).join('');
+        } else if (topicGrid) {
+          topicGrid.innerHTML = '<div class="umat-empty"><span class="material-symbols-outlined">search</span><p>No topic data yet.</p></div>';
+        }
+
+        M.util.js_complete('dash-struggle');
+      }).fail(function(err) {
+        var loading = document.getElementById('dash-stru-loading');
+        var error = document.getElementById('dash-stru-error');
+        if (loading) loading.style.display = 'none';
+        if (error) { error.style.display = ''; document.getElementById('dash-stru-error-text').textContent = 'Could not load struggle insights.'; }
+        M.util.js_complete('dash-struggle');
+      });
+    });
+  }
+
+  function escapeHtml(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
 })();

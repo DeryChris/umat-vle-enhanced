@@ -9,7 +9,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.v1.routes import recording, query, materials, analysis, health
+from api.v1.routes import recording, query, materials, analysis, health, analytics
 from models.database import init_db
 from config import get_settings
 
@@ -68,6 +68,7 @@ app.include_router(recording.router, prefix="/api/v1")
 app.include_router(query.router,     prefix="/api/v1")
 app.include_router(materials.router, prefix="/api/v1")
 app.include_router(analysis.router)  # uses explicit full paths
+app.include_router(analytics.router) # uses explicit full paths
 
 if __name__ == "__main__":
     import uvicorn

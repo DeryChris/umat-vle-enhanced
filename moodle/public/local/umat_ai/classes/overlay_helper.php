@@ -719,6 +719,7 @@ HTML;
       <nav class="umat-sb-nav">
         <button class="umat-sb-item active" data-lp="lec-home" type="button"><span class="material-symbols-outlined">home</span><span class="umat-sb-item-lbl">Home</span></button>
         <button class="umat-sb-item" data-lp="lec-analytics" type="button"><span class="material-symbols-outlined">bar_chart</span><span class="umat-sb-item-lbl">Analytics</span></button>
+        <button class="umat-sb-item" data-lp="lec-struggle" type="button"><span class="material-symbols-outlined">psychology</span><span class="umat-sb-item-lbl">Struggle</span></button>
         <button class="umat-sb-item" data-lp="lec-courses" type="button"><span class="material-symbols-outlined">menu_book</span><span class="umat-sb-item-lbl">My Courses</span></button>
         <button class="umat-sb-item" data-lp="lec-library" type="button"><span class="material-symbols-outlined">local_library</span><span class="umat-sb-item-lbl">Library</span></button>
         <button class="umat-sb-item" data-lp="lec-sessions" type="button"><span class="material-symbols-outlined">history</span><span class="umat-sb-item-lbl">Sessions</span></button>
@@ -736,6 +737,7 @@ HTML;
     <div class="umat-mob-tabbar" id="lec-mob-tabs">
       <button class="umat-mob-tab active" data-lp="lec-home" type="button"><span class="material-symbols-outlined">home</span>Home</button>
       <button class="umat-mob-tab" data-lp="lec-analytics" type="button"><span class="material-symbols-outlined">bar_chart</span>Analytics</button>
+      <button class="umat-mob-tab" data-lp="lec-struggle" type="button"><span class="material-symbols-outlined">psychology</span>Struggle</button>
       <button class="umat-mob-tab" data-lp="lec-courses" type="button"><span class="material-symbols-outlined">menu_book</span>Courses</button>
       <button class="umat-mob-tab" data-lp="lec-library" type="button"><span class="material-symbols-outlined">local_library</span>Library</button>
       <button class="umat-mob-tab" data-lp="lec-sessions" type="button"><span class="material-symbols-outlined">history</span>Sessions</button>
@@ -763,6 +765,7 @@ HTML;
             <h3>Quick Actions</h3>
             <div class="umat-quick-actions-grid">
               <button class="umat-qa-btn" data-lp="lec-analytics" type="button"><span class="material-symbols-outlined">bar_chart</span><div class="umat-qa-btn-text"><strong>View Analytics</strong><span>Course performance data</span></div></button>
+              <button class="umat-qa-btn" data-lp="lec-struggle" type="button"><span class="material-symbols-outlined">psychology</span><div class="umat-qa-btn-text"><strong>Struggle Insights</strong><span>Topic &amp; student struggle data</span></div></button>
               <button class="umat-qa-btn" data-lp="lec-courses" type="button"><span class="material-symbols-outlined">menu_book</span><div class="umat-qa-btn-text"><strong>My Courses</strong><span>Switch course analytics</span></div></button>
               <button class="umat-qa-btn" data-lp="lec-library" type="button"><span class="material-symbols-outlined">local_library</span><div class="umat-qa-btn-text"><strong>Library</strong><span>Materials &amp; recordings</span></div></button>
               <button class="umat-qa-btn" data-lp="lec-review" type="button"><span class="material-symbols-outlined">fact_check</span><div class="umat-qa-btn-text"><strong>Review AI Outputs</strong><span>{$pending} pending</span></div></button>
@@ -830,6 +833,59 @@ HTML;
             <div class="umat-an-card-hdr"><h3 class="umat-an-card-title"><span class="material-symbols-outlined">help</span>Common Student Questions</h3><span style="padding:3px 9px;border-radius:999px;background:var(--u-secc);color:var(--u-sec);font-size:10px;font-weight:700;" id="an-q-badge">0+ chats</span></div>
             <div class="umat-q-list" id="an-q-list"><div style="text-align:center;padding:24px;color:var(--u-ol);font-size:13px;">Loading questions…</div></div>
           </div>
+        </div>
+      </div>
+
+      <!-- STRUGGLE INSIGHTS -->
+      <div class="umat-tab-pane" id="lec-struggle" style="overflow-y:auto;">
+        <div class="umat-content-hdr">
+          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">psychology</span> Struggle Insights — <span id="stru-course-label">{$safe}</span></h2>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span class="umat-pill pill-info" id="stru-mode-badge">PHP Engine</span>
+          </div>
+        </div>
+        <div id="stru-loading" class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading struggle insights…</p></div>
+        <div id="stru-error" class="umat-empty" style="display:none;"><span class="material-symbols-outlined">error_outline</span><p id="stru-error-text">Could not load struggle insights.</p></div>
+        <div id="stru-content" style="display:none;padding:0 20px 20px;">
+
+          <!-- Summary bar -->
+          <div class="struggle-summary-bar">
+            <span><strong id="stru-total-q">0</strong> questions from <strong id="stru-total-s">0</strong> students</span>
+            <span class="struggle-worst-topic">Worst topic: <strong id="stru-worst">—</strong></span>
+          </div>
+
+          <!-- Topic Struggle Matrix -->
+          <div class="struggle-section">
+            <div class="struggle-section-header">
+              <h3><span class="material-symbols-outlined" style="font-size:18px;color:var(--u-p);">leaderboard</span> Topic Struggle Matrix</h3>
+              <span class="umat-pill pill-info">Score 0-100</span>
+            </div>
+            <div id="stru-topic-grid" class="struggle-topic-grid">
+              <div class="umat-empty"><span class="material-symbols-outlined">search</span><p>No topic data yet.</p></div>
+            </div>
+          </div>
+
+          <!-- Material Breakdown (grouped by course sections) -->
+          <div class="struggle-section">
+            <div class="struggle-section-header">
+              <h3><span class="material-symbols-outlined" style="font-size:18px;color:var(--u-p);">folder</span> Material Breakdown</h3>
+            </div>
+            <div id="stru-material-list" class="struggle-material-list">
+              <div class="umat-empty"><span class="material-symbols-outlined">inventory_2</span><p>No materials with struggle data.</p></div>
+            </div>
+          </div>
+
+          <!-- At-Risk Students -->
+          <div class="struggle-section">
+            <div class="struggle-section-header">
+              <h3><span class="material-symbols-outlined" style="font-size:18px;color:var(--u-p);">warning</span> At-Risk Students</h3>
+              <span class="umat-pill pill-info">Risk score 0-100</span>
+            </div>
+            <div id="stru-student-list" class="struggle-student-list">
+              <div class="umat-empty"><span class="material-symbols-outlined">person_search</span><p>No at-risk student data yet.</p></div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -922,6 +978,7 @@ var UID   = {$uid};
 var UD    = {$jsUD};
 var anLoaded = {};
 var lecLoaded= {};
+var struggleCache = {};
 
 
 /* ─── LECTURER COURSE TILES ────────────────── */
@@ -1074,6 +1131,7 @@ function initHome(){
 
 function loadPaneData(name){
   if(name==='lec-analytics')loadAnalytics(CID);
+  if(name==='lec-struggle')loadStruggleInsights(CID);
   if(name==='lec-courses')loadLecturerCourses();
   if(name==='lec-library'){populateLibCourseSel();loadLibrary();}
   if(name==='lec-sessions')loadSessions();
@@ -1364,6 +1422,158 @@ function updateReviewCounts(){
   }
 }
 
+/* ──────────────────────────────────────────────
+   STRUGGLE INSIGHTS
+   ────────────────────────────────────────────── */
+function loadStruggleInsights(cid){
+  if(!cid){document.getElementById('stru-course-label').textContent='Open a course page.';return;}
+  document.getElementById('stru-course-label').textContent=cid===CID?CN:'Loading\u2026';
+  var loading=document.getElementById('stru-loading');
+  var error=document.getElementById('stru-error');
+  var content=document.getElementById('stru-content');
+  if(loading)loading.style.display='';
+  if(error)error.style.display='none';
+  if(content)content.style.display='none';
+  ajax('local_umat_ai_get_struggle_insights',{courseid:cid,days:60},
+    function(d){
+      if(loading)loading.style.display='none';
+      if(content)content.style.display='block';
+      renderStruggleSummary(d.summary);
+      renderTopicMatrix(d.topic_matrix);
+      renderMaterialBreakdown(d.material_breakdown);
+      renderAtRiskStudents(d.at_risk_students);
+      /* Cached */
+      struggleCache[cid]=true;
+    },
+    function(){
+      if(loading)loading.style.display='none';
+      if(error){error.style.display='';document.getElementById('stru-error-text').textContent='Could not load struggle insights. Check that students have interacted with the AI tutor.';}
+    }
+  );
+}
+
+function renderStruggleSummary(summary){
+  if(!summary)return;
+  s('stru-total-q',summary.total_questions);
+  s('stru-total-s',summary.total_students);
+  s('stru-worst',summary.worst_topic||'\u2014');
+  var badge=document.getElementById('stru-mode-badge');
+  if(badge)badge.textContent=summary.ai_service_used?'AI Engine':'PHP Engine';
+}
+
+function renderTopicMatrix(topics){
+  var grid=document.getElementById('stru-topic-grid');
+  if(!grid)return;
+  if(!topics||!topics.length){
+    grid.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">search</span><p>No topic data yet. Questions will appear once students start asking.</p></div>';
+    return;
+  }
+  grid.innerHTML=topics.map(function(t){
+    var pct=Math.min(100,t.struggle_score);
+    var sev=pct>=60?'high':(pct>=30?'medium':'low');
+    var trendHtml='';
+    if(t.trend==='up')trendHtml='<span class="struggle-trend trend-up"><span class="material-symbols-outlined">trending_up</span> +'+t.trend_pct+'%</span>';
+    else if(t.trend==='down')trendHtml='<span class="struggle-trend trend-down"><span class="material-symbols-outlined">trending_down</span> '+t.trend_pct+'%</span>';
+    else trendHtml='<span class="struggle-trend trend-stable"><span class="material-symbols-outlined">trending_flat</span></span>';
+    var matChips=(t.materials||[]).slice(0,4).map(function(m){
+      return '<span class="struggle-mat-chip" title="'+esc(m.name)+': '+m.question_count+' questions">'+
+        '<span class="material-symbols-outlined" style="font-size:11px;">description</span>'+
+        esc(m.name)+(m.question_count?' ('+m.question_count+')':'')+'</span>';
+    }).join('');
+    if((t.materials||[]).length>4)matChips+='<span class="struggle-mat-chip" style="opacity:.6;">+'+(t.materials.length-4)+' more</span>';
+    var diffPill=t.difficulty==='advanced'?'<span class="umat-pill pill-high">Advanced</span>':
+      (t.difficulty==='beginner'?'<span class="umat-pill pill-ok">Beginner</span>':
+      '<span class="umat-pill pill-warn">Intermediate</span>');
+    return '<div class="struggle-topic-card struggle-'+sev+'">'+
+      '<div class="struggle-topic-header">'+
+        '<div class="struggle-topic-name"><strong>'+esc(t.topic)+'</strong> '+diffPill+'</div>'+
+        '<div class="struggle-score-wrap"><span class="struggle-score-pill struggle-'+sev+'">'+t.struggle_score+'</span>'+trendHtml+'</div>'+
+      '</div>'+
+      '<div class="struggle-topic-body">'+
+        '<span><strong>'+t.question_count+'</strong> questions</span>'+
+        '<span><strong>'+t.student_count+'</strong> students</span>'+
+      '</div>'+
+      (matChips?'<div class="struggle-topic-materials">'+matChips+'</div>':'')+
+    '</div>';
+  }).join('');
+}
+
+function renderMaterialBreakdown(sections){
+  var list=document.getElementById('stru-material-list');
+  if(!list)return;
+  if(!sections||!sections.length){
+    list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">inventory_2</span><p>No materials with struggle data yet.</p></div>';
+    return;
+  }
+  list.innerHTML=sections.map(function(sec){
+    var matHtml=(sec.materials||[]).map(function(m){
+      var diffPill=m.difficulty==='advanced'?'<span class="umat-pill pill-high">'+(m.difficulty||'intermediate').substring(0,4)+'</span>':
+        (m.difficulty==='beginner'?'<span class="umat-pill pill-ok">Beg</span>':
+        '<span class="umat-pill pill-warn">Int</span>');
+      var concepts=(m.key_concepts||[]).map(function(c){
+        return '<span class="struggle-concept-chip" title="'+esc(c.concept)+': '+c.question_count+' questions">'+
+          esc(c.concept)+(c.question_count?' <span class="chip-count">'+c.question_count+'</span>':'')+'</span>';
+      }).join('');
+      var sev=m.question_count>10?'high':(m.question_count>3?'medium':'low');
+      return '<div class="struggle-material-row struggle-'+sev+'">'+
+        '<div class="struggle-mat-info">'+
+          '<span class="material-symbols-outlined" style="font-size:16px;color:var(--u-ol);">'+
+            (m.filename.match(/\.pdf$/i)?'picture_as_pdf':
+             m.filename.match(/\.(pptx?|ppt)$/i)?'slideshow':
+             m.filename.match(/\.(docx?|doc)$/i)?'description':
+             m.filename.match(/\.(xlsx?|xls|csv)$/i)?'table_chart':
+             'insert_drive_file')+'</span>'+
+          '<span class="struggle-mat-name" title="'+esc(m.filename)+'">'+esc(m.filename)+'</span>'+
+          diffPill+
+        '</div>'+
+        '<div class="struggle-mat-stats"><strong>'+m.question_count+'</strong> Q</div>'+
+        (concepts?'<div class="struggle-mat-concepts">'+concepts+'</div>':'')+
+      '</div>';
+    }).join('');
+    return '<div class="struggle-material-group">'+
+      '<div class="struggle-group-header" onclick="var b=this.nextElementSibling;b.style.display=b.style.display===\'none\'?\'\':\'none\';this.querySelector(\'.struggle-toggle\').textContent=b.style.display===\'none\'?\'keyboard_arrow_right\':\'keyboard_arrow_down\';">'+
+        '<span class="material-symbols-outlined struggle-toggle">keyboard_arrow_down</span>'+
+        '<strong>'+esc(sec.section_name)+'</strong>'+
+        '<span class="umat-pill pill-info">'+(sec.materials||[]).length+' items</span>'+
+      '</div>'+
+      '<div class="struggle-group-body">'+matHtml+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+function renderAtRiskStudents(students){
+  var list=document.getElementById('stru-student-list');
+  if(!list)return;
+  if(!students||!students.length){
+    list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">person_search</span><p>No at-risk student data yet.</p></div>';
+    return;
+  }
+  list.innerHTML='<div class="struggle-student-header">'+
+    '<span>Student</span><span>Questions</span><span>Struggle Topics</span><span>Risk</span><span>Activity</span>'+
+  '</div>'+
+  students.slice(0,20).map(function(s){
+    var riskPill=s.risk_level==='high'?'<span class="umat-pill pill-high">High</span>':
+      (s.risk_level==='medium'?'<span class="umat-pill pill-warn">Med</span>':
+      '<span class="umat-pill pill-ok">Low</span>');
+    var topicTags=(s.struggle_topics||[]).slice(0,3).map(function(t){
+      return '<span class="struggle-topic-tag">'+esc(t)+'</span>';
+    }).join('');
+    var trendIcon=s.trend==='up'?'<span class="material-symbols-outlined" style="font-size:14px;color:var(--u-ter);">trending_up</span>':
+      (s.trend==='down'?'<span class="material-symbols-outlined" style="font-size:14px;color:var(--u-p);">trending_down</span>':
+      '<span class="material-symbols-outlined" style="font-size:14px;color:var(--u-ol);">trending_flat</span>');
+    return '<div class="struggle-student-row">'+
+      '<div class="struggle-student-info">'+
+        '<img src="'+esc(s.profileimageurl)+'" alt="" class="struggle-student-avatar" onerror="this.style.display=\'none\'">'+
+        '<span class="struggle-student-name">'+esc(s.fullname)+'</span>'+
+      '</div>'+
+      '<span class="struggle-student-qcount"><strong>'+s.question_count+'</strong> '+trendIcon+'</span>'+
+      '<span class="struggle-student-topics">'+topicTags+'</span>'+
+      '<span class="struggle-student-risk">'+riskPill+' ('+s.risk_score+')</span>'+
+      '<span class="struggle-student-active">'+esc(s.last_active)+'</span>'+
+    '</div>';
+  }).join('');
+}
+
 /* Compact panel lecturer AI send */
 function appendLecMsg(text,isUser){
   var c=document.getElementById('lcp-msgs');if(!c)return;
@@ -1412,8 +1622,8 @@ initHome();
 document.getElementById('lec-home-date').textContent=(function(){var d=new Date();return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});})();
 /* Populate library course selector */
 populateLibCourseSel();
-/* Auto-load analytics when overlay opens */
-if(expand)expand.addEventListener('click',function(){setTimeout(function(){if(!lecLoaded['lec-analytics']){lecLoaded['lec-analytics']=true;loadAnalytics(CID);}},100);});
+/* Auto-load analytics + struggle when overlay opens */
+if(expand)expand.addEventListener('click',function(){setTimeout(function(){if(!lecLoaded['lec-analytics']){lecLoaded['lec-analytics']=true;loadAnalytics(CID);}if(!struggleCache[CID]){struggleCache[CID]=true;loadStruggleInsights(CID);}},100);});
 /* ESC: close nested-first, root-last */
 _umatInitEsc([
   {id:'lec-ai-mini',isOpen:function(e){return e.style.display==='flex';},close:function(e){e.style.display='none';}},

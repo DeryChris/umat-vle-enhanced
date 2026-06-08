@@ -84,7 +84,6 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="courseid"        UNIQUE="false" FIELDS="courseid"/>
-        <INDEX NAME="materialid"      UNIQUE="false" FIELDS="materialid"/>
         <INDEX NAME="material_type"   UNIQUE="false" FIELDS="materialid,analysis_type"/>
       </INDEXES>
     </TABLE>

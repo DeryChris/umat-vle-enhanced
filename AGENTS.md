@@ -11,11 +11,12 @@
 Before you start ANY task:
 
 - [ ] **Read the request completely** — understand scope and requirements
-   - [ ] **Load Agent Skills** - Analyse this dir "C:\Users\amkch\ruflo-main\.agents\skills" and pick the best agent skill or skills for the task and load and use it in the project. 
+- [ ] **Load Agent Skills** - Analyse this dir "C:\Users\amkch\ruflo-main\.agents\skills" and pick the best agent skill or skills for the task and load and use it in the project. 
 - [ ] **Check team ownership** (see "Team Work Areas" below) — coordinate with owner if needed
 - [ ] **Review docs/** folder — existing patterns, architecture, setup
 - [ ] **Ask clarifying questions** if task is ambiguous (use `vscode_askQuestions`)
-- [ ] **Plan with `manage_todo_list`** — break into 3-5 small chunks
+- [ ] **Plan with `manage_todo_list`** — break into small chunks
+- [ ] **Comments**: Add comments to codebase for easy reference professionally.
 - [ ] **Save plan to `/memories/session/`** — make progress visible
 - [ ] **Store memory**: Document your memories after each chat/conversation in `memory/session/` and/or `memory/`
 

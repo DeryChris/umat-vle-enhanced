@@ -61,22 +61,11 @@ define(['core/ajax'], function(Ajax) {
         document.head.appendChild(style);
     }
 
-    // Add Material Symbols font
-    function addFont() {
-        if (document.getElementById('umat-material-font')) return;
-        var link = document.createElement('link');
-        link.id = 'umat-material-font';
-        link.rel = 'stylesheet';
-        link.href = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0';
-        document.head.appendChild(link);
-    }
-
     // Create the FAB button
     function createFab() {
         if (document.getElementById('umatFabBtn')) return;
 
         addStyles();
-        addFont();
 
         var fab = document.createElement('button');
         fab.id = 'umatFabBtn';

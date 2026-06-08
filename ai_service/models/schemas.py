@@ -87,6 +87,7 @@ class AnalyzeRequest(BaseModel):
 
 
 class AnalyzeResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
     analysis_id:   int
     cached:        bool
     material_id:   int
@@ -101,6 +102,7 @@ class AnalyzeResponse(BaseModel):
 
 
 class AnalysisListItem(BaseModel):
+    model_config = {"protected_namespaces": ()}
     id:            int
     analysis_type: str
     scope:         str
@@ -134,6 +136,7 @@ class BatchAnalyzeResponse(BaseModel):
 
 class SyncAnalysisRequest(BaseModel):
     """Internal: called by Moodle web service to mirror analysis metadata."""
+    model_config = {"protected_namespaces": ()}
     material_id:   int
     fileid:        int
     courseid:      int

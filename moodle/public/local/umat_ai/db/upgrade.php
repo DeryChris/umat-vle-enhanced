@@ -73,7 +73,6 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
             $at->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
             $at->add_key('material_fk', XMLDB_KEY_FOREIGN, ['materialid'], 'umat_ai_materials', ['id']);
             $at->add_index('courseid', XMLDB_INDEX_NOTUNIQUE, ['courseid']);
-            $at->add_index('materialid', XMLDB_INDEX_NOTUNIQUE, ['materialid']);
             $at->add_index('material_type', XMLDB_INDEX_NOTUNIQUE, ['materialid', 'analysis_type']);
             $dbman->create_table($at);
         }
