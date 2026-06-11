@@ -1,0 +1,622 @@
+# UMaT VLE Enhanced — Implementation Plan
+
+**Last Updated**: 2026-06-09  
+**Scope**: Detailed technical implementation plan for every component
+
+---
+
+## Table of Contents
+
+1. [AI Service (Python/FastAPI)](#1-ai-service)
+2. [Moodle Plugin (PHP)](#2-moodle-plugin)
+3. [Frontend (AMD JavaScript)](#3-frontend)
+4. [Theme (SCSS)](#4-theme)
+5. [Database Schema](#5-database-schema)
+6. [BigBlueButton Integration](#6-bigbluebutton-integration)
+7. [External Dependencies](#7-external-dependencies)
+
+---
+
+## 1. AI Service
+
+**Location**: `ai_service/`  
+**Framework**: FastAPI + Uvicorn  
+**Owner**: Seidu
+
+### 1.1 Core Architecture
+
+```
+ai_service/
+├── main.py                    # App bootstrap, router registration, startup
+├── config.py                  # Pydantic Settings from .env
+├── middleware/
+│   └── auth.py                # Bearer token verification
+├── models/
+│   ├── database.py            # SQLAlchemy ORM models
+│   └── schemas.py             # Pydantic request/response models
+├── core/
+│   ├── audio_processor.py     # Recording download + ffmpeg audio extraction
+│   ├── transcription.py       # Whisper speech-to-text
+│   ├── document_loader.py     # Multi-format file parser
+│   ├── llm_processor.py       # Gemini LLM integration
+│   └── vector_store.py        # ChromaDB embedding + search
+└── api/v1/routes/
+    ├── health.py              # GET /health
+    ├── query.py               # POST /query (RAG Q&A)
+    ├── recording.py           # POST /recording/process, GET /recording/status
+    ├── materials.py           # POST /materials/index, DELETE /materials/{id}
+    ├── analysis.py            # POST /materials/analyze, batch, GET endpoints
+    └── analytics.py           # POST /analytics/classify, struggle-topics, student-risk
+```
+
+### 1.2 Endpoint Implementation Status
+
+| Endpoint | Method | Status | Router File | Key Logic |
+|----------|--------|--------|-------------|-----------|
+| `/api/v1/health` | GET | ✅ | `health.py` | Returns status, version, model info |
+| `/api/v1/query` | POST | ✅ | `query.py` | Rate limit → ChromaDB search → RAG prompt → Gemini → log |
+| `/api/v1/recording/process` | POST | ✅ | `recording.py` | Create job → BackgroundTasks pipeline |
+| `/api/v1/recording/status/{job_id}` | GET | ✅ | `recording.py` | Query `processing_jobs` table |
+| `/api/v1/materials/index` | POST | ✅ | `materials.py` | File upload → parse → chunk → embed → store |
+| `/api/v1/materials/{material_id}` | DELETE | ✅ | `materials.py` | ChromaDB delete + DB record removal |
+| `/api/v1/materials/analyze` | POST | ✅ | `analysis.py` | Cache check → download → extract → LLM → save → sync |
+| `/api/v1/materials/{id}/analyses` | GET | ✅ | `analysis.py` | List analysis metadata |
+| `/api/v1/analyses/{analysis_id}` | GET | ✅ | `analysis.py` | Full analysis content |
+| `/api/v1/materials/analyze/batch` | POST | ✅ | `analysis.py` | Batch analyze unanalyzed materials |
+| `/api/v1/analytics/classify-questions` | POST | ✅ | `analytics.py` | LLM-based question classification |
+| `/api/v1/analytics/struggle-topics` | POST | ✅ | `analytics.py` | Topic struggle scoring |
+| `/api/v1/analytics/student-risk` | POST | ✅ | `analytics.py` | Student risk assessment |
+
+### 1.3 Key Integration Points
+
+#### LLM Integration (`core/llm_processor.py`)
+- **Provider**: Google Gemini (via `langchain-google-genai`)
+- **Default model**: `gemini-2.0-flash` (config: `gemini-1.5-flash`)
+- **Embedding model**: `gemini-embedding-001` (hardcoded REST call)
+- **Temperature by task**: Summary `0.3`, Notes `0.2`, Quiz `0.4`, RAG `0.1`, Analysis `0.2`
+
+#### Vector Store (`core/vector_store.py`)
+- **Engine**: ChromaDB 0.5 (`PersistentClient`)
+- **Storage**: `./chroma_db` (configurable via `CHROMA_DB_PATH`)
+- **Collections**: One per course (`course_{course_id}`)
+- **Embedding**: Direct REST call to Gemini embedding API
+- **Batch size**: 100 documents per add call
+- **Fallback**: Zero vector (768 dims) on embedding failure
+
+#### Audio Processing (`core/audio_processor.py`)
+- **Download**: `httpx` with 5-min timeout
+- **Conversion**: `ffmpeg -i input -vn -acodec pcm_s16le -ar 16000 -ac 1 -y output.wav`
+- **Cleanup**: Temp files removed in `finally` block
+
+#### Transcription (`core/transcription.py`)
+- **Model**: OpenAI Whisper (local, pre-loaded at startup)
+- **Config**: `WHISPER_MODEL` env (default `base`), CPU mode (`fp16=False`), English forced
+- **Output**: Full transcript + timestamped segments
+
+#### Document Loader (`core/document_loader.py`)
+- **PDF**: PyPDF2, page-by-page with `[Page N]` headers
+- **DOCX**: `python-docx`, paragraphs + tables
+- **PPTX**: `python-pptx`, slide-by-slide with `--- Slide N ---` separators
+- **XLSX**: `openpyxl`, sheet-by-sheet tab-separated
+- **Code/Text**: UTF-8 with metadata headers
+- **Media**: Whisper transcription for audio/video (MP3, WAV, MP4, etc.)
+
+### 1.4 Rate Limiting
+- **Mechanism**: In-memory `defaultdict(list)` with timestamps per `user_id`
+- **Lock**: `threading.Lock` for thread safety
+- **Limit**: 10 requests per 60 seconds per user
+- **Reset**: On service restart (no persistence)
+- **Production**: Should be upgraded to Redis-backed limiter
+
+### 1.5 Background Processing
+- **Current**: FastAPI `BackgroundTasks` (in-process, no persistence)
+- **Limitation**: Jobs lost on service restart; no retry queue; single-process
+- **Production target**: Celery or RQ with Redis broker
+- **Retry**: Current implementation has 3 attempts with exponential backoff (1s, 2s, 4s)
+
+---
+
+## 2. Moodle Plugin
+
+**Location**: `moodle/public/local/umat_ai/`  
+**Framework**: Moodle 5.1.3x local plugin  
+**Owner**: Ackon (PHP backend), Johnson (AMD JS), Agartha (Templates)
+
+### 2.1 Directory Structure
+
+```
+local/umat_ai/
+├── version.php                        # Plugin version, requirements, dependencies
+├── settings.php                       # Admin settings UI
+├── lib.php                            # Hook handlers, AMD module loading
+├── index.php                          # Dashboard page
+├── hub.php                            # AI Hub page
+├── approve.php                        # Content approval page
+├── analysis_sync.php                  # AI service callback endpoint
+├── pdf_proxy.php                      # PDF proxying for viewer
+├── pptx_render.php                    # Server-side PPTX rendering
+├── db/
+│   ├── install.xml                    # Database schema definition
+│   ├── upgrade.php                    # Schema migration logic
+│   ├── access.php                     # Capabilities/permissions
+│   ├── events.php                     | Event observer registrations
+│   ├── services.php                   # Web service definitions
+│   ├── tasks.php                      # Scheduled task registrations
+│   └── hooks.php                      | Callback hook registrations
+├── classes/
+│   ├── event_observer.php             # BBB meeting_ended handler
+│   ├── file_observer.php              # Course module created handler
+│   ├── helper.php                     # Shared utility functions
+│   ├── output.php                     | Output rendering helpers
+│   ├── privacy/
+│   │   └── provider.php               # GDPR data export/deletion
+│   ├── external/
+│   │   ├── query.php                  # Web service: ask_question
+│   │   ├── recording.php              # Web service: process_recording, get_status
+│   │   ├── materials.php              # Web service: index_material, remove_material, list_materials
+│   │   ├── analysis.php               # Web service: get_analysis_status, request_analysis
+│   │   └── analytics.php              # Web service: struggle_topics
+│   └── task/
+│       ├── process_recording.php      # Cron: process BBB recordings
+│       ├── index_materials.php        | Cron: index course materials
+│       └── check_recording_status.php # Cron: poll AI service job status
+├── amd/src/
+│   ├── ai_fab.js                     # Floating Action Button (FAB)
+│   ├── ai_fab_panel.js               # FAB panel controller
+│   ├── ai_qna.js                     # Q&A chat interface
+│   ├── ai_hub.js                     # AI Hub page logic
+│   ├── umatshared.js                 # Shared utilities, overlay management
+│   ├── material_viewer.js            # Course material viewer
+│   └── analysis_handler.js           # Material analysis UI handler
+├── templates/
+│   ├── ai_fab.mustache               # FAB button + panel template
+│   ├── ai_qna.mustache               # Chat interface template
+│   ├── ai_hub.mustache               # Hub page template
+│   ├── approve.mustache              # Approval workflow template
+│   ├── dashboard.mustache            # Student dashboard template
+│   └── materials.mustache            # Materials page template
+├── styles/
+│   ├── umat-overlay.css              # Overlay/panel styles
+│   └── umat-chat.css                 # Chat interface styles
+└── lang/
+    └── en/
+        └── local_umat_ai.php         # English language strings
+```
+
+### 2.2 Scheduled Tasks
+
+| Task Class | Schedule | Purpose | Status |
+|-----------|----------|---------|--------|
+| `task\process_recording` | Every 5 min | Picks up pending BBB sessions, calls AI service to process | ✅ |
+| `task\check_recording_status` | Every 5 min | Polls AI service for job completion, stores results | ✅ |
+| `task\index_course_materials` | Every 30 min | Scans courses for new files, indexes into ChromaDB | ✅ |
+
+### 2.3 Event Observers
+
+| Event | Handler | Purpose | Status |
+|-------|---------|---------|--------|
+| `mod_bigbluebuttonbn\event\meeting_ended` | `event_observer::handle_meeting_ended` | Records session in `umat_ai_sessions` | ✅ |
+| `core\event\course_module_created` | `file_observer::handle_file_uploaded` | Records new files in `umat_ai_materials` | ✅ |
+
+### 2.4 Web Services
+
+| Function Name | Class::Method | Purpose | Status |
+|--------------|---------------|---------|--------|
+| `local_umat_ai_ask_question` | `external\query::ask_question` | Student Q&A | ✅ |
+| `local_umat_ai_process_recording` | `external\recording::process_recording` | Trigger recording processing | ✅ |
+| `local_umat_ai_get_recording_status` | `external\recording::get_recording_status` | Check job status | ✅ |
+| `local_umat_ai_index_material` | `external\materials::index_material` | Index course file | ✅ |
+| `local_umat_ai_remove_material` | `external\materials::remove_material` | Remove from index | ✅ |
+| `local_umat_ai_list_materials` | `external\materials::list_materials` | List indexed materials | ✅ |
+| `local_umat_ai_get_analysis_status` | `external\analysis::get_analysis_status` | Check analysis status | ✅ |
+| `local_umat_ai_request_analysis` | `external\analysis::request_analysis` | Trigger analysis | ✅ |
+| `local_umat_ai_get_struggle_topics` | `external\analytics::get_struggle_topics` | Analytics data | ✅ |
+
+### 2.5 Capabilities
+
+| Capability | Role | Purpose |
+|------------|------|---------|
+| `local/umat_ai:chatwithai` | Student | Ask AI questions |
+| `local/umat_ai:viewsummary` | Student | View AI-generated summaries |
+| `local/umat_ai:approveoutput` | Lecturer | Approve/reject AI content |
+| `local/umat_ai:viewanalytics` | Lecturer | View analytics dashboard |
+
+### 2.6 Key PHP Flow: Recording Pipeline
+
+```
+1. BBB session ends
+2. event_observer::handle_meeting_ended()
+   → INSERT INTO umat_ai_sessions (status='pending')
+3. task\process_recording::execute() (every 5 min)
+   → SELECT pending sessions
+   → For each: get BBB recording URL via BBB API
+   → POST /api/v1/recording/process (sends URL + course_id)
+   → UPDATE umat_ai_sessions SET status='processing'
+4. task\check_recording_status::execute() (every 5 min)
+   → SELECT processing sessions
+   → GET /api/v1/recording/status/{job_id}
+   → If completed: INSERT INTO umat_ai_outputs (summary/notes/quiz)
+   → UPDATE umat_ai_sessions SET status='completed'
+5. Lecturer visits approve.php → reviews content → approves/rejects
+6. Students see approved content
+```
+
+### 2.7 Key PHP Flow: Student Q&A
+
+```
+1. Student types question in chat panel
+2. AMD JS → Moodle WS: local_umat_ai_ask_question
+3. external\query::ask_question():
+   a. Validate capability: local/umat_ai:chatwithai
+   b. Validate enrollment in course
+   c. Rate limit check (10/min/user)
+   d. POST /api/v1/query (question + course_id + user_id)
+   e. Return answer + sources to JS
+4. AMD JS renders answer in chat panel with source citations
+5. Question + answer logged in umat_ai_chat_logs
+```
+
+---
+
+## 3. Frontend
+
+**Location**: `moodle/public/local/umat_ai/amd/src/`  
+**Framework**: Moodle AMD (RequireJS)  
+**Owner**: Johnson
+
+### 3.1 Module Map
+
+| Module | Dependencies | Purpose | Templates Rendered |
+|--------|-------------|---------|-------------------|
+| `ai_fab` | `core/ajax`, `core/notification` | FAB button lifecycle, panel loading | `ai_fab.mustache` |
+| `ai_fab_panel` | `core/ajax`, `ai_qna` | Panel controller, tab navigation | — |
+| `ai_qna` | `core/ajax`, `core/notification` | Q&A chat: send/receive/display messages | `ai_qna.mustache` |
+| `ai_hub` | `core/ajax` | Hub page: sessions, summaries, quizzes | `ai_hub.mustache` |
+| `umatshared` | `core/ajax` | Shared utilities: overlay, materials, analysis | — |
+| `material_viewer` | `core/ajax` | Course material viewer in overlay | — |
+| `analysis_handler` | `core/ajax` | Material analysis UI: status, analyze button | — |
+
+### 3.2 Key UI Components
+
+#### FAB + Chat Panel
+- **Trigger**: FAB button fixed to bottom-right of course page
+- **Panel**: Slides up overlay with tabs (Q&A, Summary, Notes, Quiz)
+- **Q&A Tab**: Chat-style interface with message history, input field, send button
+- **Attachment**: File upload via drag-drop or button in chat input area
+- **State**: Persists open/closed state; loads history from Moodle WS
+
+#### AI Hub
+- **Location**: Standalone page (`/local/umat_ai/hub.php`)
+- **Content**: Lists all BBB sessions with recordings, AI-generated summaries/notes/quizzes
+- **Filters**: By course, date range, status
+
+#### Approval Page
+- **Location**: `/local/umat_ai/approve.php`
+- **Function**: Lecturers review AI-generated content, approve/reject
+- **Workflow**: Pending → Approved → Published to students
+
+#### Material Viewer
+- **Display**: Side panel overlay for viewing course materials
+- **Features**: PDF viewing, file info, analysis status
+- **Analysis Button**: Triggers AI analysis on unanalyzed materials
+
+### 3.3 CSS Architecture
+
+| File | Purpose |
+|------|---------|
+| `styles/umat-overlay.css` | Overlay panel, material grid, FAB, viewer |
+| `styles/umat-chat.css` | Chat messages, input area, attachment drawer |
+
+**Design system** (from `ai_assistant_designs/`):
+- Primary: `#009846` (UMaT Green)
+- Accent: `#FFCC00` (UMaT Gold)
+- Surface: `#F5FBF0` (soft green tint)
+- Cards: `#FFFFFF`
+- Uses CSS custom properties for theming
+
+---
+
+## 4. Theme
+
+**Location**: `moodle/public/theme/umat/`  
+**Base Theme**: Boost  
+**Owner**: Chrispen
+
+### 4.1 Theme Structure
+
+```
+theme/umat/
+├── version.php              # Theme version, requirements
+├── config.php               # Theme configuration
+├── lib.php                  # Theme hooks and overrides
+├── settings.php             # Theme settings
+├── scss/
+│   ├── umat.scss            # Main SCSS entry point
+│   ├── variables.scss       # UMaT color variables
+│   └── overrides.scss       # Component overrides
+├── lang/
+│   └── en/
+│       └── theme_umat.php   # Language strings
+└── layouts/
+    ├── login.php            # Custom login page layout
+    └── columns2.php         # Two-column course layout
+```
+
+### 4.2 Brand Colors
+
+| Usage | Color | Hex |
+|-------|-------|-----|
+| Primary | UMaT Green | `#009846` |
+| Accent | UMaT Gold | `#C8A951` (navy variant) / `#FFCC00` (design system) |
+| Background tint | Soft Green | `#F5FBF0` |
+
+---
+
+## 5. Database Schema
+
+### 5.1 Moodle Database (`moodle`)
+
+#### `mdl_umat_ai_sessions` — BBB Recording Sessions
+```sql
+CREATE TABLE mdl_umat_ai_sessions (
+    id BIGINT(10) PRIMARY KEY AUTO_INCREMENT,
+    sessionid VARCHAR(100) NOT NULL,
+    courseid BIGINT(10) NOT NULL,
+    cmid BIGINT(10) DEFAULT 0,
+    recording_url TEXT,
+    status VARCHAR(30) DEFAULT 'pending',
+    timecreated BIGINT(10) DEFAULT 0,
+    timemodified BIGINT(10) DEFAULT 0
+);
+```
+
+#### `mdl_umat_ai_outputs` — AI-Generated Content
+```sql
+CREATE TABLE mdl_umat_ai_outputs (
+    id BIGINT(10) PRIMARY KEY AUTO_INCREMENT,
+    sessionrecordid BIGINT(10) NOT NULL,
+    courseid BIGINT(10) NOT NULL,
+    output_type VARCHAR(30) NOT NULL,
+    content TEXT,
+    is_approved TINYINT(1) DEFAULT 0,
+    approved_by BIGINT(10) DEFAULT 0,
+    timecreated BIGINT(10) DEFAULT 0,
+    timepublished BIGINT(10) DEFAULT 0
+);
+```
+
+#### `mdl_umat_ai_materials` — Indexed Course Materials
+```sql
+CREATE TABLE mdl_umat_ai_materials (
+    id BIGINT(10) PRIMARY KEY AUTO_INCREMENT,
+    courseid BIGINT(10) NOT NULL,
+    fileid BIGINT(10) NOT NULL,
+    filename VARCHAR(255) DEFAULT '',
+    is_indexed TINYINT(1) DEFAULT 0,
+    is_analyzed TINYINT(1) DEFAULT 0,
+    timeindexed BIGINT(10) DEFAULT 0,
+    timeanalyzed BIGINT(10) DEFAULT 0,
+    timecreated BIGINT(10) DEFAULT 0
+);
+```
+
+#### `mdl_umat_ai_analysis` — Material Analysis Results
+```sql
+CREATE TABLE mdl_umat_ai_analysis (
+    id BIGINT(10) PRIMARY KEY AUTO_INCREMENT,
+    courseid BIGINT(10) NOT NULL,
+    materialid BIGINT(10) NOT NULL,
+    fileid BIGINT(10) DEFAULT 0,
+    analysis_type VARCHAR(50) DEFAULT 'full_analysis',
+    scope VARCHAR(50) DEFAULT 'full',
+    status VARCHAR(30) DEFAULT 'pending',
+    ai_analysis_id BIGINT(10) DEFAULT 0,
+    model_version VARCHAR(100) DEFAULT '',
+    token_count BIGINT(10) DEFAULT 0,
+    summary TEXT,
+    timecreated BIGINT(10) DEFAULT 0,
+    timemodified BIGINT(10) DEFAULT 0
+);
+```
+
+#### `mdl_umat_ai_chat_logs` — Q&A Interaction Logs
+```sql
+CREATE TABLE mdl_umat_ai_chat_logs (
+    id BIGINT(10) PRIMARY KEY AUTO_INCREMENT,
+    userid BIGINT(10) NOT NULL,
+    courseid BIGINT(10) NOT NULL,
+    question TEXT,
+    answer TEXT,
+    sources TEXT,
+    timecreated BIGINT(10) DEFAULT 0
+);
+```
+
+### 5.2 AI Service Database (`umat_ai_db`)
+
+#### `processing_jobs` — Recording Pipeline Jobs
+```sql
+CREATE TABLE processing_jobs (
+    id SERIAL PRIMARY KEY,
+    job_id VARCHAR(100) UNIQUE NOT NULL,
+    session_id VARCHAR(100),
+    course_id INTEGER NOT NULL,
+    recording_url TEXT,
+    status VARCHAR(30) DEFAULT 'queued',
+    transcript TEXT,
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    completed_at TIMESTAMP
+);
+```
+
+#### `indexed_documents` — ChromaDB Index Tracking
+```sql
+CREATE TABLE indexed_documents (
+    id SERIAL PRIMARY KEY,
+    material_id INTEGER NOT NULL,
+    course_id INTEGER NOT NULL,
+    filename VARCHAR(255),
+    chunk_count INTEGER DEFAULT 0,
+    collection_name VARCHAR(100),
+    indexed_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### `chat_logs` — Q&A Interaction Logs
+```sql
+CREATE TABLE chat_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    course_id INTEGER NOT NULL,
+    question TEXT,
+    answer TEXT,
+    sources TEXT,
+    response_time_ms FLOAT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### `material_analyses` — Full Analysis Content
+```sql
+CREATE TABLE material_analyses (
+    id SERIAL PRIMARY KEY,
+    material_id INTEGER NOT NULL,
+    file_id INTEGER DEFAULT 0,
+    course_id INTEGER NOT NULL,
+    analysis_type VARCHAR(50),
+    scope VARCHAR(50) DEFAULT 'full',
+    content TEXT,
+    model_version VARCHAR(100),
+    token_count INTEGER DEFAULT 0,
+    user_request TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### 5.3 Vector Store (ChromaDB)
+
+- **Storage**: `ai_service/chroma_db/` (persistent local directory)
+- **Collections**: Named `course_{course_id}`
+- **Documents**: Text chunks with metadata (source filename, page number, course ID)
+- **Embedding**: 768-dimensional vectors from `gemini-embedding-001`
+
+---
+
+## 6. BigBlueButton Integration
+
+### 6.1 Architecture
+
+```
+BBB Server ──webhook/event──▶ Moodle BBB Plugin ──meeting_ended──▶ local_umat_ai
+                                                                    │
+                                                                    ▼
+                                                            umat_ai_sessions
+                                                            (status: pending)
+                                                                    │
+                                                                    ▼
+                                                        Scheduled Task (5 min)
+                                                                    │
+                                                                    ▼
+                                                            BBB API → get recording URL
+                                                                    │
+                                                                    ▼
+                                                        AI Service: POST /recording/process
+```
+
+### 6.2 Components
+
+| Component | File | Responsibility |
+|-----------|------|----------------|
+| BBB Plugin | `mod/bigbluebuttonbn/` | External plugin (unmodified) |
+| Event Observer | `classes/event_observer.php` | Listens for `meeting_ended` |
+| Recording Task | `classes/task/process_recording.php` | Fetches recording URL, calls AI service |
+| Status Task | `classes/task/check_recording_status.php` | Polls AI service for completion |
+| Sessions Table | `mdl_umat_ai_sessions` | Tracks each session through pipeline |
+
+### 6.3 Flow Details
+
+1. **BBB meeting ends** → BBB plugin fires `meeting_ended` event
+2. **Event observer** records session in `umat_ai_sessions` with `status='pending'`
+3. **Process recording task** (every 5 min):
+   - Queries `umat_ai_sessions WHERE status='pending'`
+   - Gets recording URL from BBB API using `mod_bigbluebuttonbn` helpers
+   - Calls `POST /api/v1/recording/process` with session_id, recording_url, course_id
+   - Updates session `status='processing'`
+4. **Check status task** (every 5 min):
+   - Queries `umat_ai_sessions WHERE status='processing'`
+   - Calls `GET /api/v1/recording/status/{job_id}`
+   - On `completed`: stores transcript, summary, notes, quiz in `umat_ai_outputs`
+   - Updates session `status='completed'`
+5. **Lecturer approval**: Content visible to students only after approval
+
+---
+
+## 7. External Dependencies
+
+### 7.1 PHP Dependencies (Moodle)
+- Moodle 5.1.3x LTS (core)
+- `mod_bigbluebuttonbn` (BBB integration)
+- No additional Composer packages (all custom code)
+
+### 7.2 Python Dependencies (AI Service)
+
+**`requirements.txt`** key packages:
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `fastapi` | 0.111.0 | Web framework |
+| `uvicorn` | 0.29.0 | ASGI server |
+| `sqlalchemy` | 2.0.30 | ORM |
+| `psycopg2-binary` | 2.9.9 | PostgreSQL driver |
+| `langchain` | 0.2.1 | LLM framework |
+| `langchain-google-genai` | 1.0.8 | Gemini integration |
+| `chromadb` | 0.5.0 | Vector store |
+| `google-generativeai` | 0.7.2 | Gemini SDK |
+| `httpx` | 0.27.0 | Async HTTP |
+| `pypdf` | 4.2.0 | PDF parsing |
+| `python-docx` | 1.1.2 | DOCX parsing |
+| `python-pptx` | 0.6.23 | PPTX parsing |
+| `openpyxl` | 3.1.5 | XLSX parsing |
+| `pydantic` | 2.7.1 | Validation |
+| `pydantic-settings` | 2.2.1 | Config management |
+
+**Separate install**:
+- `openai-whisper` (local transcription, ~2GB disk with model)
+
+### 7.3 System Dependencies
+- **ffmpeg**: Audio extraction from video recordings
+- **LibreOffice** (optional): Better PPTX-to-image conversion
+- **ImageMagick/Ghostscript** (optional): PDF-to-image conversion
+
+### 7.4 External Services
+
+| Service | Dependency | Auth Method | Cost |
+|---------|-----------|-------------|------|
+| Google Gemini API | Required | API Key in `.env` | ~$0.05-0.10/lecture |
+| BigBlueButton Server | Required | Shared Secret | Server hosting cost |
+| PostgreSQL | Required | Password auth | Free |
+
+---
+
+## Appendix: Environment Variables
+
+### AI Service (`.env`)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AI_SERVICE_TOKEN` | Yes | — | Bearer token for API auth |
+| `AI_SERVICE_HOST` | No | `0.0.0.0` | Bind address |
+| `AI_SERVICE_PORT` | No | `8000` | Listen port |
+| `GOOGLE_API_KEY` | Yes | — | Gemini API key |
+| `LLM_MODEL` | No | `gemini-2.0-flash` | LLM model name |
+| `AI_DB_HOST` | No | `localhost` | PostgreSQL host |
+| `AI_DB_PORT` | No | `5432` | PostgreSQL port |
+| `AI_DB_NAME` | No | `umat_ai_db` | AI service database |
+| `AI_DB_USER` | No | `postgres` | DB user |
+| `AI_DB_PASSWORD` | Yes | — | DB password |
+| `CHROMA_DB_PATH` | No | `./chroma_db` | ChromaDB storage path |
+| `UPLOAD_DIR` | No | `./uploads` | Temp file storage |
+| `WHISPER_MODEL` | No | `base` | Whisper model size |
+| `MAX_FILE_SIZE_MB` | No | `500` | Max file upload size |

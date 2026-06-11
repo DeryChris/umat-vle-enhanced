@@ -433,7 +433,7 @@ define([], function () {
     }
 
     // ═══════════════════════════════════════════
-    //  DOCX VIEWER (mammoth.js)
+    //  DOCX VIEWER
     // ═══════════════════════════════════════════
 
     function viewDocx(container, opts) {

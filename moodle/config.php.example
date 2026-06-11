@@ -23,6 +23,9 @@ $CFG->admin     = 'admin';
 
 $CFG->directorypermissions = 0777;
 
+// Allow localhost:8000 for AI service
+$CFG->customscripts = ''; // Dummy to ensure config loads
+
 // For development purposes
 $CFG->debug = 32767;
 $CFG->cachejs = false;
