@@ -17,8 +17,8 @@ class Settings(BaseSettings):
 
     # Google Gemini (LLM + embeddings)
     google_api_key: str
-    llm_model: str = "gemini-2.0-flash"
-    embedding_model: str = "text-embedding-004"
+    llm_model: str = "gemini-2.5-flash"
+    embedding_model: str = "gemini-embedding-001"
 
     # Database
     ai_db_host: str = "localhost"
