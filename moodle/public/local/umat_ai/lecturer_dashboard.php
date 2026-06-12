@@ -83,23 +83,29 @@ $topQuestions = $DB->get_records_sql(
     0, 10
 );
 
-// Struggle index (session with most questions).
+// Struggle index — the course material students cite most in their questions
+// (human-readable, unlike the old session-key fragment).
 $struggleIndex = get_string('na', 'local_umat_ai');
-$struggleRaw   = $DB->get_records_sql(
-    "SELECT session_key, COUNT(*) AS cnt
-       FROM {umat_ai_chat_logs}
+$struggleCount = 0;
+$sourceRows = $DB->get_records_sql(
+    "SELECT id, sources FROM {umat_ai_chat_logs}
       WHERE courseid = :cid AND timecreated > :since AND role = 'student'
-        AND session_key IS NOT NULL AND session_key != ''
-   GROUP BY session_key ORDER BY cnt DESC",
-    ['cid' => $courseid, 'since' => $since],
-    0, 1
+        AND sources IS NOT NULL AND sources != '' AND sources != '[]'",
+    ['cid' => $courseid, 'since' => $since]
 );
-if (!empty($struggleRaw)) {
-    $top           = array_values($struggleRaw)[0];
-    $struggleIndex = 'Session ' . strtoupper(substr($top->session_key, 0, 6));
-    $struggleCount = $top->cnt;
-} else {
-    $struggleCount = 0;
+$sourceCounts = [];
+foreach ($sourceRows as $row) {
+    $srcs = json_decode($row->sources, true);
+    if (!is_array($srcs)) continue;
+    foreach (array_unique(array_filter($srcs, 'is_string')) as $src) {
+        $sourceCounts[$src] = ($sourceCounts[$src] ?? 0) + 1;
+    }
+}
+if (!empty($sourceCounts)) {
+    arsort($sourceCounts);
+    $topSource     = array_key_first($sourceCounts);
+    $struggleIndex = pathinfo($topSource, PATHINFO_FILENAME);
+    $struggleCount = (int) $sourceCounts[$topSource];
 }
 
 // Avg questions per session.

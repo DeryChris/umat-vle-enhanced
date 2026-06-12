@@ -130,6 +130,7 @@ class get_struggle_insights extends \external_api {
         foreach ($logs as $l) {
             $uid = (int)$l->userid;
             $qid = (int)$l->id;
+            $qTopicAssigned = false; // whether THIS question got a topic
 
             // Track per-student
             if (!isset($studentQuestions[$uid])) $studentQuestions[$uid] = [];
@@ -189,6 +190,7 @@ class get_struggle_insights extends \external_api {
                             $topicQuestions[$lc][$qid] = true;
                             $topicStudents[$lc][$uid] = true;
                             $topicMaterials[$lc][$mid] = true;
+                            $qTopicAssigned = true;
                         }
                     }
                 }
@@ -209,6 +211,7 @@ class get_struggle_insights extends \external_api {
                         if (!isset($topicQuestions[$lc])) $topicQuestions[$lc] = [];
                         $topicQuestions[$lc][$qid] = true;
                         $topicStudents[$lc][$uid] = true;
+                        $qTopicAssigned = true;
                         if (isset($conceptToMaterials[$lc])) {
                             foreach ($conceptToMaterials[$lc] as $mid => $_) {
                                 $matchedMids[$mid] = true;
@@ -219,8 +222,11 @@ class get_struggle_insights extends \external_api {
                 }
             }
 
-            // Fallback for unmatched questions: extract significant words as ad-hoc topic
-            if (empty($matchedMids) && empty($topicQuestions)) {
+            // Fallback for any question that didn't get a topic above:
+            // extract significant words as an ad-hoc topic. (Previously gated
+            // on empty($topicQuestions) — the global accumulator — so only the
+            // first unmatched question ever produced a topic.)
+            if (!$qTopicAssigned) {
                 $stopwords = ['the','a','an','is','are','was','were','do','does','did',
                               'how','what','why','when','where','which','who','whom',
                               'this','that','these','those','i','you','he','she','it',
@@ -232,16 +238,16 @@ class get_struggle_insights extends \external_api {
                               'up','down','than','very','just','also','can','will','has',
                               'have','had','been','being','be','get','got','would','could',
                               'should','may','might','shall','need','like','make','made'];
-                $words = array_filter(explode(' ', strtolower($l->question)));
+                $words = array_filter(preg_split('/[^a-z0-9]+/', strtolower($l->question)));
                 $words = array_diff($words, $stopwords);
                 $words = array_filter($words, function($w) { return strlen($w) > 3; });
                 $words = array_slice(array_unique($words), 0, 3);
-                if (count($words) >= 1) {
-                    $adhoctopic = implode(' ', $words);
-                    $lc = strtolower($adhoctopic);
-                    if (!isset($topicQuestions[$lc])) $topicQuestions[$lc] = [];
-                    $topicQuestions[$lc][$qid] = true;
-                    $topicStudents[$lc][$uid] = true;
+                // One topic per word (not one combined string) so the same
+                // term aggregates across different students' questions.
+                foreach ($words as $w) {
+                    if (!isset($topicQuestions[$w])) $topicQuestions[$w] = [];
+                    $topicQuestions[$w][$qid] = true;
+                    $topicStudents[$w][$uid] = true;
                 }
             }
         }

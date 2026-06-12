@@ -93,22 +93,30 @@ class get_analytics extends \external_api {
             return ['text' => $text, 'ask_count' => (int) $q->ask_count];
         }, (array) $rawQuestions));
 
-        // 7. Struggle index — session_key with highest question count.
+        // 7. Struggle index — the course material students cite most in their
+        //    questions (human-readable, unlike the old session-key fragment).
         $struggleIndex = 'N/A';
         $struggleCount = 0;
-        $struggleRow = $DB->get_record_sql(
-            "SELECT session_key, COUNT(*) AS cnt
-               FROM {umat_ai_chat_logs}
+        $sourceRows = $DB->get_records_sql(
+            "SELECT id, sources FROM {umat_ai_chat_logs}
               WHERE courseid = :cid AND timecreated > :since AND role = 'student'
-                AND session_key IS NOT NULL AND session_key != ''
-           GROUP BY session_key
-           ORDER BY cnt DESC",
-            ['cid' => $cid, 'since' => $since],
-            IGNORE_MULTIPLE
+                AND sources IS NOT NULL AND sources != '' AND sources != '[]'",
+            ['cid' => $cid, 'since' => $since]
         );
-        if ($struggleRow) {
-            $struggleIndex = 'Session ' . strtoupper(substr($struggleRow->session_key, 0, 6));
-            $struggleCount = (int) $struggleRow->cnt;
+        $sourceCounts = [];
+        foreach ($sourceRows as $row) {
+            $srcs = json_decode($row->sources, true);
+            if (!is_array($srcs)) continue;
+            foreach (array_unique(array_filter($srcs, 'is_string')) as $src) {
+                $sourceCounts[$src] = ($sourceCounts[$src] ?? 0) + 1;
+            }
+        }
+        if (!empty($sourceCounts)) {
+            arsort($sourceCounts);
+            $topSource = array_key_first($sourceCounts);
+            // Strip the file extension for display.
+            $struggleIndex = pathinfo($topSource, PATHINFO_FILENAME);
+            $struggleCount = (int) $sourceCounts[$topSource];
         }
 
         // 8. Avg questions per session.
