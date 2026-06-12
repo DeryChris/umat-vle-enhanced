@@ -41,13 +41,10 @@ class ai_query extends \external_api {
 
         // Moodle-side rate limit (secondary guard — AI service also enforces its own).
         $rateLimit = (int) get_config('local_umat_ai', 'rate_limit') ?: 10;
-        $recent = $DB->count_records_select(
-            'umat_ai_chat_logs',
-            'userid = :uid AND timecreated > :since AND role = :role',
-            ['uid' => $USER->id, 'since' => time() - 60, 'role' => 'student']
-        );
-        if ($recent >= $rateLimit) {
-            return ['success' => false, 'answer' => get_string('rate_limit_hit', 'local_umat_ai'), 'sources' => [], 'error' => 'rate_limit'];
+        $remaining = local_umat_ai_questions_remaining($USER->id, $rateLimit);
+        if ($remaining <= 0) {
+            return ['success' => false, 'answer' => get_string('rate_limit_hit', 'local_umat_ai'),
+                    'sources' => [], 'error' => 'rate_limit', 'remaining' => 0];
         }
 
         // Call AI service — only pass what the schema expects.
@@ -74,20 +71,23 @@ class ai_query extends \external_api {
                 'sources'     => json_encode($result['sources'] ?? []),
                 'timecreated' => time(),
             ]);
-            return ['success' => true, 'answer' => $result['answer'], 'sources' => $result['sources'] ?? [], 'error' => ''];
+            return ['success' => true, 'answer' => $result['answer'], 'sources' => $result['sources'] ?? [],
+                    'error' => '', 'remaining' => $remaining - 1];
         }
 
         // AI service returned no answer — return graceful error.
+        // Failed questions are not logged, so they do not consume the rate-limit window.
         $msg = $result['detail']['message'] ?? get_string('ai_unavailable', 'local_umat_ai');
-        return ['success' => false, 'answer' => $msg, 'sources' => [], 'error' => 'service_error'];
+        return ['success' => false, 'answer' => $msg, 'sources' => [], 'error' => 'service_error', 'remaining' => $remaining];
     }
 
     public static function ask_question_returns() {
         return new \external_single_structure([
-            'success' => new \external_value(PARAM_BOOL),
-            'answer'  => new \external_value(PARAM_RAW),
-            'sources' => new \external_multiple_structure(new \external_value(PARAM_TEXT)),
-            'error'   => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+            'success'   => new \external_value(PARAM_BOOL),
+            'answer'    => new \external_value(PARAM_RAW),
+            'sources'   => new \external_multiple_structure(new \external_value(PARAM_TEXT)),
+            'error'     => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+            'remaining' => new \external_value(PARAM_INT, 'Questions remaining in the current rate-limit window', VALUE_DEFAULT, -1),
         ]);
     }
 

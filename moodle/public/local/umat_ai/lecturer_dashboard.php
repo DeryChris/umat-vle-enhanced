@@ -117,10 +117,15 @@ if (!empty($sessionsData)) {
 }
 
 // Student performance breakdown (approximate from AI usage frequency).
-$highPerformers = $DB->count_records_sql(
-    "SELECT COUNT(DISTINCT userid) FROM {umat_ai_chat_logs}
-     WHERE courseid = :cid AND timecreated > :since AND role = 'student'
-     GROUP BY userid HAVING COUNT(*) >= 10",
+// Same fix as get_analytics.php: COUNT over a grouped subquery, not GROUP BY in count_records_sql.
+$highPerformers = (int) $DB->get_field_sql(
+    "SELECT COUNT(*) FROM (
+        SELECT userid
+          FROM {umat_ai_chat_logs}
+         WHERE courseid = :cid AND timecreated > :since AND role = 'student'
+      GROUP BY userid
+        HAVING COUNT(*) >= 10
+     ) hp_subq",
     ['cid' => $courseid, 'since' => $since]
 ) ?: 0;
 

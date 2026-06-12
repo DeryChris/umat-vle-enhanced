@@ -86,7 +86,7 @@ JS;
         <div class="umat-cp-av"><span class="material-symbols-outlined">smart_toy</span><span class="umat-cp-dot"></span></div>
         <div class="umat-cp-info">
           <h2>AI Tutor</h2>
-          <div class="sub">● Online &amp; Ready</div>
+          <div class="sub" id="stu-conn-status">● Checking…</div>
           <div class="ctx" title="{$safeName}">{$safeName}</div>
         </div>
         <button class="umat-cp-hbtn umat-cp-exp" id="stu-expand-btn" type="button">
@@ -328,7 +328,9 @@ var courseId   = {$jsCid};
 var courseName = {$jsName};
 var userData   = {$userData};
 var sessionKey = 'stu_'+Math.random().toString(36).substr(2,18);
-var qLeft      = 10;
+/* Rolling 60s rate-limit window — mirrors the server check, refills as entries expire */
+var RATE_MAX = 10;
+var qTimes   = [];
 var selectedMats = [];
 var lecturesLoaded = false;
 var libraryLoaded  = false;
@@ -342,7 +344,7 @@ var cpOv    = document.getElementById('stu-cp-ov');
 var cpClose = document.getElementById('stu-cp-close');
 var expBtn  = document.getElementById('stu-expand-btn');
 
-fab.addEventListener('click', function(){ cpOv.classList.add('open'); updateRate(); });
+fab.addEventListener('click', function(){ cpOv.classList.add('open'); updateRate(); checkConn(); });
 cpClose.addEventListener('click', function(){ cpOv.classList.remove('open'); });
 cpOv.addEventListener('click', function(e){ if(e.target===cpOv) cpOv.classList.remove('open'); });
 expBtn.addEventListener('click', function(){ cpOv.classList.remove('open'); openOverlay(); });
@@ -397,12 +399,49 @@ ov.querySelectorAll('[data-sb-tab]').forEach(function(btn){
   btn.addEventListener('click',function(){ switchToTab(btn.dataset.sbTab); });
 });
 
-/* ---- rate counter ---- */
+/* ---- rate counter (rolling 60s window) ---- */
+function qRemaining(){
+  var now=Date.now();
+  qTimes=qTimes.filter(function(t){return now-t<60000;});
+  return Math.max(0,RATE_MAX-qTimes.length);
+}
+/* Reconcile with the server's count (covers other tabs/devices) */
+function syncRemaining(rem){
+  if(typeof rem!=='number'||rem<0)return;
+  var now=Date.now();
+  while(qRemaining()>rem)qTimes.push(now);
+}
 function updateRate(){
+  var left=qRemaining();
   var el=document.getElementById('cp-rate'),el2=document.getElementById('ws-rate-pill');
-  var t=qLeft+' question'+(qLeft!==1?'s':'')+' remaining';
+  var t=left+' question'+(left!==1?'s':'')+' remaining';
   if(el)el.textContent=t;
   if(el2)el2.textContent=t;
+}
+setInterval(updateRate,5000); /* refill display as window entries expire */
+
+/* ---- connection status ---- */
+var connOnline=null,connTimer=null;
+function setConn(state){
+  var el=document.getElementById('stu-conn-status');
+  if(!el)return;
+  if(state==='online'){el.innerHTML='&#9679; Online &amp; Ready';el.style.color='';}
+  else if(state==='checking'){el.innerHTML='&#9679; Checking…';el.style.color='#d97706';}
+  else{el.innerHTML='<span class="material-symbols-outlined" style="font-size:12px;vertical-align:-2px;">wifi_off</span> Offline — retrying…';el.style.color='#fca5a5';}
+}
+function markConn(online){
+  connOnline=online;
+  setConn(online?'online':'offline');
+  clearTimeout(connTimer);
+  if(!online)connTimer=setTimeout(checkConn,15000); /* keep retrying while panel is open */
+}
+function checkConn(){
+  if(connOnline===null)setConn('checking');
+  require(['core/ajax'],function(Ajax){
+    Ajax.call([{methodname:'local_umat_ai_service_status',args:{}}])[0]
+      .done(function(r){markConn(!!r.online);})
+      .fail(function(){markConn(false);});
+  });
 }
 
 /* ---- HOME TAB data ---- */
@@ -443,8 +482,8 @@ function populateHomeTab(){
 /* ---- AI TUTOR chat ---- */
 function sendQuestion(q, msgsId){
   q=(q||'').trim();if(!q)return;
-  if(qLeft<=0){_umatAppendAi(msgsId,'Rate limit reached. Please wait a moment.',[]); return;}
-  qLeft--;updateRate();
+  if(qRemaining()<=0){_umatAppendAi(msgsId,'Rate limit reached. Please wait a moment before asking again.',[]); return;}
+  qTimes.push(Date.now());updateRate();
   _umatAppendUser(msgsId,q);
   var tid='typ_'+Date.now();_umatShowTyping(msgsId,tid);
 
@@ -453,8 +492,19 @@ function sendQuestion(q, msgsId){
 
   require(['core/ajax'],function(Ajax){
     Ajax.call([{methodname:'local_umat_ai_ask_question',args:{courseid:courseId,question:contextQ,session_key:sessionKey}}])[0]
-      .done(function(r){_umatHideTyping(tid);_umatAppendAi(msgsId,r.success?r.answer:'Sorry, an error occurred.',r.sources||[]);})
-      .fail(function(){_umatHideTyping(tid);_umatAppendAi(msgsId,'Connection error. Please try again.',[]);});
+      .done(function(r){
+        _umatHideTyping(tid);
+        /* Server message is always user-friendly (rate limit, no materials, service down) */
+        _umatAppendAi(msgsId,r.answer||'Sorry, an error occurred. Please try again.',r.sources||[]);
+        syncRemaining(r.remaining);updateRate();
+        markConn(r.error!=='service_error');
+      })
+      .fail(function(){
+        _umatHideTyping(tid);
+        qTimes.pop();updateRate(); /* request never reached the server — refund it */
+        _umatAppendAi(msgsId,'Connection error. Please try again.',[]);
+        markConn(false);
+      });
   });
 }
 
@@ -1856,7 +1906,9 @@ window._umatSharedReady.then(function() {
 var UD      = {$jsUD} || {};
 var UID     = {$uid};
 var sessKey = 'hub_'+Math.random().toString(36).substr(2,18);
-var qLeft   = 10;
+/* Rolling 60s rate-limit window — mirrors the server check, refills as entries expire */
+var RATE_MAX = 10;
+var qTimes   = [];
 var selMat  = [];
 var matLoaded = false;
 var loaded  = {};
@@ -2086,7 +2138,10 @@ function openHubPdf(url,name){
 }
 
 /* Chat */
-function updateRate(){var e=document.getElementById('hub-rate');if(e){e.textContent=qLeft+' Q/min';e.style.color=qLeft<=2?'var(--u-ter)':'';}}
+function qRemaining(){var now=Date.now();qTimes=qTimes.filter(function(t){return now-t<60000;});return Math.max(0,RATE_MAX-qTimes.length);}
+function syncRemaining(rem){if(typeof rem!=='number'||rem<0)return;var now=Date.now();while(qRemaining()>rem)qTimes.push(now);}
+function updateRate(){var left=qRemaining();var e=document.getElementById('hub-rate');if(e){e.textContent=left+' Q/min';e.style.color=left<=2?'var(--u-ter)':'';}}
+setInterval(updateRate,5000); /* refill display as window entries expire */
 function appendMsg(text,isUser,container,sources){
   var d=document.createElement('div');
   if(isUser)d.innerHTML='<div class="umat-msg-user"><div class="umat-bubble-user"><p>'+esc(text)+'</p></div></div>';
@@ -2096,8 +2151,8 @@ function appendMsg(text,isUser,container,sources){
 }
 function sendQ(q){
   q=(q||'').trim();if(!q)return;
-  if(qLeft<=0){appendMsg('Rate limit reached.',false,document.getElementById('hub-msgs'),[]);return;}
-  qLeft--;updateRate();
+  if(qRemaining()<=0){appendMsg('Rate limit reached. Please wait a moment before asking again.',false,document.getElementById('hub-msgs'),[]);return;}
+  qTimes.push(Date.now());updateRate();
   var ctx=selMat.length>0?'[Referencing: '+selMat.map(function(m){return m.name;}).join(', ')+'] '+q:q;
   var cid=parseInt(document.getElementById('hub-course-sel').value)||activeCID||1;
   var msgs=document.getElementById('hub-msgs');
@@ -2106,8 +2161,8 @@ function sendQ(q){
   var t=document.createElement('div');t.id=tid;t.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-typing"><span></span><span></span><span></span></div></div></div></div>';
   msgs.appendChild(t);msgs.scrollTop=msgs.scrollHeight;
   ajax('local_umat_ai_ask_question',{courseid:cid,question:ctx,session_key:sessKey},
-    function(r){var e=document.getElementById(tid);if(e)e.parentNode.removeChild(e);appendMsg(r.success?r.answer:'Error. Please try again.',false,msgs,r.sources||[]);},
-    function(){var e=document.getElementById(tid);if(e)e.parentNode.removeChild(e);appendMsg('Connection error.',false,msgs,[]);}
+    function(r){var e=document.getElementById(tid);if(e)e.parentNode.removeChild(e);appendMsg(r.answer||'Error. Please try again.',false,msgs,r.sources||[]);syncRemaining(r.remaining);updateRate();},
+    function(){var e=document.getElementById(tid);if(e)e.parentNode.removeChild(e);qTimes.pop();updateRate();appendMsg('Connection error.',false,msgs,[]);}
   );
 }
 var hubIn=document.getElementById('hub-input');var hubSend=document.getElementById('hub-send');
@@ -2148,7 +2203,7 @@ document.getElementById('hub-drawer-confirm').addEventListener('click',function(
 })();
 
 /* New session */
-function newSession(){sessKey='hub_'+Math.random().toString(36).substr(2,18);selMat=[];var msgs=document.getElementById('hub-msgs');if(msgs){msgs.innerHTML='';addWelcome('your courses');}qLeft=10;updateRate();}
+function newSession(){sessKey='hub_'+Math.random().toString(36).substr(2,18);selMat=[];var msgs=document.getElementById('hub-msgs');if(msgs){msgs.innerHTML='';addWelcome('your courses');}updateRate();}
 if(newBtn)newBtn.addEventListener('click',newSession);
 if(newBtn2)newBtn2.addEventListener('click',function(){newSession();switchPane('hub-tutor');});
 

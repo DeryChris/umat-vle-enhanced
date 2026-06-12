@@ -77,6 +77,11 @@ $functions = [
         'description' => 'Trigger material analysis on AI service', 'type' => 'write', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
+    'local_umat_ai_service_status' => [
+        'classname'   => '\local_umat_ai\external\service_status', 'methodname' => 'ping',
+        'description' => 'Check AI service availability for the connection indicator', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => '',
+    ],
 ];
 
 $services = [

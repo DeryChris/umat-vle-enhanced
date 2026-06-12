@@ -68,3 +68,9 @@ $string['no_resources']      = 'Indexed course materials will appear here once u
 
 /* ---- Analytics ---- */
 $string['analytics_dashboard_title'] = 'Lecturer Analytics Dashboard';
+
+/* ---- Notifications ---- */
+$string['messageprovider:pendingapproval'] = 'AI-generated content pending approval';
+$string['pendingapproval_subject'] = 'New AI content awaits your review: {$a}';
+$string['pendingapproval_body']    = 'The AI assistant has generated new {$a->types} for a lecture in "{$a->course}". Please review and approve the content so students can see it: {$a->url}';
+$string['pendingapproval_short']   = 'New AI outputs ({$a->types}) await approval in {$a->course}.';
