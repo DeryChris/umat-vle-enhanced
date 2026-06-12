@@ -12,9 +12,11 @@ settings = get_settings()
 
 @router.get("", response_model=HealthResponse)
 async def health_check():
+    active_model = (settings.openai_llm_model if settings.llm_provider == "openai"
+                    else settings.llm_model)
     return HealthResponse(
         status        = "healthy",
         version       = "1.0.0",
         whisper_model = settings.whisper_model,
-        llm_model     = settings.llm_model,
+        llm_model     = f"{settings.llm_provider}:{active_model}",
     )

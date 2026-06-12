@@ -4,6 +4,22 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 settings = get_settings()
 
+
+def _make_llm(temperature: float):
+    """Build a chat model for the configured provider (gemini or openai)."""
+    if settings.llm_provider == "openai":
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            model=settings.openai_llm_model,
+            api_key=settings.openai_api_key,
+            temperature=temperature,
+        )
+    return ChatGoogleGenerativeAI(
+        model=settings.llm_model,
+        google_api_key=settings.google_api_key,
+        temperature=temperature,
+    )
+
 SUMMARY_PROMPT = """You are an academic assistant for the University of Mines and Technology (UMaT), Ghana.
 
 Based on the following lecture transcript, generate a structured academic summary.
@@ -79,19 +95,11 @@ ANSWER:"""
 
 class LLMProcessor:
     def __init__(self):
-        self.llm = ChatGoogleGenerativeAI(
-            model=settings.llm_model,                 # gemini-1.5-flash
-            google_api_key=settings.google_api_key,
-            temperature=0.3,
-        )
+        self.llm = _make_llm(temperature=0.3)
 
     def _invoke(self, prompt: str, temperature: float, max_chars: int) -> str:
-        # Gemini through LangChain uses "temperature" set on model; easiest is to recreate per call
-        llm = ChatGoogleGenerativeAI(
-            model=settings.llm_model,
-            google_api_key=settings.google_api_key,
-            temperature=temperature,
-        )
+        # Temperature is set on the model; easiest is to recreate per call.
+        llm = _make_llm(temperature=temperature)
         prompt = prompt[:max_chars]
         result = llm.invoke(prompt)
         return result.content.strip()

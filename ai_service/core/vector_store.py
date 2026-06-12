@@ -27,6 +27,42 @@ def get_chroma_client():
 
 
 def embed_texts(texts: List[str]) -> List[List[float]]:
+    """Direct API call for embeddings — provider chosen by LLM_PROVIDER."""
+    if settings.llm_provider == "openai":
+        return _embed_texts_openai(texts)
+    return _embed_texts_gemini(texts)
+
+
+def _embed_texts_openai(texts: List[str]) -> List[List[float]]:
+    import logging
+    logger = logging.getLogger(__name__)
+
+    embeddings = []
+    # OpenAI accepts batched input — one request per 100 chunks.
+    for i in range(0, len(texts), 100):
+        batch = [t[:8000] for t in texts[i:i + 100]]
+        try:
+            response = requests.post(
+                "https://api.openai.com/v1/embeddings",
+                headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+                json={"model": settings.openai_embedding_model, "input": batch},
+                timeout=30,
+            )
+            logger.info(f"Embedding batch {i // 100}: status={response.status_code}")
+            if response.status_code == 200:
+                data = response.json().get("data", [])
+                embeddings.extend(item["embedding"] for item in data)
+            else:
+                logger.error(f"Embedding failed: {response.status_code} - {response.text[:200]}")
+                embeddings.extend([[0.0] * 1536] * len(batch))
+        except Exception as e:
+            logger.error(f"Embedding error for batch {i // 100}: {str(e)}")
+            embeddings.extend([[0.0] * 1536] * len(batch))
+
+    return embeddings
+
+
+def _embed_texts_gemini(texts: List[str]) -> List[List[float]]:
     """Direct Google API call for embeddings."""
     import logging
     logger = logging.getLogger(__name__)
@@ -84,6 +120,11 @@ def get_embedding_function():
 class VectorStoreManager:
 
     def get_collection_name(self, course_id: int) -> str:
+        # Provider-scoped: Gemini and OpenAI embeddings have different
+        # dimensions, so each provider keeps its own collection per course.
+        # Gemini keeps the legacy name for backward compatibility.
+        if settings.llm_provider == "openai":
+            return f"course_{course_id}_openai"
         return f"course_{course_id}"
 
     def add_documents(
