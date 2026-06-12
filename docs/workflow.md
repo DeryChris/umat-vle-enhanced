@@ -1,6 +1,6 @@
 # UMaT VLE Enhanced — Development Workflow
 
-**Last Updated**: 2026-06-09  
+**Last Updated**: 2026-06-11  
 **Audience**: All team members (Seidu, Ackon, Chrispen, Agartha, Johnson)
 
 ---
@@ -353,12 +353,36 @@ git push origin --force --all
 | Meeting scheduling | WhatsApp poll | < 1 day |
 | Emergency (site down) | WhatsApp call | Immediate |
 
-### 7.2 Meeting Cadence
+### 7.2 Scrum Framework
+
+The project follows a **hybrid DSR + Agile Scrum** methodology. The development lifecycle uses Scrum with **2-week sprints**.
+
+**Scrum Artifacts**:
+- **Product Backlog**: Master list of all features (tracked in roadmap.md)
+- **Sprint Backlog**: Current tasks selected for each 2-week sprint
+- **Project Increment**: The actual growing system delivered each sprint
+
+**Sprint Ceremonies**:
+- **Sprint Planning** (biweekly): Select backlog items, assign owners, estimate effort
+- **Daily Scrum** (daily, async via WhatsApp): What I did, what I'll do, blockers
+- **Sprint Review** (biweekly): Demo working features to stakeholders
+- **Sprint Retrospective** (biweekly): What went well, what to improve
+
+**Development Lifecycle (6-step)**:
+1. Problem Identification & Motivation
+2. Definition of Objectives
+3. Design & Development (Agile Sprints) — 2-week iterations
+4. Demonstration — Real UMaT course environment
+5. Evaluation — DSR standards + performance analysis
+6. Communication — Architecture and findings documented in thesis report
+
+### 7.3 Meeting Cadence
 
 | Meeting | Frequency | Duration | Attendees | Agenda |
 |---------|-----------|----------|-----------|--------|
 | Daily standup | Daily (async) | — | All | What I did yesterday, what I'm doing today, blockers |
 | Sprint planning | Biweekly | 30 min | All | Select tasks from roadmap, assign owners |
+| Sprint review | Biweekly | 30 min | All + stakeholders | Demo working features, collect feedback |
 | Code sync | Weekly | 15 min | Ackon + Johnson + Agartha | Cross-component issues, template data contracts |
 | Architecture review | Monthly | 30 min | All | Design decisions, tech debt, production planning |
 

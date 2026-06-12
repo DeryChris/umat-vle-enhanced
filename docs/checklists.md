@@ -1,6 +1,6 @@
 # UMaT VLE Enhanced — Development Checklists
 
-**Last Updated**: 2026-06-09  
+**Last Updated**: 2026-06-11  
 **Purpose**: Quick-reference checklists for common development activities
 
 ---
@@ -272,7 +272,53 @@ $OUTPUT->render_from_template('local_umat_ai/template_name', $data);
 
 ---
 
-## 9. Emergency Rollback Checklist
+## 9. System Evaluation Checklist (Thesis-Based)
+
+Evaluation measures as defined in the thesis (Chapter 3 — System Evaluation Strategy):
+
+### Usability Testing
+- [ ] Students can open AI panel, ask questions, and see responses without assistance
+- [ ] Lecturers can create BBB sessions, end them, and see processed AI content
+- [ ] Approval workflow is intuitive for lecturers (approve/reject with one click)
+- [ ] Material viewing and analysis trigger is discoverable
+- [ ] All interactions work within Moodle without requiring external tools
+- [ ] User satisfaction questionnaire prepared and distributed
+- [ ] SUS (System Usability Scale) score collected and documented
+
+### Performance Analysis
+- [ ] AI Service response time < 3s for Q&A queries
+- [ ] Recording processing time < 30 min for 1-hour lecture
+- [ ] Material indexing time < 10s for 50-page PDF
+- [ ] Page load time with all AMD modules < 2s
+- [ ] Low bandwidth performance tested (simulated 1Mbps connection)
+- [ ] Concurrent user simulation (target: 500+ users)
+
+### AI Output Accuracy
+- [ ] RAG responses verified against source materials (no hallucination)
+- [ ] Summaries capture key points from transcript (tested against 5+ lectures)
+- [ ] Quiz questions are relevant and answerable from course content
+- [ ] Analysis output matches material content (tested across formats)
+- [ ] Lecturer approval catch rate — what % of AI errors does approval catch?
+
+### Data Flow Verification
+- [ ] BBB meeting_ended → session recorded in DB
+- [ ] Recording pipeline: pending → processing → completed
+- [ ] Materials uploaded → auto-indexed in ChromaDB
+- [ ] Student question → RAG retrieval → answer with source citations
+- [ ] Approved content visible to students, unapproved hidden
+
+### Evaluation Metrics
+| Metric | Method | Target |
+|--------|--------|--------|
+| User satisfaction | Questionnaire (SUS) | > 68 (above average) |
+| AI response accuracy | Manual review of 50+ Q&A pairs | > 90% correct |
+| Transcription accuracy | WER (Word Error Rate) vs manual transcript | < 15% WER |
+| System response time | Automated load test | < 3s p95 |
+| Availability | Uptime monitoring | > 99.5% |
+
+---
+
+## 10. Emergency Rollback Checklist
 
 ### If AI Service is broken:
 
@@ -321,7 +367,7 @@ Visit http://localhost
 
 ---
 
-## 10. GDPR / Data Privacy Checklist
+## 11. GDPR / Data Privacy Checklist
 
 - [ ] Privacy provider implemented in `classes/privacy/provider.php`
 - [ ] `export_user_data()` returns all AI-related data for a user
@@ -333,7 +379,7 @@ Visit http://localhost
 
 ---
 
-## 11. Post-Completion Memory Save Template
+## 12. Post-Completion Memory Save Template
 
 After completing any significant task, save a session memory file:
 
@@ -372,7 +418,7 @@ After completing any significant task, save a session memory file:
 
 ---
 
-## 12. Quick Reference: Common Fixes
+## 13. Quick Reference: Common Fixes
 
 ### "ConnectionRefused :8000"
 ```

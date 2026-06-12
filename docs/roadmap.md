@@ -2,7 +2,34 @@
 
 **Project**: AI-Enhanced Virtual Learning Environment for University of Mines and Technology  
 **Repository**: `github.com/derychris/umat-vle-enhanced`  
-**Last Updated**: 2026-06-09
+**Last Updated**: 2026-06-11
+
+---
+
+## Project Context
+
+This project is an **academic thesis/research project** at the University of Mines and Technology (UMaT), Tarkwa. It addresses the fragmentation of learning activities across multiple platforms (Zoom, Microsoft Teams, general-purpose LLMs) by embedding live class functionality and Generative AI-assisted academic support directly within the UMaT Moodle VLE.
+
+### Aim
+Strengthen the UMaT-VLE by embedding live class functionality and Generative AI-assisted academic support directly within the platform, to improve how lecture knowledge is captured, organised, and made available for student revision.
+
+### Objectives
+1. **Live Class Integration** — Develop and integrate a native live class feature within UMaT-VLE that enables real-time instruction, student interaction, and attendance tracking without reliance on external conferencing tools.
+2. **GenAI Academic Support** — Build Generative AI-assisted academic support that draws from ASR-generated lecture transcripts, session discussions, and lecturer-approved course materials to produce structured notes and concise summaries under defined academic controls.
+
+### Methodology
+The project follows a **hybrid DSR + Agile Scrum** approach:
+- **Design Science Research (DSR)** — Provides a scientific method for creating a new artifact to address learning fragmentation
+- **Agile Scrum (2-week sprints)** — Handles technical development with Sprint Planning, Daily Scrums, Sprint Reviews, and three artifacts: Product Backlog, Sprint Backlog, and Project Increment
+
+### System Architecture (5-Layer)
+| Layer | Technology | Responsibility |
+|-------|-----------|----------------|
+| **Presentation** | Moodle HTML/CSS/JS | User-facing interface |
+| **Application** | Moodle PHP | Auth, course activities, session handling, request distribution |
+| **Integration** | RESTful APIs | Communication between Moodle, AI Service, BigBlueButton |
+| **Processing AI** | Python/FastAPI + LLM | Transcription, NLP, summarization, RAG-based answering |
+| **Data** | PostgreSQL | User data, courses, lectures, interactions, GenAI outputs |
 
 ---
 
@@ -132,6 +159,16 @@ Transform UMaT's Moodle VLE into an AI-powered learning platform where:
 | Phase 4: UI/UX Enhancement | 2026 Q3 | 🔄 In Progress |
 | Phase 5: Production Hardening | 2026 Q3-Q4 | ⬜ Not Started |
 | Phase 6: Advanced Features | 2026 Q4+ | ⬜ Not Started |
+
+## Academic Deliverables
+
+| Deliverable | Status | Description |
+|------------|--------|-------------|
+| Chapter 1: Introduction | ✅ Complete | Background, problem statement, aim, objectives, scope |
+| Chapter 2: Literature Review | — | Existing work on VLEs, live learning, AI-assisted support |
+| Chapter 3: System Design & Methodology | ✅ Complete | Architecture, DSR + Scrum approach, data sources, UI, requirements |
+| Chapter 4: Implementation & Testing | 🔄 In Progress | Build, integration, usability testing, performance analysis |
+| Chapter 5: Conclusions & Recommendations | ⬜ Not Started | Findings, limitations, future work |
 
 ---
 
