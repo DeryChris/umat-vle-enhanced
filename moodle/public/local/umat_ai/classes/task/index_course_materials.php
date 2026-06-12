@@ -23,14 +23,16 @@ class index_course_materials extends \core\task\scheduled_task {
 
         mtrace("  [umat_ai] Starting course material indexing...");
 
-        // Get all courses that have at least one umat_ai_materials record
-        // (i.e. courses where the plugin is active)
+        // All real courses — not just ones with existing umat_ai_materials
+        // records, otherwise a course is never indexed until something
+        // else creates its first record (chicken-and-egg).
         $courseids = $DB->get_fieldset_sql(
-            "SELECT DISTINCT courseid FROM {umat_ai_materials}"
+            "SELECT id FROM {course} WHERE id <> :siteid AND visible = 1",
+            ['siteid' => SITEID]
         );
 
         if (empty($courseids)) {
-            mtrace("  [umat_ai] No courses found with existing materials. Skipping.");
+            mtrace("  [umat_ai] No courses found. Skipping.");
             return;
         }
 
@@ -61,12 +63,15 @@ class index_course_materials extends \core\task\scheduled_task {
 
         $result = ['indexed' => 0, 'skipped' => 0, 'failed' => 0];
 
-        // Get existing indexed file IDs to skip duplicates
-        $existing = $DB->get_fieldset_sql(
-            "SELECT fileid FROM {umat_ai_materials} WHERE courseid = :cid",
-            ['cid' => $courseid]
-        );
-        $existingFileIds = array_flip($existing);
+        // Existing records keyed by fileid. Files marked is_indexed=0 are
+        // re-sent (failed first attempts, or a deliberate re-index after an
+        // LLM provider switch: UPDATE {umat_ai_materials} SET is_indexed=0).
+        // fileid=0 rows come from manual uploads in materials.php and are
+        // not discoverable via the File API, so they are ignored here.
+        $existingRecords = [];
+        foreach ($DB->get_records('umat_ai_materials', ['courseid' => $courseid]) as $rec) {
+            if ($rec->fileid > 0) $existingRecords[$rec->fileid] = $rec;
+        }
 
         // Discover files via Moodle File API (mirrors get_course_materials logic)
         $course = get_course($courseid);
@@ -102,28 +107,33 @@ class index_course_materials extends \core\task\scheduled_task {
 
                     if ($file->get_filesize() === 0) continue;
 
-                    // Skip already-indexed files
-                    if (isset($existingFileIds[$file->get_id()])) {
+                    // Skip only files that are recorded AND successfully indexed.
+                    $existing = $existingRecords[$file->get_id()] ?? null;
+                    if ($existing && $existing->is_indexed) {
                         $result['skipped']++;
                         continue;
                     }
 
-                    // Index this file
+                    // Index (or re-index) this file
                     try {
                         $this->send_to_ai_service($file, $courseid);
                         $result['indexed']++;
 
-                        // Record in umat_ai_materials
-                        $record = (object)[
-                            'courseid'   => $courseid,
-                            'cmid'       => 0,
-                            'fileid'     => $file->get_id(),
-                            'filename'   => $file->get_filename(),
-                            'is_indexed' => 1,
-                            'timeindexed' => time(),
-                            'timecreated' => time(),
-                        ];
-                        $DB->insert_record('umat_ai_materials', $record);
+                        if ($existing) {
+                            $existing->is_indexed  = 1;
+                            $existing->timeindexed = time();
+                            $DB->update_record('umat_ai_materials', $existing);
+                        } else {
+                            $DB->insert_record('umat_ai_materials', (object)[
+                                'courseid'   => $courseid,
+                                'cmid'       => 0,
+                                'fileid'     => $file->get_id(),
+                                'filename'   => $file->get_filename(),
+                                'is_indexed' => 1,
+                                'timeindexed' => time(),
+                                'timecreated' => time(),
+                            ]);
+                        }
 
                         mtrace("  [umat_ai]   Indexed: {$file->get_filename()} (course {$courseid})");
 
