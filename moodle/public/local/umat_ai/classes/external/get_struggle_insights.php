@@ -736,6 +736,10 @@ class get_struggle_insights extends \external_api {
                     'trend'          => new \external_value(PARAM_TEXT),
                     'trend_pct'      => new \external_value(PARAM_INT),
                     'difficulty'     => new \external_value(PARAM_TEXT),
+                    // Only present on topics enriched by the AI classification
+                    // step — without this declaration Moodle rejects the whole
+                    // response as soon as the AI service is reachable.
+                    'ai_classified'  => new \external_value(PARAM_BOOL, '', VALUE_OPTIONAL),
                     'materials'      => new \external_multiple_structure(
                         new \external_single_structure([
                             'id'             => new \external_value(PARAM_INT),

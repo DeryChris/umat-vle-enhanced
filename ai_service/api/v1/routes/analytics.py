@@ -13,9 +13,11 @@ from pydantic import BaseModel
 
 from middleware.auth import verify_token
 from core.llm_processor import LLMProcessor
+from config import get_settings
 
-logger = logging.getLogger(__name__)
-router = APIRouter(tags=["analytics"])
+logger   = logging.getLogger(__name__)
+router   = APIRouter(tags=["analytics"])
+settings = get_settings()
 
 
 # ── Schemas ─────────────────────────────────────────────────
@@ -72,6 +74,28 @@ def get_llm() -> LLMProcessor:
 def _call_llm(prompt: str, max_chars: int = 4096) -> str:
     llm = get_llm()
     return llm._invoke(prompt, temperature=0.2, max_chars=max_chars)
+
+
+def _parse_llm_json(raw: str):
+    """Parse JSON from an LLM reply, tolerating markdown code fences and
+    surrounding prose (gpt-4o-mini in particular wraps JSON in ```json)."""
+    text = raw.strip()
+    if text.startswith("```"):
+        # Drop the opening fence (with optional language tag) and closing fence.
+        text = text.split("\n", 1)[1] if "\n" in text else text
+        if text.rstrip().endswith("```"):
+            text = text.rstrip()[:-3]
+        text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # Last resort: extract the outermost JSON array or object.
+        for opener, closer in (("[", "]"), ("{", "}")):
+            start = text.find(opener)
+            end   = text.rfind(closer)
+            if start != -1 and end > start:
+                return json.loads(text[start:end + 1])
+        raise
 
 
 # ── Prompts ──────────────────────────────────────────────────
@@ -162,12 +186,12 @@ async def classify_questions(
             questions_json=questions_json,
         )
         result = _call_llm(prompt, max_chars=4096)
-        classifications = json.loads(result)
+        classifications = _parse_llm_json(result)
         return ClassifyResponse(
             classifications=[
                 ClassificationResult(**c) for c in classifications
             ],
-            llm_used="gemini",
+            llm_used=settings.llm_provider,
         )
     except json.JSONDecodeError:
         logger.error(f"LLM returned invalid JSON: {result}")
@@ -186,7 +210,7 @@ async def struggle_topics(
         topics_json = json.dumps(topics_data.get("topics", []))
         prompt = STRUGGLE_TOPICS_PROMPT.format(topics_json=topics_json)
         result = _call_llm(prompt, max_chars=2048)
-        parsed = json.loads(result)
+        parsed = _parse_llm_json(result)
         return StruggleTopicsResponse(
             topics=[StruggleTopic(**t) for t in parsed["topics"]],
             summary=parsed.get("summary", ""),
@@ -208,7 +232,7 @@ async def student_risk(
         students_json = json.dumps(students_data.get("students", []))
         prompt = STUDENT_RISK_PROMPT.format(students_json=students_json)
         result = _call_llm(prompt, max_chars=4096)
-        parsed = json.loads(result)
+        parsed = _parse_llm_json(result)
         return StudentRiskResponse(
             students=[StudentRiskItem(**s) for s in parsed],
         )
