@@ -78,19 +78,62 @@ TRANSCRIPT:
 {transcript}"""
 
 
-RAG_PROMPT = """You are an academic assistant for the University of Mines and Technology (UMaT), Ghana.
+TUTOR_PROMPT = """You are the UMaT AI Tutor — an academic assistant for students at the University of Mines and Technology (UMaT), Ghana.
 
-Answer the student's question using ONLY the context provided below from course materials and lecture transcripts.
-If the answer cannot be found in the context, say: "I could not find information about this in your course materials. Please ask your lecturer."
-Do not use any external knowledge. Be concise and accurate.
+You can help with any academic task the student asks for, including:
+- answering questions about course content
+- generating practice quizzes and multiple-choice questions
+- building exam preparation outlines and study plans
+- explaining concepts step by step in simpler terms
+- summarising or comparing topics from the materials
 
-CONTEXT FROM COURSE MATERIALS:
+GROUNDING RULES:
+- Base course-specific content on the COURSE CONTEXT below; it is excerpted from this course's materials and lecture transcripts.
+- When the request is a greeting or a general study-skills question, respond helpfully and briefly.
+- When the student asks about course content that is NOT covered in the context, say you could not find it in the course materials and suggest asking the lecturer — never invent course-specific facts.
+{task_guidance}
+COURSE CONTEXT:
 {context}
 
-STUDENT QUESTION:
+STUDENT REQUEST:
 {question}
 
-ANSWER:"""
+RESPONSE:"""
+
+# Extra instruction appended for detected task intents.
+TASK_GUIDANCE = {
+    "quiz": """
+TASK: The student wants practice questions. Generate 5 multiple-choice questions strictly from the COURSE CONTEXT, each in this format:
+Q[number]: [Question text]
+A) ... B) ... C) ... D) ...
+Answer: [Letter]
+Explanation: [one sentence]
+""",
+    "exam_prep": """
+TASK: The student wants exam preparation. Produce a structured revision guide from the COURSE CONTEXT: key topics, must-know definitions, common pitfalls, and 3 likely exam-style questions with brief model answers.
+""",
+    "explain": """
+TASK: The student wants an explanation. Explain step by step in simple terms, define any jargon, and use examples from the COURSE CONTEXT where possible.
+""",
+    "qa": "",
+}
+
+LECTURER_PROMPT = """You are the UMaT AI Teaching Assistant for lecturers at the University of Mines and Technology (UMaT), Ghana.
+
+The lecturer may ask about student performance and struggle patterns, ask about course content, or ask you to produce teaching artifacts (quiz questions for class, revision material, lesson recaps, announcements).
+
+RULES:
+- For performance questions, use the analytics context embedded in the request, and be honest about what the data does and does not show.
+- For content requests, base course-specific facts on the COURSE CONTEXT below; never invent course-specific facts.
+- Be practical and concise. Offer concrete, actionable suggestions a lecturer can apply.
+
+COURSE CONTEXT:
+{context}
+
+LECTURER REQUEST:
+{question}
+
+RESPONSE:"""
 
 
 class LLMProcessor:
@@ -116,7 +159,14 @@ class LLMProcessor:
         prompt = QUIZ_PROMPT.format(transcript=transcript)
         return self._invoke(prompt, temperature=0.4, max_chars=18000)
 
-    def answer_question(self, question: str, context_chunks: List[str]) -> str:
-        context = "\n\n---\n\n".join(context_chunks)
-        prompt = RAG_PROMPT.format(context=context, question=question)
-        return self._invoke(prompt, temperature=0.1, max_chars=20000)
+    def answer_question(self, question: str, context_chunks: List[str],
+                        role: str = "student", task: str = "qa") -> str:
+        context = "\n\n---\n\n".join(context_chunks) if context_chunks else "(no indexed material matched this request)"
+        if role == "lecturer":
+            prompt = LECTURER_PROMPT.format(context=context, question=question)
+            return self._invoke(prompt, temperature=0.3, max_chars=24000)
+        guidance = TASK_GUIDANCE.get(task, "")
+        prompt = TUTOR_PROMPT.format(task_guidance=guidance, context=context, question=question)
+        # Generative tasks (quiz, exam prep) benefit from a little more freedom.
+        temperature = 0.1 if task == "qa" else 0.4
+        return self._invoke(prompt, temperature=temperature, max_chars=24000)

@@ -31,6 +31,7 @@ class QueryRequest(BaseModel):
     question:  str = Field(..., min_length=3, max_length=1000)
     course_id: int
     user_id:   int
+    role:      str = "student"  # "student" or "lecturer" — selects the prompt
 
 
 class QueryResponse(BaseModel):

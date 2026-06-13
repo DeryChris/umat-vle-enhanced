@@ -27,6 +27,18 @@ _rate_limit_store = defaultdict(list)
 _rate_limit_lock = Lock()
 
 
+def detect_task(question: str) -> str:
+    """Lightweight intent detection to pick the right prompt guidance."""
+    q = question.lower()
+    if any(k in q for k in ("quiz", "test me", "practice question", "mcq", "multiple choice", "practice test")):
+        return "quiz"
+    if any(k in q for k in ("exam", "revision", "study plan", "prepare for", "past question", "revise")):
+        return "exam_prep"
+    if any(k in q for k in ("explain", "break down", "simpler", "step by step", "don't understand", "dont understand", "confused")):
+        return "explain"
+    return "qa"
+
+
 def check_rate_limit(user_id: int) -> tuple[bool, int]:
     """Check if user is within rate limit. Returns (allowed, remaining)."""
     now = time.time()
@@ -64,11 +76,14 @@ async def query_course_ai(
 
     start_time = time.time()
 
+    task = detect_task(request.question)
+
     try:
         results = vector_store.similarity_search(
             course_id=request.course_id,
             query=request.question,
-            n_results=5,
+            # Generative tasks need a wider slice of the materials.
+            n_results=10 if task in ("quiz", "exam_prep") else 5,
         )
     except Exception as e:
         logger.error(f"ChromaDB error: {str(e)}")
@@ -78,7 +93,9 @@ async def query_course_ai(
             confidence=0.0,
         )
 
-    if not results:
+    if not results and request.role != "lecturer":
+        # Lecturers may legitimately ask analytics questions with no indexed
+        # materials; students need indexed content for grounded answers.
         return QueryResponse(
             answer="No course materials have been indexed for this course yet. "
                    "Please ask your lecturer to upload course materials.",
@@ -93,7 +110,8 @@ async def query_course_ai(
     ]))
 
     try:
-        answer = llm.answer_question(request.question, context_texts)
+        answer = llm.answer_question(request.question, context_texts,
+                                     role=request.role, task=task)
     except Exception as e:
         logger.error(f"LLM error: {str(e)}")
         return QueryResponse(
