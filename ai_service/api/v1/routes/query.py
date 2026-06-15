@@ -1,24 +1,20 @@
-# ============================================================
-# POST /api/v1/query — student asks a question; RAG retrieves context
-# ============================================================
-
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from models.schemas import QueryRequest, QueryResponse
-from models.database import get_db, ChatLog
+from models.database import get_db
 from middleware.auth import verify_token
-from core.vector_store import VectorStoreManager
 from core.llm_processor import LLMProcessor
-from datetime import datetime
+from api.v1.query_pipeline import prepare_query, log_chat
 from collections import defaultdict
 from threading import Lock
 import time
+import json
 import logging
 
-router       = APIRouter(prefix="/query", tags=["query"])
-logger       = logging.getLogger(__name__)
-vector_store = VectorStoreManager()
-llm          = LLMProcessor()
+router = APIRouter(prefix="/query", tags=["query"])
+logger = logging.getLogger(__name__)
+llm = LLMProcessor()
 
 RATE_LIMIT_SECONDS = 60
 RATE_LIMIT_MAX = 10
@@ -27,43 +23,103 @@ _rate_limit_store = defaultdict(list)
 _rate_limit_lock = Lock()
 
 
-def detect_task(question: str) -> str:
-    """Lightweight intent detection to pick the right prompt guidance."""
-    q = question.lower()
-    if any(k in q for k in ("quiz", "test me", "practice question", "mcq", "multiple choice", "practice test")):
-        return "quiz"
-    if any(k in q for k in ("exam", "revision", "study plan", "prepare for", "past question", "revise")):
-        return "exam_prep"
-    if any(k in q for k in ("explain", "break down", "simpler", "step by step", "don't understand", "dont understand", "confused")):
-        return "explain"
-    return "qa"
-
-
 def check_rate_limit(user_id: int) -> tuple[bool, int]:
-    """Check if user is within rate limit. Returns (allowed, remaining)."""
     now = time.time()
     window_start = now - RATE_LIMIT_SECONDS
 
     with _rate_limit_lock:
         user_requests = _rate_limit_store[user_id]
         user_requests[:] = [t for t in user_requests if t > window_start]
-
         remaining = RATE_LIMIT_MAX - len(user_requests)
         if remaining <= 0:
             return False, 0
-
         user_requests.append(now)
         return True, remaining
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+@router.post("/stream")
+async def query_course_ai_stream(
+    request: QueryRequest,
+    db: Session = Depends(get_db),
+    token: str = Depends(verify_token),
+):
+    """Stream tutor response as Server-Sent Events (SSE)."""
+    allowed, remaining = check_rate_limit(request.user_id)
+
+    def generate():
+        if not allowed:
+            yield _sse("error", {
+                "message": "Too many requests. Please wait before asking another question.",
+                "error": "rate_limit",
+                "remaining": 0,
+            })
+            return
+
+        start_time = time.time()
+        prepared = prepare_query(request, db)
+
+        yield _sse("meta", {
+            "task": prepared.task,
+            "sources": prepared.sources,
+            "remaining": max(0, remaining - 1),
+        })
+
+        if prepared.instant_answer is not None:
+            answer = prepared.instant_answer
+            yield _sse("token", {"text": answer})
+            elapsed_ms = (time.time() - start_time) * 1000
+            log_chat(db, request, answer, prepared.sources, elapsed_ms)
+            yield _sse("done", {
+                "answer": answer,
+                "sources": prepared.sources,
+                "confidence": prepared.confidence,
+            })
+            return
+
+        answer_parts: list[str] = []
+        try:
+            for chunk in llm.stream_prompt(prepared.prompt, task=prepared.task):
+                answer_parts.append(chunk)
+                yield _sse("token", {"text": chunk})
+        except Exception as e:
+            logger.error(f"LLM stream error: {e}")
+            yield _sse("error", {
+                "message": "AI assistant is processing your request. Please try again in a moment.",
+                "error": "llm_error",
+            })
+            return
+
+        answer = "".join(answer_parts).strip()
+        elapsed_ms = (time.time() - start_time) * 1000
+        log_chat(db, request, answer, prepared.sources, elapsed_ms)
+        yield _sse("done", {
+            "answer": answer,
+            "sources": prepared.sources,
+            "confidence": prepared.confidence,
+        })
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("", response_model=QueryResponse)
 async def query_course_ai(
     request: QueryRequest,
-    db:      Session = Depends(get_db),
-    token:   str     = Depends(verify_token),
+    db: Session = Depends(get_db),
+    token: str = Depends(verify_token),
 ):
     allowed, remaining = check_rate_limit(request.user_id)
-
     if not allowed:
         raise HTTPException(
             status_code=429,
@@ -71,69 +127,31 @@ async def query_course_ai(
                 "error": "Rate limit exceeded",
                 "message": "Too many requests. Please wait before asking another question.",
                 "retry_after": RATE_LIMIT_SECONDS,
-            }
+            },
         )
 
     start_time = time.time()
+    prepared = prepare_query(request, db)
 
-    task = detect_task(request.question)
+    if prepared.instant_answer is not None:
+        elapsed_ms = (time.time() - start_time) * 1000
+        log_chat(db, request, prepared.instant_answer, prepared.sources, elapsed_ms)
+        return QueryResponse(
+            answer=prepared.instant_answer,
+            sources=prepared.sources,
+            confidence=prepared.confidence,
+        )
 
     try:
-        results = vector_store.similarity_search(
-            course_id=request.course_id,
-            query=request.question,
-            # Generative tasks need a wider slice of the materials.
-            n_results=10 if task in ("quiz", "exam_prep") else 5,
-        )
+        answer = llm.answer_with_prompt(prepared.prompt, task=prepared.task)
     except Exception as e:
-        logger.error(f"ChromaDB error: {str(e)}")
-        return QueryResponse(
-            answer="AI service temporarily unavailable. Please try again later.",
-            sources=[],
-            confidence=0.0,
-        )
-
-    if not results and request.role != "lecturer":
-        # Lecturers may legitimately ask analytics questions with no indexed
-        # materials; students need indexed content for grounded answers.
-        return QueryResponse(
-            answer="No course materials have been indexed for this course yet. "
-                   "Please ask your lecturer to upload course materials.",
-            sources=[],
-            confidence=0.0,
-        )
-
-    context_texts = [doc for doc, _ in results]
-    sources = list(set([
-        meta.get("source", "Unknown source")
-        for _, meta in results
-    ]))
-
-    try:
-        answer = llm.answer_question(request.question, context_texts,
-                                     role=request.role, task=task)
-    except Exception as e:
-        logger.error(f"LLM error: {str(e)}")
+        logger.error(f"LLM error: {e}")
         return QueryResponse(
             answer="AI assistant is processing your request. Please try again in a moment.",
-            sources=sources,
+            sources=prepared.sources,
             confidence=0.0,
         )
 
     elapsed_ms = (time.time() - start_time) * 1000
-
-    try:
-        db.add(ChatLog(
-            user_id          = request.user_id,
-            course_id        = request.course_id,
-            question         = request.question,
-            answer           = answer,
-            sources          = ", ".join(sources),
-            response_time_ms = elapsed_ms,
-            created_at       = datetime.utcnow(),
-        ))
-        db.commit()
-    except Exception as e:
-        logger.warning(f"Failed to log chat: {str(e)}")
-
-    return QueryResponse(answer=answer, sources=sources, confidence=0.85)
+    log_chat(db, request, answer, prepared.sources, elapsed_ms)
+    return QueryResponse(answer=answer, sources=prepared.sources, confidence=prepared.confidence)

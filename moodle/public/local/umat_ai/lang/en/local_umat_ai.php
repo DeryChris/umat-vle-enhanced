@@ -69,6 +69,32 @@ $string['no_resources']      = 'Indexed course materials will appear here once u
 /* ---- Analytics ---- */
 $string['analytics_dashboard_title'] = 'Lecturer Analytics Dashboard';
 
+/* ---- Student Notes ---- */
+$string['my_notes']              = 'My Notes';
+$string['new_note']              = 'New Note';
+$string['edit_note']             = 'Edit Note';
+$string['delete_note']           = 'Delete Note';
+$string['delete_note_confirm']   = 'Are you sure you want to delete this note?';
+$string['note_title']            = 'Title';
+$string['note_content']          = 'Note content';
+$string['note_saved']            = 'Note saved successfully';
+$string['note_deleted']          = 'Note deleted';
+$string['note_pinned']           = 'Pinned';
+$string['note_unpin']            = 'Unpin';
+$string['note_pin']              = 'Pin to top';
+$string['no_notes_yet_student']  = 'No notes yet. Tap + to create your first note!';
+$string['note_tags']             = 'Tags';
+$string['tag_course']            = 'Course';
+$string['tag_material']          = 'Material';
+$string['tag_session']           = 'Chat Session';
+$string['tag_custom']            = 'Custom Tag';
+$string['note_save_and_tag']     = 'Save & Add Tags';
+$string['note_open_in_chat']     = 'Open in Chat';
+$string['note_resume_session']   = 'Resume Session';
+$string['note_attach_to_chat']   = 'Attach to Chat';
+$string['note_search']           = 'Search notes…';
+$string['note_untitled']         = 'Untitled Note';
+
 /* ---- Notifications ---- */
 $string['messageprovider:pendingapproval'] = 'AI-generated content pending approval';
 $string['pendingapproval_subject'] = 'New AI content awaits your review: {$a}';

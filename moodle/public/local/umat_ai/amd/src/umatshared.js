@@ -11,6 +11,36 @@ define([], function() {
         return d.innerHTML;
     }
 
+    // ─── Format AI response text (markdown → HTML) ─── //
+    function _umatFormatAI(text) {
+        if (!text) return '';
+        text = _umatEsc(text);
+        text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
+        text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+        var lines = text.split('\n');
+        var out = [];
+        var inOl = false, inUl = false;
+        function closeLists() { if (inOl) { out.push('</ol>'); inOl = false; } if (inUl) { out.push('</ul>'); inUl = false; } }
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i], t = line.trim();
+            if (!t) { closeLists(); continue; }
+            if (/^[-*_]{3,}$/.test(t)) { closeLists(); out.push('<hr>'); continue; }
+            var h3 = t.match(/^###\s+(.*)/); if (h3) { closeLists(); out.push('<h3>' + h3[1] + '</h3>'); continue; }
+            var h2 = t.match(/^##\s+(.*)/); if (h2) { closeLists(); out.push('<h2>' + h2[1] + '</h2>'); continue; }
+            var h1 = t.match(/^#\s+(.*)/);  if (h1) { closeLists(); out.push('<h2>' + h1[1] + '</h2>'); continue; }
+            var ol = t.match(/^\d+[.)]\s+(.*)/);
+            if (ol) { if (inUl) { out.push('</ul>'); inUl = false; } if (!inOl) { out.push('<ol>'); inOl = true; } out.push('<li>' + ol[1] + '</li>'); continue; }
+            var ul = t.match(/^[-*]\s+(.*)/);
+            if (ul) { if (inOl) { out.push('</ol>'); inOl = false; } if (!inUl) { out.push('<ul>'); inUl = true; } out.push('<li>' + ul[1] + '</li>'); continue; }
+            closeLists();
+            out.push('<p>' + line + '</p>');
+        }
+        closeLists();
+        return out.join('\n');
+    }
+
     // ─── Format duration (seconds → M:SS) ──────────── //
     function _umatFmtT(s) {
         var m = Math.floor(s / 60);
@@ -84,7 +114,7 @@ define([], function() {
             }).join('') + '</div>';
         }
         var d = document.createElement('div');
-        d.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>' + _umatEsc(t) + '</p>' + src + '</div></div></div>';
+        d.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">' + _umatFormatAI(t) + '</div>' + src + '</div></div></div>';
         c.appendChild(d);
         c.scrollTop = c.scrollHeight;
     }
@@ -104,6 +134,115 @@ define([], function() {
     function _umatHideTyping(tid) {
         var e = document.getElementById(tid);
         if (e) e.parentNode.removeChild(e);
+    }
+
+    // ─── Append source chips to a streaming bubble ─── //
+    function _umatAppendSources(bubble, sources) {
+        if (!bubble || !sources || !sources.length) return;
+        if (bubble.querySelector('.umat-src-chips')) return;
+        var src = document.createElement('div');
+        src.className = 'umat-src-chips';
+        src.innerHTML = sources.map(function(x) {
+            return '<span class="umat-src-chip">' + _umatEsc(x) + '</span>';
+        }).join('');
+        bubble.appendChild(src);
+    }
+
+    // ─── Stream AI tutor response via SSE proxy ────── //
+    function _umatStreamChat(opts) {
+        var accumulated = '';
+        var streamRow = null;
+        var contentEl = null;
+        var bubbleEl = null;
+        var formatTimer = null;
+
+        function ensureBubble() {
+            if (streamRow) return;
+            var c = document.getElementById(opts.msgsId);
+            if (!c) return;
+            streamRow = document.createElement('div');
+            streamRow.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>'
+                + '<div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div>'
+                + '<div class="umat-bubble-ai"><div class="umat-ai-stream-content"></div></div></div></div>';
+            c.appendChild(streamRow);
+            bubbleEl = streamRow.querySelector('.umat-bubble-ai');
+            contentEl = streamRow.querySelector('.umat-ai-stream-content');
+            c.scrollTop = c.scrollHeight;
+        }
+
+        function renderContent() {
+            if (!contentEl) return;
+            contentEl.innerHTML = _umatFormatAI(accumulated);
+            var c = document.getElementById(opts.msgsId);
+            if (c) c.scrollTop = c.scrollHeight;
+        }
+
+        function scheduleRender() {
+            if (formatTimer) return;
+            formatTimer = setTimeout(function() {
+                formatTimer = null;
+                renderContent();
+            }, 60);
+        }
+
+        var body = new FormData();
+        body.append('sesskey', opts.sesskey);
+        body.append('courseid', String(opts.courseid));
+        body.append('question', opts.question);
+        body.append('session_key', opts.session_key || '');
+        body.append('material_ids', JSON.stringify(opts.material_ids || []));
+
+        return fetch(opts.url, { method: 'POST', body: body, credentials: 'same-origin' })
+            .then(function(response) {
+                if (!response.ok || !response.body) {
+                    throw new Error('Stream unavailable');
+                }
+                var reader = response.body.getReader();
+                var decoder = new TextDecoder();
+                var buffer = '';
+
+                function handleBlock(block) {
+                    var event = 'message';
+                    var data = '';
+                    block.split('\n').forEach(function(line) {
+                        if (line.indexOf('event:') === 0) event = line.slice(6).trim();
+                        else if (line.indexOf('data:') === 0) data = line.slice(5).trim();
+                    });
+                    if (!data) return;
+                    var payload = JSON.parse(data);
+                    if (event === 'meta') {
+                        if (opts.onMeta) opts.onMeta(payload);
+                    } else if (event === 'token') {
+                        ensureBubble();
+                        accumulated += payload.text || '';
+                        scheduleRender();
+                    } else if (event === 'done') {
+                        if (payload.answer) accumulated = payload.answer;
+                        ensureBubble();
+                        renderContent();
+                        _umatAppendSources(bubbleEl, payload.sources || []);
+                        if (opts.onDone) opts.onDone(payload, accumulated);
+                    } else if (event === 'error') {
+                        if (opts.onError) opts.onError(payload);
+                    }
+                }
+
+                function pump() {
+                    return reader.read().then(function(result) {
+                        if (result.done) return;
+                        buffer += decoder.decode(result.value, { stream: true });
+                        var parts = buffer.split('\n\n');
+                        buffer = parts.pop() || '';
+                        parts.forEach(handleBlock);
+                        return pump();
+                    });
+                }
+
+                return pump();
+            })
+            .catch(function(err) {
+                if (opts.onError) opts.onError({ message: err.message || 'Connection error.' });
+            });
     }
 
     // ─── Voice input init ──────────────────────────── //
@@ -151,57 +290,385 @@ define([], function() {
         btn.innerHTML = mats.length ? '<span class="material-symbols-outlined">attach_file</span>' + mats.length + ' ref' : '<span class="material-symbols-outlined">attach_file</span>Ref Material';
     }
 
-    // ─── Init attachment drawer ────────────────────── //
+    // ─── File type icon name ← mime type (drawer) ──── //
+    function _umatDrawerIcon(m) {
+        if (!m) return { icon: 'description', cls: 'di-other' };
+        m = m.toLowerCase();
+        if (m.indexOf('pdf') !== -1) return { icon: 'picture_as_pdf', cls: 'di-pdf' };
+        if (m.indexOf('video') !== -1) return { icon: 'videocam', cls: 'di-video' };
+        if (m.indexOf('presentation') !== -1 || m.indexOf('powerpoint') !== -1) return { icon: 'co_present', cls: 'di-pptx' };
+        if (m.indexOf('sheet') !== -1 || m.indexOf('excel') !== -1) return { icon: 'table_chart', cls: 'di-xlsx' };
+        if (m.indexOf('word') !== -1 || m.indexOf('document') !== -1) return { icon: 'description', cls: 'di-doc' };
+        if (m.indexOf('image') !== -1) return { icon: 'image', cls: 'di-img' };
+        if (m.indexOf('audio') !== -1) return { icon: 'music_note', cls: 'di-audio' };
+        if (m.indexOf('zip') !== -1 || m.indexOf('rar') !== -1 || m.indexOf('tar') !== -1 || m.indexOf('gz') !== -1 || m.indexOf('7z') !== -1) return { icon: 'folder_zip', cls: 'di-archive' };
+        if (m.indexOf('text/') === 0 || m.indexOf('application/json') === 0 || m.indexOf('application/xml') === 0 || m.indexOf('application/javascript') !== -1 || m.indexOf('application/x-httpd-php') !== -1) return { icon: 'code', cls: 'di-code' };
+        return { icon: 'description', cls: 'di-other' };
+    }
+
+    // ─── Category ← mime type ──────────────────────── //
+    function _umatDrawerCat(m) {
+        if (!m) return 'other';
+        m = m.toLowerCase();
+        if (m.indexOf('pdf') !== -1) return 'pdf';
+        if (m.indexOf('video') !== -1) return 'video';
+        if (m.indexOf('presentation') !== -1 || m.indexOf('powerpoint') !== -1) return 'slides';
+        if (m.indexOf('sheet') !== -1 || m.indexOf('excel') !== -1) return 'sheets';
+        if (m.indexOf('word') !== -1 || m.indexOf('document') !== -1) return 'docs';
+        if (m.indexOf('image') !== -1) return 'image';
+        if (m.indexOf('audio') !== -1) return 'audio';
+        return 'other';
+    }
+
+    // ─── Recently used (localStorage) ──────────────── //
+    function _umatDrawerRecentGet() {
+        try {
+            return JSON.parse(localStorage.getItem('umat_drawer_recent') || '[]');
+        } catch (e) { return []; }
+    }
+
+    function _umatDrawerRecentAdd(id, name) {
+        var r = _umatDrawerRecentGet();
+        r = r.filter(function(x) { return x.id !== id; });
+        r.unshift({ id: id, name: name });
+        if (r.length > 10) r = r.slice(0, 10);
+        try { localStorage.setItem('umat_drawer_recent', JSON.stringify(r)); } catch (e) {}
+    }
+
+    // ─── Init attachment drawer (enhanced) ─────────── //
     function _umatInitAttachDrawer(cfg) {
         var d = document.getElementById(cfg.drawerId);
         var ab = document.getElementById(cfg.attachBtnId);
-        if (!ab || !d) return;
+        if (!ab || !d) return { clear: function() {} };
+
         var m = [];
+        var allMats = [];
+        var activeCat = 'all';
+        var searchQ = '';
+        var maxSel = cfg.maxSelections || 20;
+        var focusIdx = -1;
+
+        var searchInput = document.getElementById(cfg.searchId);
+        var listEl = document.getElementById(cfg.listId);
+        var countEl = document.getElementById(cfg.countId);
+        var confirmBtn = document.getElementById(cfg.confirmId);
+        var closeBtn = document.getElementById(cfg.closeBtnId);
+        var catsEl = document.getElementById(cfg.catsId);
 
         function closeDrawer() { d.classList.remove('open'); }
+
+        function updateCount() {
+            if (countEl) {
+                var txt = m.length + ' selected';
+                if (maxSel < 999) txt = txt + ' (max ' + maxSel + ')';
+                countEl.textContent = txt;
+            }
+            if (confirmBtn) {
+                confirmBtn.disabled = m.length === 0;
+            }
+        }
+
+        function toggleItem(id, checked) {
+            if (checked) {
+                if (m.length >= maxSel) {
+                    showMaxWarn();
+                    return false;
+                }
+                var mat = allMats.find(function(x) { return String(x.id) === String(id); });
+                if (mat && !m.find(function(x) { return String(x.id) === String(id); })) {
+                    m.push({ id: mat.id, name: mat.filename });
+                    _umatDrawerRecentAdd(mat.id, mat.filename);
+                }
+            } else {
+                m = m.filter(function(x) { return String(x.id) !== String(id); });
+            }
+            updateCount();
+            renderRecentChips();
+            return true;
+        }
+
+        function showMaxWarn() {
+            var warn = d.querySelector('.umat-drawer-max-warn');
+            if (!warn) {
+                warn = document.createElement('div');
+                warn.className = 'umat-drawer-max-warn';
+                warn.innerHTML = '<span class="material-symbols-outlined">warning</span> Maximum ' + maxSel + ' materials allowed. Deselect one to add another.';
+                if (searchInput && searchInput.parentNode) {
+                    searchInput.parentNode.parentNode.insertBefore(warn, searchInput.parentNode.nextSibling);
+                }
+            }
+            warn.style.display = 'flex';
+            setTimeout(function() { warn.style.display = 'none'; }, 3000);
+        }
+
+        function clearAll() {
+            m = [];
+            if (listEl) {
+                listEl.querySelectorAll('input[type=checkbox]:checked').forEach(function(cb) {
+                    cb.checked = false;
+                });
+                listEl.querySelectorAll('.umat-drawer-item-selected').forEach(function(item) {
+                    item.classList.remove('umat-drawer-item-selected');
+                });
+            }
+            updateCount();
+            renderRecentChips();
+        }
+
+        function filterList() {
+            if (!listEl) return;
+            var items = listEl.querySelectorAll('.umat-drawer-item');
+            var q = searchQ.toLowerCase().trim();
+            var visibleCount = 0;
+            items.forEach(function(item) {
+                var name = (item.dataset.name || '').toLowerCase();
+                var cat = item.dataset.cat || 'other';
+                var matchCat = activeCat === 'all' || cat === activeCat;
+                var matchQ = !q || name.indexOf(q) !== -1;
+                var visible = matchCat && matchQ;
+                item.classList.toggle('umat-drawer-item-hidden', !visible);
+                if (visible) visibleCount++;
+            });
+            var noResults = listEl.querySelector('.umat-drawer-noresults');
+            if (visibleCount === 0 && items.length > 0) {
+                if (!noResults) {
+                    noResults = document.createElement('div');
+                    noResults.className = 'umat-drawer-noresults';
+                    listEl.appendChild(noResults);
+                }
+                noResults.innerHTML = 'No ' + (activeCat !== 'all' ? activeCat + ' ' : '') + 'materials match "<strong>' + _umatEsc(searchQ) + '</strong>"';
+                noResults.style.display = '';
+            } else if (noResults) {
+                noResults.style.display = 'none';
+            }
+            focusIdx = -1;
+        }
+
+        function renderRecentChips() {
+            var recentContainer = document.getElementById(cfg.recentId);
+            if (!recentContainer) return;
+            var recent = _umatDrawerRecentGet();
+            if (!recent.length) {
+                recentContainer.style.display = 'none';
+                return;
+            }
+            recentContainer.style.display = '';
+            recentContainer.innerHTML = '<div class="umat-drawer-recent-lbl">Recently Used</div><div class="umat-drawer-recent-chips">' +
+                recent.map(function(r) {
+                    return '<button class="umat-drawer-recent-chip" data-id="' + r.id + '" data-name="' + _umatEsc(r.name) + '" type="button"><span class="material-symbols-outlined">history</span>' + _umatEsc(r.name) + '</button>';
+                }).join('') + '</div>';
+            recentContainer.querySelectorAll('.umat-drawer-recent-chip').forEach(function(chip) {
+                chip.addEventListener('click', function() {
+                    var id = this.dataset.id;
+                    var cb = listEl ? listEl.querySelector('input[value="' + id + '"]') : null;
+                    if (cb) {
+                        if (!cb.checked) {
+                            if (toggleItem(id, true)) {
+                                cb.checked = true;
+                                var item = cb.closest('.umat-drawer-item');
+                                if (item) item.classList.add('umat-drawer-item-selected');
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        function renderMats(ms) {
+            allMats = ms || [];
+            if (!listEl) return;
+            if (!ms || !ms.length) {
+                listEl.innerHTML = '<div class="umat-drawer-empty"><span class="material-symbols-outlined">folder_open</span><p>No materials for this course.</p><p class="sub">Add materials in your course settings.</p></div>';
+                if (confirmBtn) confirmBtn.disabled = true;
+                return;
+            }
+
+            var cats = {};
+            var catLabels = { pdf: 'PDF', video: 'Video', slides: 'Slides', sheets: 'Sheets', docs: 'Documents', image: 'Images', audio: 'Audio', other: 'Other' };
+            var catOrder = ['pdf', 'video', 'slides', 'docs', 'sheets', 'image', 'audio', 'other'];
+
+            listEl.innerHTML = ms.map(function(x) {
+                var mime = x.mimetype || '';
+                var di = _umatDrawerIcon(mime);
+                var cat = _umatDrawerCat(mime);
+                if (!cats[cat]) cats[cat] = 0;
+                cats[cat]++;
+                var sz = _umatFmtSz(x.filesize);
+                var checked = m.some(function(s) { return String(s.id) === String(x.id); }) ? ' checked' : '';
+                return '<label class="umat-drawer-item' + (checked ? ' umat-drawer-item-selected' : '') + '" data-name="' + _umatEsc(x.filename) + '" data-cat="' + cat + '" data-id="' + x.id + '">' +
+                    '<input type="checkbox" value="' + x.id + '" data-name="' + _umatEsc(x.filename) + '"' + checked + '>' +
+                    '<div class="umat-drawer-item-icon ' + di.cls + '"><span class="material-symbols-outlined">' + di.icon + '</span></div>' +
+                    '<div class="umat-drawer-item-info"><strong>' + _umatEsc(x.filename) + '</strong><span>' + sz + '</span></div>' +
+                    '</label>';
+            }).join('');
+
+            // Category tabs
+            if (catsEl) {
+                var catHtml = '<button class="umat-drawer-cat-btn active" data-cat="all">All <span class="umat-drawer-count">' + ms.length + '</span></button>';
+                catOrder.forEach(function(c) {
+                    if (cats[c]) {
+                        catHtml += '<button class="umat-drawer-cat-btn" data-cat="' + c + '">' + (catLabels[c] || c) + ' <span class="umat-drawer-count">' + cats[c] + '</span></button>';
+                    }
+                });
+                catsEl.innerHTML = catHtml;
+                catsEl.querySelectorAll('.umat-drawer-cat-btn').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        catsEl.querySelectorAll('.umat-drawer-cat-btn').forEach(function(b) { b.classList.remove('active'); });
+                        this.classList.add('active');
+                        activeCat = this.dataset.cat;
+                        filterList();
+                    });
+                });
+            }
+
+            // Checkbox events
+            listEl.querySelectorAll('input[type=checkbox]').forEach(function(cb) {
+                cb.addEventListener('change', function() {
+                    var item = this.closest('.umat-drawer-item');
+                    if (this.checked) {
+                        if (toggleItem(this.value, true)) {
+                            if (item) item.classList.add('umat-drawer-item-selected');
+                        } else {
+                            this.checked = false;
+                        }
+                    } else {
+                        toggleItem(this.value, false);
+                        if (item) item.classList.remove('umat-drawer-item-selected');
+                    }
+                });
+            });
+
+            // Click on item label toggles
+            listEl.querySelectorAll('.umat-drawer-item').forEach(function(item) {
+                item.addEventListener('click', function(e) {
+                    if (e.target.tagName === 'INPUT') return;
+                    var cb = this.querySelector('input[type=checkbox]');
+                    if (cb) cb.click();
+                });
+            });
+
+            // Keyboard navigation
+            listEl.addEventListener('keydown', function(e) {
+                var items = listEl.querySelectorAll('.umat-drawer-item:not(.umat-drawer-item-hidden)');
+                if (!items.length) return;
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    focusIdx = Math.min(focusIdx + 1, items.length - 1);
+                    updateFocus(items);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    focusIdx = Math.max(focusIdx - 1, 0);
+                    updateFocus(items);
+                } else if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (focusIdx >= 0 && focusIdx < items.length) {
+                        var focused = items[focusIdx];
+                        var cb = focused.querySelector('input[type=checkbox]');
+                        if (cb) cb.click();
+                    }
+                }
+            });
+
+            function updateFocus(items) {
+                items.forEach(function(item, i) {
+                    item.classList.toggle('umat-drawer-focused', i === focusIdx);
+                    if (i === focusIdx) {
+                        item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                });
+            }
+
+            renderRecentChips();
+            updateCount();
+            filterList();
+        }
 
         function loadMats() {
             var cid = typeof cfg.getCourseId === 'function' ? cfg.getCourseId() : cfg.courseid;
             if (!cid) return;
-            var l = document.getElementById(cfg.listId);
-            if (!l) return;
+            if (!listEl) return;
+            listEl.innerHTML = '<div class="umat-drawer-loading"><div class="umat-vw-spinner"></div><span>Loading materials\u2026</span></div>';
             require(['core/ajax'], function(A) {
                 A.call([{ methodname: 'local_umat_ai_get_course_materials', args: { courseid: cid } }])[0]
                     .done(function(r) {
-                        var ms = r.materials || [];
-                        if (!ms.length) {
-                            l.innerHTML = '<div style="text-align:center;padding:20px;color:var(--u-ol);font-size:13px;">No materials for this course.</div>';
-                            return;
-                        }
-                        l.innerHTML = ms.map(function(x) {
-                            return '<label class="umat-drawer-item"><input type="checkbox" value="' + x.id + '" data-name="' + _umatEsc(x.filename) + '"><div class="umat-drawer-item-icon di-doc"><span class="material-symbols-outlined" style="font-size:16px;">description</span></div><div class="umat-drawer-item-info"><strong>' + _umatEsc(x.filename) + '</strong><span>' + ((x.filesize || 0) / 1024).toFixed(0) + 'KB</span></div></label>';
-                        }).join('');
-                        l.querySelectorAll('input[type=checkbox]').forEach(function(cb) {
-                            cb.addEventListener('change', function() {
-                                m = [];
-                                l.querySelectorAll('input:checked').forEach(function(c) {
-                                    m.push({ id: c.value, name: c.dataset.name });
-                                });
-                                var cnt = document.getElementById(cfg.countId);
-                                if (cnt) cnt.textContent = m.length + ' selected';
-                            });
-                        });
+                        renderMats(r.materials || []);
                     }).fail(function() {
-                        l.innerHTML = '<div style="text-align:center;padding:20px;color:var(--u-ol);font-size:13px;">Failed to load materials.</div>';
+                        listEl.innerHTML = '<div class="umat-drawer-empty"><span class="material-symbols-outlined">error</span><p>Failed to load materials.</p><p class="sub">Check your connection and try again.</p></div>';
                     });
             });
         }
+
+        // ─── Event binding ──────────────────────────── //
         ab.addEventListener('click', function() {
             d.classList.toggle('open');
-            if (d.classList.contains('open')) { d.dataset.loaded = '1'; loadMats(); }
+            if (d.classList.contains('open')) {
+                loadMats();
+                setTimeout(function() {
+                    if (searchInput) searchInput.focus();
+                }, 400);
+            }
         });
-        var cb = document.getElementById(cfg.closeBtnId);
-        if (cb) cb.addEventListener('click', closeDrawer);
-        var cf = document.getElementById(cfg.confirmId);
-        if (cf) cf.addEventListener('click', function() { closeDrawer(); if (cfg.onConfirm) cfg.onConfirm(m); });
+
+        if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', function() {
+                closeDrawer();
+                if (cfg.onConfirm) cfg.onConfirm(m);
+            });
+        }
+
+        // Clear all
+        var clearBtn = document.getElementById(cfg.clearId);
+        if (clearBtn) clearBtn.addEventListener('click', clearAll);
+
+        // Search input
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                searchQ = this.value;
+                filterList();
+            });
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    this.value = '';
+                    searchQ = '';
+                    filterList();
+                    this.blur();
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    var items = listEl ? listEl.querySelectorAll('.umat-drawer-item:not(.umat-drawer-item-hidden)') : [];
+                    if (items.length > 0 && focusIdx < 0) focusIdx = 0;
+                    if (focusIdx >= 0 && focusIdx < items.length) {
+                        var cb = items[focusIdx].querySelector('input[type=checkbox]');
+                        if (cb) cb.click();
+                    }
+                } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.stopPropagation();
+                }
+            });
+        }
+
+        // Close on outside click
         document.addEventListener('click', function(e) {
-            if (d.classList.contains('open') && !d.contains(e.target) && !ab.contains(e.target)) closeDrawer();
+            if (d.classList.contains('open') && !d.contains(e.target) && !ab.contains(e.target)) {
+                closeDrawer();
+            }
         });
+
+        return {
+            clear: function() {
+                m = [];
+                if (listEl) {
+                    listEl.querySelectorAll('input[type=checkbox]:checked').forEach(function(cb) {
+                        cb.checked = false;
+                    });
+                    listEl.querySelectorAll('.umat-drawer-item-selected').forEach(function(item) {
+                        item.classList.remove('umat-drawer-item-selected');
+                    });
+                }
+                updateCount();
+                renderRecentChips();
+            }
+        };
     }
 
     // ═══════════════════════════════════════════════════ //
@@ -597,12 +1064,19 @@ define([], function() {
         _umatAppendAi: _umatAppendAi,
         _umatShowTyping: _umatShowTyping,
         _umatHideTyping: _umatHideTyping,
+        _umatStreamChat: _umatStreamChat,
 
         // Voice
         _umatInitVoice: _umatInitVoice,
 
         // Materials bar
         _umatRenderMatsBar: _umatRenderMatsBar,
+
+        // Drawer helpers
+        _umatDrawerIcon: _umatDrawerIcon,
+        _umatDrawerCat: _umatDrawerCat,
+        _umatDrawerRecentGet: _umatDrawerRecentGet,
+        _umatDrawerRecentAdd: _umatDrawerRecentAdd,
 
         // Attachment drawer
         _umatInitAttachDrawer: _umatInitAttachDrawer,

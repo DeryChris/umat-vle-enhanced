@@ -14,6 +14,9 @@ from pydantic import BaseModel
 from middleware.auth import verify_token
 from core.llm_processor import LLMProcessor
 from config import get_settings
+from sqlalchemy.orm import Session
+from models.database import get_db
+from analytics.student_profile import upsert_student_context
 
 logger   = logging.getLogger(__name__)
 router   = APIRouter(tags=["analytics"])
@@ -60,6 +63,19 @@ class StudentRiskItem(BaseModel):
 
 class StudentRiskResponse(BaseModel):
     students: List[StudentRiskItem]
+
+
+class AnalyticsUpdateRequest(BaseModel):
+    user_id: int
+    course_id: int
+    event_type: str
+    payload: dict = {}
+    profile: dict = {}
+
+
+class AnalyticsUpdateResponse(BaseModel):
+    success: bool
+    message: str
 
 
 # ── LLM Processor Helper ────────────────────────────────────
@@ -172,6 +188,34 @@ Students data:
 
 
 # ── Endpoints ────────────────────────────────────────────────
+
+@router.post("/api/v1/analytics/update", response_model=AnalyticsUpdateResponse)
+async def analytics_update(
+    request: AnalyticsUpdateRequest,
+    db: Session = Depends(get_db),
+    _ = Depends(verify_token),
+):
+    """Receive student activity events from Moodle event observers."""
+    try:
+        upsert_student_context(
+            db=db,
+            user_id=request.user_id,
+            course_id=request.course_id,
+            profile=request.profile,
+            event_type=request.event_type,
+        )
+        logger.info(
+            f"Analytics update: user={request.user_id} course={request.course_id} "
+            f"event={request.event_type}"
+        )
+        return AnalyticsUpdateResponse(
+            success=True,
+            message=f"Profile updated for user {request.user_id} in course {request.course_id}",
+        )
+    except Exception as e:
+        logger.error(f"Analytics update error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/api/v1/analytics/classify-questions", response_model=ClassifyResponse)
 async def classify_questions(

@@ -201,7 +201,6 @@ moodle/local/umat_ai/amd/build/*
 # ============================================================
 # AGENTS.md
 # CLAUDE.md
-memories/
 
 # ============================================================
 # OPERATING SYSTEM
@@ -224,6 +223,8 @@ secrets/
 !*.env.example
 
 # Miscellaneous
+docs/test_features/
+memories/
 filetree.md
 notes.md
 

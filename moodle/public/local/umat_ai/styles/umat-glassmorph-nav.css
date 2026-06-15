@@ -1,0 +1,325 @@
+/* ================================================================
+   GLASSMORPHISM OVERLAY TAB BAR  — UMaT AI v1.5
+   Translucent warm gold palette blended with UMaT green.
+   Inset in overlays. Mobile-only.
+   ================================================================ */
+:root {
+  --gm-gold1: #ccbf63;
+  --gm-gold2: #e4c987;
+  --gm-gold3: #ddcb95;
+  --gm-gold4: #e8d68e;
+  --gm-gold5: #c6bb5e;
+  --gm-green: #006b2f;
+  --gm-inactive: #414148;
+}
+
+/* ── Container ── */
+.umat-glass-tabs {
+  display: none;
+  margin: 0 12px 12px;
+  border-radius: 16px;
+  background: linear-gradient(135deg,
+    rgba(204,191,99,0.1),
+    rgba(228,201,135,0.07),
+    rgba(221,203,149,0.1),
+    rgba(232,214,142,0.07),
+    rgba(198,187,94,0.1));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 -1px 12px rgba(0,0,0,.05),0 2px 8px rgba(0,0,0,.04);
+  border: 1px solid rgba(255,255,255,.12);
+  min-height: 48px;
+  height: auto;
+  padding: 0 4px;
+  position: relative;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+/* ── Real tabs row ── */
+.umat-glass-tabs-row {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  width: 100%;
+  height: 48px;
+  padding: 0 4px;
+  position: relative;
+  z-index: 3;
+}
+
+.umat-glass-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 4px 6px;
+  border: none;
+  background: none;
+  color: var(--gm-inactive);
+  font-size: 9px;
+  font-weight: 700;
+  font-family: Inter,sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+  z-index: 3;
+  letter-spacing: .02em;
+  line-height: 1.2;
+  pointer-events: auto;
+  touch-action: manipulation;
+  transition: color .12s,filter .12s,transform .12s;
+}
+
+.umat-glass-tab .material-symbols-outlined {
+  font-size: 20px;
+  transition: color .12s,filter .12s;
+}
+
+.umat-glass-tab:hover,
+.umat-glass-tab:hover .material-symbols-outlined {
+  filter: brightness(1.7);
+}
+.umat-glass-tab:hover {
+  transform: scale(1.08);
+  color: #55555e;
+}
+
+.umat-glass-tab.active {
+  color: var(--gm-green) !important;
+  filter: none;
+  text-shadow: none;
+}
+
+.umat-glass-tab.active .material-symbols-outlined {
+  filter: none;
+}
+
+/* ── Fake icons overlay (clipped circle reveal) ── */
+.umat-glass-fake {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0 4px;
+  pointer-events: none;
+  clip-path: circle(0 at 0 50%);
+  transition: clip-path .4s cubic-bezier(.34,1.56,.64,1);
+  border-radius: 16px;
+  z-index: 1;
+}
+
+.umat-glass-fake-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
+.umat-glass-fake-box .material-symbols-outlined {
+  font-size: 20px;
+  color: var(--gm-inactive);
+  transition: color .15s,transform .4s cubic-bezier(.34,1.56,.64,1);
+}
+
+/* ── Glass magnifier circle ── */
+.umat-glass-spot {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%,
+    rgba(255,255,255,.28) 0%,
+    rgba(0,170,70,.15) 40%,
+    rgba(204,191,99,.08) 75%,
+    transparent 100%);
+  box-shadow:
+    0 0 0 .5px rgba(255,255,255,.25) inset,
+    0 0 0 1px rgba(0,170,70,.15) inset,
+    0 0 20px rgba(0,170,70,.18),
+    0 0 10px rgba(255,255,255,.08);
+  pointer-events: none;
+  overflow: hidden;
+  transition: left .4s cubic-bezier(.34,1.56,.64,1);
+  z-index: 0;
+}
+
+.umat-glass-spot::before {
+  content: "";
+  display: block;
+  border-radius: 50%;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 34px;
+  height: 34px;
+  box-shadow: 0 0 0 1px rgba(0,170,70,.1) inset;
+}
+
+.umat-glass-spot::after {
+  content: "";
+  display: block;
+  border-radius: 50%;
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid transparent;
+  border-right-color: rgba(0,170,70,.18);
+  border-left-color: rgba(255,255,255,.06);
+  transform: rotate(-45deg);
+}
+
+/* ── Page-specific states ── */
+/*   gpos = boxCenter - spotRadius, spot radius = 20px (40/2)      */
+/*   => clip-path center = 20px + var(--gposN) = boxCenter ✓       */
+.umat-glass-tabs--on-1 .umat-glass-fake {
+  clip-path: circle(22px at calc(20px + var(--gpos1)) 50%);
+}
+.umat-glass-tabs--on-1 .umat-glass-spot { left: var(--gpos1); }
+.umat-glass-tabs--on-1 .umat-glass-fake-box:nth-child(1) .material-symbols-outlined {
+  color: var(--gm-green);
+  transform: translateX(0);
+}
+
+.umat-glass-tabs--on-2 .umat-glass-fake {
+  clip-path: circle(22px at calc(20px + var(--gpos2)) 50%);
+}
+.umat-glass-tabs--on-2 .umat-glass-spot { left: var(--gpos2); }
+.umat-glass-tabs--on-2 .umat-glass-fake-box:nth-child(2) .material-symbols-outlined {
+  color: var(--gm-green);
+  transform: translateX(0);
+}
+
+.umat-glass-tabs--on-3 .umat-glass-fake {
+  clip-path: circle(22px at calc(20px + var(--gpos3)) 50%);
+}
+.umat-glass-tabs--on-3 .umat-glass-spot { left: var(--gpos3); }
+.umat-glass-tabs--on-3 .umat-glass-fake-box:nth-child(3) .material-symbols-outlined {
+  color: var(--gm-green);
+  transform: translateX(0);
+}
+
+.umat-glass-tabs--on-4 .umat-glass-fake {
+  clip-path: circle(22px at calc(20px + var(--gpos4)) 50%);
+}
+.umat-glass-tabs--on-4 .umat-glass-spot { left: var(--gpos4); }
+.umat-glass-tabs--on-4 .umat-glass-fake-box:nth-child(4) .material-symbols-outlined {
+  color: var(--gm-green);
+  transform: translateX(0);
+}
+
+.umat-glass-tabs--on-5 .umat-glass-fake {
+  clip-path: circle(22px at calc(20px + var(--gpos5)) 50%);
+}
+.umat-glass-tabs--on-5 .umat-glass-spot { left: var(--gpos5); }
+.umat-glass-tabs--on-5 .umat-glass-fake-box:nth-child(5) .material-symbols-outlined {
+  color: var(--gm-green);
+  transform: translateX(0);
+}
+
+.umat-glass-tabs--on-6 .umat-glass-fake {
+  clip-path: circle(22px at calc(20px + var(--gpos6)) 50%);
+}
+.umat-glass-tabs--on-6 .umat-glass-spot { left: var(--gpos6); }
+.umat-glass-tabs--on-6 .umat-glass-fake-box:nth-child(6) .material-symbols-outlined {
+  color: var(--gm-green);
+  transform: translateX(0);
+}
+
+.umat-glass-tabs--on-7 .umat-glass-fake {
+  clip-path: circle(22px at calc(20px + var(--gpos7)) 50%);
+}
+.umat-glass-tabs--on-7 .umat-glass-spot { left: var(--gpos7); }
+.umat-glass-tabs--on-7 .umat-glass-fake-box:nth-child(7) .material-symbols-outlined {
+  color: var(--gm-green);
+  transform: translateX(0);
+}
+
+/* Inactive fake icons slide away */
+.umat-glass-tabs--on-2 .umat-glass-fake-box:nth-child(1) .material-symbols-outlined,
+.umat-glass-tabs--on-3 .umat-glass-fake-box:nth-child(1) .material-symbols-outlined,
+.umat-glass-tabs--on-4 .umat-glass-fake-box:nth-child(1) .material-symbols-outlined,
+.umat-glass-tabs--on-5 .umat-glass-fake-box:nth-child(1) .material-symbols-outlined,
+.umat-glass-tabs--on-6 .umat-glass-fake-box:nth-child(1) .material-symbols-outlined,
+.umat-glass-tabs--on-7 .umat-glass-fake-box:nth-child(1) .material-symbols-outlined {
+  transform: translateX(-50%);
+}
+.umat-glass-tabs--on-3 .umat-glass-fake-box:nth-child(2) .material-symbols-outlined,
+.umat-glass-tabs--on-4 .umat-glass-fake-box:nth-child(2) .material-symbols-outlined,
+.umat-glass-tabs--on-5 .umat-glass-fake-box:nth-child(2) .material-symbols-outlined,
+.umat-glass-tabs--on-6 .umat-glass-fake-box:nth-child(2) .material-symbols-outlined,
+.umat-glass-tabs--on-7 .umat-glass-fake-box:nth-child(2) .material-symbols-outlined {
+  transform: translateX(-50%);
+}
+.umat-glass-tabs--on-4 .umat-glass-fake-box:nth-child(3) .material-symbols-outlined,
+.umat-glass-tabs--on-5 .umat-glass-fake-box:nth-child(3) .material-symbols-outlined,
+.umat-glass-tabs--on-6 .umat-glass-fake-box:nth-child(3) .material-symbols-outlined,
+.umat-glass-tabs--on-7 .umat-glass-fake-box:nth-child(3) .material-symbols-outlined {
+  transform: translateX(-50%);
+}
+.umat-glass-tabs--on-5 .umat-glass-fake-box:nth-child(4) .material-symbols-outlined,
+.umat-glass-tabs--on-6 .umat-glass-fake-box:nth-child(4) .material-symbols-outlined,
+.umat-glass-tabs--on-7 .umat-glass-fake-box:nth-child(4) .material-symbols-outlined {
+  transform: translateX(-50%);
+}
+.umat-glass-tabs--on-6 .umat-glass-fake-box:nth-child(5) .material-symbols-outlined,
+.umat-glass-tabs--on-7 .umat-glass-fake-box:nth-child(5) .material-symbols-outlined {
+  transform: translateX(-50%);
+}
+.umat-glass-tabs--on-7 .umat-glass-fake-box:nth-child(6) .material-symbols-outlined {
+  transform: translateX(-50%);
+}
+
+/* ── Mobile: show tab bar, hide sidebar ── */
+@media (max-width: 639px) {
+  .umat-glass-tabs {
+    display: block;
+  }
+  .umat-mob-tabbar {
+    display: none !important;
+  }
+}
+
+/* ── Desktop: hidden ── */
+@media (min-width: 640px) {
+  .umat-glass-tabs {
+    display: none !important;
+  }
+}
+
+/* ── Dark mode ── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --gm-inactive: #b0b0b8;
+  }
+  .umat-glass-tabs {
+    background: linear-gradient(135deg,
+      rgba(204, 191, 99, 0.06),
+      rgba(228, 201, 135, 0.04),
+      rgba(221, 203, 149, 0.06),
+      rgba(232, 214, 142, 0.04),
+      rgba(198, 187, 94, 0.06)
+    );
+    border-color: rgba(255, 255, 255, 0.06);
+    box-shadow:
+      0 -1px 12px rgba(0, 0, 0, 0.2),
+      0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+  .umat-glass-tab:hover,
+  .umat-glass-tab:hover .material-symbols-outlined {
+    filter: brightness(2);
+  }
+  .umat-glass-tab:hover {
+    color: #d0d0d8;
+  }
+}

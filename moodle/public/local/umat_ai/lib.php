@@ -71,3 +71,71 @@ function local_umat_ai_is_student(int $courseid): bool {
     if (has_capability('local/umat_ai:viewanalytics', $ctx)) return false; // lecturer, not student
     return is_enrolled($ctx, $USER, '', false);
 }
+
+/**
+ * Base64url encode (JWT helper).
+ *
+ * @param string $data
+ * @return string
+ */
+function local_umat_ai_base64url_encode(string $data): string {
+    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+}
+
+/**
+ * Create a short-lived HS256 JWT for webhook authentication.
+ *
+ * @param array $claims Custom claims to embed in the payload
+ * @param int $ttl Seconds until expiry (default 5 minutes)
+ * @return string Signed JWT
+ */
+function local_umat_ai_create_jwt(array $claims, int $ttl = 300): string {
+    $config = local_umat_ai_get_service_config();
+    $secret = $config['token'];
+    if ($secret === '') {
+        return '';
+    }
+
+    $header  = local_umat_ai_base64url_encode(json_encode(['typ' => 'JWT', 'alg' => 'HS256']));
+    $payload = local_umat_ai_base64url_encode(json_encode(array_merge($claims, [
+        'iat' => time(),
+        'exp' => time() + $ttl,
+        'iss' => 'umat_vle_moodle',
+    ])));
+
+    $signature = local_umat_ai_base64url_encode(
+        hash_hmac('sha256', $header . '.' . $payload, $secret, true)
+    );
+
+    return $header . '.' . $payload . '.' . $signature;
+}
+
+/**
+ * Push student analytics event to the Python AI engine.
+ * Uses JWT when a service token is configured, otherwise Bearer token.
+ *
+ * @param array $body Request body (user_id, course_id, event_type, payload, profile)
+ * @return bool True if the webhook was accepted (HTTP 2xx)
+ */
+function local_umat_ai_push_analytics(array $body): bool {
+    $config = local_umat_ai_get_service_config();
+    if ($config['url'] === '' || $config['token'] === '') {
+        return false;
+    }
+
+    $url  = $config['url'] . '/api/v1/analytics/update';
+    $jwt  = local_umat_ai_create_jwt(['sub' => 'moodle_webhook']);
+    $auth = $jwt !== '' ? 'Bearer ' . $jwt : 'Bearer ' . $config['token'];
+
+    $client = new \curl(['ignoresecurity' => true]);
+    $client->setHeader([
+        'Content-Type: application/json',
+        'Authorization: ' . $auth,
+    ]);
+
+    $response = $client->post($url, json_encode($body));
+    $info     = $client->get_info();
+    $httpcode = (int) ($info['http_code'] ?? 0);
+
+    return $httpcode >= 200 && $httpcode < 300;
+}

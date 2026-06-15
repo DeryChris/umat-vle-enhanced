@@ -1,0 +1,246 @@
+/* ═══════════════════════════════════════════════════════════
+   YOUTUBE-STYLE TILE GRID  — UMaT AI v1.4
+   Applies to: student Lectures, My Courses, Library
+               lecturer My Courses, Library
+   ═══════════════════════════════════════════════════════════ */
+
+/* Grid container */
+.umat-ov .yt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px 18px;
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  align-content: start;
+}
+.umat-ov .yt-grid::-webkit-scrollbar { width: 5px; }
+.umat-ov .yt-grid::-webkit-scrollbar-thumb { background: var(--u-olv); border-radius: 3px; }
+
+/* Tile card */
+.umat-ov .yt-tile {
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: Inter, -apple-system, sans-serif;
+  text-align: left;
+  width: 100%;
+  transition: transform .18s ease;
+}
+.umat-ov .yt-tile:hover { transform: translateY(-3px); }
+
+/* ─── Thumbnail ────────────────────────────── */
+.umat-ov .yt-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow .2s ease;
+}
+.umat-ov .yt-tile:hover .yt-thumb {
+  box-shadow: 0 8px 28px rgba(0,0,0,.28);
+}
+/* Type-based backgrounds */
+.umat-ov .yt-bg-video  { background: linear-gradient(150deg, #071a12 0%, #103826 100%); }
+.umat-ov .yt-bg-pdf    { background: linear-gradient(150deg, #3b0000 0%, #7f1d1d 100%); }
+.umat-ov .yt-bg-word   { background: linear-gradient(150deg, #001040 0%, #1e3a8a 100%); }
+.umat-ov .yt-bg-pptx   { background: linear-gradient(150deg, #3b1000 0%, #92400e 100%); }
+.umat-ov .yt-bg-excel  { background: linear-gradient(150deg, #001a0a 0%, #14532d 100%); }
+.umat-ov .yt-bg-image  { background: linear-gradient(150deg, #1a0030 0%, #4c1d95 100%); }
+.umat-ov .yt-bg-audio  { background: linear-gradient(150deg, #0a0028 0%, #1e1b4b 100%); }
+.umat-ov .yt-bg-course { background: linear-gradient(150deg, #004520 0%, #006b2f 100%); }
+.umat-ov .yt-bg-other  { background: linear-gradient(150deg, #1a1c1a 0%, #374151 100%); }
+
+/* Large centre icon */
+.umat-ov .yt-thumb-icon {
+  font-size: 72px;
+  color: rgba(255,255,255,.32);
+  transition: color .18s, transform .18s;
+  pointer-events: none;
+  user-select: none;
+}
+.umat-ov .yt-tile:hover .yt-thumb-icon {
+  color: rgba(255,255,255,.6);
+  transform: scale(1.07);
+}
+/* Play-overlay on hover */
+.umat-ov .yt-play-ov {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.18);
+  opacity: 0;
+  transition: opacity .18s;
+}
+.umat-ov .yt-tile:hover .yt-play-ov { opacity: 1; }
+.umat-ov .yt-play-ov .material-symbols-outlined {
+  font-size: 56px;
+  color: rgba(255,255,255,.92);
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,.55));
+}
+/* Duration / page-count badge */
+.umat-ov .yt-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0,0,0,.82);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  pointer-events: none;
+  line-height: 1.4;
+}
+/* Course shortcode overlay */
+.umat-ov .yt-course-ov {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  text-align: center;
+}
+.umat-ov .yt-course-code {
+  font-size: 28px;
+  font-weight: 900;
+  color: rgba(255,255,255,.96);
+  letter-spacing: .07em;
+  text-shadow: 0 2px 10px rgba(0,0,0,.4);
+  margin-bottom: 5px;
+}
+.umat-ov .yt-course-name {
+  font-size: 12px;
+  color: rgba(255,255,255,.78);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ─── Meta row ─────────────────────────────── */
+.umat-ov .yt-meta {
+  display: flex;
+  gap: 10px;
+  padding: 10px 2px 2px;
+  align-items: flex-start;
+}
+/* Avatar */
+.umat-ov .yt-av {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #fff;
+}
+.umat-ov .yt-av .material-symbols-outlined { font-size: 18px; }
+.umat-ov .yt-av-video  { background: linear-gradient(135deg,#006b2f,#00873d); }
+.umat-ov .yt-av-pdf    { background: #dc2626; }
+.umat-ov .yt-av-word   { background: #2563eb; }
+.umat-ov .yt-av-pptx   { background: #c2410c; }
+.umat-ov .yt-av-excel  { background: #15803d; }
+.umat-ov .yt-av-image  { background: #7c3aed; }
+.umat-ov .yt-av-audio  { background: #0284c7; }
+.umat-ov .yt-av-course { background: linear-gradient(135deg,#006b2f,#00873d); }
+.umat-ov .yt-av-other  { background: #6b7280; }
+/* Text */
+.umat-ov .yt-text { flex: 1; min-width: 0; }
+.umat-ov .yt-title {
+  margin: 0 0 3px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--u-ons, #171d17);
+  line-height: 1.38;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.umat-ov .yt-channel {
+  margin: 0;
+  font-size: 12px;
+  color: var(--u-ol, #6e7a6d);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.umat-ov .yt-stats {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--u-ol, #6e7a6d);
+}
+
+/* ─── Hover action bar ─────────────────────── */
+.umat-ov .yt-actions {
+  display: flex;
+  gap: 7px;
+  padding: 6px 2px 2px;
+  opacity: 0;
+  transform: translateY(-5px);
+  transition: opacity .18s, transform .18s;
+  pointer-events: none;
+}
+.umat-ov .yt-tile:hover .yt-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.umat-ov .yt-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid var(--u-olv, #bdcaba);
+  background: var(--u-sflo, #fff);
+  color: var(--u-onsv, #3e4a3e);
+  transition: all .15s;
+  text-decoration: none;
+  font-family: inherit;
+}
+.umat-ov .yt-btn .material-symbols-outlined { font-size: 14px; }
+.umat-ov .yt-btn:hover {
+  border-color: var(--u-p, #006b2f);
+  color: var(--u-p, #006b2f);
+  background: rgba(0,107,47,.05);
+}
+
+/* ─── Responsive breakpoints ───────────────── */
+@media (max-width: 1280px) { .umat-ov .yt-grid { grid-template-columns: repeat(auto-fill, minmax(265px,1fr)); } }
+@media (max-width: 900px)  { .umat-ov .yt-grid { grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap:14px; padding:14px; } }
+@media (max-width: 600px)  { .umat-ov .yt-grid { grid-template-columns: repeat(2,1fr); padding:10px; gap:10px; } }
+@media (max-width: 380px)  { .umat-ov .yt-grid { grid-template-columns: 1fr; } }
+
+/* Safety: also scope yt tiles by direct grid IDs in case .umat-ov ancestor check fails */
+#ws-video-grid.yt-grid, #ws-courses-grid.yt-grid, #ws-lib-grid.yt-grid,
+#lec-courses-grid.yt-grid, #lec-lib-grid.yt-grid,
+#hub-lec-grid.yt-grid, #hub-courses-grid.yt-grid, #hub-lib-grid.yt-grid,
+#stu-lec-grid.yt-grid, #stu-courses-grid.yt-grid, #stu-lib-grid.yt-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px 18px;
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  align-content: start;
+}
+

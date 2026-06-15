@@ -2,6 +2,10 @@
 // NAVIGATION — Top AppBar, SideNav, Bottom Nav
 // ============================================================
 
+// ---- Responsive Display Utilities ----
+// Desktop (md+): show topbar, hide bottomnav
+// Mobile (<md): hide topbar, show bottomnav
+
 // ---- Top AppBar ----
 .umat-topbar {
     background-color: $surface-container-lowest;
@@ -150,9 +154,35 @@
 
         .material-symbols-outlined { font-size: 24px; }
 
-        &.active {
-            background-color: $secondary-container;
-            color: $on-secondary-container;
-        }
+            &.active {
+                background-color: $secondary-container;
+                color: $on-secondary-container;
+            }
+    }
+}
+
+// ---- Responsive Behavior ----
+// Mobile: Add bottom padding to page content for fixed bottom nav
+@media (max-width: 767.98px) {
+    // Ensure page content has space for fixed bottom nav
+    #page-content {
+        padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+    }
+
+    // Hide Boost's default mobile primary drawer toggle since we use bottom nav
+    .drawer-toggler.drawer-left-toggle {
+        display: none !important;
+    }
+
+    // Adjust drawer toggle for blocks drawer on mobile
+    .drawer-toggler.drawer-right-toggle {
+        margin-left: auto;
+    }
+}
+
+// Desktop: Ensure proper spacing for fixed topbar
+@media (min-width: 768px) {
+    #page-content {
+        padding-top: 72px; // Account for fixed 64px topbar + 8px margin
     }
 }

@@ -58,11 +58,45 @@ class ChatLog(Base):
     id               = Column(Integer, primary_key=True, index=True)
     user_id          = Column(Integer, nullable=False)
     course_id        = Column(Integer, nullable=False)
+    session_key      = Column(String(100), nullable=True, index=True)
     question         = Column(Text, nullable=False)
     answer           = Column(Text, nullable=True)
     sources          = Column(Text, nullable=True)
     response_time_ms = Column(Float, nullable=True)
     created_at       = Column(DateTime, default=datetime.utcnow)
+
+
+class ConversationMemory(Base):
+    """Summarized memory of past conversations for long-term context."""
+    __tablename__ = "conversation_memory"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    user_id         = Column(Integer, nullable=False, index=True)
+    course_id       = Column(Integer, nullable=False, index=True)
+    session_key     = Column(String(100), nullable=True, index=True)
+    summary         = Column(Text, nullable=True)
+    key_topics      = Column(Text, nullable=True)
+    active_goals    = Column(Text, nullable=True)
+    message_count   = Column(Integer, default=0)
+    token_count     = Column(Integer, default=0)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+    updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class StudentContext(Base):
+    """Student struggle profile synced from Moodle event observers."""
+    __tablename__ = "student_context"
+
+    id               = Column(Integer, primary_key=True, index=True)
+    user_id          = Column(Integer, nullable=False, index=True)
+    course_id        = Column(Integer, nullable=False, index=True)
+    current_grade    = Column(Float, nullable=True)
+    struggle_topics  = Column(Text, nullable=True)   # JSON array
+    recent_events    = Column(Text, nullable=True)   # JSON array
+    learning_style   = Column(String(50), default="standard")
+    last_event_type  = Column(String(50), nullable=True)
+    created_at       = Column(DateTime, default=datetime.utcnow)
+    updated_at       = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class MaterialAnalysis(Base):
@@ -84,6 +118,24 @@ class MaterialAnalysis(Base):
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+
+    # Add session_key column to chat_logs if it doesn't exist (gradual migration)
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    columns = [c['name'] for c in inspector.get_columns('chat_logs')]
+    if 'session_key' not in columns:
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE chat_logs ADD COLUMN session_key VARCHAR(100)"))
+            conn.execute(text("CREATE INDEX ix_chat_logs_session_key ON chat_logs (session_key)"))
+            conn.commit()
+
+    # Create conversation_memory table if not exists
+    if not inspector.has_table('conversation_memory'):
+        ConversationMemory.__table__.create(bind=engine)
+
+    # Create student_context table if not exists
+    if not inspector.has_table('student_context'):
+        StudentContext.__table__.create(bind=engine)
 
 
 def get_db():

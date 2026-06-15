@@ -1,0 +1,52 @@
+# UMaT VLE Enhanced — Docker Compose
+# Services: PostgreSQL (AI analytics DB), Python AI service
+# Moodle runs separately (existing installation)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: umat_ai_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${AI_DB_PASSWORD:-changeme}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ai_service:
+    build:
+      context: ./ai_service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN}
+      AI_DB_HOST: postgres
+      AI_DB_PORT: 5432
+      AI_DB_NAME: umat_ai_db
+      AI_DB_USER: postgres
+      AI_DB_PASSWORD: ${AI_DB_PASSWORD:-changeme}
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CHROMA_DB_PATH: /app/chroma_db
+      UPLOAD_DIR: /app/uploads
+      LTI_ENABLED: ${LTI_ENABLED:-false}
+    volumes:
+      - chroma_data:/app/chroma_db
+      - upload_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  chroma_data:
+  upload_data:

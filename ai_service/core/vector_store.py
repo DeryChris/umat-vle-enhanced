@@ -160,11 +160,16 @@ class VectorStoreManager:
 
     def similarity_search(
         self,
-        course_id: int,
-        query:     str,
-        n_results: int = 5,
+        course_id:     int,
+        query:         str,
+        n_results:     int = 5,
+        material_ids:  List[int] = None,
     ) -> List[Tuple[str, dict]]:
-        """Return top-N relevant chunks for a query string."""
+        """Return top-N relevant chunks for a query string.
+
+        If material_ids is provided and non-empty, restrict search to only chunks
+        belonging to those materials (using the material_id metadata field).
+        """
         client   = get_chroma_client()
         embedder = get_embedding_function()
         coll_name = self.get_collection_name(course_id)
@@ -175,9 +180,15 @@ class VectorStoreManager:
             return []  # No documents indexed for this course yet
 
         query_embedding = embedder.embed_query(query)
+
+        where_filter = None
+        if material_ids:
+            where_filter = {"material_id": {"$in": [str(mid) for mid in material_ids]}}
+
         results = collection.query(
             query_embeddings=[query_embedding],
             n_results=n_results,
+            where=where_filter,
             include=["documents", "metadatas", "distances"],
         )
 

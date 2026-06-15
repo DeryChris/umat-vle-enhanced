@@ -20,19 +20,26 @@ class ai_query extends \external_api {
 
     public static function ask_question_parameters() {
         return new \external_function_parameters([
-            'courseid'    => new \external_value(PARAM_INT,  'Course ID'),
-            'question'    => new \external_value(PARAM_TEXT, 'Question text'),
-            'session_key' => new \external_value(PARAM_ALPHANUMEXT, 'Client session UUID', VALUE_DEFAULT, ''),
+            'courseid'     => new \external_value(PARAM_INT,  'Course ID'),
+            'question'     => new \external_value(PARAM_TEXT, 'Question text'),
+            'session_key'  => new \external_value(PARAM_ALPHANUMEXT, 'Client session UUID', VALUE_DEFAULT, ''),
+            'material_ids' => new \external_multiple_structure(
+                new \external_value(PARAM_INT, 'Material ID'),
+                'Material IDs to restrict RAG search to — empty means all materials',
+                VALUE_DEFAULT,
+                []
+            ),
         ]);
     }
 
-    public static function ask_question($courseid, $question, $session_key = '') {
+    public static function ask_question($courseid, $question, $session_key = '', $material_ids = []) {
         global $DB, $USER;
 
         $params = self::validate_parameters(self::ask_question_parameters(), [
-            'courseid'    => $courseid,
-            'question'    => $question,
-            'session_key' => $session_key,
+            'courseid'     => $courseid,
+            'question'     => $question,
+            'session_key'  => $session_key,
+            'material_ids' => $material_ids,
         ]);
 
         $context = \context_course::instance($params['courseid']);
@@ -53,11 +60,17 @@ class ai_query extends \external_api {
         $client->setHeader(['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['token']]);
         $client->setopt(['CURLOPT_TIMEOUT' => 30]);
 
-        $raw    = $client->post($cfg['url'] . '/api/v1/query', json_encode([
-            'question'  => $params['question'],
-            'course_id' => (int) $params['courseid'],
-            'user_id'   => (int) $USER->id,
-        ]));
+        $req = [
+            'question'    => $params['question'],
+            'course_id'   => (int) $params['courseid'],
+            'user_id'     => (int) $USER->id,
+            'session_key' => $params['session_key'] ?: '',
+        ];
+        $mids = $params['material_ids'] ?? [];
+        if (!empty($mids)) {
+            $req['material_ids'] = array_map('intval', $mids);
+        }
+        $raw = $client->post($cfg['url'] . '/api/v1/query', json_encode($req));
         $result = json_decode($raw, true);
 
         if (!empty($result['answer'])) {

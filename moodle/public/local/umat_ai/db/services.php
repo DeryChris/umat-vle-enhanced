@@ -82,6 +82,28 @@ $functions = [
         'description' => 'Check AI service availability for the connection indicator', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => '',
     ],
+
+    /* ---- Student Notes ---- */
+    'local_umat_ai_get_notes' => [
+        'classname'   => '\local_umat_ai\external\notes', 'methodname' => 'get_notes',
+        'description' => 'Get all notes for the current user', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_save_note' => [
+        'classname'   => '\local_umat_ai\external\notes', 'methodname' => 'save_note',
+        'description' => 'Create or update a note with tags', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_delete_note' => [
+        'classname'   => '\local_umat_ai\external\notes', 'methodname' => 'delete_note',
+        'description' => 'Delete a note and its tags', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_get_note_tag_sources' => [
+        'classname'   => '\local_umat_ai\external\notes', 'methodname' => 'get_note_tag_sources',
+        'description' => 'Get available tag sources (sessions, materials) for a course', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
 ];
 
 $services = [

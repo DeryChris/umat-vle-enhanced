@@ -50,6 +50,18 @@ class Settings(BaseSettings):
     max_chunk_size: int = 1000
     chunk_overlap: int = 200
 
+    # LTI 1.3 (optional — set LTI_ENABLED=true to activate)
+    lti_enabled: bool = False
+    lti_client_id: str = ""
+    lti_deployment_id: str = ""
+    lti_platform_issuer: str = ""
+    lti_auth_login_url: str = ""
+    lti_auth_token_url: str = ""
+    lti_key_set_url: str = ""
+    lti_target_link_uri: str = "http://localhost:8000/lti/launch"
+    lti_private_key_path: str = "./lti_keys/private.key"
+    lti_key_id: str = "umat-ai-key-1"
+
     @property
     def database_url(self) -> str:
         return (

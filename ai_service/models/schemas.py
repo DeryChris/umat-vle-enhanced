@@ -28,10 +28,12 @@ class ProcessRecordingResponse(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    question:  str = Field(..., min_length=3, max_length=1000)
-    course_id: int
-    user_id:   int
-    role:      str = "student"  # "student" or "lecturer" — selects the prompt
+    question:      str = Field(..., min_length=1, max_length=2000)
+    course_id:     int
+    user_id:       int
+    role:          str = "student"  # "student" or "lecturer" — selects the prompt
+    session_key:   str = ""  # For conversation continuity — groups messages into a thread
+    material_ids:  List[int] = Field(default=[], description="If non-empty, restrict RAG search to these material IDs only")
 
 
 class QueryResponse(BaseModel):

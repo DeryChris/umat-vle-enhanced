@@ -1,0 +1,700 @@
+/* =============================================================
+   STUDENT NOTES — modern note-taking UI
+   ============================================================= */
+
+/* ── Notes tab pane ── */
+[data-tab="my-notes"].active {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.umat-notes-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Toolbar ── */
+.umat-notes-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--u-olv);
+  flex-shrink: 0;
+}
+.umat-notes-search-wrap {
+  position: relative;
+  flex: 1;
+}
+.umat-notes-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  color: var(--u-ol);
+  pointer-events: none;
+}
+.umat-notes-search {
+  width: 100%;
+  padding: 8px 10px 8px 34px;
+  border: 1px solid var(--u-olv);
+  border-radius: var(--u-r8);
+  background: var(--u-sfl);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--u-ons);
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.umat-notes-search:focus {
+  border-color: var(--u-p);
+  box-shadow: 0 0 0 2px rgba(0,107,47,.15);
+}
+.umat-notes-search::placeholder {
+  color: var(--u-ol);
+}
+.umat-notes-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, var(--u-p), var(--u-pb));
+  color: #fff;
+  border: none;
+  border-radius: var(--u-r8);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .2s;
+}
+.umat-notes-add-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+.umat-notes-add-btn:hover {
+  box-shadow: var(--u-fshadow);
+  transform: translateY(-1px);
+}
+.umat-notes-add-btn:active {
+  transform: scale(.97);
+}
+
+/* ── Notes list ── */
+.umat-notes-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.umat-notes-list::-webkit-scrollbar {
+  width: 4px;
+}
+.umat-notes-list::-webkit-scrollbar-thumb {
+  background: var(--u-olv);
+  border-radius: 2px;
+}
+
+/* ── Note card ── */
+.umat-note-card {
+  background: var(--u-sflo);
+  border: 1px solid var(--u-olv);
+  border-radius: var(--u-r16);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all .2s;
+  animation: ufade .35s var(--u-cb) forwards;
+}
+.umat-note-card:hover {
+  border-color: var(--u-p);
+  box-shadow: 0 2px 12px rgba(0,0,0,.06);
+}
+.umat-note-card.pinned {
+  border-left: 3px solid var(--u-p);
+  background: linear-gradient(135deg, rgba(0,107,47,.03), transparent);
+}
+.umat-note-card-hdr {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.umat-note-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--u-ons);
+  cursor: pointer;
+  flex: 1;
+  line-height: 1.4;
+}
+.umat-note-title:hover {
+  color: var(--u-p);
+}
+.umat-note-card-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.umat-note-pin-btn,
+.umat-note-del-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: var(--u-r6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+  color: var(--u-ol);
+}
+.umat-note-pin-btn .material-symbols-outlined,
+.umat-note-del-btn .material-symbols-outlined {
+  font-size: 17px;
+}
+.umat-note-pin-btn:hover {
+  color: var(--u-p);
+  background: rgba(0,107,47,.08);
+}
+.umat-note-pin-btn.active {
+  color: var(--u-p);
+}
+.umat-note-del-btn:hover {
+  color: var(--u-ter);
+  background: rgba(239,68,68,.1);
+}
+
+/* ── Tag chips on note card ── */
+.umat-note-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.umat-note-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px 2px 5px;
+  background: rgba(0,107,47,.07);
+  color: var(--u-p);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: default;
+  transition: background .15s;
+}
+.umat-note-tag .material-symbols-outlined {
+  font-size: 13px;
+}
+
+/* ── Note preview ── */
+.umat-note-preview {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--u-txt);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-wrap:break-word;
+}
+.umat-note-preview p { margin:2px 0; }
+.umat-note-preview ul, .umat-note-preview ol { padding-left:18px; margin:2px 0; }
+.umat-note-preview-rich { -webkit-line-clamp: 4; }
+
+/* ── Card footer ── */
+.umat-note-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--u-olv);
+}
+.umat-note-date {
+  font-size: 11px;
+  color: var(--u-ol);
+}
+.umat-note-actions {
+  display: flex;
+  gap: 4px;
+}
+.umat-note-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 10px;
+  border: 1px solid var(--u-olv);
+  background: var(--u-sfl);
+  border-radius: var(--u-r6);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--u-ons);
+  cursor: pointer;
+  transition: all .2s;
+}
+.umat-note-action-btn .material-symbols-outlined {
+  font-size: 14px;
+}
+.umat-note-action-btn:hover {
+  border-color: var(--u-p);
+  color: var(--u-p);
+  background: rgba(0,107,47,.05);
+}
+
+/* ── Compact panel notes ── */
+.umat-cp-notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 0;
+  flex-shrink: 0;
+}
+.umat-cp-notes-tabs {
+  display: flex;
+  gap: 2px;
+}
+.umat-cp-notes-tab {
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--u-ol);
+  cursor: pointer;
+  border-radius: var(--u-r6);
+  transition: all .2s;
+}
+.umat-cp-notes-tab.active {
+  background: var(--u-sfl);
+  color: var(--u-p);
+  font-weight: 600;
+}
+.umat-cp-notes-tab:hover {
+  color: var(--u-ons);
+}
+.umat-cp-notes-add {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: var(--u-p);
+  color: #fff;
+  border-radius: var(--u-r6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+}
+.umat-cp-notes-add .material-symbols-outlined {
+  font-size: 16px;
+}
+.umat-cp-notes-add:hover {
+  box-shadow: var(--u-fshadow);
+  transform: scale(1.05);
+}
+.umat-cp-notes-tab-pane {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+}
+.umat-cp-notes-tab-pane.active {
+  display: flex;
+  flex-direction: column;
+}
+.umat-cp-note-item {
+  padding: 8px 10px;
+  border-radius: var(--u-r6);
+  cursor: pointer;
+  transition: background .15s;
+  border: 1px solid transparent;
+}
+.umat-cp-note-item:hover {
+  background: var(--u-sfl);
+  border-color: var(--u-olv);
+}
+.umat-cp-note-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--u-ons);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.umat-cp-note-preview {
+  font-size: 11px;
+  color: var(--u-ol);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+.umat-cp-note-more {
+  padding: 6px;
+  text-align: center;
+}
+
+/* =============================================================
+   NOTE EDITOR MODAL
+   ============================================================= */
+.umat-note-editor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(0,0,0,.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity .25s;
+  backdrop-filter: blur(2px);
+}
+.umat-note-editor-overlay.open {
+  opacity: 1;
+}
+.umat-note-editor {
+  background: var(--u-sf);
+  border-radius: var(--u-r14);
+  width: 520px;
+  max-width: 94vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,.18);
+  transform: scale(.95) translateY(10px);
+  transition: transform .25s var(--u-cbi);
+}
+.umat-note-editor-overlay.open .umat-note-editor {
+  transform: scale(1) translateY(0);
+}
+
+/* ── Editor header ── */
+.umat-ne-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--u-olv);
+}
+.umat-ne-hdr h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--u-ons);
+}
+.umat-ne-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: var(--u-r6);
+  cursor: pointer;
+  color: var(--u-ol);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+}
+.umat-ne-close:hover {
+  background: var(--u-sfl);
+  color: var(--u-ons);
+}
+.umat-ne-close .material-symbols-outlined {
+  font-size: 20px;
+}
+
+/* ── Editor body ── */
+.umat-ne-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.umat-ne-input {
+  width: 100%;
+  border: 1px solid var(--u-olv);
+  border-radius: var(--u-r8);
+  background: var(--u-sfl);
+  font-family: inherit;
+  color: var(--u-ons);
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  box-sizing: border-box;
+}
+.umat-ne-input:focus {
+  border-color: var(--u-p);
+  box-shadow: 0 0 0 2px rgba(0,107,47,.12);
+}
+.umat-ne-title-input {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 12px;
+}
+.umat-ne-title-input::placeholder {
+  color: var(--u-ol);
+  font-weight: 400;
+}
+.umat-ne-content {
+  min-height:160px;
+  padding:12px 14px;
+  line-height:1.7;
+  font-size:14px;
+  color:var(--u-txt);
+  background:#fafafa;
+  border:1px solid var(--u-bd);
+  border-radius:0 0 8px 8px;
+  outline:none;
+  transition:border .2s,box-shadow .2s;
+  overflow-y:auto;
+  word-wrap:break-word;
+}
+.umat-ne-content:focus {
+  border-color:var(--u-prm);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--u-prm) 18%,transparent);
+  background:#fff;
+}
+.umat-ne-content:empty:before {
+  content:attr(placeholder);
+  color:var(--u-ol);
+  pointer-events:none;
+}
+.umat-ne-content ul, .umat-ne-content ol {
+  padding-left:22px;
+  margin:4px 0;
+}
+.umat-ne-content li { margin:2px 0; }
+.umat-ne-content p { margin:4px 0; }
+
+/* ── Note formatting toolbar ── */
+.umat-ne-toolbar {
+  display:flex;
+  align-items:center;
+  gap:2px;
+  padding:6px 8px;
+  background:var(--u-srf);
+  border:1px solid var(--u-bd);
+  border-radius:8px 8px 0 0;
+  border-bottom:none;
+  flex-wrap:wrap;
+}
+.umat-ne-tb-btn {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:30px;height:30px;
+  border:none;
+  border-radius:5px;
+  background:transparent;
+  color:var(--u-txt);
+  cursor:pointer;
+  font-size:14px;
+  transition:background .15s,color .15s;
+  padding:0;
+}
+.umat-ne-tb-btn:hover { background:var(--u-hvr); color:var(--u-prm); }
+.umat-ne-tb-btn:active { background:color-mix(in srgb,var(--u-prm) 15%,transparent); }
+.umat-ne-tb-btn strong, .umat-ne-tb-btn em, .umat-ne-tb-btn u { pointer-events:none; }
+.umat-ne-tb-btn small { font-size:10px; }
+.umat-ne-tb-sep {
+  width:1px;height:18px;
+  background:var(--u-bd);
+  margin:0 4px;
+}
+
+/* ── Tags section ── */
+.umat-ne-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.umat-ne-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--u-ons);
+}
+.umat-ne-hint {
+  font-weight: 400;
+  color: var(--u-ol);
+  font-size: 11px;
+}
+.umat-ne-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 28px;
+}
+.umat-ne-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px 3px 5px;
+  background: rgba(0,107,47,.08);
+  color: var(--u-p);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  animation: ufade .2s forwards;
+}
+.umat-ne-tag-remove {
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--u-ol);
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 50%;
+  transition: all .15s;
+  padding: 0;
+}
+.umat-ne-tag-remove:hover {
+  background: rgba(0,0,0,.1);
+  color: var(--u-ter);
+}
+.umat-ne-tag-adder {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.umat-ne-select {
+  padding: 6px 8px;
+  border: 1px solid var(--u-olv);
+  border-radius: var(--u-r6);
+  background: var(--u-sfl);
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--u-ons);
+  outline: none;
+  cursor: pointer;
+}
+.umat-ne-select:focus {
+  border-color: var(--u-p);
+}
+.umat-ne-add-tag-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--u-p);
+  background: transparent;
+  color: var(--u-p);
+  border-radius: var(--u-r6);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .2s;
+}
+.umat-ne-add-tag-btn:hover {
+  background: rgba(0,107,47,.07);
+}
+
+/* ── Pin checkbox ── */
+.umat-ne-pin-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--u-ons);
+  cursor: pointer;
+}
+.umat-ne-pin-label input[type="checkbox"] {
+  accent-color: var(--u-p);
+}
+
+/* ── Editor footer ── */
+.umat-ne-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--u-olv);
+}
+.umat-ne-delete-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--u-ter);
+  background: transparent;
+  color: var(--u-ter);
+  border-radius: var(--u-r8);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .2s;
+}
+.umat-ne-delete-btn:hover {
+  background: rgba(239,68,68,.07);
+}
+.umat-ne-save-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 22px;
+  background: linear-gradient(135deg, var(--u-p), var(--u-pb));
+  color: #fff;
+  border: none;
+  border-radius: var(--u-r8);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .2s;
+  margin-left: auto;
+}
+.umat-ne-save-btn .material-symbols-outlined {
+  font-size: 17px;
+}
+.umat-ne-save-btn:hover {
+  box-shadow: var(--u-fshadow);
+  transform: translateY(-1px);
+}
+.umat-ne-save-btn:active {
+  transform: scale(.97);
+}
+
+/* ── Empty state ── */
+.umat-notes-list .umat-empty {
+  padding: 48px 20px;
+}
+.umat-notes-list .umat-empty .material-symbols-outlined {
+  font-size: 44px;
+  color: var(--u-olv);
+}
+
+/* ── Wider screens: grid layout for tiles ── */
+@media (min-width: 768px) {
+  .umat-sessions-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(375px, 1fr));
+    gap: 12px;
+    padding: 20px;
+  }
+  .umat-sessions-list .umat-session-tile {
+    height: 145px;
+  }
+  .umat-notes-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(375px, 1fr));
+    gap: 12px;
+    padding: 16px;
+  }
+  .umat-notes-list .umat-note-card {
+    height: 145px;
+  }
+}

@@ -83,6 +83,7 @@
    - [ ] Mark todo as in-progress, then completed
    - [ ] Test/validate after EACH change
    - [ ] Use `Edit` tool for modifications, `Write` for new files
+   - [ ] Write comments in the work for easy understanding of codes when I want to go through, telling what this is or this block is.
 
 6. **Validate thoroughly**
    - [ ] Run tests (`pytest tests/ -v` for AI service)

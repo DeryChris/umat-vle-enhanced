@@ -121,5 +121,42 @@
       <INDEXES><INDEX NAME="userid_courseid" UNIQUE="false" FIELDS="userid,courseid"/></INDEXES>
     </TABLE>
 
+    <TABLE NAME="umat_ai_student_context" COMMENT="Per-student struggle areas detected by event observers">
+      <FIELDS>
+        <FIELD NAME="id"              TYPE="int"    LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid"          TYPE="int"    LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="courseid"        TYPE="int"    LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="cmid"            TYPE="int"    LENGTH="10"  NOTNULL="false"/>
+        <FIELD NAME="topic_label"     TYPE="char"   LENGTH="255" NOTNULL="true" DEFAULT=""/>
+        <FIELD NAME="struggle_reason" TYPE="char"   LENGTH="50"  NOTNULL="false"/>
+        <FIELD NAME="struggle_score"  TYPE="number" LENGTH="10, 2" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="is_struggle"     TYPE="int"    LENGTH="1"   NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timecreated"     TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timemodified"    TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS><KEY NAME="primary" TYPE="primary" FIELDS="id"/></KEYS>
+      <INDEXES>
+        <INDEX NAME="user_course" UNIQUE="false" FIELDS="userid,courseid"/>
+        <INDEX NAME="user_course_cmid" UNIQUE="false" FIELDS="userid,courseid,cmid"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_activity_log" COMMENT="Raw student activity events for analytics webhooks">
+      <FIELDS>
+        <FIELD NAME="id"          TYPE="int"  LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid"      TYPE="int"  LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="courseid"    TYPE="int"  LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="cmid"        TYPE="int"  LENGTH="10" NOTNULL="false"/>
+        <FIELD NAME="event_type"  TYPE="char" LENGTH="50" NOTNULL="true"/>
+        <FIELD NAME="event_data"  TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS><KEY NAME="primary" TYPE="primary" FIELDS="id"/></KEYS>
+      <INDEXES>
+        <INDEX NAME="user_course_type" UNIQUE="false" FIELDS="userid,courseid,event_type"/>
+        <INDEX NAME="timecreated" UNIQUE="false" FIELDS="timecreated"/>
+      </INDEXES>
+    </TABLE>
+
   </TABLES>
 </XMLDB>

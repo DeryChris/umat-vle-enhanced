@@ -1,0 +1,18 @@
+{{!
+    @template theme_umat/bottomnav
+
+    Mobile bottom navigation bar.
+    Only visible on screens < 768px (mobile).
+    Hidden on desktop where sidebar drawers are used.
+}}
+
+{{#bottomnavitems}}
+<nav class="umat-bottomnav d-md-none" aria-label="{{#str}}bottomnavigation, theme_umat{{/str}}">
+    {{#.}}
+        <a href="{{{url}}}" class="umat-bottomnav-item {{#active}}active{{/active}}" {{#active}}aria-current="page"{{/active}}>
+            <span class="material-symbols-outlined">{{icon}}</span>
+            <span>{{text}}</span>
+        </a>
+    {{/.}}
+</nav>
+{{/bottomnavitems}}

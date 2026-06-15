@@ -79,5 +79,88 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026060100, 'local', 'umat_ai');
     }
 
+    if ($oldversion < 2026061300) {
+        // Create umat_ai_notes table — student's own notes with tagging support
+        $nt = new xmldb_table('umat_ai_notes');
+        if (!$dbman->table_exists($nt)) {
+            $nt->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $nt->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $nt->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+            $nt->add_field('title', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, '');
+            $nt->add_field('content', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $nt->add_field('pinned', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0');
+            $nt->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $nt->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $nt->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $nt->add_key('user_fk', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
+            $nt->add_index('userid_courseid', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid']);
+            $dbman->create_table($nt);
+        }
+
+        // Create umat_ai_note_tags table — polymorphic tags on notes
+        $tt = new xmldb_table('umat_ai_note_tags');
+        if (!$dbman->table_exists($tt)) {
+            $tt->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $tt->add_field('noteid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $tt->add_field('tag_type', XMLDB_TYPE_CHAR, '50', null, XMLDB_NOTNULL, null, null);
+            $tt->add_field('tag_id', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+            $tt->add_field('tag_label', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null);
+            $tt->add_field('tag_value', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $tt->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $tt->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $tt->add_key('note_fk', XMLDB_KEY_FOREIGN, ['noteid'], 'umat_ai_notes', ['id']);
+            // tag_type+tag_id lookup — noteid index is auto-created by the FK
+            $tt->add_index('tag_type', XMLDB_INDEX_NOTUNIQUE, ['tag_type', 'tag_id']);
+            $dbman->create_table($tt);
+        }
+        upgrade_plugin_savepoint(true, 2026061300, 'local', 'umat_ai');
+    }
+
+    if ($oldversion < 2026061301) {
+        set_config('enable_student_fab', '1', 'local_umat_ai');
+        set_config('enable_lecturer_fab', '1', 'local_umat_ai');
+        set_config('enable_hub_fab', '1', 'local_umat_ai');
+        upgrade_plugin_savepoint(true, 2026061301, 'local', 'umat_ai');
+    }
+
+    if ($oldversion < 2026061400) {
+        // Student struggle context — aggregated per user/course/module
+        $ctx = new xmldb_table('umat_ai_student_context');
+        if (!$dbman->table_exists($ctx)) {
+            $ctx->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $ctx->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $ctx->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $ctx->add_field('cmid', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+            $ctx->add_field('topic_label', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, '');
+            $ctx->add_field('struggle_reason', XMLDB_TYPE_CHAR, '50', null, null, null, null);
+            $ctx->add_field('struggle_score', XMLDB_TYPE_NUMBER, '10, 2', null, XMLDB_NOTNULL, null, '0');
+            $ctx->add_field('is_struggle', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0');
+            $ctx->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $ctx->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $ctx->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $ctx->add_index('user_course', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid']);
+            $ctx->add_index('user_course_cmid', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid', 'cmid']);
+            $dbman->create_table($ctx);
+        }
+
+        // Raw activity log for analytics webhooks
+        $log = new xmldb_table('umat_ai_activity_log');
+        if (!$dbman->table_exists($log)) {
+            $log->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $log->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $log->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $log->add_field('cmid', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+            $log->add_field('event_type', XMLDB_TYPE_CHAR, '50', null, XMLDB_NOTNULL, null, null);
+            $log->add_field('event_data', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $log->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $log->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $log->add_index('user_course_type', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid', 'event_type']);
+            $log->add_index('timecreated', XMLDB_INDEX_NOTUNIQUE, ['timecreated']);
+            $dbman->create_table($log);
+        }
+
+        upgrade_plugin_savepoint(true, 2026061400, 'local', 'umat_ai');
+    }
+
     return true;
 }
