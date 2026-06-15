@@ -5,13 +5,15 @@
 //          chat Q&A, suggestion chips, generate-summary action.
 // ============================================================
 
-define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
+define(['core/ajax', 'core/notification', 'local_umat_ai/umatshared'], function(Ajax, Notification, Shared) {
     'use strict';
 
     var courseId   = 0;
     var sessionId  = 0;
     var courseName = '';
     var sessionKey = '';
+    var streamUrl  = '';
+    var sesskey    = '';
 
     // ---- Video player ------------------------------------------------- //
 
@@ -195,30 +197,29 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         q = (q || '').trim();
         if (!q || !courseId) return;
 
-        appendUserBubble(q);
+        Shared._umatAppendUser('workspace-chat-messages', q);
         showTyping();
 
         var inputEl = document.getElementById('workspace-question-input');
         if (inputEl) inputEl.value = '';
 
-        Ajax.call([{
-            methodname: 'local_umat_ai_ask_question',
-            args: {
-                courseid:    courseId,
-                question:    q,
-                session_key: sessionKey,
-            },
-        }])[0].done(function(r) {
-            hideTyping();
-            if (r.success) {
-                appendAiBubble(r.answer, r.sources || []);
-            } else {
-                appendAiBubble('Sorry, something went wrong. Please try again.', []);
+        var msgsId = 'workspace-chat-messages';
+        var tid = 'workspace-typing';
+
+        Shared._umatStreamChat({
+            url: streamUrl,
+            sesskey: sesskey,
+            courseid: courseId,
+            question: q,
+            session_key: sessionKey,
+            material_ids: [],
+            msgsId: msgsId,
+            onMeta: function(meta){ hideTyping(); },
+            onDone: function(meta){ hideTyping(); },
+            onError: function(err){
+                hideTyping();
+                Shared._umatAppendAi(msgsId, err.message || 'Sorry, an error occurred. Please try again.', []);
             }
-        }).fail(function(ex) {
-            hideTyping();
-            appendAiBubble('Error connecting to the AI service. Please check your connection.', []);
-            Notification.exception(ex);
         });
     }
 
@@ -319,6 +320,8 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         sessionId  = cfg.sessionId  || 0;
         courseName = cfg.courseName || '';
         sessionKey = 'ws_' + Math.random().toString(36).substr(2, 16);
+        streamUrl  = cfg.streamUrl  || '';
+        sesskey    = cfg.sesskey    || '';
 
         initVideo();
         initTranscript();

@@ -8,26 +8,29 @@ define([], function() {
         this.spot = container.querySelector('[data-glass]');
         this.fakeBoxes = container.querySelectorAll('[data-glass-item]');
         this.tabs = container.querySelectorAll('.umat-glass-tab');
-        if (!this.spot || !this.fakeBoxes.length) return;
-        this.spotRadius = this.spot.offsetWidth / 2;
+        if (!this.spot || !this.tabs.length) return;
+        this.spotRadius = 26;
         this._bindEvents();
         this._onReady();
     };
 
-    // ── Calculate tab positions ──
+    // Calculate tab positions.
     Magnifier.prototype._calc = function() {
         var any = false;
-        for (var i = 0; i < this.fakeBoxes.length; i++) {
-            var box = this.fakeBoxes[i];
-            var idx = box.getAttribute('data-glass-item');
-            var center = box.offsetLeft + box.offsetWidth / 2;
+        var base = this.container.getBoundingClientRect();
+        this.spotRadius = this.spot.offsetWidth ? this.spot.offsetWidth / 2 : 26;
+        for (var i = 0; i < this.tabs.length; i++) {
+            var tab = this.tabs[i];
+            var idx = i + 1;
+            var rect = tab.getBoundingClientRect();
+            var center = rect.left - base.left + rect.width / 2;
             this.container.style.setProperty('--gpos' + idx, (center - this.spotRadius) + 'px');
-            if (box.offsetLeft > 0) any = true;
+            if (rect.width > 0) any = true;
         }
         return any;
     };
 
-    // ── Find index of active tab (1-based) ──
+    // Find index of active tab (1-based).
     Magnifier.prototype._activeIdx = function() {
         for (var i = 0; i < this.tabs.length; i++) {
             if (this.tabs[i].classList.contains('active')) {
@@ -37,23 +40,23 @@ define([], function() {
         return 0;
     };
 
-    // ── Apply position class ──
+    // Apply position class.
     Magnifier.prototype._activate = function(idx) {
         if (!idx) return;
-        for (var p = 1; p <= this.fakeBoxes.length; p++) {
+        for (var p = 1; p <= this.tabs.length; p++) {
             this.container.classList.remove('umat-glass-tabs--on-' + p);
         }
         this.container.classList.add('umat-glass-tabs--on-' + idx);
     };
 
-    // ── Recalculate positions and activate ──
+    // Recalculate positions and activate.
     Magnifier.prototype.refresh = function() {
         if (this._calc()) {
             this._activate(this._activeIdx());
         }
     };
 
-    // ── Initialize after overlay becomes visible ──
+    // Initialize after overlay becomes visible.
     Magnifier.prototype._onReady = function() {
         var ov = this.container.closest('.umat-ov, .umat-cp-ov');
         if (!ov) { this.refresh(); return; }
@@ -79,13 +82,43 @@ define([], function() {
         poll();
     };
 
-    // ── Event handlers ──
+    // Event handlers.
     Magnifier.prototype._bindEvents = function() {
         var self = this;
-        // Tab click — active class already toggled by inline JS in target phase
-        this.container.addEventListener('click', function(e) {
-            if (e.target.closest('.umat-glass-tab')) {
-                self.refresh();
+        Array.prototype.forEach.call(this.tabs, function(tab, index) {
+            tab.addEventListener('pointerdown', function() {
+                self._calc();
+                self._activate(index + 1);
+                tab.classList.add('is-pressing');
+            });
+            tab.addEventListener('pointerup', function() { tab.classList.remove('is-pressing'); });
+            tab.addEventListener('pointercancel', function() { tab.classList.remove('is-pressing'); });
+            tab.addEventListener('pointerleave', function() { tab.classList.remove('is-pressing'); });
+            tab.addEventListener('click', function() {
+                // Remove active class from all tabs
+                for (var j = 0; j < self.tabs.length; j++) {
+                    self.tabs[j].classList.remove('active');
+                }
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                
+                // Update visual position
+                self._calc();
+                self._activate(index + 1);
+                setTimeout(function() { self.refresh(); }, 0);
+                
+                // Trigger custom event for other listeners
+                if (window.CustomEvent) {
+                    try {
+                        tab.dispatchEvent(new CustomEvent('umat-glass-tab-changed', {
+                            detail: { tab: tab, index: index }
+                        }));
+                    } catch(e) {}
+                }
+            });
+            if (window.MutationObserver) {
+                new MutationObserver(function() { self.refresh(); })
+                    .observe(tab, { attributes: true, attributeFilter: ['class'] });
             }
         });
         window.addEventListener('resize', function() {

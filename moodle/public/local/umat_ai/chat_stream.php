@@ -18,20 +18,55 @@ $sessionkey = optional_param('session_key', '', PARAM_ALPHANUMEXT);
 $materialidsraw = optional_param('material_ids', '[]', PARAM_RAW);
 
 $context = context_course::instance($courseid);
-require_capability('local/umat_ai:chatwithai', $context);
+$is_lecturer = local_umat_ai_is_lecturer($courseid);
+$role = 'student';
+$question_to_send = $question;
 
-$rateLimit = (int) get_config('local_umat_ai', 'rate_limit') ?: 10;
-$remaining = local_umat_ai_questions_remaining($USER->id, $rateLimit);
-if ($remaining <= 0) {
-    header('Content-Type: text/event-stream');
-    header('Cache-Control: no-cache');
-    echo "event: error\n";
-    echo 'data: ' . json_encode([
-        'message' => get_string('rate_limit_hit', 'local_umat_ai'),
-        'error' => 'rate_limit',
-        'remaining' => 0,
-    ]) . "\n\n";
-    exit;
+if ($is_lecturer) {
+    require_capability('local/umat_ai:viewanalytics', $context);
+    $role = 'lecturer';
+
+    // Gather analytics context for the AI prompt.
+    $since = time() - (30 * 86400);
+
+    $totalInteractions = $DB->count_records_select(
+        'umat_ai_chat_logs',
+        'courseid = :courseid AND timecreated > :since',
+        ['courseid' => $courseid, 'since' => $since]
+    );
+
+    $topQs = $DB->get_records_sql(
+        "SELECT question, COUNT(*) AS cnt
+           FROM {umat_ai_chat_logs}
+          WHERE courseid = :courseid AND timecreated > :since AND role = 'student'
+       GROUP BY question ORDER BY cnt DESC",
+        ['courseid' => $courseid, 'since' => $since],
+        0, 5
+    );
+    $topQsList = implode('; ', array_column((array) $topQs, 'question'));
+
+    // Build an analytics-enriched prompt.
+    $analyticsCtx = "Course analytics context: "
+        . "Total AI interactions in last 30 days: {$totalInteractions}. "
+        . "Top student questions: {$topQsList}. ";
+
+    $question_to_send = $analyticsCtx . ' Lecturer query: ' . $question;
+} else {
+    require_capability('local/umat_ai:chatwithai', $context);
+
+    $rateLimit = (int) get_config('local_umat_ai', 'rate_limit') ?: 10;
+    $remaining = local_umat_ai_questions_remaining($USER->id, $rateLimit);
+    if ($remaining <= 0) {
+        header('Content-Type: text/event-stream');
+        header('Cache-Control: no-cache');
+        echo "event: error\n";
+        echo 'data: ' . json_encode([
+            'message' => get_string('rate_limit_hit', 'local_umat_ai'),
+            'error' => 'rate_limit',
+            'remaining' => 0,
+        ]) . "\n\n";
+        exit;
+    }
 }
 
 $materialids = json_decode($materialidsraw, true);
@@ -52,12 +87,12 @@ if ($cfg['url'] === '' || $cfg['token'] === '') {
 }
 
 $payload = json_encode([
-    'question'     => $question,
+    'question'     => $question_to_send,
     'course_id'    => $courseid,
     'user_id'      => (int) $USER->id,
     'session_key'  => $sessionkey,
     'material_ids' => array_map('intval', $materialids),
-    'role'         => 'student',
+    'role'         => $role,
 ]);
 
 @ini_set('output_buffering', 'off');
@@ -89,7 +124,7 @@ curl_setopt_array($ch, [
     CURLOPT_POSTFIELDS     => $payload,
     CURLOPT_RETURNTRANSFER => false,
     CURLOPT_TIMEOUT        => 120,
-    CURLOPT_WRITEFUNCTION  => function($curl, $data) use (&$buffer, &$fullanswer, &$sources, &$logged, $DB, $USER, $courseid, $question, $sessionkey) {
+    CURLOPT_WRITEFUNCTION  => function($curl, $data) use (&$buffer, &$fullanswer, &$sources, &$logged, $DB, $USER, $courseid, $question, $sessionkey, $role) {
         echo $data;
         if (function_exists('ob_flush')) {
             @ob_flush();
@@ -126,16 +161,26 @@ curl_setopt_array($ch, [
                 $fullanswer = $parsed['answer'] ?? $fullanswer;
                 $sources = $parsed['sources'] ?? $sources;
                 if (!$logged && $fullanswer !== '') {
-                    $DB->insert_record('umat_ai_chat_logs', (object) [
-                        'userid'      => $USER->id,
-                        'courseid'    => $courseid,
-                        'session_key' => $sessionkey,
-                        'role'        => 'student',
-                        'question'    => $question,
-                        'answer'      => $fullanswer,
-                        'sources'     => json_encode($sources),
-                        'timecreated' => time(),
-                    ]);
+                    if ($role === 'lecturer') {
+                        $DB->insert_record('umat_ai_lecturer_notes', (object)[
+                            'userid'      => $USER->id,
+                            'courseid'    => $courseid,
+                            'query'       => $question,
+                            'response'    => $fullanswer,
+                            'timecreated' => time(),
+                        ]);
+                    } else {
+                        $DB->insert_record('umat_ai_chat_logs', (object) [
+                            'userid'      => $USER->id,
+                            'courseid'    => $courseid,
+                            'session_key' => $sessionkey,
+                            'role'        => 'student',
+                            'question'    => $question,
+                            'answer'      => $fullanswer,
+                            'sources'     => json_encode($sources),
+                            'timecreated' => time(),
+                        ]);
+                    }
                     $logged = true;
                 }
             }

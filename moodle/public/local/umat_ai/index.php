@@ -79,6 +79,8 @@ $PAGE->requires->js_amd_inline("
             sessionId:     {$sessionDbId},
             courseName:    " . json_encode($course->fullname) . ",
             hasCapability: true,
+            streamUrl:     " . json_encode($CFG->wwwroot . '/local/umat_ai/chat_stream.php') . ",
+            sesskey:       " . json_encode(sesskey()) . "
         });
     });
 ");

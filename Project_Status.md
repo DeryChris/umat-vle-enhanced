@@ -1,7 +1,7 @@
 # Project Status — UMaT Generative AI-Enhanced VLE
 
 **Last Updated:** May 11, 2026  
-**Project Phase:** Beta (v1.0.0) — Core features implemented, integration & testing in progress
+**Project Phase:** Beta (v1.1.0) — Core features implemented; integration/testing & UI polish in progress
 
 ---
 

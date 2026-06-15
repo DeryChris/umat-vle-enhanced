@@ -48,7 +48,10 @@ async def query_course_ai_stream(
     token: str = Depends(verify_token),
 ):
     """Stream tutor response as Server-Sent Events (SSE)."""
-    allowed, remaining = check_rate_limit(request.user_id)
+    if request.role == "lecturer":
+        allowed, remaining = True, RATE_LIMIT_MAX
+    else:
+        allowed, remaining = check_rate_limit(request.user_id)
 
     def generate():
         if not allowed:
@@ -119,7 +122,10 @@ async def query_course_ai(
     db: Session = Depends(get_db),
     token: str = Depends(verify_token),
 ):
-    allowed, remaining = check_rate_limit(request.user_id)
+    if request.role == "lecturer":
+        allowed, remaining = True, RATE_LIMIT_MAX
+    else:
+        allowed, remaining = check_rate_limit(request.user_id)
     if not allowed:
         raise HTTPException(
             status_code=429,
