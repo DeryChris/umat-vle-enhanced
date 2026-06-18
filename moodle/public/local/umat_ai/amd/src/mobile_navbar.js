@@ -1,10 +1,8 @@
 // ============================================================
 // AMD module: local_umat_ai/mobile_navbar
-// Handles mobile navbar scroll hide/show
-// Features:
-//   - Hides navbar on scroll down, shows on scroll up (mobile only)
-//   - Works with overlay content areas and scrollable containers
-//   - Auto-shows after inactivity
+// Handles floating glass tab bar scroll hide/show on mobile.
+// Hides bar on scroll down, shows on scroll up (threshold 30px).
+// Works with overlay scrollable containers.
 // ============================================================
 
 define([], function() {
@@ -13,73 +11,32 @@ define([], function() {
     var lastScrollY = 0;
     var isNavbarHidden = false;
     var scrollTimeout = null;
-    var scrollContainer = null;
+    var scrollTargets = [];
     var isMobileView = false;
 
-    // Detect if we're in mobile view (width < 640px)
     function checkMobileView() {
         isMobileView = window.innerWidth < 640;
     }
 
-    // Find the main scrollable container
-    function findScrollContainer() {
-        // Try to find overlay content first
-        var overlayContent = document.querySelector('.umat-ov-content');
-        if (overlayContent && overlayContent.scrollHeight > overlayContent.clientHeight) {
-            return overlayContent;
-        }
-        // Try other scrollable containers
-        var containers = [
-            document.querySelector('[role="main"]'),
-            document.querySelector('main'),
-            document.querySelector('.moodle-has-dir-ltr'),
-            document.documentElement
-        ];
-        for (var i = 0; i < containers.length; i++) {
-            if (containers[i] && containers[i].scrollHeight > containers[i].clientHeight) {
-                return containers[i];
-            }
-        }
-        return document.documentElement;
+    function findScrollTargets() {
+        var targets = [];
+        var ovContent = document.querySelector('.umat-ov-content');
+        if (ovContent) targets.push(ovContent);
+        var tabPane = document.querySelector('.umat-tab-pane.active');
+        if (tabPane && tabPane !== ovContent) targets.push(tabPane);
+        var cp = document.querySelector('.umat-cp');
+        if (cp) targets.push(cp);
+        targets.push(window);
+        return targets;
     }
 
-    // Handle scroll events - hide on down, show on up
-    function handleScroll(e) {
-        if (!isMobileView) return; // Only on mobile
-
-        // Get current scroll position
-        var currentScrollY = 0;
-        if (scrollContainer && scrollContainer !== document.documentElement && scrollContainer !== window) {
-            currentScrollY = scrollContainer.scrollTop;
-        } else {
-            currentScrollY = window.scrollY || document.documentElement.scrollTop || window.pageYOffset || 0;
+    function getScrollY(target) {
+        if (target === window || target === document || target === document.documentElement) {
+            return window.scrollY || document.documentElement.scrollTop || window.pageYOffset || 0;
         }
-
-        // Clear existing timeout
-        if (scrollTimeout) {
-            clearTimeout(scrollTimeout);
-        }
-
-        // Show navbar on scroll up
-        if (isNavbarHidden && currentScrollY < lastScrollY) {
-            showNavbar();
-        }
-        // Hide navbar on scroll down (with 30px threshold to avoid jitter)
-        else if (!isNavbarHidden && currentScrollY > lastScrollY + 30) {
-            hideNavbar();
-        }
-
-        lastScrollY = currentScrollY;
-
-        // Auto-show navbar after scroll stops (0.5s of no scrolling)
-        scrollTimeout = setTimeout(function() {
-            if (isNavbarHidden) {
-                showNavbar();
-            }
-        }, 500);
+        return target.scrollTop || 0;
     }
 
-    // Show the navbar (sliding animation)
     function showNavbar() {
         var glassContainer = document.querySelector('.umat-glass-tabs');
         if (glassContainer && isNavbarHidden) {
@@ -88,7 +45,6 @@ define([], function() {
         }
     }
 
-    // Hide the navbar (sliding animation)
     function hideNavbar() {
         var glassContainer = document.querySelector('.umat-glass-tabs');
         if (glassContainer && !isNavbarHidden) {
@@ -97,37 +53,50 @@ define([], function() {
         }
     }
 
-    // Handle tab clicks - show navbar after interaction
-    function handleTabClick(e) {
-        if (scrollTimeout) {
-            clearTimeout(scrollTimeout);
+    function handleScroll(e) {
+        if (!isMobileView) return;
+
+        var currentScrollY = 0;
+        for (var i = 0; i < scrollTargets.length; i++) {
+            var sy = getScrollY(scrollTargets[i]);
+            if (sy > currentScrollY) currentScrollY = sy;
         }
-        lastScrollY = 0; // Reset scroll position to force navbar show
+
+        if (scrollTimeout) clearTimeout(scrollTimeout);
+
+        if (isNavbarHidden && currentScrollY < lastScrollY) {
+            showNavbar();
+        } else if (!isNavbarHidden && currentScrollY > lastScrollY + 30) {
+            hideNavbar();
+        }
+
+        lastScrollY = currentScrollY;
+
+        scrollTimeout = setTimeout(function() {
+            if (isNavbarHidden) showNavbar();
+        }, 600);
+    }
+
+    function handleTabClick() {
+        if (scrollTimeout) clearTimeout(scrollTimeout);
+        lastScrollY = 0;
         showNavbar();
     }
 
-    // Handle window resize
     function handleResize() {
         checkMobileView();
-        // If switching from mobile to desktop or vice versa
-        if (!isMobileView && isNavbarHidden) {
-            showNavbar(); // Show if switching to desktop
+        if (!isMobileView && isNavbarHidden) showNavbar();
+        if (isMobileView) {
+            scrollTargets = findScrollTargets();
         }
     }
 
-    // Initialize the module
     function init() {
         checkMobileView();
-        
-        if (!isMobileView) {
-            console.log('UMaT mobile navbar: desktop view detected, module inactive');
-            return;
-        }
+        if (!isMobileView) return;
 
-        // Get the main scrollable container
-        scrollContainer = findScrollContainer();
+        scrollTargets = findScrollTargets();
 
-        // Add click handlers to glass tabs
         var glassContainer = document.querySelector('.umat-glass-tabs');
         if (glassContainer) {
             var tabs = glassContainer.querySelectorAll('.umat-glass-tab');
@@ -136,22 +105,26 @@ define([], function() {
             }
         }
 
-        // Add scroll listeners
-        // Listen on window scroll
-        window.addEventListener('scroll', handleScroll, { passive: true });
-
-        // Listen on specific scrollable container if not window
-        if (scrollContainer && scrollContainer !== document.documentElement) {
-            scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+        for (var j = 0; j < scrollTargets.length; j++) {
+            scrollTargets[j].addEventListener('scroll', handleScroll, { passive: true });
         }
 
-        // Handle document scroll
-        document.addEventListener('scroll', handleScroll, { passive: true, capture: true });
-
-        // Update mobile view check on resize
         window.addEventListener('resize', handleResize);
 
-        console.log('UMaT mobile navbar initialized - scroll animations enabled');
+        // Re-scan scroll targets when overlay opens
+        var ov = document.querySelector('.umat-ov');
+        if (ov) {
+            var ovObserver = new MutationObserver(function() {
+                if (ov.classList.contains('open')) {
+                    scrollTargets = findScrollTargets();
+                    for (var k = 0; k < scrollTargets.length; k++) {
+                        scrollTargets[k].removeEventListener('scroll', handleScroll);
+                        scrollTargets[k].addEventListener('scroll', handleScroll, { passive: true });
+                    }
+                }
+            });
+            ovObserver.observe(ov, { attributes: true, attributeFilter: ['class'] });
+        }
     }
 
     return {
@@ -161,4 +134,3 @@ define([], function() {
         checkMobile: checkMobileView
     };
 });
-

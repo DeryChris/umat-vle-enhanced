@@ -47,8 +47,6 @@ HTML;
 window._umatSharedReady=new Promise(function(r){!function c(){typeof require==='function'?require(['local_umat_ai/umatshared','local_umat_ai/material_viewer'],function(s){for(var k in s)window[k]=s[k];var cb=document.getElementById('{$closeId}'),ov=document.getElementById('{$overlayId}');if(cb&&ov)cb.addEventListener('click',function(){ov.classList.remove('open');});r();}):setTimeout(c,20);}();});
 </script>
 
-/* Session tile on home tab */
-(function(){var t=document.getElementById('ws-recent-sess-tile')||document.querySelector('[id$="recent-sess-tile"]');if(t&&!t._cw){t._cw=1;t.style.cursor='pointer';t.addEventListener('click',function(){var sk=t.dataset.sessKey||'',cid=parseInt(t.dataset.sessCid||0),cn=t.dataset.sessCn||'';if(typeof resumeSess==='function'&&sk)resumeSess(sk,cid,cn);else{var b=document.querySelector('[data-pane="sessions"],[data-sb-tab="sessions"]');if(b)b.click();}});}})();
 /* Mobile nav: slide-to-hide + indicator pill */
 (function(){document.querySelectorAll('.umat-mob-tabs').forEach(function(nav){var pill=document.createElement('div');pill.className='umat-mob-pill';nav.appendChild(pill);function mv(){var a=nav.querySelector('.umat-mob-tab.active');if(!a)return;var nr=nav.getBoundingClientRect(),tr=a.getBoundingClientRect();pill.style.left=(tr.left-nr.left)+'px';pill.style.width=tr.width+'px';}mv();nav.addEventListener('click',function(e){if(e.target.closest('.umat-mob-tab'))setTimeout(mv,30);});var sc=nav.closest&&nav.closest('.umat-ov')&&nav.closest('.umat-ov').querySelector('.umat-ov-content'),ly=0,ti=false;function os(){if(ti)return;ti=true;requestAnimationFrame(function(){var y=sc?sc.scrollTop:window.scrollY;if(y-ly>40)nav.classList.add('nav-hidden');else if(ly-y>10)nav.classList.remove('nav-hidden');ly=y;ti=false;});}(sc||window).addEventListener('scroll',os,{passive:true});window.addEventListener('resize',mv);});})();
 /* Thumbnail loader */
@@ -591,15 +589,15 @@ function populateHomeTab(){
     var cont=document.getElementById('ws-recent-session');
     if(wrap)wrap.style.display='';
     if(cont){
-      cont.innerHTML='<div class="umat-session-tile" style="max-width:480px;">'
+      cont.innerHTML='<div class="umat-session-tile" id="ws-recent-sess-tile" data-sk="'+_umatEsc(s.session_key)+'" data-cid="'+((d.courses&&d.courses[0])?d.courses[0].id:courseId)+'" style="max-width:480px;">'
         +'<div class="umat-session-tile-hdr"><span class="umat-session-badge">'+_umatEsc(s.course_short||'')+'</span><span class="umat-session-time">'+_umatEsc(s.time_label)+'</span></div>'
         +'<h4>'+_umatEsc(s.course_name)+' AI Session</h4>'
         +'<p>'+_umatEsc(s.preview)+'</p>'
         +'<div class="umat-session-tile-foot"><span class="umat-session-meta"><span class="material-symbols-outlined">chat</span>'+s.msg_count+' messages</span>'
         +'<button class="umat-resume-btn" data-sk="'+_umatEsc(s.session_key)+'" type="button">Resume →</button></div></div>';
-      cont.querySelector('.umat-resume-btn').addEventListener('click',function(){
-        resumeSession(this.dataset.sk, d.courses&&d.courses[0]?d.courses[0].id:courseId);
-      });
+      var tile=cont.querySelector('.umat-session-tile');
+      tile.addEventListener('click',function(){resumeSession(tile.dataset.sk,tile.dataset.cid);});
+      cont.querySelector('.umat-resume-btn').addEventListener('click',function(e){e.stopPropagation();resumeSession(this.dataset.sk, d.courses&&d.courses[0]?d.courses[0].id:courseId);});
     }
   }
 }
@@ -3275,28 +3273,18 @@ HTML;
 
     public static function glassmorph_tab_bar(array $tabs, string $attrName, string $containerId): string {
         $realTabs = '';
-        $fakeIcons = '';
-        $i = 1;
         foreach ($tabs as $tab) {
             $active = !empty($tab['active']);
             $attr = htmlspecialchars($attrName, ENT_QUOTES);
             $val  = htmlspecialchars($tab['id'], ENT_QUOTES);
             $icon = htmlspecialchars($tab['icon'], ENT_QUOTES);
             $label = htmlspecialchars($tab['label'], ENT_QUOTES);
-
             $realTabs .= '<button class="umat-glass-tab' . ($active ? ' active' : '') . '" data-'
                 . $attr . '="' . $val . '" type="button">'
                 . '<span class="material-symbols-outlined">' . $icon . '</span>'
                 . '<span>' . $label . '</span></button>';
-
-            $fakeIcons .= '<div class="umat-glass-fake-box" data-glass-item="' . $i . '">'
-                . '<span class="material-symbols-outlined">' . $icon . '</span></div>';
-            $i++;
         }
-
         return '<div class="umat-glass-tabs" id="' . htmlspecialchars($containerId, ENT_QUOTES) . '">'
-            . '<div class="umat-glass-spot" data-glass></div>'
-            . '<div class="umat-glass-fake">' . $fakeIcons . '</div>'
             . '<div class="umat-glass-tabs-row">' . $realTabs . '</div>'
             . '</div>';
     }
