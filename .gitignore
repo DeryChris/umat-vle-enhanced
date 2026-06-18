@@ -195,6 +195,7 @@ moodle/local/umat_ai/amd/build/*
 .vs/
 .qodo
 .claude
+.blackbox
 
 # ============================================================
 # Agents

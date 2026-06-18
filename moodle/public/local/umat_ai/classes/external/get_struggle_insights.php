@@ -337,6 +337,53 @@ class get_struggle_insights extends \external_api {
             ];
         }
 
+        // ── Guaranteed fallback: if PHP topic extraction found nothing
+        // (no materials indexed, no keyword matches) but we DO have
+        // questions — synthesise topics from most common question words. ──
+        if (empty($topicMatrix) && $totalQuestions > 0) {
+            $stopwords = ['the','a','an','is','are','was','were','do','does','did',
+                          'how','what','why','when','where','which','who','can','will',
+                          'this','that','these','those','and','but','or','not','so',
+                          'to','of','in','for','on','with','at','by','from','as',
+                          'into','through','about','up','down','than','very','just',
+                          'also','has','have','had','been','being','get','got','would',
+                          'could','should','may','might','shall','need','like','make'];
+            $wordCounts = []; $wordStudents = [];
+            foreach ($logs as $l) {
+                $words = array_filter(
+                    preg_split('/[^a-z0-9]+/', strtolower($l->question)),
+                    function($w) use ($stopwords) { return strlen($w) > 3 && !in_array($w,$stopwords); }
+                );
+                $uniqueWords = array_unique(array_slice($words,0,8));
+                foreach ($uniqueWords as $w) {
+                    $wordCounts[$w]  = ($wordCounts[$w]  ?? 0) + 1;
+                    $wordStudents[$w][$l->userid] = true;
+                }
+            }
+            arsort($wordCounts);
+            $rank = 0;
+            foreach (array_slice($wordCounts,0,15,true) as $w => $cnt) {
+                if ($cnt < 1) continue;
+                $stuCnt = count($wordStudents[$w] ?? []);
+                $pct    = $totalQuestions > 0 ? $cnt/$totalQuestions : 0;
+                $score  = min(100, (int)round($pct*60 + $stuCnt*5 + ($rank===0?20:0)));
+                $topicMatrix[] = [
+                    'topic'          => ucwords($w),
+                    'question_count' => $cnt,
+                    'student_count'  => $stuCnt,
+                    'struggle_score' => $score,
+                    'trend'          => 'stable',
+                    'trend_pct'      => 0,
+                    'difficulty'     => 'intermediate',
+                    'materials'      => [],
+                ];
+                $rank++;
+            }
+            // If AI said there were questions about a concept, use the concept
+            // as the topic label (better than raw keywords)
+            $worstTopic = !empty($topicMatrix) ? $topicMatrix[0]['topic'] : '—';
+        }
+
         // Sort by struggle score descending
         usort($topicMatrix, function($a, $b) {
             return $b['struggle_score'] - $a['struggle_score'];

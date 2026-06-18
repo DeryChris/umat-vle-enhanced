@@ -67,7 +67,7 @@
 .umat-fab:hover .umat-fab-tip{opacity:1;}
 /* ==== COMPACT PANEL ==== */
 .umat-cp-ov{position:fixed!important;inset:0!important;z-index:9995!important;
-  background:rgba(15,23,15,0.18);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:none;justify-content:flex-end;}
+  background:transparent;display:none;justify-content:flex-end;}
 .umat-cp-ov.open{display:flex;animation:ufade .25s var(--u-cb) forwards;}
 .umat-cp{width:440px;max-width:96vw;height:100%;background:var(--u-sflo);
   backdrop-filter:blur(24px) saturate(190%);-webkit-backdrop-filter:blur(24px) saturate(190%);
@@ -75,7 +75,7 @@
   transform:translateX(100%);transition:transform .36s var(--u-cb);overflow:hidden;
   font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;border-radius:24px 0 0 24px;}
 .umat-cp-ov.open .umat-cp{transform:translateX(0);}
-.umat-cp-lec{width:480px;}
+.umat-cp-lec{width:480px;background:#f7fbf3!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
 /* Panel header */
 .umat-cp-hdr{background:linear-gradient(135deg,var(--u-p),var(--u-pb));color:var(--u-op);padding:15px 17px 12px;flex-shrink:0;}
 .umat-cp-hdr-row{display:flex;align-items:center;gap:11px;}
@@ -689,11 +689,7 @@
 @keyframes umat-ai-arrive{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
 @keyframes umat-caret-pulse{0%,100%{opacity:.25}50%{opacity:1}}
 .umat-ov,.umat-home-wrap,.umat-msgs,.umat-player-panel,.umat-pdf-viewer-wrap{background:radial-gradient(circle at 12% 8%,rgba(0,107,47,.08),transparent 32%),radial-gradient(circle at 86% 14%,rgba(228,201,135,.16),transparent 30%),var(--u-sf);}
-.umat-ov,.umat-cp-ov{background:#f7fbf3!important;background-color:#f7fbf3!important;}
-.umat-cp-ov.open{background:#f7fbf3!important;background-color:#f7fbf3!important;}
-.umat-cp-ov{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
-.umat-cp-ov::before{content:'';position:fixed;inset:0;background:#f7fbf3!important;z-index:0;opacity:1!important;pointer-events:none;}
-.umat-cp{position:relative;z-index:1;}
+.umat-ov{background:#f7fbf3!important;background-color:#f7fbf3!important;}
 .umat-ov.open,.umat-cp-ov.open{isolation:isolate;}
 .umat-cp,.umat-sb,.umat-content-hdr,.umat-player-top,.umat-player-right,.umat-input-area,.umat-cp-tabs,.umat-transcript,.umat-player-transcript,.umat-attach-drawer,.umat-pdf-viewer-bar{
   background:var(--u-glass);backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);

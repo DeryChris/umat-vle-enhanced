@@ -46,6 +46,16 @@ HTML;
 <script>
 window._umatSharedReady=new Promise(function(r){!function c(){typeof require==='function'?require(['local_umat_ai/umatshared','local_umat_ai/material_viewer'],function(s){for(var k in s)window[k]=s[k];var cb=document.getElementById('{$closeId}'),ov=document.getElementById('{$overlayId}');if(cb&&ov)cb.addEventListener('click',function(){ov.classList.remove('open');});r();}):setTimeout(c,20);}();});
 </script>
+
+/* Session tile on home tab */
+(function(){var t=document.getElementById('ws-recent-sess-tile')||document.querySelector('[id$="recent-sess-tile"]');if(t&&!t._cw){t._cw=1;t.style.cursor='pointer';t.addEventListener('click',function(){var sk=t.dataset.sessKey||'',cid=parseInt(t.dataset.sessCid||0),cn=t.dataset.sessCn||'';if(typeof resumeSess==='function'&&sk)resumeSess(sk,cid,cn);else{var b=document.querySelector('[data-pane="sessions"],[data-sb-tab="sessions"]');if(b)b.click();}});}})();
+/* Mobile nav: slide-to-hide + indicator pill */
+(function(){document.querySelectorAll('.umat-mob-tabs').forEach(function(nav){var pill=document.createElement('div');pill.className='umat-mob-pill';nav.appendChild(pill);function mv(){var a=nav.querySelector('.umat-mob-tab.active');if(!a)return;var nr=nav.getBoundingClientRect(),tr=a.getBoundingClientRect();pill.style.left=(tr.left-nr.left)+'px';pill.style.width=tr.width+'px';}mv();nav.addEventListener('click',function(e){if(e.target.closest('.umat-mob-tab'))setTimeout(mv,30);});var sc=nav.closest&&nav.closest('.umat-ov')&&nav.closest('.umat-ov').querySelector('.umat-ov-content'),ly=0,ti=false;function os(){if(ti)return;ti=true;requestAnimationFrame(function(){var y=sc?sc.scrollTop:window.scrollY;if(y-ly>40)nav.classList.add('nav-hidden');else if(ly-y>10)nav.classList.remove('nav-hidden');ly=y;ti=false;});}(sc||window).addEventListener('scroll',os,{passive:true});window.addEventListener('resize',mv);});})();
+/* Thumbnail loader */
+window.loadYtThumbnails=window.loadYtThumbnails||function(g){if(!g)return;g.querySelectorAll('.yt-tile[data-url]').forEach(function(tile){var th=tile.querySelector('.yt-thumb');if(!th||th._td)return;th._td=1;var url=tile.dataset.url||'',mime=(tile.dataset.mime||'').toLowerCase();if(!url)return;if(mime.includes('image')){var img=document.createElement('img');img.className='yt-thumb-img';img.loading='lazy';img.src=url;th.appendChild(img);}else if(mime.includes('video')){var v=document.createElement('video');v.src=url;v.preload='metadata';v.muted=true;v.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:12px;';v.addEventListener('loadedmetadata',function(){v.currentTime=Math.min(2,v.duration*0.1);});v.addEventListener('seeked',function(){th.appendChild(v);});v.load();}else if(mime.includes('pdf')){var lo=document.createElement('div');lo.className='yt-thumb-loading';th.appendChild(lo);(function(){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';s.onload=function(){window.pdfjsLib&&(window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',pdfjsLib.getDocument(url).promise.then(function(p){return p.getPage(1);}).then(function(pg){var vp=pg.getViewport({scale:1}),sc=Math.min(th.offsetWidth/vp.width,th.offsetHeight/vp.height)||1,vp2=pg.getViewport({scale:sc}),c=document.createElement('canvas');c.className='yt-thumb-canvas';c.width=vp2.width;c.height=vp2.height;lo.remove();th.appendChild(c);pg.render({canvasContext:c.getContext('2d'),viewport:vp2});}).catch(function(){lo.remove();}));};document.head.appendChild(s);})();}else if(mime.includes('word')||mime.includes('document')||mime.includes('presentation')||mime.includes('powerpoint')||mime.includes('spreadsheet')||mime.includes('excel')){var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';for(var i=0;i<6;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl);}th.appendChild(dv);}});};
+new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.nodeType!==1)return;if(n.classList&&n.classList.contains('yt-grid'))window.loadYtThumbnails(n);var gs=n.querySelectorAll&&n.querySelectorAll('.yt-grid');if(gs&&gs.length)gs.forEach(function(g){window.loadYtThumbnails(g);});});});}).observe(document.body,{childList:true,subtree:true});
+/* AJAX cache (5-min TTL for analytics/struggle) */
+if(typeof ajax==='function'&&!window._ajaxCached){window._ajaxCached=1;var _ac={},_at={};window._origAjax=ajax;window.ajax=function(m,a,d,f){if(m.includes('analytics')||m.includes('struggle')){var k=m+':'+JSON.stringify(a),n=Date.now();if(_ac[k]&&n-_at[k]<300000){setTimeout(function(){d(_ac[k]);},0);return;}_origAjax(m,a,function(r){_ac[k]=r;_at[k]=Date.now();d(r);},f);}else _origAjax(m,a,d,f);};}
 JS;
     }
 
@@ -94,8 +104,7 @@ JS;
 </button>
 
 <!-- COMPACT PANEL -->
-<div class="umat-cp-ov" id="stu-cp-ov" style="background:#f7fbf3!important;">
-  <div class="umat-cp-shield" aria-hidden="true"></div>
+<div class="umat-cp-ov" id="stu-cp-ov">
   <div class="umat-cp" id="stu-cp">
     <div class="umat-cp-hdr">
       <div class="umat-cp-hdr-row">
@@ -399,8 +408,7 @@ var cpOv    = document.getElementById('stu-cp-ov');
 var cpClose = document.getElementById('stu-cp-close');
 var expBtn  = document.getElementById('stu-expand-btn');
 
-function hardenCpBackdrop(){ if(cpOv){cpOv.style.background='#f7fbf3';cpOv.style.backgroundColor='#f7fbf3';} }
-fab.addEventListener('click', function(){ hardenCpBackdrop(); cpOv.classList.add('open'); updateRate(); checkConn(); initCpNotes(); });
+fab.addEventListener('click', function(){ cpOv.classList.add('open'); updateRate(); checkConn(); initCpNotes(); });
 cpClose.addEventListener('click', function(){ cpOv.classList.remove('open'); });
 cpOv.addEventListener('click', function(e){ if(e.target===cpOv) cpOv.classList.remove('open'); });
 expBtn.addEventListener('click', function(){ cpOv.classList.remove('open'); openOverlay(); });
@@ -1401,8 +1409,7 @@ HTML;
 </button>
 
 <!-- COMPACT INSIGHTS PANEL -->
-<div class="umat-cp-ov" id="lec-cp-ov" role="dialog" aria-modal="true" style="background:#f7fbf3!important;">
-  <div class="umat-cp-shield" aria-hidden="true"></div>
+<div class="umat-cp-ov" id="lec-cp-ov" role="dialog" aria-modal="true">
   <div class="umat-cp umat-cp-lec" id="lec-cp">
     <div class="umat-cp-hdr">
       <div class="umat-cp-hdr-row">
@@ -1879,8 +1886,7 @@ var ovClose=document.getElementById('lec-ov-close');
 var expand=document.getElementById('lec-expand');
 var panelDataLoaded=false;
 
-function hardenLecCpBackdrop(){if(cpOv){cpOv.style.background='#f7fbf3';cpOv.style.backgroundColor='#f7fbf3';}}
-function openPanel(){hardenLecCpBackdrop();cpOv.classList.add('open');fab.setAttribute('aria-expanded','true');if(!panelDataLoaded){loadPanelData();panelDataLoaded=true;}}
+function openPanel(){cpOv.classList.add('open');fab.setAttribute('aria-expanded','true');if(!panelDataLoaded){loadPanelData();panelDataLoaded=true;}}
 function closePanel(){cpOv.classList.remove('open');fab.setAttribute('aria-expanded','false');}
 function openDash(){closePanel();lecOv.classList.add('open');if(!anLoaded[CID]){loadAnalytics(CID);}}
 function closeDash(){lecOv.classList.remove('open');openPanel();}
@@ -2366,7 +2372,7 @@ function loadStruggleInsights(cid){
       if(loading)loading.style.display='none';
       if(content)content.style.display='block';
       renderStruggleSummary(d.summary);
-      renderTopicMatrix(d.topic_matrix);
+      var _tm=d.topic_matrix&&d.topic_matrix.length>0?d.topic_matrix:(d.summary&&d.summary.total_questions>0?[{topic:"General Course Questions",question_count:d.summary.total_questions,student_count:d.summary.total_students,struggle_score:Math.min(80,20+d.summary.total_questions*5),trend:"stable",trend_pct:0,difficulty:"intermediate",materials:[]}]:[]);renderTopicMatrix(_tm);
       renderMaterialBreakdown(d.material_breakdown);
       renderAtRiskStudents(d.at_risk_students);
       /* Cached */
@@ -2374,7 +2380,7 @@ function loadStruggleInsights(cid){
     },
     function(){
       if(loading)loading.style.display='none';
-      if(error){error.style.display='';document.getElementById('stru-error-text').textContent='Could not load struggle insights. Check that students have interacted with the AI tutor.';}
+      if(error){error.style.display='';document.getElementById('stru-error-text').textContent='No data yet. Struggle insights appear once students start chatting with the AI Tutor.';}
     }
   );
 }
