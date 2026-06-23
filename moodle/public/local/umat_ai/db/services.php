@@ -104,6 +104,28 @@ $functions = [
         'description' => 'Get available tag sources (sessions, materials) for a course', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
+
+    /* ---- Issue Reports ---- */
+    'local_umat_ai_submit_issue' => [
+        'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'submit_issue',
+        'description' => 'Student submits an issue/complaint', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_get_student_issues' => [
+        'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'get_student_issues',
+        'description' => 'Student views their own issue reports', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_get_course_issues' => [
+        'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'get_course_issues',
+        'description' => 'Lecturer views all issues for a course', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_update_issue_status' => [
+        'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'update_issue_status',
+        'description' => 'Lecturer updates issue status and notes', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
 ];
 
 $services = [

@@ -123,6 +123,18 @@
   }
 }
 
+/* Active indicator pill */
+.umat-glass-pill {
+  position: absolute;
+  bottom: 0;
+  height: 3px;
+  border-radius: 2px 2px 0 0;
+  background: var(--u-p);
+  transition: left .28s cubic-bezier(.4,0,.2,1), width .28s cubic-bezier(.4,0,.2,1);
+  z-index: 0;
+  pointer-events: none;
+}
+
 /* Desktop: hidden */
 @media (min-width: 640px) {
   .umat-glass-tabs {

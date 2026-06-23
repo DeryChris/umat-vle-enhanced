@@ -162,5 +162,29 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026061400, 'local', 'umat_ai');
     }
 
+    if ($oldversion < 2026061500) {
+        // Create umat_ai_issue_reports table
+        $irt = new xmldb_table('umat_ai_issue_reports');
+        if (!$dbman->table_exists($irt)) {
+            $irt->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $irt->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $irt->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $irt->add_field('category', XMLDB_TYPE_CHAR, '30', null, XMLDB_NOTNULL, null, 'other');
+            $irt->add_field('topic', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $irt->add_field('description', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
+            $irt->add_field('status', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'open');
+            $irt->add_field('lecturer_notes', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $irt->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $irt->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $irt->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $irt->add_index('user_course', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid']);
+            $irt->add_index('course_status', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'status']);
+            $dbman->create_table($irt);
+        }
+
+        // Also add the new reportissue capability
+        upgrade_plugin_savepoint(true, 2026061500, 'local', 'umat_ai');
+    }
+
     return true;
 }

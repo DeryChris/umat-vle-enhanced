@@ -111,6 +111,60 @@ function local_umat_ai_create_jwt(array $claims, int $ttl = 300): string {
 }
 
 /**
+ * Filter material file IDs based on the user's access to associated course modules.
+ *
+ * Uses Moodle's availability/restriction system (dates, group, grade, completion)
+ * to determine which materials the user can access. Materials linked to course
+ * modules with restrictions the user doesn't meet are excluded.
+ *
+ * @param int      $courseid    Course ID
+ * @param int      $userid      Moodle user ID
+ * @param int[]|null $fileIds   Optional subset of file IDs to check; null = all course materials
+ * @return int[]                Filtered file IDs the user can access
+ */
+function local_umat_ai_filter_accessible_materials(int $courseid, int $userid, ?array $fileIds = null): array {
+    global $DB;
+
+    $course = get_course($courseid);
+    $modinfo = get_fast_modinfo($course, $userid);
+
+    $params = ['courseid' => $courseid];
+    if ($fileIds !== null && !empty($fileIds)) {
+        [$insql, $inparams] = $DB->get_in_or_equal($fileIds, SQL_PARAMS_NAMED, 'fid');
+        $params = array_merge($params, $inparams);
+        $records = $DB->get_records_select('umat_ai_materials',
+            "courseid = :courseid AND fileid $insql", $params, '', 'fileid,cmid');
+    } else {
+        $records = $DB->get_records('umat_ai_materials', $params, '', 'fileid,cmid');
+    }
+
+    if (empty($records)) {
+        return $fileIds ?? [];
+    }
+
+    $allowed = [];
+    foreach ($records as $rec) {
+        $cmid = (int)$rec->cmid;
+        if ($cmid === 0) {
+            // Course-level or manual upload — no CM restriction.
+            $allowed[] = (int)$rec->fileid;
+            continue;
+        }
+        try {
+            $cm = $modinfo->get_cm($cmid);
+            if ($cm->uservisible) {
+                $allowed[] = (int)$rec->fileid;
+            }
+        } catch (\moodle_exception $e) {
+            // CM not found in modinfo — treat as restricted.
+            continue;
+        }
+    }
+
+    return $allowed;
+}
+
+/**
  * Push student analytics event to the Python AI engine.
  * Uses JWT when a service token is configured, otherwise Bearer token.
  *

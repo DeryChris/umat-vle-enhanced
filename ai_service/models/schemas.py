@@ -36,10 +36,25 @@ class QueryRequest(BaseModel):
     material_ids:  List[int] = Field(default=[], description="If non-empty, restrict RAG search to these material IDs only")
 
 
+class QuizQuestion(BaseModel):
+    type:        str = "objective"  # "objective" or "theoretical"
+    question:    str
+    options:     Optional[List[str]] = None
+    correct:     Optional[int] = None
+    explanation: Optional[str] = None
+    answer_hint: Optional[str] = None
+
+
+class QuizData(BaseModel):
+    title:     str = "Practice Quiz"
+    questions: List[QuizQuestion]
+
+
 class QueryResponse(BaseModel):
     answer:     str
     sources:    List[str] = []
     confidence: float = 0.0
+    quiz_data:  Optional[QuizData] = None
 
 
 class IndexMaterialRequest(BaseModel):

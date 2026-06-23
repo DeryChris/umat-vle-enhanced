@@ -232,7 +232,7 @@
 
 /* Safety: also scope yt tiles by direct grid IDs in case .umat-ov ancestor check fails */
 #ws-video-grid.yt-grid, #ws-courses-grid.yt-grid, #ws-lib-grid.yt-grid,
-#lec-courses-grid.yt-grid, #lec-lib-grid.yt-grid,
+#lec-courses-grid.yt-grid, #lec-lib-grid.yt-grid, #lec-an-course-grid.yt-grid, #stru-course-grid.yt-grid,
 #hub-lec-grid.yt-grid, #hub-courses-grid.yt-grid, #hub-lib-grid.yt-grid,
 #stu-lec-grid.yt-grid, #stu-courses-grid.yt-grid, #stu-lib-grid.yt-grid {
   display: grid !important;

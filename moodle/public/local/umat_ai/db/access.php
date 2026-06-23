@@ -43,6 +43,15 @@ $capabilities = [
         ],
     ],
 
+    // Report issues about course content (students).
+    'local/umat_ai:reportissue' => [
+        'captype'      => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes'   => [
+            'student' => CAP_ALLOW,
+        ],
+    ],
+
     // View the lecturer analytics dashboard (teachers + managers only).
     'local/umat_ai:viewanalytics' => [
         'captype'      => 'read',

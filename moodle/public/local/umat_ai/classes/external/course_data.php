@@ -145,19 +145,35 @@ class course_data extends \external_api {
             self::get_course_materials_parameters(), ['courseid' => $courseid]);
         $cid = (int)$params['courseid'];
 
-        // Collect context IDs.
+        // Collect context IDs and build context→CM map for access filtering.
         $contextIds = [];
+        $ctxToCm = []; // context_id → cm_id (0 = course context)
+        $modinfo = null;
+        $isStudent = false;
+
         if ($cid > 0) {
             $ctx = \context_course::instance($cid);
             self::validate_context($ctx);
             require_capability('local/umat_ai:chatwithai', $ctx);
             $contextIds[] = (int)$ctx->id;
-            $modCtxIds = $DB->get_fieldset_sql(
-                "SELECT ctx.id FROM {context} ctx
+            $ctxToCm[(int)$ctx->id] = 0;
+
+            $moduleCtxRows = $DB->get_records_sql(
+                "SELECT ctx.id, cm.id AS cmid FROM {context} ctx
                  JOIN {course_modules} cm ON cm.id = ctx.instanceid
                  WHERE ctx.contextlevel = :lv AND cm.course = :cid",
                 ['lv' => CONTEXT_MODULE, 'cid' => $cid]);
-            foreach ($modCtxIds as $mid) $contextIds[] = (int)$mid;
+            foreach ($moduleCtxRows as $row) {
+                $contextIds[] = (int)$row->id;
+                $ctxToCm[(int)$row->id] = (int)$row->cmid;
+            }
+
+            // Filter materials for students only (lecturers see all).
+            if (!has_capability('local/umat_ai:viewanalytics', $ctx)) {
+                $isStudent = true;
+                $course = get_course($cid);
+                $modinfo = get_fast_modinfo($course, $USER->id);
+            }
         } else {
             $courses = enrol_get_users_courses($USER->id, true, 'id');
             foreach ($courses as $c) {
@@ -178,6 +194,19 @@ class course_data extends \external_api {
         ];
 
         foreach ($contextIds as $ctxId) {
+            // For students: skip files from inaccessible course modules.
+            if ($isStudent) {
+                $cmId = $ctxToCm[$ctxId] ?? 0;
+                if ($cmId > 0) {
+                    try {
+                        $cm = $modinfo->get_cm($cmId);
+                        if (!$cm->uservisible) continue;
+                    } catch (\moodle_exception $e) {
+                        continue;
+                    }
+                }
+            }
+
             foreach ($areas as [$component, $filearea]) {
                 $files = $fs->get_area_files($ctxId, $component, $filearea,
                                               false, 'timemodified DESC', false);

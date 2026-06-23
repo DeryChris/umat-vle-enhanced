@@ -54,7 +54,18 @@ class ai_query extends \external_api {
                     'sources' => [], 'error' => 'rate_limit', 'remaining' => 0];
         }
 
-        // Call AI service — only pass what the schema expects.
+        // Filter materials by access restrictions (security boundary).
+        // When the student explicitly selected materials, always pass the accessible
+        // subset (even if empty) so the AI never searches unrestricted materials.
+        // When no selection was made, pass all accessible materials.
+        $mids = $params['material_ids'] ?? [];
+        $hadSelection = !empty($mids);
+        $accessible = local_umat_ai_filter_accessible_materials(
+            $params['courseid'], $USER->id,
+            $hadSelection ? array_map('intval', $mids) : null
+        );
+
+        // Call AI service — only pass accessible material IDs.
         $cfg    = local_umat_ai_get_service_config();
         $client = new \curl(['ignoresecurity' => true]);
         $client->setHeader(['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['token']]);
@@ -66,9 +77,10 @@ class ai_query extends \external_api {
             'user_id'     => (int) $USER->id,
             'session_key' => $params['session_key'] ?: '',
         ];
-        $mids = $params['material_ids'] ?? [];
-        if (!empty($mids)) {
-            $req['material_ids'] = array_map('intval', $mids);
+        if (!empty($accessible)) {
+            $req['material_ids'] = $accessible;
+        } elseif ($hadSelection) {
+            $req['material_ids'] = [];
         }
         $raw = $client->post($cfg['url'] . '/api/v1/query', json_encode($req));
         $result = json_decode($raw, true);

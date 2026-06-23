@@ -85,11 +85,14 @@ class index_course_materials extends \core\task\scheduled_task {
             ['component' => 'local_umat_ai', 'filearea' => 'materials'],
         ];
 
-        // Collect all module contexts for this course
+        // Collect all module contexts for this course with CM ID mapping
         $modinfo = get_fast_modinfo($course);
+        $contextMap = [$courseCtx->id => 0]; // course context has no cmid
         $contexts = [$courseCtx];
         foreach ($modinfo->get_cms() as $cm) {
-            $contexts[] = \context_module::instance($cm->id);
+            $cmCtx = \context_module::instance($cm->id);
+            $contexts[] = $cmCtx;
+            $contextMap[$cmCtx->id] = $cm->id;
         }
 
         $seen = [];
@@ -121,15 +124,16 @@ class index_course_materials extends \core\task\scheduled_task {
 
                         if ($existing) {
                             $existing->is_indexed  = 1;
+                            $existing->cmid        = $contextMap[$ctx->id] ?? $existing->cmid;
                             $existing->timeindexed = time();
                             $DB->update_record('umat_ai_materials', $existing);
                         } else {
                             $DB->insert_record('umat_ai_materials', (object)[
-                                'courseid'   => $courseid,
-                                'cmid'       => 0,
-                                'fileid'     => $file->get_id(),
-                                'filename'   => $file->get_filename(),
-                                'is_indexed' => 1,
+                                'courseid'    => $courseid,
+                                'cmid'        => $contextMap[$ctx->id] ?? 0,
+                                'fileid'      => $file->get_id(),
+                                'filename'    => $file->get_filename(),
+                                'is_indexed'  => 1,
                                 'timeindexed' => time(),
                                 'timecreated' => time(),
                             ]);

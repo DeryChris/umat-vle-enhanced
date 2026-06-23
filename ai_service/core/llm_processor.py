@@ -110,25 +110,26 @@ RESPONSE:"""
 
 TASK_GUIDANCE = {
     "quiz": """
-TASK: Generate 5 high-quality multiple-choice practice questions based strictly on the COURSE CONTEXT.
+TASK: Generate practice questions based strictly on the COURSE CONTEXT to test understanding.
 
-REQUIREMENTS:
-- Each question must test understanding of key concepts, definitions, or applications from the materials
-- Vary question difficulty — include 2 straightforward, 2 moderate, and 1 challenging
-- Use this exact format for each question:
-  Q[number]: [Clear, unambiguous question text]
-  A) [Option A]
-  B) [Option B]
-  C) [Option C]
-  D) [Option D]
-  Answer: [Single letter: A, B, C, or D]
-  Explanation: [One sentence explaining why this is correct and briefly why others are incorrect]
+CRITICAL — You MUST structure your response as follows:
 
-CONSTRAINTS:
-- Only use information explicitly present in the COURSE CONTEXT
-- Ensure all questions are educationally valuable and test meaningful understanding
-- Make distractors (incorrect options) plausible but clearly wrong based on the context
-- Keep language clear and appropriate for undergraduate level
+1. Begin with a brief 1-2 sentence text introduction (e.g. "Here are some practice questions on [topic] to test your understanding.")
+2. Then immediately output a JSON code block with the quiz structure. The JSON code block MUST be wrapped in triple backticks with the `json` marker.
+
+The quiz JSON must follow this exact schema:
+```json
+{"quiz":{"title":"Practice Quiz: [Topic Name]","questions":[{"type":"objective","question":"Question text?","options":["Opt A","Opt B","Opt C","Opt D"],"correct":0,"explanation":"Why this is correct."},{"type":"theoretical","question":"Explain X in your own words.","answer_hint":"Key points: definition, example, importance"}]}}
+```
+
+RULES:
+- Generate an appropriate number of questions (5 if the student did not specify). Mix objective (multiple-choice) and theoretical (explain/essay) questions.
+- Objective questions: exactly 4 options, `correct` is 0-based index of the right answer, include a one-sentence `explanation`.
+- Theoretical questions: include `answer_hint` with key points the answer should cover.
+- Vary difficulty: ~2 straightforward, ~2 moderate, ~1 challenging.
+- Only use information explicitly present in the COURSE CONTEXT.
+- Make distractors (wrong options) plausible but clearly incorrect based on the materials.
+- Keep language clear and appropriate for undergraduate level.
 """,
     "exam_prep": """
 TASK: Create a comprehensive exam preparation guide based on the COURSE CONTEXT.

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="local/umat_ai/db" VERSION="20260518" COMMENT="UMaT AI plugin v1.2 schema">
+<XMLDB PATH="local/umat_ai/db" VERSION="2026061500" COMMENT="UMaT AI plugin v1.6.1 schema">
   <TABLES>
 
     <TABLE NAME="umat_ai_sessions" COMMENT="Tracks BBB recordings being processed by the AI service">
@@ -155,6 +155,65 @@
       <INDEXES>
         <INDEX NAME="user_course_type" UNIQUE="false" FIELDS="userid,courseid,event_type"/>
         <INDEX NAME="timecreated" UNIQUE="false" FIELDS="timecreated"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_issue_reports" COMMENT="Student-submitted issues/complaints about course content">
+      <FIELDS>
+        <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid"      TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="courseid"    TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="category"    TYPE="char" LENGTH="30"  NOTNULL="true" DEFAULT="other"/>
+        <FIELD NAME="topic"       TYPE="char" LENGTH="255" NOTNULL="false"/>
+        <FIELD NAME="description" TYPE="text" NOTNULL="true"/>
+        <FIELD NAME="status"      TYPE="char" LENGTH="20"  NOTNULL="true" DEFAULT="open"/>
+        <FIELD NAME="lecturer_notes" TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS><KEY NAME="primary" TYPE="primary" FIELDS="id"/></KEYS>
+      <INDEXES>
+        <INDEX NAME="user_course" UNIQUE="false" FIELDS="userid,courseid"/>
+        <INDEX NAME="course_status" UNIQUE="false" FIELDS="courseid,status"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_notes" COMMENT="Student's own notes with tagging support">
+      <FIELDS>
+        <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid"      TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="courseid"    TYPE="int"  LENGTH="10"  NOTNULL="false"/>
+        <FIELD NAME="title"       TYPE="char" LENGTH="255" NOTNULL="true" DEFAULT=""/>
+        <FIELD NAME="content"     TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="pinned"      TYPE="int"  LENGTH="1"   NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="user_fk" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="userid_courseid" UNIQUE="false" FIELDS="userid,courseid"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_note_tags" COMMENT="Polymorphic tags on notes">
+      <FIELDS>
+        <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="noteid"      TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="tag_type"    TYPE="char" LENGTH="50"  NOTNULL="true"/>
+        <FIELD NAME="tag_id"      TYPE="int"  LENGTH="10"  NOTNULL="false"/>
+        <FIELD NAME="tag_label"   TYPE="char" LENGTH="255" NOTNULL="true"/>
+        <FIELD NAME="tag_value"   TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="note_fk" TYPE="foreign" FIELDS="noteid" REFTABLE="umat_ai_notes" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="tag_type" UNIQUE="false" FIELDS="tag_type,tag_id"/>
       </INDEXES>
     </TABLE>
 

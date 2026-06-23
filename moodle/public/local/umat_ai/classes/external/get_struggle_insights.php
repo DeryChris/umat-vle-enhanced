@@ -11,6 +11,7 @@ namespace local_umat_ai\external;
 
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->libdir . '/externallib.php');
+require_once($CFG->dirroot . '/local/umat_ai/lib.php');
 
 class get_struggle_insights extends \external_api {
 
@@ -22,7 +23,7 @@ class get_struggle_insights extends \external_api {
     }
 
     public static function get_struggle_insights($courseid, $days = 60) {
-        global $DB;
+        global $DB, $CFG;
 
         $params = self::validate_parameters(
             self::get_struggle_insights_parameters(),
@@ -486,21 +487,6 @@ class get_struggle_insights extends \external_api {
             $secId = (int)$sec->id;
             if (!isset($sectionedMats[$secId]) || empty($sectionedMats[$secId])) continue;
             $sectionName = $sec->name ?: 'Week ' . ($sec->section + 1);
-            // Count unique students across materials in this section
-            $secStudents = [];
-            foreach ($sectionedMats[$secId] as $mat) {
-                $stmt = $DB->get_records_sql(
-                    "SELECT DISTINCT l.userid
-                       FROM {umat_ai_chat_logs} l
-                      WHERE l.courseid = :cid AND l.role = 'student' AND l.timecreated > :since
-                        AND l.id IN (
-                          SELECT cl.id FROM {umat_ai_chat_logs} cl
-                          WHERE cl.courseid = :cid2 AND cl.timecreated > :since2 AND cl.role = 'student'
-                        )",
-                    ['cid' => $cid, 'since' => $since, 'cid2' => $cid, 'since2' => $since]
-                );
-                // Simplified: just use existing data
-            }
             $sectionList[] = [
                 'section_name' => $sectionName,
                 'section_num'  => (int)$sec->section + 1,
@@ -586,11 +572,15 @@ class get_struggle_insights extends \external_api {
             $user = $DB->get_record('user', ['id' => $uid], 'id, firstname, lastname');
             if (!$user) continue;
 
+            $issueCnt = $DB->count_records_select('umat_ai_issue_reports',
+                'userid = ? AND courseid = ? AND timecreated > ?', [$uid, $cid, $since]);
+
             $atRiskStudents[] = [
                 'userid'          => $uid,
                 'fullname'        => fullname($user),
                 'profileimageurl' => (new \moodle_url('/user/pix.php/' . $uid . '/f1.jpg'))->out(false),
                 'question_count'  => $qCnt,
+                'issue_count'     => (int)$issueCnt,
                 'struggle_topics' => $stuTopicNames,
                 'risk_score'      => $riskScore,
                 'risk_level'      => $riskLevel,
@@ -673,6 +663,7 @@ class get_struggle_insights extends \external_api {
     $cfg = \local_umat_ai_get_service_config();
     if (!empty($cfg['token'])) {
         try {
+            require_once($CFG->libdir . '/filelib.php');
             $client = new \curl(['ignoresecurity' => true]);
             $client->setHeader(['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['token']]);
             $client->setopt(['CURLOPT_TIMEOUT' => 15]);
@@ -748,14 +739,35 @@ class get_struggle_insights extends \external_api {
                     }
                 }
             }
-        } catch (\Exception $e) {
-            // AI service unavailable; fall back to PHP-only data
+        } catch (\Throwable $e) {
             $aiServiceUsed = false;
         }
     }
 
     // ──────────────────────────────────────────────────────────────
-    // 11. Summary & return
+    // 11. Issue report enrichment
+    // ──────────────────────────────────────────────────────────────
+    $totalIssues   = 0;
+    $openIssues    = 0;
+    $topIssueTopics = [];
+    $issueRecords = $DB->get_records_select('umat_ai_issue_reports', 'courseid = ? AND timecreated > ?', [$cid, $since], 'timecreated DESC');
+    if ($issueRecords) {
+        $totalIssues = count($issueRecords);
+        $topicCounts = [];
+        foreach ($issueRecords as $ir) {
+            if ($ir->status === 'open' || $ir->status === 'in_review') {
+                $openIssues++;
+            }
+            if ($ir->topic !== '') {
+                $topicCounts[$ir->topic] = ($topicCounts[$ir->topic] ?? 0) + 1;
+            }
+        }
+        arsort($topicCounts);
+        $topIssueTopics = array_slice(array_keys($topicCounts), 0, 5);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 12. Summary & return
     // ──────────────────────────────────────────────────────────────
     return [
         'topic_matrix'       => $topicMatrix,
@@ -763,10 +775,13 @@ class get_struggle_insights extends \external_api {
         'recording_struggle' => $recordingStruggle,
         'at_risk_students'   => $atRiskStudents,
         'summary' => [
-            'total_questions' => $totalQuestions,
-            'total_students'  => $uniqueStudents,
-            'worst_topic'     => $worstTopic,
-            'ai_service_used' => $aiServiceUsed,
+            'total_questions'  => $totalQuestions,
+            'total_students'   => $uniqueStudents,
+            'worst_topic'      => $worstTopic,
+            'ai_service_used'  => $aiServiceUsed,
+            'total_issues'     => $totalIssues,
+            'open_issues'      => $openIssues,
+            'top_issue_topics' => $topIssueTopics,
         ],
     ];
 
@@ -842,6 +857,7 @@ class get_struggle_insights extends \external_api {
                     'fullname'        => new \external_value(PARAM_TEXT),
                     'profileimageurl' => new \external_value(PARAM_URL),
                     'question_count'  => new \external_value(PARAM_INT),
+                    'issue_count'     => new \external_value(PARAM_INT),
                     'struggle_topics' => new \external_multiple_structure(
                         new \external_value(PARAM_TEXT)
                     ),
@@ -852,10 +868,15 @@ class get_struggle_insights extends \external_api {
                 ])
             ),
             'summary' => new \external_single_structure([
-                'total_questions' => new \external_value(PARAM_INT),
-                'total_students'  => new \external_value(PARAM_INT),
-                'worst_topic'     => new \external_value(PARAM_TEXT),
-                'ai_service_used' => new \external_value(PARAM_BOOL),
+                'total_questions'  => new \external_value(PARAM_INT),
+                'total_students'   => new \external_value(PARAM_INT),
+                'worst_topic'      => new \external_value(PARAM_TEXT),
+                'ai_service_used'  => new \external_value(PARAM_BOOL),
+                'total_issues'     => new \external_value(PARAM_INT),
+                'open_issues'      => new \external_value(PARAM_INT),
+                'top_issue_topics' => new \external_multiple_structure(
+                    new \external_value(PARAM_TEXT)
+                ),
             ]),
         ]);
     }

@@ -2,6 +2,7 @@
 # Shared query preparation — used by sync and streaming endpoints
 # ============================================================
 
+import json
 import random
 import re
 import logging
@@ -10,7 +11,7 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
-from models.schemas import QueryRequest
+from models.schemas import QueryRequest, QuizData
 from models.database import ChatLog
 from core.llm_processor import TASK_GUIDANCE
 from rag.hybrid_retriever import get_hybrid_retriever
@@ -69,11 +70,16 @@ def detect_task(question: str) -> str:
             return "chitchat"
 
     quiz_patterns = [
-        "quiz", "test me", "practice question", "practice test", "practice problems",
+        "quiz", "test me", "test my", "test myself", "test my knowledge",
+        "practice question", "practice test", "practice problems", "practice",
         "mcq", "multiple choice", "true or false", "fill in the blank",
         "make me a quiz", "create a quiz", "generate questions", "test questions",
         "practice with questions", "question bank", "sample questions",
         "exam questions", "past papers", "past questions", "revision questions",
+        "ask me questions", "give me questions", "prepare some questions",
+        "question me", "drill me", "challenge me", "test my understanding",
+        "check my understanding", "assess my knowledge", "evaluate me",
+        "give me practice", "question session", "quick test",
     ]
     exam_patterns = [
         "exam", "midterm", "final", "prepare for", "get ready for",
@@ -81,7 +87,8 @@ def detect_task(question: str) -> str:
         "exam preparation", "exam prep", "how to study", "study tips",
         "what to study", "important topics", "key concepts", "focus areas",
         "exam tips", "pass the exam", "exam strategy", "exam techniques",
-        "review session", "cram", "last minute",
+        "review session", "cram", "last minute", "test preparation",
+        "study material", "what to focus on",
     ]
     explain_patterns = [
         "explain", "explain like i'm 5", "eli5", "break down", "walk me through",
@@ -110,6 +117,25 @@ def detect_task(question: str) -> str:
     if any(p in q for p in explain_patterns):
         return "explain"
     return "qa"
+
+
+_QUIZ_JSON_PATTERN = re.compile(r"```(?:json)?\s*(\{.*\"quiz\"\s*:.*\})\s*```", re.DOTALL)
+
+
+def extract_quiz_json(text: str) -> Optional[dict]:
+    """Scan the LLM response text for a JSON quiz code block and parse it.
+    Returns the parsed quiz dict (i.e. the value of the 'quiz' key), or None."""
+    m = _QUIZ_JSON_PATTERN.search(text)
+    if not m:
+        return None
+    try:
+        data = json.loads(m.group(1))
+        quiz = data.get("quiz")
+        if quiz and isinstance(quiz.get("questions"), list) and len(quiz["questions"]) > 0:
+            return quiz
+    except (json.JSONDecodeError, KeyError, TypeError):
+        pass
+    return None
 
 
 def _get_chitchat_response(question: str) -> str:

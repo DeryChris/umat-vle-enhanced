@@ -133,7 +133,11 @@ define([], function() {
     // ─── Hide typing indicator ─────────────────────── //
     function _umatHideTyping(tid) {
         var e = document.getElementById(tid);
-        if (e) e.parentNode.removeChild(e);
+        if (e && e.parentNode) e.parentNode.removeChild(e);
+        document.querySelectorAll('.umat-typing').forEach(function(el){
+            var r = el.closest('[id^="typ_"]');
+            if (r && r.parentNode) r.parentNode.removeChild(r);
+        });
     }
 
     // ─── Append source chips to a streaming bubble ─── //
@@ -216,8 +220,17 @@ define([], function() {
                         ensureBubble();
                         accumulated += payload.text || '';
                         scheduleRender();
+                    } else if (event === 'quiz_data') {
+                        if (typeof opts.onQuizData === 'function') {
+                            opts.onQuizData(payload);
+                        } else if (typeof window._umatOnQuizData === 'function') {
+                            window._umatOnQuizData(payload);
+                        }
+                        accumulated = accumulated.replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
+                        scheduleRender();
                     } else if (event === 'done') {
                         if (payload.answer) accumulated = payload.answer;
+                        accumulated = accumulated.replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
                         ensureBubble();
                         renderContent();
                         _umatAppendSources(bubbleEl, payload.sources || []);

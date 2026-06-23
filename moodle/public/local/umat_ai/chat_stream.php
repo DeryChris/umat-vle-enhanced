@@ -74,6 +74,19 @@ if (!is_array($materialids)) {
     $materialids = [];
 }
 
+// Filter materials by access restrictions (security boundary).
+// For students, only accessible materials are sent to the AI service.
+$hadSelection = !empty($materialids);
+$accessible = local_umat_ai_filter_accessible_materials(
+    $courseid, $USER->id,
+    $hadSelection ? $materialids : null
+);
+// When the student explicitly selected materials, always pass the
+// accessible subset (even if empty) so the AI never searches
+// unrestricted materials.
+$finalMaterialIds = !empty($accessible) ? $accessible
+    : ($hadSelection ? [] : $materialids);
+
 $cfg = local_umat_ai_get_service_config();
 if ($cfg['url'] === '' || $cfg['token'] === '') {
     header('Content-Type: text/event-stream');
@@ -91,7 +104,7 @@ $payload = json_encode([
     'course_id'    => $courseid,
     'user_id'      => (int) $USER->id,
     'session_key'  => $sessionkey,
-    'material_ids' => array_map('intval', $materialids),
+    'material_ids' => $finalMaterialIds,
     'role'         => $role,
 ]);
 

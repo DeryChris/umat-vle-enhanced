@@ -174,10 +174,11 @@
 }
 .struggle-topic-body {
   display: flex;
-  gap: 14px;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 2px;
   font-size: 12px;
   color: var(--u-onsv);
+  flex-wrap: wrap;
 }
 .struggle-topic-body strong {
   color: var(--u-ons);
@@ -910,6 +911,521 @@
   .umat-drawer-recent-chip {
     font-size: 9px;
     padding: 2px 6px;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   OVERVIEW (Composite Analytics / Struggle)
+   ═══════════════════════════════════════════ */
+#lec-an-overview, #stru-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 4px 20px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+.ov-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
+}
+.ov-kpi {
+  background: var(--u-sf);
+  border: 1px solid var(--u-olv);
+  border-radius: var(--u-r12);
+  padding: 16px 14px;
+  text-align: center;
+}
+.ov-kpi-icon {
+  width: 36px;height:36px;
+  border-radius: 50%;
+  display: inline-flex;align-items:center;justify-content:center;
+  margin-bottom: 8px;font-size:18px;
+}
+.ov-kpi-val {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--u-ons);
+  line-height: 1.2;
+}
+.ov-kpi-sub {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--u-ol);
+}
+.ov-kpi-lbl {
+  font-size: 11px;
+  color: var(--u-ol);
+  margin-top: 4px;
+}
+.ov-kpi-pct {
+  font-weight: 600;
+  color: var(--u-p);
+}
+.ov-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.ov-card {
+  background: var(--u-sf);
+  border: 1px solid var(--u-olv);
+  border-radius: var(--u-r12);
+  overflow: hidden;
+}
+.ov-card.ov-full {
+  grid-column: 1/-1;
+}
+.ov-card-hdr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--u-ons);
+  border-bottom: 1px solid var(--u-olv);
+}
+.ov-card-hdr .material-symbols-outlined {
+  font-size: 16px;
+  color: var(--u-p);
+}
+/* Horizontal bar chart */
+.ov-chart-bars {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ov-bar-row {
+  display: grid;
+  grid-template-columns: minmax(70px,auto) 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+.ov-bar-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ov-bar-course {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--u-ons);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+.ov-bar-val {
+  font-size: 10px;
+  color: var(--u-ol);
+}
+.ov-bar-track {
+  height: 20px;
+  background: var(--u-bg);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.ov-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width .8s ease;
+}
+.ov-bar-an { background: linear-gradient(90deg,var(--u-p),rgba(0,200,83,.6)); }
+.ov-bar-stru { background: linear-gradient(90deg,var(--u-warn,#f59e0b),rgba(239,68,68,.6)); }
+.ov-bar-score {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--u-ol);
+  text-align: right;
+}
+/* Donut */
+.ov-donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+}
+.ov-donut {
+  flex-shrink: 0;
+  width: 120px;
+  height: 120px;
+}
+.ov-donut svg { width:100%;height:100%; }
+.ov-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--u-ons);
+}
+.ov-donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ov-dot {
+  width: 10px;height:10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.ov-donut-legend-item strong {
+  margin-left: auto;
+  font-weight: 700;
+}
+/* Canvas chart */
+.ov-chart-canvas {
+  padding: 10px 16px 6px;
+  position: relative;
+}
+.ov-chart-canvas canvas {
+  width: 100%;
+  height: 140px;
+}
+/* Questions */
+.ov-q-list {
+  padding: 8px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ov-q-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--u-bg);
+  border-radius: var(--u-r8);
+}
+.ov-q-rank {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--u-p);
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.ov-q-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--u-ons);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ov-q-count {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--u-ol);
+  flex-shrink: 0;
+}
+.ov-q-count .material-symbols-outlined {
+  font-size: 14px;
+}
+/* Loading / Placeholder */
+.ov-loading {
+  text-align: center;
+  padding: 20px;
+  color: var(--u-ol);
+  font-size: 13px;
+}
+.ov-placeholder {
+  text-align: center;
+  padding: 32px 20px;
+  color: var(--u-ol);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.ov-placeholder .material-symbols-outlined {
+  font-size: 32px;
+  color: var(--u-olv);
+}
+/* Struggle overview topics */
+.ov-topic-mini {
+  padding: 8px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ov-topic-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--u-bg);
+  border-radius: var(--u-r8);
+}
+.ov-topic-dot {
+  width: 8px;height:8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ov-topic-info {
+  flex: 1;
+  min-width: 0;
+}
+.ov-topic-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--u-ons);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ov-topic-meta {
+  font-size: 10px;
+  color: var(--u-ol);
+}
+.ov-topic-score {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.ov-topic-score.struggle-high { background: rgba(239,68,68,.12); color: var(--u-ter); }
+.ov-topic-score.struggle-medium { background: rgba(245,158,11,.12); color: var(--u-warn,#f59e0b); }
+.ov-topic-score.struggle-low { background: rgba(0,135,61,.1); color: var(--u-p); }
+/* Struggle overview students */
+.ov-student-list {
+  padding: 8px 16px 16px;
+  overflow-x: auto;
+}
+.ov-student-hdr {
+  display: grid;
+  grid-template-columns: 1.5fr .8fr 60px 80px 80px;
+  gap: 10px;
+  padding: 8px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--u-ol);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  border-bottom: 1px solid var(--u-olv);
+  margin-bottom: 4px;
+}
+.ov-student-row {
+  display: grid;
+  grid-template-columns: 1.5fr .8fr 60px 80px 80px;
+  gap: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--u-ons);
+  align-items: center;
+  border-radius: var(--u-r6);
+}
+.ov-student-row:hover {
+  background: var(--u-bg);
+}
+.ov-student-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+.ov-student-avatar {
+  width: 24px;height:24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.ov-student-course {
+  font-size: 11px;
+  color: var(--u-ol);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Responsive */
+@media (max-width: 800px) {
+  .ov-kpi-row { grid-template-columns: repeat(2,1fr); }
+  .ov-2col { grid-template-columns: 1fr; }
+}
+@media (max-width: 500px) {
+  .ov-kpi-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ov-kpi { padding: 12px 10px; }
+  .ov-kpi-val { font-size: 18px; }
+  .ov-donut-wrap { flex-direction: column; align-items: center; }
+  .ov-student-hdr, .ov-student-row { grid-template-columns: 1fr 60px 60px 60px; }
+  .ov-student-hdr span:nth-child(2), .ov-student-row .ov-student-course { display: none; }
+}
+
+/* ═══════════════════════════════════════════
+   STRUGGLE TAB — INFO-GRAPHICS & CHARTS
+   ═══════════════════════════════════════════ */
+
+/* --- SVG Score Ring --- */
+.stru-svg-ring {
+  flex-shrink: 0;
+}
+
+/* --- Severity Donut KPI (overview) --- */
+.stru-donut-kpi {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px;
+  min-width: 100px;
+}
+.stru-donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stru-donut-svg {
+  flex-shrink: 0;
+}
+.stru-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--u-onsv);
+  white-space: nowrap;
+}
+.stru-legend-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.stru-donut-legend strong {
+  color: var(--u-ons);
+  margin-left: 2px;
+}
+
+/* --- Enhanced KPI cards (per-course summary) --- */
+.struggle-summary-bar {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--u-onsv);
+}
+.stru-kpi-card {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--u-sflo);
+  border: 1px solid var(--u-olv);
+  border-radius: var(--u-r10);
+  transition: box-shadow .15s, transform .15s;
+}
+.stru-kpi-card:hover {
+  box-shadow: 0 2px 12px rgba(0,0,0,.05);
+  transform: translateY(-1px);
+}
+.stru-kpi-click {
+  cursor: pointer;
+}
+.stru-kpi-click:hover {
+  border-color: var(--u-ter);
+}
+.stru-kpi-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.stru-kpi-icon .material-symbols-outlined {
+  font-size: 20px;
+}
+.stru-kpi-q {
+  background: rgba(0,107,47,.1);
+  color: #006b2f;
+}
+.stru-kpi-s {
+  background: rgba(59,130,246,.1);
+  color: #2563eb;
+}
+.stru-kpi-w {
+  background: rgba(239,68,68,.1);
+  color: #dc2626;
+}
+.stru-kpi-i {
+  background: rgba(245,158,11,.1);
+  color: #d97706;
+}
+.stru-kpi-body {
+  min-width: 0;
+}
+.stru-kpi-val {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--u-ons);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stru-kpi-lbl {
+  font-size: 11px;
+  color: var(--u-ol);
+  line-height: 1.3;
+}
+
+/* --- Enhanced topic stat icons --- */
+.stru-topic-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--u-onsv);
+}
+.stru-topic-stat .material-symbols-outlined {
+  font-size: 14px;
+  color: var(--u-ol);
+}
+.stru-topic-stat strong {
+  color: var(--u-ons);
+  font-size: 13px;
+}
+.struggle-topic-body-sub {
+  font-size: 11px;
+  color: var(--u-ol);
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+
+/* --- Topic card score ring layout --- */
+/* .struggle-score-wrap already defined above */
+
+/* --- Summary bar responsive --- */
+@media (max-width: 700px) {
+  .stru-kpi-card {
+    min-width: calc(50% - 6px);
+    flex: none;
+  }
+  .stru-donut-wrap {
+    flex-direction: column;
+  }
+  .struggle-summary-bar {
+    gap: 6px;
   }
 }
 

@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from models.schemas import QueryRequest, QueryResponse
+from models.schemas import QueryRequest, QueryResponse, QuizData
 from models.database import get_db
 from middleware.auth import verify_token
 from core.llm_processor import LLMProcessor
-from api.v1.query_pipeline import prepare_query, log_chat
+from api.v1.query_pipeline import prepare_query, log_chat, extract_quiz_json
 from collections import defaultdict
 from threading import Lock
 import time
@@ -99,6 +99,11 @@ async def query_course_ai_stream(
         answer = "".join(answer_parts).strip()
         elapsed_ms = (time.time() - start_time) * 1000
         log_chat(db, request, answer, prepared.sources, elapsed_ms)
+
+        quiz_data = extract_quiz_json(answer)
+        if quiz_data is not None:
+            yield _sse("quiz_data", {"quiz": quiz_data})
+
         yield _sse("done", {
             "answer": answer,
             "sources": prepared.sources,
@@ -160,4 +165,18 @@ async def query_course_ai(
 
     elapsed_ms = (time.time() - start_time) * 1000
     log_chat(db, request, answer, prepared.sources, elapsed_ms)
-    return QueryResponse(answer=answer, sources=prepared.sources, confidence=prepared.confidence)
+
+    quiz_raw = extract_quiz_json(answer)
+    quiz_data = None
+    if quiz_raw is not None:
+        try:
+            quiz_data = QuizData(**quiz_raw)
+        except Exception as e:
+            logger.warning(f"Failed to parse quiz_data: {e}")
+
+    return QueryResponse(
+        answer=answer,
+        sources=prepared.sources,
+        confidence=prepared.confidence,
+        quiz_data=quiz_data,
+    )

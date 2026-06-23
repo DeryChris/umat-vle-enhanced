@@ -43,6 +43,8 @@ define([], function() {
             isNavbarHidden = false;
             glassContainer.classList.remove('umat-navbar-hidden');
         }
+        var content = document.querySelector('.umat-ov-content');
+        if (content) content.style.paddingBottom = '80px';
     }
 
     function hideNavbar() {
@@ -51,6 +53,8 @@ define([], function() {
             isNavbarHidden = true;
             glassContainer.classList.add('umat-navbar-hidden');
         }
+        var content = document.querySelector('.umat-ov-content');
+        if (content) content.style.paddingBottom = '16px';
     }
 
     function handleScroll(e) {
@@ -116,11 +120,13 @@ define([], function() {
         if (ov) {
             var ovObserver = new MutationObserver(function() {
                 if (ov.classList.contains('open')) {
-                    scrollTargets = findScrollTargets();
-                    for (var k = 0; k < scrollTargets.length; k++) {
-                        scrollTargets[k].removeEventListener('scroll', handleScroll);
-                        scrollTargets[k].addEventListener('scroll', handleScroll, { passive: true });
-                    }
+                    setTimeout(function() {
+                        scrollTargets = findScrollTargets();
+                        for (var k = 0; k < scrollTargets.length; k++) {
+                            scrollTargets[k].removeEventListener('scroll', handleScroll);
+                            scrollTargets[k].addEventListener('scroll', handleScroll, { passive: true });
+                        }
+                    }, 100);
                 }
             });
             ovObserver.observe(ov, { attributes: true, attributeFilter: ['class'] });
