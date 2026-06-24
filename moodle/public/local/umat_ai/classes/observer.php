@@ -42,6 +42,7 @@ class observer {
         if ($gradepercent !== null && $gradepercent < self::STRUGGLE_GRADE_THRESHOLD) {
             $topic = self::resolve_module_label($cmid);
             self::upsert_struggle_context($userid, $courseid, $cmid, $topic, 'quiz_failure', $gradepercent);
+            self::purge_struggle_cache($courseid);
             self::push_analytics_update($userid, $courseid, 'quiz_submitted', [
                 'cmid'           => $cmid,
                 'topic'          => $topic,
@@ -84,6 +85,7 @@ class observer {
             $topic = self::resolve_module_label($cmid);
             $score = min(100, ($viewcount - self::STRUGGLE_VIEW_THRESHOLD) * 15 + 40);
             self::upsert_struggle_context($userid, $courseid, $cmid, $topic, 'repeated_views', $score);
+            self::purge_struggle_cache($courseid);
             self::push_analytics_update($userid, $courseid, 'resource_viewed', [
                 'cmid'           => $cmid,
                 'topic'          => $topic,
@@ -119,6 +121,7 @@ class observer {
         if ($gradepercent !== null && $gradepercent < self::STRUGGLE_GRADE_THRESHOLD) {
             $topic = self::resolve_module_label($cmid);
             self::upsert_struggle_context($userid, $courseid, $cmid, $topic, 'assignment_failure', $gradepercent);
+            self::purge_struggle_cache($courseid);
             self::push_analytics_update($userid, $courseid, 'submission_graded', [
                 'cmid'           => $cmid,
                 'topic'          => $topic,
@@ -130,6 +133,21 @@ class observer {
     }
 
     // ── Internal helpers ────────────────────────────────────────
+
+    /**
+     * Purge the Moodle struggle-insights cache for a course so the
+     * lecturer dashboard picks up the new data on next load.
+     */
+    private static function purge_struggle_cache(int $courseid): void {
+        try {
+            $cache = \cache::make('local_umat_ai', 'struggle_insights');
+            foreach ([30, 60] as $days) {
+                $cache->delete("struggle_{$courseid}_{$days}");
+            }
+        } catch (\Throwable $e) {
+            // Cache purging is best-effort.
+        }
+    }
 
     private static function log_activity(int $userid, int $courseid, int $cmid,
                                          string $eventtype, array $payload): void {

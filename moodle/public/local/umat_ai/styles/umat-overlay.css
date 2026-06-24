@@ -793,4 +793,179 @@
 .umat-quiz-card-btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,107,47,.25);}
 .umat-quiz-card-btn:active{transform:translateY(0) scale(.96);}
 .umat-quiz-card-btn .material-symbols-outlined{font-size:18px;}
+body.umat-body-lock{overflow:hidden;}
+
+/* ── My Progress Tab ── */
+.prog-kpi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.prog-kpi {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 120px;
+  padding: 12px 14px;
+  border-radius: var(--u-r12);
+  background: var(--u-sflo);
+  border: 1px solid var(--u-olv);
+}
+.prog-kpi-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.prog-kpi-icon.pk-q { background: rgba(99,102,241,.12); color: #6366f1; }
+.prog-kpi-icon.pk-w { background: rgba(251,191,36,.12); color: #d97706; }
+.prog-kpi-icon.pk-s { background: rgba(22,163,74,.12); color: #16a34a; }
+.prog-kpi-icon.pk-i { background: rgba(220,38,38,.12); color: #dc2626; }
+.prog-kpi-body { min-width: 0; }
+.prog-kpi-val { font-size: 18px; font-weight: 800; color: var(--u-ons); line-height: 1.2; }
+.prog-kpi-lbl { font-size: 10px; color: var(--u-ol); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+
+.prog-ai-rec {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--u-r12);
+  background: linear-gradient(135deg, rgba(99,102,241,.06), rgba(168,85,247,.06));
+  border: 1px solid rgba(99,102,241,.15);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--u-ons);
+  margin-bottom: 12px;
+}
+
+/* Weekly chart */
+.prog-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 100px;
+  padding: 10px 0;
+}
+.prog-chart-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  height: 100%;
+  justify-content: flex-end;
+}
+.prog-chart-bar {
+  width: 28px;
+  border-radius: 5px 5px 2px 2px;
+  background: linear-gradient(180deg, var(--u-p), var(--u-pb));
+  opacity: .8;
+  transition: height .3s;
+  min-height: 4px;
+}
+.prog-chart-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--u-ol);
+  text-transform: uppercase;
+}
+.prog-chart-val {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--u-ons);
+}
+
+/* Struggle topics list */
+.prog-struggle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.prog-struggle-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--u-r10);
+  background: var(--u-sflo);
+  border: 1px solid var(--u-olv);
+  font-size: 12px;
+}
+.prog-struggle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.prog-struggle-info {
+  flex: 1;
+  min-width: 0;
+}
+.prog-struggle-topic {
+  display: block;
+  font-weight: 700;
+  color: var(--u-ons);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prog-struggle-course {
+  display: block;
+  font-size: 10px;
+  color: var(--u-ol);
+}
+.prog-struggle-reason {
+  font-size: 10px;
+  color: var(--u-ol);
+  text-align: right;
+  flex-shrink: 0;
+}
+.prog-struggle-score {
+  font-size: 14px;
+  font-weight: 800;
+  width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Issue status summary */
+.prog-issue-stats {
+  display: flex;
+  gap: 8px;
+}
+.prog-issue-stat {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  border-radius: var(--u-r10);
+  background: var(--u-sflo);
+  border: 1px solid var(--u-olv);
+}
+.prog-issue-num {
+  display: block;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.prog-issue-lbl {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--u-ol);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-top: 2px;
+}
+
+@media(max-width:600px){
+  .prog-kpi { min-width: calc(50% - 4px); }
+  .prog-chart-bar { width: 20px; }
+}
 

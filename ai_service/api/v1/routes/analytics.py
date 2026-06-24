@@ -286,3 +286,99 @@ async def student_risk(
     except Exception as e:
         logger.error(f"Student risk error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Course Health Report ─────────────────────────────────────
+
+COURSE_HEALTH_PROMPT = """You are an educational analytics assistant producing a comprehensive course health report for a university lecturer.
+
+Given the following course analytics data, produce a natural-language report that a lecturer can understand at a glance.
+
+Course data:
+{course_data_json}
+
+Respond with a JSON object:
+{{
+  "overall_health": "<healthy|moderate|struggling>",
+  "summary": "<2-3 sentence overall assessment>",
+  "key_findings": ["<finding 1>", "<finding 2>", ...],
+  "worst_topic_analysis": "<brief analysis of the most problematic topic>",
+  "student_risk_summary": "<summary of at-risk student patterns>",
+  "recommendations": ["<recommendation 1>", "<recommendation 2>", ...],
+  "event_pattern_insight": "<if events exist, what the pattern suggests; otherwise empty string>"
+}}
+
+Keep the report concise and actionable. Focus on patterns the lecturer can actually do something about.
+"""
+
+
+class CourseHealthResponse(BaseModel):
+    overall_health: str
+    summary: str
+    key_findings: List[str]
+    worst_topic_analysis: str
+    student_risk_summary: str
+    recommendations: List[str]
+    event_pattern_insight: str
+
+
+@router.post("/api/v1/analytics/course-health", response_model=CourseHealthResponse)
+async def course_health(
+    health_data: dict,
+    _ = Depends(verify_token),
+):
+    try:
+        course_data_json = json.dumps(health_data, indent=2)
+        prompt = COURSE_HEALTH_PROMPT.format(course_data_json=course_data_json)
+        result = _call_llm(prompt, max_chars=4096)
+        parsed = _parse_llm_json(result)
+        return CourseHealthResponse(**parsed)
+    except json.JSONDecodeError:
+        logger.error(f"LLM returned invalid JSON: {result}")
+        raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
+    except Exception as e:
+        logger.error(f"Course health error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Student Personal Progress Recommendation ────────────────
+
+STUDENT_PROGRESS_PROMPT = """You are a supportive educational coach. A student has shared their learning progress data. Provide a brief, encouraging, personalized recommendation to help them improve.
+
+Student data:
+{student_data_json}
+
+Respond with a JSON object:
+{{
+  "recommendation": "<2-3 sentence personalized message. Be specific about their courses/topics of struggle. Encourage specific actions like reviewing materials, asking more questions on weak topics, or resolving open issues. Keep tone supportive and constructive.>"
+}}
+
+Focus on:
+- Their struggle topics and scores — suggest which topics need attention
+- Their question activity — encourage consistency if low, praise if high
+- Their open issues — suggest following up if any are unresolved
+- Overall patterns — identify if they're doing well or need a study plan
+"""
+
+
+class StudentProgressResponse(BaseModel):
+    recommendation: str
+
+
+@router.post("/api/v1/analytics/student-progress", response_model=StudentProgressResponse)
+async def student_progress(
+    progress_data: dict,
+    _ = Depends(verify_token),
+):
+    try:
+        student_data_json = json.dumps(progress_data, indent=2)
+        prompt = STUDENT_PROGRESS_PROMPT.format(student_data_json=student_data_json)
+        result = _call_llm(prompt, max_chars=2048)
+        parsed = _parse_llm_json(result)
+        return StudentProgressResponse(**parsed)
+    except json.JSONDecodeError:
+        logger.error(f"LLM returned invalid JSON: {result}")
+        raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
+    except Exception as e:
+        logger.error(f"Student progress error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

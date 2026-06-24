@@ -126,6 +126,13 @@ $functions = [
         'description' => 'Lecturer updates issue status and notes', 'type' => 'write', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
+
+    /* ---- Student Progress ---- */
+    'local_umat_ai_get_my_progress' => [
+        'classname'   => '\local_umat_ai\external\student_progress', 'methodname' => 'get_my_progress',
+        'description' => 'Student views their personal progress/struggle dashboard', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
 ];
 
 $services = [

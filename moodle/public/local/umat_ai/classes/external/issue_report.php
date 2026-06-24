@@ -16,7 +16,7 @@ class issue_report extends \external_api {
     public static function submit_issue_parameters() {
         return new \external_function_parameters([
             'courseid'    => new \external_value(PARAM_INT, 'Course ID'),
-            'category'    => new \external_value(PARAM_ALPHA, 'Category: concept_confusion|material_error|technical_issue|suggestion|other'),
+            'category'    => new \external_value(PARAM_ALPHAEXT, 'Category: concept_confusion|material_error|technical_issue|suggestion|other'),
             'topic'       => new \external_value(PARAM_TEXT, 'Optional topic label', VALUE_DEFAULT, ''),
             'description' => new \external_value(PARAM_RAW, 'Description of the issue'),
         ]);
@@ -36,6 +36,10 @@ class issue_report extends \external_api {
             $topic       = trim($params['topic'] ?? '');
             $description = trim($params['description']);
             $userid      = (int)$USER->id;
+
+            if (!$courseid) {
+                return ['success' => false, 'issue_id' => 0, 'message' => 'Please open a course page to submit an issue report.'];
+            }
 
             $context = \context_course::instance($courseid);
             self::validate_context($context);
@@ -93,9 +97,16 @@ class issue_report extends \external_api {
                 }
             }
 
+            // Purge struggle-insights cache so lecturer dashboard picks up the new issue.
+            try {
+                \cache::make('local_umat_ai', 'struggle_insights')->delete("struggle_{$courseid}_60");
+            } catch (\Throwable $e) {
+                // Best-effort.
+            }
+
             return ['success' => true, 'issue_id' => $id, 'message' => 'Issue reported successfully.'];
-        } catch (\Exception $e) {
-            return ['success' => false, 'issue_id' => 0, 'message' => 'Database error: ' . $e->getMessage()];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'issue_id' => 0, 'message' => 'Error: ' . $e->getMessage()];
         }
     }
 
@@ -118,45 +129,49 @@ class issue_report extends \external_api {
 
     public static function get_student_issues($courseid = 0) {
         global $DB, $USER;
-        $params = self::validate_parameters(self::get_student_issues_parameters(), ['courseid' => $courseid]);
-        $userid = (int)$USER->id;
+        try {
+            $params = self::validate_parameters(self::get_student_issues_parameters(), ['courseid' => $courseid]);
+            $userid = (int)$USER->id;
 
-        $sql  = 'SELECT * FROM {umat_ai_issue_reports} WHERE userid = ?';
-        $args = [$userid];
-        if (!empty($params['courseid'])) {
-            $sql   .= ' AND courseid = ?';
-            $args[] = (int)$params['courseid'];
+            $sql  = 'SELECT * FROM {umat_ai_issue_reports} WHERE userid = ?';
+            $args = [$userid];
+            if (!empty($params['courseid'])) {
+                $sql   .= ' AND courseid = ?';
+                $args[] = (int)$params['courseid'];
+            }
+            $sql .= ' ORDER BY timecreated DESC';
+
+            $rows = $DB->get_records_sql($sql, $args);
+            return array_values(array_map(function($r) {
+                return [
+                    'id'             => (int)$r->id,
+                    'courseid'       => (int)$r->courseid,
+                    'category'       => $r->category,
+                    'topic'          => $r->topic ?? '',
+                    'description'    => $r->description,
+                    'status'         => $r->status,
+                    'lecturer_notes' => $r->lecturer_notes ?? '',
+                    'timecreated'    => (int)$r->timecreated,
+                    'timemodified'   => (int)$r->timemodified,
+                ];
+            }, $rows ?: []));
+        } catch (\Throwable $e) {
+            return [];
         }
-        $sql .= ' ORDER BY timecreated DESC';
-
-        $rows = $DB->get_records_sql($sql, $args);
-        return array_map(function($r) {
-            return [
-                'id'             => (int)$r->id,
-                'courseid'       => (int)$r->courseid,
-                'category'       => $r->category,
-                'topic'          => $r->topic ?? '',
-                'description'    => $r->description,
-                'status'         => $r->status,
-                'lecturer_notes' => $r->lecturer_notes ?? '',
-                'timecreated'    => (int)$r->timecreated,
-                'timemodified'   => (int)$r->timemodified,
-            ];
-        }, $rows ?: []);
     }
 
     public static function get_student_issues_returns() {
         return new \external_multiple_structure(
             new \external_single_structure([
-                'id'             => \external_value::build(PARAM_INT, 'Issue ID'),
-                'courseid'       => \external_value::build(PARAM_INT, 'Course ID'),
-                'category'       => \external_value::build(PARAM_ALPHA, 'Category'),
-                'topic'          => \external_value::build(PARAM_TEXT, 'Optional topic'),
-                'description'    => \external_value::build(PARAM_RAW, 'Issue description'),
-                'status'         => \external_value::build(PARAM_ALPHA, 'Status: open|in_review|resolved|closed'),
-                'lecturer_notes' => \external_value::build(PARAM_RAW, 'Lecturer notes'),
-                'timecreated'    => \external_value::build(PARAM_INT, 'Created timestamp'),
-                'timemodified'   => \external_value::build(PARAM_INT, 'Modified timestamp'),
+                'id'             => new \external_value(PARAM_INT, 'Issue ID'),
+                'courseid'       => new \external_value(PARAM_INT, 'Course ID'),
+                'category'       => new \external_value(PARAM_ALPHAEXT, 'Category'),
+                'topic'          => new \external_value(PARAM_TEXT, 'Optional topic'),
+                'description'    => new \external_value(PARAM_RAW, 'Issue description'),
+                'status'         => new \external_value(PARAM_ALPHAEXT, 'Status: open|in_review|resolved|closed'),
+                'lecturer_notes' => new \external_value(PARAM_RAW, 'Lecturer notes'),
+                'timecreated'    => new \external_value(PARAM_INT, 'Created timestamp'),
+                'timemodified'   => new \external_value(PARAM_INT, 'Modified timestamp'),
             ])
         );
     }
@@ -167,12 +182,12 @@ class issue_report extends \external_api {
     public static function get_course_issues_parameters() {
         return new \external_function_parameters([
             'courseid' => new \external_value(PARAM_INT, 'Course ID'),
-            'status'   => new \external_value(PARAM_ALPHA, 'Filter by status (open|in_review|resolved|closed, empty=all)', VALUE_DEFAULT, ''),
+            'status'   => new \external_value(PARAM_ALPHAEXT, 'Filter by status (open|in_review|resolved|closed, empty=all)', VALUE_DEFAULT, ''),
         ]);
     }
 
     public static function get_course_issues($courseid, $status = '') {
-        global $DB;
+        global $DB, $PAGE;
         $params = self::validate_parameters(self::get_course_issues_parameters(), [
             'courseid' => $courseid,
             'status'   => $status,
@@ -203,7 +218,7 @@ class issue_report extends \external_api {
                 'id'             => (int)$r->id,
                 'userid'         => (int)$r->userid,
                 'fullname'       => fullname($r),
-                'userpicture'    => $userpic->get_url(new \moodle_url('/'))->out(false),
+                'userpicture'    => $userpic->get_url($PAGE)->out(false),
                 'category'       => $r->category,
                 'topic'          => $r->topic ?? '',
                 'description'    => $r->description,
@@ -220,17 +235,17 @@ class issue_report extends \external_api {
         return new \external_single_structure([
             'issues' => new \external_multiple_structure(
                 new \external_single_structure([
-                    'id'             => \external_value::build(PARAM_INT, 'Issue ID'),
-                    'userid'         => \external_value::build(PARAM_INT, 'Student user ID'),
-                    'fullname'       => \external_value::build(PARAM_TEXT, 'Student full name'),
-                    'userpicture'    => \external_value::build(PARAM_URL, 'Student avatar URL'),
-                    'category'       => \external_value::build(PARAM_ALPHA, 'Category'),
-                    'topic'          => \external_value::build(PARAM_TEXT, 'Optional topic'),
-                    'description'    => \external_value::build(PARAM_RAW, 'Issue description'),
-                    'status'         => \external_value::build(PARAM_ALPHA, 'Status'),
-                    'lecturer_notes' => \external_value::build(PARAM_RAW, 'Lecturer notes'),
-                    'timecreated'    => \external_value::build(PARAM_INT, 'Created timestamp'),
-                    'timemodified'   => \external_value::build(PARAM_INT, 'Modified timestamp'),
+                    'id'             => new \external_value(PARAM_INT, 'Issue ID'),
+                    'userid'         => new \external_value(PARAM_INT, 'Student user ID'),
+                    'fullname'       => new \external_value(PARAM_TEXT, 'Student full name'),
+                    'userpicture'    => new \external_value(PARAM_URL, 'Student avatar URL'),
+                    'category'       => new \external_value(PARAM_ALPHAEXT, 'Category'),
+                    'topic'          => new \external_value(PARAM_TEXT, 'Optional topic'),
+                    'description'    => new \external_value(PARAM_RAW, 'Issue description'),
+                    'status'         => new \external_value(PARAM_ALPHAEXT, 'Status'),
+                    'lecturer_notes' => new \external_value(PARAM_RAW, 'Lecturer notes'),
+                    'timecreated'    => new \external_value(PARAM_INT, 'Created timestamp'),
+                    'timemodified'   => new \external_value(PARAM_INT, 'Modified timestamp'),
                 ])
             ),
             'total' => new \external_value(PARAM_INT, 'Total count'),
@@ -243,7 +258,7 @@ class issue_report extends \external_api {
     public static function update_issue_status_parameters() {
         return new \external_function_parameters([
             'issue_id'      => new \external_value(PARAM_INT, 'Issue ID'),
-            'status'        => new \external_value(PARAM_ALPHA, 'New status: open|in_review|resolved|closed'),
+            'status'        => new \external_value(PARAM_ALPHAEXT, 'New status: open|in_review|resolved|closed'),
             'lecturer_notes' => new \external_value(PARAM_RAW, 'Optional lecturer notes', VALUE_DEFAULT, ''),
         ]);
     }

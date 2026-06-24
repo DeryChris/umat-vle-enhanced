@@ -1,8 +1,16 @@
+import hashlib
+import os
 from typing import List, Optional
+from diskcache import Cache
 from config import get_settings
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 settings = get_settings()
+
+# Disk-based LLM response cache (persists across restarts, LRU eviction).
+_cache_dir = os.path.join(os.path.dirname(__file__), '..', '.llm_cache')
+os.makedirs(_cache_dir, exist_ok=True)
+_llm_cache = Cache(_cache_dir, size_limit=500 * 1024 * 1024)  # 500 MB limit.
 
 
 def _make_llm(temperature: float):
@@ -228,10 +236,21 @@ class LLMProcessor:
         self.llm = _make_llm(temperature=0.3)
 
     def _invoke(self, prompt: str, temperature: float, max_chars: int) -> str:
+        # Build a deterministic cache key so identical prompts skip the LLM.
+        raw = f"{prompt}___{temperature}___{max_chars}"
+        key = hashlib.sha256(raw.encode()).hexdigest()
+        cached = _llm_cache.get(key)
+        if cached is not None:
+            return cached
+
         llm = _make_llm(temperature=temperature)
         prompt = prompt[:max_chars]
         result = llm.invoke(prompt)
-        return result.content.strip()
+        text = result.content.strip()
+
+        # Cache for 15 minutes.
+        _llm_cache.set(key, text, expire=900)
+        return text
 
     def generate_summary(self, transcript: str) -> str:
         prompt = SUMMARY_PROMPT.format(transcript=transcript)

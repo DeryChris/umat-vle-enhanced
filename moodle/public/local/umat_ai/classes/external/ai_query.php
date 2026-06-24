@@ -96,6 +96,14 @@ class ai_query extends \external_api {
                 'sources'     => json_encode($result['sources'] ?? []),
                 'timecreated' => time(),
             ]);
+
+            // Purge struggle-insights cache so lecturer dashboard picks up the new question.
+            try {
+                \cache::make('local_umat_ai', 'struggle_insights')->delete("struggle_{$params['courseid']}_60");
+            } catch (\Throwable $e) {
+                // Best-effort.
+            }
+
             return ['success' => true, 'answer' => $result['answer'], 'sources' => $result['sources'] ?? [],
                     'error' => '', 'remaining' => $remaining - 1];
         }

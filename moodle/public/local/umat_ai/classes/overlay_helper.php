@@ -85,6 +85,7 @@ JS;
             ['id' => 'courses',   'icon' => 'menu_book',     'label' => 'My Courses','active' => false],
             ['id' => 'library',   'icon' => 'local_library', 'label' => 'Library',   'active' => false],
             ['id' => 'my-notes',  'icon' => 'note_add',      'label' => 'My Notes',  'active' => false],
+            ['id' => 'my-progress','icon' => 'trending_up',  'label' => 'My Progress','active' => false],
             ['id' => 'sessions',  'icon' => 'chat_bubble',   'label' => 'Sessions',  'active' => false],
             ['id' => 'report-issue', 'icon' => 'flag',      'label' => 'Report Issue', 'active' => false],
         ];
@@ -99,6 +100,7 @@ JS;
             ['id' => 'courses',  'icon' => 'menu_book',   'label' => 'Courses',  'active' => false],
             ['id' => 'library',  'icon' => 'local_library','label' => 'Library',  'active' => false],
             ['id' => 'my-notes', 'icon' => 'note_add',    'label' => 'Notes',    'active' => false],
+            ['id' => 'my-progress','icon' => 'trending_up','label' => 'Progress','active' => false],
             ['id' => 'sessions', 'icon' => 'chat_bubble', 'label' => 'Sessions', 'active' => false],
             ['id' => 'report-issue', 'icon' => 'flag',   'label' => 'Report',  'active' => false],
         ];
@@ -142,6 +144,7 @@ JS;
       <button class="umat-cp-feature-tab" data-cp-open="lectures" type="button"><span class="material-symbols-outlined">play_circle</span><span>Lectures</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="courses" type="button"><span class="material-symbols-outlined">menu_book</span><span>Courses</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="library" type="button"><span class="material-symbols-outlined">local_library</span><span>Library</span></button>
+      <button class="umat-cp-feature-tab" data-cp-open="my-progress" type="button"><span class="material-symbols-outlined">trending_up</span><span>Progress</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="sessions" type="button"><span class="material-symbols-outlined">chat_bubble</span><span>Sessions</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="report-issue" type="button"><span class="material-symbols-outlined">flag</span><span>Report</span></button>
     </div>
@@ -450,6 +453,32 @@ JS;
       </div>
     </div>
 
+    <!-- My Progress pane -->
+    <div class="umat-tab-pane" data-tab="my-progress">
+      <div class="umat-content-hdr">
+        <h2><span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px;">trending_up</span>My Progress</h2>
+      </div>
+      <div class="umat-home-wrap" id="prog-body">
+        <div class="umat-empty" id="prog-loading"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading your progress&hellip;</p></div>
+        <div id="prog-content" style="display:none;">
+          <div class="prog-kpi-row" id="prog-kpis"></div>
+          <div id="prog-ai-recs" style="display:none;"></div>
+          <div class="umat-home-section">
+            <h3><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px;">bar_chart</span>Weekly Activity</h3>
+            <div id="prog-week-chart" class="prog-chart" style="margin-top:8px;"></div>
+          </div>
+          <div class="umat-home-section">
+            <h3><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px;">psychology</span>Struggle Topics</h3>
+            <div id="prog-struggle-list" class="prog-struggle-list" style="margin-top:8px;"></div>
+          </div>
+          <div class="umat-home-section">
+            <h3><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px;">flag</span>Issue Reports</h3>
+            <div id="prog-issues" style="margin-top:8px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /ov-content -->
 
   {$stuMobTabs}
@@ -477,6 +506,7 @@ var coursesLoaded  = false;
 var notesLoaded    = false;
 var sessionsLoaded = false;
 var reportLoaded = false;
+var progLoaded = false;
 var ov = document.getElementById('umat-student-ov');
 
 /* ---- FAB & compact panel ---- */
@@ -485,9 +515,11 @@ var cpOv    = document.getElementById('stu-cp-ov');
 var cpClose = document.getElementById('stu-cp-close');
 var expBtn  = document.getElementById('stu-expand-btn');
 
-fab.addEventListener('click', function(){ if(window.innerWidth<640){ cpOv.classList.remove('open'); ov.classList.add('open'); switchPane('home'); initHome(); } else { cpOv.classList.add('open'); } updateRate(); checkConn(); initCpNotes(); });
-cpClose.addEventListener('click', function(){ cpOv.classList.remove('open'); });
-cpOv.addEventListener('click', function(e){ if(e.target===cpOv) cpOv.classList.remove('open'); });
+function updateBodyLock(){document.body.classList.toggle('umat-body-lock',!(!document.querySelector('.umat-ov.open,.umat-cp-ov.open')));}
+
+fab.addEventListener('click', function(){ if(window.innerWidth<640){ cpOv.classList.remove('open'); ov.classList.add('open'); switchPane('home'); initHome(); } else { cpOv.classList.add('open'); } updateRate(); checkConn(); initCpNotes(); updateBodyLock(); });
+cpClose.addEventListener('click', function(){ cpOv.classList.remove('open'); updateBodyLock(); });
+cpOv.addEventListener('click', function(e){ if(e.target===cpOv){ cpOv.classList.remove('open'); updateBodyLock(); } });
 expBtn.addEventListener('click', function(){ cpOv.classList.remove('open'); openOverlay(); });
 
 document.getElementById('sb-new-btn').addEventListener('click', newSession);
@@ -512,8 +544,8 @@ function newSession(){
   try{sessionStorage.removeItem('qz_state');}catch(e){}
 }
 
-function openOverlay(){ ov.classList.add('open'); populateHomeTab(); }
-function closeOverlay(){ ov.classList.remove('open'); cpOv.classList.add('open'); }
+function openOverlay(){ ov.classList.add('open'); populateHomeTab(); updateBodyLock(); }
+function closeOverlay(){ ov.classList.remove('open'); cpOv.classList.add('open'); updateBodyLock(); }
 if(ov)ov.addEventListener('click',function(e){if(e.target===ov)closeOverlay();});
 
 /* Wire up the workspace close button */
@@ -542,7 +574,7 @@ function setCpFeatureActive(name){
 }
 function renderCpFeature(name){
   var meta={
-    home:['home','Home','Course snapshot'],lectures:['play_circle','Lectures','Recent recordings'],courses:['menu_book','Courses','Your enrolled courses'],library:['local_library','Library','Course materials'],sessions:['chat_bubble','Sessions','Recent AI chats'],'report-issue':['flag','Report Issue','Submit a complaint']
+    home:['home','Home','Course snapshot'],lectures:['play_circle','Lectures','Recent recordings'],courses:['menu_book','Courses','Your enrolled courses'],library:['local_library','Library','Course materials'],sessions:['chat_bubble','Sessions','Recent AI chats'],'report-issue':['flag','Report Issue','Submit a complaint'],'my-progress':['trending_up','My Progress','Personal learning insights']
   }[name]||['widgets','Feature','Quick view'];
   showCpPane('cp-feature');setCpFeatureActive(name);
   document.getElementById('cp-feature-icon').textContent=meta[0];document.getElementById('cp-feature-title').textContent=meta[1];document.getElementById('cp-feature-sub').textContent=meta[2];
@@ -553,14 +585,16 @@ function renderCpFeature(name){
   if(name==='lectures')return renderCpLectures(body);
   if(name==='library')return renderCpLibrary(body);
   if(name==='report-issue')return renderCpReportIssue(body);
+  if(name==='my-progress')return renderCpProgress(body);
 }
 function renderCpReportIssue(body){
+  if(!courseId){var c=(userData&&userData.courses)||[];if(!c.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses available.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course to report an issue:</div><div style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+c.slice(0,12).map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';body.querySelectorAll('.umat-chip').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;renderCpFeature('report-issue');});});return;}
   body.innerHTML='<div style="padding:14px;"><div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;color:var(--u-ol);display:block;margin-bottom:3px;">Category</label>'
     +'<select id="cp-issue-cat" style="width:100%;padding:7px 9px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;">'
     +'<option value="concept_confusion">Concept Confusion</option><option value="material_error">Material Error</option>'
     +'<option value="technical_issue">Technical Issue</option><option value="suggestion">Suggestion</option><option value="other">Other</option></select></div>'
     +'<div style="margin-bottom:12px;"><input type="text" id="cp-issue-topic" placeholder="Topic (optional)" style="width:100%;padding:7px 9px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;"></div>'
-    +'<div style="margin-bottom:12px;"><textarea id="cp-issue-desc" placeholder="Describe the issue…" rows="3" style="width:100%;padding:7px 9px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;resize:vertical;"></textarea></div>'
+    +'<div style="margin-bottom:12px;"><textarea id="cp-issue-desc" placeholder="Describe the issue\u2026" rows="3" style="width:100%;padding:7px 9px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;resize:vertical;"></textarea></div>'
     +'<button class="umat-btn-p" id="cp-issue-submit" type="button" style="width:100%;justify-content:center;font-size:12px;padding:8px;"><span class="material-symbols-outlined" style="font-size:16px;">send</span>Submit</button>'
     +'<div id="cp-issue-msg" style="margin-top:6px;font-size:11px;display:none;"></div></div>';
   document.getElementById('cp-issue-submit').addEventListener('click',function(){
@@ -569,11 +603,19 @@ function renderCpReportIssue(body){
     var desc=document.getElementById('cp-issue-desc').value.trim();
     var msg=document.getElementById('cp-issue-msg');
     if(desc.length<10){msg.textContent='Please provide more detail.';msg.style.display='block';msg.style.color='var(--u-ter)';return;}
-    var btn=this;btn.disabled=true;btn.textContent='Submitting…';
+    var btn=this;btn.disabled=true;btn.textContent='Submitting\u2026';
+    console.log('[cp-issue] submitting cat='+cat+' cid='+courseId);
     require(['core/ajax'],function(Ajax){
       Ajax.call([{methodname:'local_umat_ai_submit_issue',args:{courseid:courseId,category:cat,topic:topic,description:desc}}])[0]
-        .done(function(r){if(r.success){msg.textContent='Submitted!';msg.style.display='block';msg.style.color='var(--u-sec)';document.getElementById('cp-issue-topic').value='';document.getElementById('cp-issue-desc').value='';}else{msg.textContent=r.message||'Failed.';msg.style.display='block';msg.style.color='var(--u-ter)';}})
-        .fail(function(){msg.textContent='Connection error.';msg.style.display='block';msg.style.color='var(--u-ter)';})
+        .done(function(r){
+          console.log('[cp-issue] response',r);
+          if(r.success){msg.textContent='Submitted!';msg.style.display='block';msg.style.color='var(--u-sec)';document.getElementById('cp-issue-topic').value='';document.getElementById('cp-issue-desc').value='';}else{msg.textContent=r.message||'Failed.';msg.style.display='block';msg.style.color='var(--u-ter)';}
+        })
+        .fail(function(e){
+          console.log('[cp-issue] AJAX fail',e);
+          var errMsg=e&&(e.message||e.errorcode||e);
+          msg.textContent=errMsg||'Connection error.';msg.style.display='block';msg.style.color='var(--u-ter)';
+        })
         .always(function(){btn.disabled=false;btn.innerHTML='<span class="material-symbols-outlined" style="font-size:16px;">send</span>Submit';});
     });
   });
@@ -600,10 +642,32 @@ function renderCpSessions(body){
   body.querySelectorAll('[data-sk]').forEach(function(b){b.addEventListener('click',function(){sessionKey=b.dataset.sk;courseId=parseInt(b.dataset.cid)||courseId;showCpPane('cp-chat');_umatAppendAi('cp-msgs','Session resumed. Ask a follow-up question to continue.',[]);});});
 }
 function renderCpLectures(body){
+  if(!courseId){var c=(userData&&userData.courses)||[];if(!c.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses found.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course to view recordings:</div><div style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+c.slice(0,12).map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';body.querySelectorAll('.umat-chip').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;renderCpFeature('lectures');});});return;}
   require(['core/ajax'],function(Ajax){Ajax.call([{methodname:'local_umat_ai_get_course_recordings',args:{courseid:courseId}}])[0].done(function(r){var recs=r.recordings||r||[];if(!recs.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">videocam_off</span><p>No recordings yet.</p></div>';return;}body.innerHTML=recs.slice(0,10).map(function(v){return '<button class="umat-cp-list-card as-btn" type="button"><strong>'+_umatEsc(v.title||'Lecture Recording')+'</strong><p>'+_umatEsc(v.duration||v.time_label||'Recording available')+'</p></button>';}).join('');}).fail(function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load recordings.</p></div>';});});
 }
 function renderCpLibrary(body){
+  if(!courseId){var c=(userData&&userData.courses)||[];if(!c.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses found.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course to view materials:</div><div style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+c.slice(0,12).map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';body.querySelectorAll('.umat-chip').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;renderCpFeature('library');});});return;}
   require(['core/ajax'],function(Ajax){Ajax.call([{methodname:'local_umat_ai_get_course_materials',args:{courseid:courseId}}])[0].done(function(r){var mats=r.materials||[];if(!mats.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">folder_open</span><p>No materials indexed yet.</p></div>';return;}body.innerHTML=mats.slice(0,12).map(function(m){return '<button class="umat-cp-list-card as-btn" data-mid="'+m.id+'" type="button"><strong>'+_umatEsc(m.filename||m.name||'Material')+'</strong><p>'+_umatEsc(m.mimetype||m.type||'Course material')+'</p></button>';}).join('');}).fail(function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load materials.</p></div>';});});
+}
+function renderCpProgress(body){
+  require(['core/ajax'],function(Ajax){
+    Ajax.call([{methodname:'local_umat_ai_get_my_progress',args:{courseid:courseId||0,days:60}}])[0]
+      .done(function(d){
+        if(!d||!d.total_questions&&!d.struggle_topics.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">info</span><p>Start chatting with the AI tutor to see your progress!</p></div>';return;}
+        var avgStr=d.struggle_score||0;
+        var strLevel=avgStr>=60?'high':(avgStr>=30?'medium':'low');
+        var strColor=strLevel==='high'?'#dc2626':(strLevel==='medium'?'#d97706':'#16a34a');
+        body.innerHTML=
+          '<div class="umat-cp-mini-grid">'+
+            '<div class="umat-cp-mini-card"><span class="material-symbols-outlined">quiz</span><strong>'+(d.total_questions||0)+'</strong><small>Questions</small></div>'+
+            '<div class="umat-cp-mini-card"><span class="material-symbols-outlined">bar_chart</span><strong>'+(d.week_questions||0)+'</strong><small>This Week</small></div>'+
+            '<div class="umat-cp-mini-card"><span class="material-symbols-outlined">chat</span><strong>'+(d.total_sessions||0)+'</strong><small>Sessions</small></div>'+
+            '<div class="umat-cp-mini-card" style="color:'+strColor+';"><span class="material-symbols-outlined">psychology</span><strong>'+avgStr+'</strong><small>Struggle</small></div>'+
+          '</div>'+
+          (d.ai_recommendation?'<div class="umat-cp-list-card" style="margin-top:8px;background:linear-gradient(135deg, rgba(99,102,241,.06), rgba(168,85,247,.06));border:1px solid rgba(99,102,241,.12);"><span class="material-symbols-outlined" style="color:var(--u-p);vertical-align:middle;margin-right:4px;">auto_awesome</span><span style="font-size:11px;">'+_umatEsc(d.ai_recommendation)+'</span></div>':'');
+      })
+      .fail(function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load progress.</p></div>';});
+  });
 }
 
 /* ---- workspace tab switching ---- */
@@ -616,6 +680,7 @@ function switchToTab(name){
   if(name==='my-notes'   && !notesLoaded){   initNotesTab();  notesLoaded=true;    }
   if(name==='sessions'   && !sessionsLoaded){ loadSessions();  sessionsLoaded=true; }
   if(name==='report-issue' && !reportLoaded){ initReportIssueTab(); reportLoaded=true; }
+  if(name==='my-progress' && !progLoaded){ initProgressTab(); progLoaded=true; }
 }
 /* Select course: set context and switch to AI Tutor */
 function selectCourse(cid,cname){
@@ -1015,38 +1080,48 @@ if(cpInput)cpInput.addEventListener('keypress',function(e){if(e.key==='Enter'&&!
 
 /* ---- REPORT ISSUE ---- */
 function initReportIssueTab(){
-  var toggle=document.getElementById('ws-issue-toggle');
   var form=document.getElementById('ws-issue-form-wrap');
+  if(!courseId){var c=(userData&&userData.courses)||[];var list=document.getElementById('ws-issue-list');if(list){if(!c.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses available.</p></div>';}else{list.innerHTML='<div style="padding:14px;"><div style="font-size:11px;color:var(--u-ol);font-weight:600;margin-bottom:8px;">Select a course to report an issue:</div>'+c.map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button" style="margin:2px;">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';list.querySelectorAll('[data-cid]').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;initReportIssueTab();});});}}if(form)form.style.display='none';return;}
+  var toggle=document.getElementById('ws-issue-toggle');
   if(toggle) toggle.addEventListener('click',function(){form.style.display=form.style.display==='none'?'block':'none';});
   if(form) form.style.display='none';
   var submit=document.getElementById('ws-issue-submit');
-  if(submit) submit.addEventListener('click',function(){
-    var cat=document.getElementById('ws-issue-cat').value;
-    var topic=document.getElementById('ws-issue-topic').value.trim();
-    var desc=document.getElementById('ws-issue-desc').value.trim();
-    var msg=document.getElementById('ws-issue-msg');
-    if(desc.length<10){msg.textContent='Please provide a more detailed description (at least 10 characters).';msg.style.display='block';msg.style.color='var(--u-ter)';return;}
-    submit.disabled=true;submit.textContent='Submitting…';
-    require(['core/ajax'],function(Ajax){
-      Ajax.call([{methodname:'local_umat_ai_submit_issue',args:{courseid:courseId,category:cat,topic:topic,description:desc}}])[0]
-        .done(function(r){
-          if(r.success){
-            msg.textContent='Issue reported successfully!';msg.style.display='block';msg.style.color='var(--u-sec)';
-            document.getElementById('ws-issue-topic').value='';document.getElementById('ws-issue-desc').value='';
-            form.style.display='none';loadMyIssues();
-          }else{msg.textContent=r.message||'Failed to submit.';msg.style.display='block';msg.style.color='var(--u-ter)';}
-        })
-        .fail(function(){msg.textContent='Connection error. Please try again.';msg.style.display='block';msg.style.color='var(--u-ter)';})
-        .always(function(){submit.disabled=false;submit.innerHTML='<span class="material-symbols-outlined">send</span>Submit Report';});
+    if(submit) submit.addEventListener('click',function(){
+      var cat=document.getElementById('ws-issue-cat').value;
+      var topic=document.getElementById('ws-issue-topic').value.trim();
+      var desc=document.getElementById('ws-issue-desc').value.trim();
+      var msg=document.getElementById('ws-issue-msg');
+      if(desc.length<10){msg.textContent='Please provide a more detailed description (at least 10 characters).';msg.style.display='block';msg.style.color='var(--u-ter)';return;}
+      submit.disabled=true;submit.textContent='Submitting\u2026';
+      console.log('[issue] submitting cat='+cat+' cid='+courseId+' desc='+desc.substring(0,30));
+      require(['core/ajax'],function(Ajax){
+        Ajax.call([{methodname:'local_umat_ai_submit_issue',args:{courseid:courseId,category:cat,topic:topic,description:desc}}])[0]
+          .done(function(r){
+            console.log('[issue] response',r);
+            if(r.success){
+              msg.textContent='Issue reported successfully!';msg.style.display='block';msg.style.color='var(--u-sec)';
+              document.getElementById('ws-issue-topic').value='';document.getElementById('ws-issue-desc').value='';
+              form.style.display='none';loadMyIssues();
+            }else{msg.textContent=r.message||'Failed to submit.';msg.style.display='block';msg.style.color='var(--u-ter)';}
+          })
+          .fail(function(e){
+            console.log('[issue] AJAX fail',e);
+            var errMsg=e&&(e.message||e.errorcode||e);
+            msg.textContent=errMsg||'Connection error. Please try again.';msg.style.display='block';msg.style.color='var(--u-ter)';
+          })
+          .always(function(){submit.disabled=false;submit.innerHTML='<span class="material-symbols-outlined">send</span>Submit Report';});
+      });
     });
-  });
   loadMyIssues();
 }
 function loadMyIssues(){
-  var list=document.getElementById('ws-issue-list');if(!list)return;
+  var list=document.getElementById('ws-issue-list');if(!list){console.log('[issues] list not found');return;}
+  if(!courseId){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">school</span><p>Select a course above to view your reports.</p></div>';return;}
+  console.log('[issues] loading for cid='+courseId);
   require(['core/ajax'],function(Ajax){
     Ajax.call([{methodname:'local_umat_ai_get_student_issues',args:{courseid:courseId}}])[0]
       .done(function(rows){
+        console.log('[issues] got rows',rows,typeof rows,Array.isArray(rows),rows&&rows.length);
         if(!rows||!rows.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No issues reported yet.</p></div>';return;}
         list.innerHTML=rows.map(function(r){
           var catLabel={'concept_confusion':'Concept Confusion','material_error':'Material Error','technical_issue':'Technical Issue','suggestion':'Suggestion','other':'Other'}[r.category]||r.category;
@@ -1066,7 +1141,7 @@ function loadMyIssues(){
             +'</div>';
         }).join('');
       })
-      .fail(function(){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load issues.</p></div>';});
+      .fail(function(e){console.log('[issues] AJAX fail',e);list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load issues.</p></div>';});
   });
 }
 
@@ -1216,6 +1291,7 @@ function _clearNoteCtx(){
 function loadNotesAndRender(){
   var list=document.getElementById('ws-notes-list');
   if(!list)return;
+  if(!courseId){var c=(userData&&userData.courses)||[];if(!c.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses found.</p></div>';return;}list.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:11px;color:var(--u-ol);font-weight:600;">Select a course to view notes:</div><div style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+c.slice(0,12).map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';list.querySelectorAll('.umat-chip').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;loadNotesAndRender();});});return;}
   ajax('local_umat_ai_get_notes',{courseid:courseId},
     function(r){
       _notesCache=r.notes||[];
@@ -1758,6 +1834,108 @@ sendQuestion=function(q,msgsId){
   return _origSendQ(q,msgsId);
 };
 
+/* ── My Progress ── */
+function initProgressTab(){
+  var body=document.getElementById('prog-body');
+  if(!body)return;
+  var loading=document.getElementById('prog-loading');
+  var content=document.getElementById('prog-content');
+  loading.style.display='';
+  if(content)content.style.display='none';
+  require(['core/ajax'],function(Ajax){
+    Ajax.call([{methodname:'local_umat_ai_get_my_progress',args:{courseid:courseId||0,days:60}}])[0]
+      .done(function(d){
+        loading.style.display='none';
+        if(content)content.style.display='block';
+        renderProgress(d);
+      })
+      .fail(function(e){
+        loading.innerHTML='<span class="material-symbols-outlined">error</span><p>Failed to load progress data.</p>';
+        console.warn('Progress load error:',e);
+      });
+  });
+}
+
+function renderProgress(d){
+  if(!d)return;
+  /* KPI cards */
+  var kpis=document.getElementById('prog-kpis');
+  if(kpis){
+    var questions=d.total_questions||0;
+    var weekQ=d.week_questions||0;
+    var sessions=d.total_sessions||0;
+    var issues=d.total_issues||0;
+    var avgStr=d.struggle_score||0;
+    var strLevel=avgStr>=60?'high':(avgStr>=30?'medium':'low');
+    var strIcon=strLevel==='high'?'error':'warning';
+    var strColor=strLevel==='high'?'#dc2626':(strLevel==='medium'?'#d97706':'#16a34a');
+    kpis.innerHTML=
+      '<div class="prog-kpi"><div class="prog-kpi-icon pk-q"><span class="material-symbols-outlined">quiz</span></div><div class="prog-kpi-body"><div class="prog-kpi-val">'+questions+'</div><div class="prog-kpi-lbl">Questions</div></div></div>'+
+      '<div class="prog-kpi"><div class="prog-kpi-icon pk-w"><span class="material-symbols-outlined">bar_chart</span></div><div class="prog-kpi-body"><div class="prog-kpi-val">'+weekQ+'</div><div class="prog-kpi-lbl">This Week</div></div></div>'+
+      '<div class="prog-kpi"><div class="prog-kpi-icon pk-s"><span class="material-symbols-outlined">chat</span></div><div class="prog-kpi-body"><div class="prog-kpi-val">'+sessions+'</div><div class="prog-kpi-lbl">Sessions</div></div></div>'+
+      '<div class="prog-kpi"><div class="prog-kpi-icon pk-i"><span class="material-symbols-outlined">flag</span></div><div class="prog-kpi-body"><div class="prog-kpi-val">'+issues+'</div><div class="prog-kpi-lbl">Issues</div></div></div>'+
+      '<div class="prog-kpi"><div class="prog-kpi-icon" style="background:'+strColor+'20;color:'+strColor+';"><span class="material-symbols-outlined">'+strIcon+'</span></div><div class="prog-kpi-body"><div class="prog-kpi-val" style="color:'+strColor+';">'+avgStr+'</div><div class="prog-kpi-lbl">Struggle Level</div></div></div>';
+  }
+
+  /* AI recommendation */
+  var aiEl=document.getElementById('prog-ai-recs');
+  if(aiEl){
+    if(d.ai_recommendation){
+      aiEl.style.display='block';
+      aiEl.innerHTML='<div class="prog-ai-rec"><span class="material-symbols-outlined" style="color:var(--u-p);vertical-align:middle;margin-right:6px;">auto_awesome</span><span>'+_umatEsc(d.ai_recommendation)+'</span></div>';
+    }else{
+      aiEl.style.display='none';
+    }
+  }
+
+  /* Weekly chart */
+  var chartEl=document.getElementById('prog-week-chart');
+  if(chartEl){
+    var days=d.day_labels||[];
+    var counts=d.daily_questions||[];
+    if(days.length&&counts.length){
+      var maxC=Math.max.apply(null,counts)||1;
+      chartEl.innerHTML=days.map(function(day,i){
+        var h=Math.round((counts[i]||0)/maxC*60);
+        return '<div class="prog-chart-bar-wrap"><div class="prog-chart-bar" style="height:'+Math.max(4,h)+'px;" title="'+counts[i]+' questions"></div><div class="prog-chart-label">'+day+'</div><div class="prog-chart-val">'+(counts[i]||0)+'</div></div>';
+      }).join('');
+    }else{
+      chartEl.innerHTML='<div class="umat-empty" style="padding:20px;"><span class="material-symbols-outlined">bar_chart</span><p>No activity data yet.</p></div>';
+    }
+  }
+
+  /* Struggle topics */
+  var stEl=document.getElementById('prog-struggle-list');
+  if(stEl){
+    var topics=d.struggle_topics||[];
+    if(topics.length){
+      stEl.innerHTML=topics.slice(0,10).map(function(t){
+        var reasonLabel={quiz_failure:'Quiz Failure',repeated_views:'Repeated Viewing',assignment_failure:'Assignment Issue',issue_reported:'Issue Reported'}[t.struggle_reason]||t.struggle_reason;
+        var sev=t.struggle_score>=60?'high':(t.struggle_score>=30?'medium':'low');
+        var sevColor=sev==='high'?'#dc2626':(sev==='medium'?'#d97706':'#16a34a');
+        return '<div class="prog-struggle-item"><div class="prog-struggle-dot" style="background:'+sevColor+';"></div><div class="prog-struggle-info"><span class="prog-struggle-topic">'+_umatEsc(t.topic_label||'General')+'</span><span class="prog-struggle-course">'+_umatEsc(t.course_short||'')+'</span></div><div class="prog-struggle-reason">'+reasonLabel+'</div><div class="prog-struggle-score" style="color:'+sevColor+';">'+t.struggle_score+'</div></div>';
+      }).join('');
+    }else{
+      stEl.innerHTML='<div class="umat-empty" style="padding:20px;"><span class="material-symbols-outlined">check_circle</span><p>No struggle signals detected. Keep up the good work!</p></div>';
+    }
+  }
+
+  /* Issues summary */
+  var issEl=document.getElementById('prog-issues');
+  if(issEl){
+    var is=d.issue_statuses||{};
+    var total=d.total_issues||0;
+    if(total>0){
+      var open=is.open||0,inReview=is.in_review||0,resolved=is.resolved||0,closed=is.closed||0;
+      issEl.innerHTML=
+        '<div class="prog-issue-stats"><div class="prog-issue-stat"><span class="prog-issue-num" style="color:#dc2626;">'+open+'</span><span class="prog-issue-lbl">Open</span></div><div class="prog-issue-stat"><span class="prog-issue-num" style="color:#d97706;">'+inReview+'</span><span class="prog-issue-lbl">In Review</span></div><div class="prog-issue-stat"><span class="prog-issue-num" style="color:#16a34a;">'+resolved+'</span><span class="prog-issue-lbl">Resolved</span></div><div class="prog-issue-stat"><span class="prog-issue-num" style="color:var(--u-ol);">'+closed+'</span><span class="prog-issue-lbl">Closed</span></div></div>'+
+        (open>0?'<p style="font-size:12px;color:var(--u-ol);margin-top:8px;"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">info</span> You have '+open+' open issue'+(open>1?'s':'')+'. <a href="#" onclick="switchToTab(\'report-issue\');return false;" style="color:var(--u-p);">View your reports</a></p>':'');
+    }else{
+      issEl.innerHTML='<div class="umat-empty" style="padding:20px;"><span class="material-symbols-outlined">check_circle</span><p>No issues reported yet.</p></div>';
+    }
+  }
+}
+
 })();
 });
 </script>
@@ -1826,12 +2004,12 @@ HTML;
       </div>
     </div>
     <div class="umat-cp-tabs umat-cp-tabs-legacy">
-      <button class="umat-cp-tab active" data-lcp-tab="lcp-insights" type="button">Insights</button>
+      <button class="umat-cp-tab active" data-lcp-tab="lcp-insights" type="button">Home</button>
       <button class="umat-cp-tab" data-lcp-tab="lcp-questions" type="button">Questions</button>
       <button class="umat-cp-tab" data-lcp-tab="lcp-ai" type="button">Ask AI</button>
     </div>
     <div class="umat-cp-feature-tabs" aria-label="Quick lecturer tools" role="tablist">
-      <button class="umat-cp-feature-tab active" data-lcp-pane="lcp-insights" type="button"><span class="material-symbols-outlined">insights</span><span>Insights</span></button>
+      <button class="umat-cp-feature-tab active" data-lcp-pane="lcp-insights" type="button"><span class="material-symbols-outlined">home</span><span>Home</span></button>
       <button class="umat-cp-feature-tab" data-lcp-pane="lcp-questions" type="button"><span class="material-symbols-outlined">forum</span><span>Questions</span></button>
       <button class="umat-cp-feature-tab" data-lcp-pane="lcp-ai" type="button"><span class="material-symbols-outlined">smart_toy</span><span>Ask AI</span></button>
       <button class="umat-cp-feature-tab" data-lcp-open="lec-analytics" type="button"><span class="material-symbols-outlined">bar_chart</span><span>Analytics</span></button>
@@ -2130,6 +2308,12 @@ HTML;
           </div>
           <div id="stru-issues-summary" style="display:none;align-items:center;gap:10px;padding:8px 12px;margin-top:8px;border-radius:10px;background:var(--u-warnbg, rgba(239,68,68,.08));font-size:13px;cursor:pointer;" onclick="switchPane('lec-issues')" title="View student issues"></div>
 
+          <!-- AI Overall Summary -->
+          <div id="stru-ai-summary" style="display:none;align-items:center;gap:10px;padding:10px 14px;margin-top:10px;border-radius:10px;background:linear-gradient(135deg, rgba(99,102,241,.08), rgba(168,85,247,.08));font-size:13px;border:1px solid rgba(99,102,241,.15);"></div>
+
+          <!-- AI Course Health Report -->
+          <div id="stru-course-health" style="display:none;margin-top:12px;border-radius:10px;border:1px solid var(--u-border);overflow:hidden;"></div>
+
           <!-- Topic Struggle Matrix -->
           <div class="struggle-section">
             <div class="struggle-section-header">
@@ -2383,10 +2567,11 @@ var cpClose=document.getElementById('lec-cp-close');
 var ovClose=document.getElementById('lec-ov-close');
 var expand=document.getElementById('lec-expand');
 var panelDataLoaded=false;
+function updateBodyLock(){document.body.classList.toggle('umat-body-lock',!(!document.querySelector('.umat-ov.open,.umat-cp-ov.open')));}
 
-function openPanel(){if(window.innerWidth<640){cpOv.classList.remove('open');lecOv.classList.add('open');if(!anLoaded[CID||lecAnalyticsCourseId]){loadAnalytics(CID||lecAnalyticsCourseId);}}else{cpOv.classList.add('open');}fab.setAttribute('aria-expanded','true');if(!panelDataLoaded){loadPanelData();panelDataLoaded=true;}}
-function closePanel(){cpOv.classList.remove('open');fab.setAttribute('aria-expanded','false');}
-function openDash(){closePanel();lecOv.classList.add('open');if(!anLoaded[CID||lecAnalyticsCourseId]){loadAnalytics(CID||lecAnalyticsCourseId);}}
+function openPanel(){if(window.innerWidth<640){cpOv.classList.remove('open');lecOv.classList.add('open');if(!anLoaded[CID||lecAnalyticsCourseId]){loadAnalytics(CID||lecAnalyticsCourseId);}}else{cpOv.classList.add('open');}fab.setAttribute('aria-expanded','true');if(!panelDataLoaded){loadPanelData();panelDataLoaded=true;}updateBodyLock();}
+function closePanel(){cpOv.classList.remove('open');fab.setAttribute('aria-expanded','false');updateBodyLock();}
+function openDash(){closePanel();lecOv.classList.add('open');if(!anLoaded[CID||lecAnalyticsCourseId]){loadAnalytics(CID||lecAnalyticsCourseId);}updateBodyLock();}
 function closeDash(){lecOv.classList.remove('open');openPanel();}
 
 if(fab)fab.addEventListener('click',openPanel);
@@ -2432,11 +2617,11 @@ function renderLcpFeature(name){
   if(name==='lec-issues')return renderLcpIssues(body);
 }
 function renderLcpCourses(body){var courses=(UD&&UD.courses)||[];if(!courses.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses found.</p></div>';return;}body.innerHTML=courses.map(function(c){return '<button class="umat-cp-list-card as-btn" data-cid="'+c.id+'" data-name="'+esc(c.fullname||'')+'" type="button"><strong>'+esc(c.shortname||c.fullname)+'</strong><p>'+esc(c.fullname||'')+'</p></button>';}).join('');body.querySelectorAll('[data-cid]').forEach(function(b){b.addEventListener('click',function(){CID=parseInt(b.dataset.cid)||CID;CN=b.dataset.name||CN;renderLcpFeature('lec-analytics');});});}
-function renderLcpAnalytics(body,name){if(!CID){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">school</span><p>Open a course page to view analytics.</p></div>';return;}ajax('local_umat_ai_get_analytics',{courseid:CID,days:30},function(d){if(name==='lec-struggle'){body.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">psychology</span><strong>'+esc(d.struggle_index||'N/A')+'</strong><small>struggle index</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">forum</span><strong>'+((d.top_questions||[]).length)+'</strong><small>top questions</small></div></div>'+((d.top_questions||[]).slice(0,6).map(function(q){return '<div class="umat-cp-list-card"><strong>'+esc(q.text)+'</strong><p>'+q.ask_count+' students asked</p></div>';}).join('')||'<div class="umat-empty"><span class="material-symbols-outlined">check_circle</span><p>No struggle questions yet.</p></div>');return;}body.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">group</span><strong>'+d.active_students+'/'+d.enrolled_students+'</strong><small>active students</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">forum</span><strong>'+d.total_interactions+'</strong><small>AI interactions</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">psychology</span><strong>'+esc(d.struggle_index||'N/A')+'</strong><small>struggle index</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">timer</span><strong>'+esc(d.avg_questions_per_session||'0')+'</strong><small>avg Q/session</small></div></div>';},function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load analytics.</p></div>';});}
+function renderLcpAnalytics(body,name){if(!CID){var courses=(UD&&UD.courses)||[];if(!courses.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">school</span><p>No courses available.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course or view composite:</div><div id="lcp-cs-bar" style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+courses.slice(0,16).map(function(c){return '<button class="umat-chip" data-cid="'+c.id+'" type="button">'+esc(c.shortname||c.fullname)+'</button>';}).join('')+'</div><div id="lcp-ov-body" style="padding:0 14px 14px;"><div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading overview\u2026</p></div></div>';body.querySelectorAll('#lcp-cs-bar .umat-chip').forEach(function(b){b.addEventListener('click',function(){CID=parseInt(this.dataset.cid)||CID;renderLcpFeature(name);});});var ovBody=document.getElementById('lcp-ov-body'),agg=name==='lec-struggle'?{total_questions:0,total_students:0,total_issues:0,open_issues:0,per_course:[],all_topics:[],all_students:[],topic_map:{}}:{active_students:0,enrolled_students:0,total_interactions:0,per_course:[],all_questions:[],high_total:0,risk_total:0,track_total:0},done=0;courses.forEach(function(c){ajax(name==='lec-struggle'?'local_umat_ai_get_struggle_insights':'local_umat_ai_get_analytics',{courseid:c.id,days:name==='lec-struggle'?60:30},function(d){if(name==='lec-struggle'){var s=d.summary||{};agg.total_questions+=s.total_questions||0;agg.total_students+=s.total_students||0;agg.total_issues+=s.total_issues||0;agg.open_issues+=s.open_issues||0;var sc='N/A';if(d.topic_matrix&&d.topic_matrix.length){var scs=d.topic_matrix.map(function(t){return t.struggle_score||0;});sc=Math.round(scs.reduce(function(a,b){return a+b;})/scs.length);d.topic_matrix.forEach(function(t){var k=t.topic;if(agg.topic_map[k]){agg.topic_map[k].question_count+=t.question_count;agg.topic_map[k].student_count+=t.student_count;agg.topic_map[k].struggle_score=(agg.topic_map[k].struggle_score+t.struggle_score)/2;}else{agg.topic_map[k]=JSON.parse(JSON.stringify(t));}});}(d.at_risk_students||[]).forEach(function(s){s.course_name=c.shortname;agg.all_students.push(s);});agg.per_course.push({id:c.id,name:c.shortname,questions:s.total_questions||0,students:s.total_students||0,struggle:sc});}else{agg.active_students+=d.active_students;agg.enrolled_students+=d.enrolled_students;agg.total_interactions+=d.total_interactions;agg.high_total+=d.high_performers||0;agg.risk_total+=Math.max(0,d.enrolled_students-d.active_students);agg.track_total+=Math.max(0,d.active_students-(d.high_performers||0));(d.top_questions||[]).forEach(function(q){agg.all_questions.push(q);});agg.per_course.push({id:c.id,name:c.shortname,active:d.active_students,enrolled:d.enrolled_students,interactions:d.total_interactions,struggle:d.struggle_index});}done++;if(done===courses.length){if(name==='lec-struggle'){var tm=Object.keys(agg.topic_map);var hi=0,md=0,lo=0;tm.forEach(function(k){var sc=agg.topic_map[k].struggle_score||0;if(sc>=60)hi++;else if(sc>=30)md++;else lo++;});ovBody.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">quiz</span><strong>'+agg.total_questions+'</strong><small>total questions</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">people</span><strong>'+agg.total_students+'</strong><small>students</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">flag</span><strong>'+agg.total_issues+'</strong><small>issues ('+agg.open_issues+' open)</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">donut_small</span><strong>'+tm.length+'</strong><small>topics (H:'+hi+' M:'+md+' L:'+lo+')</small></div></div>'+((agg.all_students||[]).slice(0,5).map(function(s){return '<div class="umat-cp-list-card"><strong>'+esc(s.fullname||'Student')+'</strong><p>'+esc(s.course_name||'')+'\u00a0\u00b7\u00a0'+esc(s.topic||'')+'</p></div>';}).join('')||'<div class="umat-empty"><span class="material-symbols-outlined">check_circle</span><p>No at-risk students.</p></div>');}else{ovBody.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">group</span><strong>'+agg.active_students+'/'+agg.enrolled_students+'</strong><small>active students</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">forum</span><strong>'+agg.total_interactions+'</strong><small>total interactions</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">trending_up</span><strong>'+agg.high_total+'</strong><small>high performers</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">warning</span><strong>'+agg.risk_total+'</strong><small>at risk</small></div></div>'+((agg.all_questions||[]).sort(function(a,b){return b.ask_count-a.ask_count;}).slice(0,5).map(function(q){return '<div class="umat-cp-list-card"><strong>'+esc(q.text)+'</strong><p>'+q.ask_count+' students asked</p></div>';}).join('')||'<div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>No questions yet.</p></div>');}}},function(){done++;if(done===courses.length)ovBody.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load some courses.</p></div>';});});return;}ajax('local_umat_ai_get_analytics',{courseid:CID,days:30},function(d){if(name==='lec-struggle'){body.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">psychology</span><strong>'+esc(d.struggle_index||'N/A')+'</strong><small>struggle index</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">forum</span><strong>'+((d.top_questions||[]).length)+'</strong><small>top questions</small></div></div>'+((d.top_questions||[]).slice(0,6).map(function(q){return '<div class="umat-cp-list-card"><strong>'+esc(q.text)+'</strong><p>'+q.ask_count+' students asked</p></div>';}).join('')||'<div class="umat-empty"><span class="material-symbols-outlined">check_circle</span><p>No struggle questions yet.</p></div>');return;}body.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">group</span><strong>'+d.active_students+'/'+d.enrolled_students+'</strong><small>active students</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">forum</span><strong>'+d.total_interactions+'</strong><small>AI interactions</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">psychology</span><strong>'+esc(d.struggle_index||'N/A')+'</strong><small>struggle index</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">timer</span><strong>'+esc(d.avg_questions_per_session||'0')+'</strong><small>avg Q/session</small></div></div>';},function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load analytics.</p></div>';});}
 function renderLcpLibrary(body){var courses=(UD&&UD.courses)||[];body.innerHTML=(courses.length?'<p class="umat-cp-help">Choose a course to view materials in this panel.</p>'+courses.slice(0,10).map(function(c){return '<button class="umat-cp-list-card as-btn" data-cid="'+c.id+'" type="button"><strong>'+esc(c.shortname||c.fullname)+'</strong><p>'+esc(c.fullname||'')+'</p></button>';}).join(''):'<div class="umat-empty"><span class="material-symbols-outlined">local_library</span><p>No courses available.</p></div>');body.querySelectorAll('[data-cid]').forEach(function(b){b.addEventListener('click',function(){var cid=parseInt(b.dataset.cid);body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading materials…</p></div>';ajax('local_umat_ai_get_course_materials',{courseid:cid},function(r){var mats=r.materials||[];body.innerHTML=mats.length?mats.slice(0,12).map(function(m){return '<div class="umat-cp-list-card"><strong>'+esc(m.filename||m.name||'Material')+'</strong><p>'+esc(m.mimetype||m.type||'Course material')+'</p></div>';}).join(''):'<div class="umat-empty"><span class="material-symbols-outlined">folder_open</span><p>No materials for this course.</p></div>';},function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load materials.</p></div>';});});});}
 function renderLcpSessions(body){var courses=(UD&&UD.courses)||[];body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>Select a course from Courses, then ask AI about session history in this panel.</p></div>'+(courses.length?courses.slice(0,6).map(function(c){return '<button class="umat-cp-list-card as-btn" data-cid="'+c.id+'" type="button"><strong>'+esc(c.shortname||c.fullname)+'</strong><p>Use this course context</p></button>';}).join(''):'');body.querySelectorAll('[data-cid]').forEach(function(b){b.addEventListener('click',function(){CID=parseInt(b.dataset.cid)||CID;showLcpPane('lcp-ai');});});}
 function renderLcpReview(body){body.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">pending_actions</span><strong>{$pending}</strong><small>pending outputs</small></div></div><div class="umat-cp-list-card"><strong>Review workflow</strong><p>Use the full review table for approvals. You can ask AI for a summary here first.</p><button class="umat-btn-p" type="button" id="lcp-review-ask"><span class="material-symbols-outlined">smart_toy</span>Summarise pending work</button></div>';var ask=document.getElementById('lcp-review-ask');if(ask)ask.addEventListener('click',function(){showLcpPane('lcp-ai');document.getElementById('lcp-input').value='Summarise pending AI outputs for this course.';document.getElementById('lcp-send').click();});}
-function renderLcpIssues(body){if(!CID){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">school</span><p>Open a course page to view issues.</p></div>';return;}body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading issues…</p></div>';ajax('local_umat_ai_get_course_issues',{courseid:CID},function(r){var issues=r.issues||[];if(!issues.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No student issues.</p></div>';return;}body.innerHTML=issues.slice(0,10).map(function(iss){var sc={'open':'var(--u-ter)','in_review':'#d97706','resolved':'var(--u-sec)','closed':'var(--u-ol)'}[iss.status]||'var(--u-ol)';return '<div style="padding:8px 10px;border-bottom:1px solid var(--u-olv);font-size:12px;display:flex;justify-content:space-between;"><span><strong>'+esc(iss.fullname||'Student')+'</strong><br>'+esc(iss.description.replace(/^(.{60}[^\\s]*).*$/,'$1')+(iss.description.length>60?'...':''))+'</span><span style="font-size:10px;padding:2px 6px;border-radius:999px;background:'+sc+'20;color:'+sc+';white-space:nowrap;">'+iss.status.replace('_',' ')+'</span></div>';}).join('');},function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load issues.</p></div>';});}
+function renderLcpIssues(body){if(!CID){var courses=(UD&&UD.courses)||[];if(!courses.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">school</span><p>No courses available.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course to view its issues:</div><div id="lcp-iss-cs-bar" style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+courses.slice(0,16).map(function(c){return '<button class="umat-chip" data-cid="'+c.id+'" type="button">'+esc(c.shortname||c.fullname)+'</button>';}).join('')+'</div>';body.querySelectorAll('#lcp-iss-cs-bar .umat-chip').forEach(function(b){b.addEventListener('click',function(){CID=parseInt(this.dataset.cid)||CID;renderLcpFeature('lec-issues');});});return;}body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading issues\u2026</p></div>';ajax('local_umat_ai_get_course_issues',{courseid:CID},function(r){var issues=r.issues||[];if(!issues.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No student issues.</p></div>';return;}body.innerHTML=issues.slice(0,10).map(function(iss){var sc={'open':'var(--u-ter)','in_review':'#d97706','resolved':'var(--u-sec)','closed':'var(--u-ol)'}[iss.status]||'var(--u-ol)';return '<div style="padding:8px 10px;border-bottom:1px solid var(--u-olv);font-size:12px;display:flex;justify-content:space-between;"><span><strong>'+esc(iss.fullname||'Student')+'</strong><br>'+esc(iss.description.replace(/^(.{60}[^\\s]*).*$/,'$1')+(iss.description.length>60?'...':''))+'</span><span style="font-size:10px;padding:2px 6px;border-radius:999px;background:'+sc+'20;color:'+sc+';white-space:nowrap;">'+iss.status.replace('_',' ')+'</span></div>';}).join('');},function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load issues.</p></div>';});}
 var lcpMsgs=document.getElementById('lcp-msgs');
 if(lcpMsgs)lcpMsgs.addEventListener('click',function(e){
   var chip=e.target.closest('.umat-chip[data-lp]');
@@ -2525,7 +2710,12 @@ if(reviewRefresh)reviewRefresh.addEventListener('click',loadReviewPane);
 
 /* Load panel (compact) data */
 function loadPanelData(){
-  if(!CID){return;}
+  if(!CID){
+    var gl=document.getElementById('lcp-gap-title');if(gl)gl.textContent='All Courses Mode';
+    var gd=document.getElementById('lcp-gap-desc');if(gd)gd.textContent='Select a course from Courses, Analytics, or Struggle tabs to view per-course data.';
+    var db=document.getElementById('lcp-open-dash');if(db)db.textContent='Open Dashboard Overview';
+    return;
+  }
   ajax('local_umat_ai_get_analytics',{courseid:CID,days:30},function(d){
     var s=function(id,v){var e=document.getElementById(id);if(e)e.textContent=v;};
     s('lcp-k-active',d.active_students+'/'+d.enrolled_students);
@@ -2947,11 +3137,13 @@ function loadReviewPane(){
 
 /* ─── Student Issues (Lecturer) ───────────────────── */
 function loadLecturerIssues(){
-  var body=document.getElementById('lec-issues-body');if(!body)return;
+  var body=document.getElementById('lec-issues-body');if(!body){console.log('[lec-issues] body not found');return;}
   var filter=document.getElementById('lec-issues-filter');var status=filter?filter.value:'';
+  console.log('[lec-issues] loading CID='+CID+' status='+status);
   body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading issues…</p></div>';
   var args={courseid:CID};if(status)args.status=status;
   ajax('local_umat_ai_get_course_issues',args,function(r){
+    console.log('[lec-issues] response',r);
     var issues=r.issues||[],total=r.total||0;
     var count=document.getElementById('lec-issues-count');if(count)count.textContent=total;
     if(!issues.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No student issues'+(status?' with this status':'')+'.</p></div>';return;}
@@ -3008,7 +3200,8 @@ function loadLecturerIssues(){
         });
       });
     });
-  },function(){
+  },function(e){
+    console.log('[lec-issues] error',e);
     body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load issues.</p></div>';
   });
 }
@@ -3226,9 +3419,6 @@ function renderStruggleOverview(agg){
 
 function renderStruggleSummary(summary){
   if(!summary)return;
-  s('stru-total-q',summary.total_questions);
-  s('stru-total-s',summary.total_students);
-  s('stru-worst',summary.worst_topic||'\u2014');
   var badge=document.getElementById('stru-mode-badge');
   if(badge)badge.textContent=summary.ai_service_used?'AI Engine':'PHP Engine';
   /* Enhanced KPI bar with visual cards */
@@ -3246,6 +3436,44 @@ function renderStruggleSummary(summary){
     issuesEl.style.display='flex';
     var cnt=summary.total_issues,open=summary.open_issues;
     issuesEl.innerHTML='<span class="material-symbols-outlined" style="color:var(--u-ter);">flag</span><div><strong>'+cnt+' issue'+(cnt!==1?'s':'')+' reported</strong><span style="display:block;font-size:11px;color:var(--u-ol);">'+open+' open'+((summary.top_issue_topics||[]).length?' \u00b7 '+summary.top_issue_topics.slice(0,3).join(', '):'')+'</span></div>';
+  }
+  /* AI Overall Summary */
+  var aiSumEl=document.getElementById('stru-ai-summary');
+  if(aiSumEl){
+    if(summary.ai_overall_summary){
+      aiSumEl.style.display='';
+      aiSumEl.innerHTML='<span class="material-symbols-outlined" style="color:var(--u-p);font-size:18px;">auto_awesome</span><div class="stru-ai-summary-text">'+esc(summary.ai_overall_summary)+'</div>';
+    }else{
+      aiSumEl.style.display='none';
+    }
+  }
+  /* AI Course Health Report */
+  var healthEl=document.getElementById('stru-course-health');
+  if(healthEl&&summary.ai_course_health){
+    try{
+      var ch=typeof summary.ai_course_health==='string'?JSON.parse(summary.ai_course_health):summary.ai_course_health;
+      var healthIcon=ch.overall_health==='healthy'?'check_circle':
+        (ch.overall_health==='moderate'?'warning':'error');
+      var healthColor=ch.overall_health==='healthy'?'var(--u-p)':
+        (ch.overall_health==='moderate'?'#f59e0b':'#dc2626');
+      var findings=(ch.key_findings||[]).map(function(f){return '<li>'+esc(f)+'</li>';}).join('');
+      var recs=(ch.recommendations||[]).map(function(r){return '<li>'+esc(r)+'</li>';}).join('');
+      healthEl.style.display='block';
+      healthEl.innerHTML=
+        '<div class="stru-health-header"><span class="material-symbols-outlined" style="color:'+healthColor+';">'+healthIcon+'</span><strong>Course Health: '+ch.overall_health.charAt(0).toUpperCase()+ch.overall_health.slice(1)+'</strong></div>'+
+        '<div class="stru-health-body">'+
+          (ch.summary?'<p class="stru-health-summary">'+esc(ch.summary)+'</p>':'')+
+          (findings?'<div class="stru-health-section"><strong>Key Findings</strong><ul>'+findings+'</ul></div>':'')+
+          (ch.worst_topic_analysis?'<div class="stru-health-section"><strong>Worst Topic Analysis</strong><p>'+esc(ch.worst_topic_analysis)+'</p></div>':'')+
+          (ch.student_risk_summary?'<div class="stru-health-section"><strong>Student Risk Summary</strong><p>'+esc(ch.student_risk_summary)+'</p></div>':'')+
+          (recs?'<div class="stru-health-section"><strong>Recommendations</strong><ul>'+recs+'</ul></div>':'')+
+          (ch.event_pattern_insight?'<div class="stru-health-section"><strong>Event Pattern Insight</strong><p>'+esc(ch.event_pattern_insight)+'</p></div>':'')+
+        '</div>';
+    }catch(e){
+      healthEl.style.display='none';
+    }
+  }else if(healthEl){
+    healthEl.style.display='none';
   }
 }
 
@@ -3289,7 +3517,9 @@ function renderTopicMatrix(topics){
       '<div class="struggle-topic-body-sub">'+
         '<span>'+t.question_count+' questions by '+t.student_count+' student'+(t.student_count!==1?'s':'')+'</span>'+
       '</div>'+
+      (t.event_sources?makeEventSourceBar(t.event_sources):'')+
       (matChips?'<div class="struggle-topic-materials">'+matChips+'</div>':'')+
+      (t.ai_recommendation?'<div class="struggle-topic-ai"><span class="material-symbols-outlined" style="font-size:15px;color:var(--u-p);">auto_awesome</span><span>'+esc(t.ai_recommendation)+'</span></div>':'')+
     '</div>';
   }).join('');
 }
@@ -3367,6 +3597,8 @@ function renderAtRiskStudents(students){
       '<span class="struggle-student-topics">'+topicTags+'</span>'+
       '<span class="struggle-student-risk">'+riskPill+' ('+s.risk_score+')</span>'+
       '<span class="struggle-student-active">'+esc(s.last_active)+'</span>'+
+      (s.ai_risk_factors&&s.ai_risk_factors.length?'<div class="struggle-student-ai-factors"><span class="material-symbols-outlined" style="font-size:13px;color:var(--u-p);">insight</span>'+s.ai_risk_factors.map(function(f){return '<span class="struggle-factor-tag">'+esc(f)+'</span>';}).join('')+'</div>':'')+
+      (s.ai_recommendation?'<div class="struggle-student-ai-recs">'+esc(s.ai_recommendation)+'</div>':'')+
     '</div>';
   }).join('');
 }
@@ -3375,6 +3607,30 @@ function renderAtRiskStudents(students){
 function makeScoreRing(pct,color,label){
   var r=15.9,c=100,off=c-Math.min(100,pct)/100*c;
   return '<svg class="stru-svg-ring" width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="'+r+'" fill="none" stroke="#e5e7eb" stroke-width="2.8"/><circle cx="18" cy="18" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="2.8" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'" transform="rotate(-90,18,18)" stroke-linecap="round"/><text x="18" y="18" text-anchor="middle" dominant-baseline="central" font-size="10" font-weight="800" fill="'+color+'">'+(label||pct)+'</text></svg>';
+}
+
+/* ── Event Source Bar (visual breakdown for a topic) ── */
+function makeEventSourceBar(es){
+  if(!es)return '';
+  var total=0,items=[];
+  var sources={chat_questions:'chat',quiz_failures:'quiz',repeated_views:'views',assignment_failures:'assign',issue_reports:'issues'};
+  var icons={chat_questions:'forum',quiz_failures:'quiz',repeated_views:'visibility',assignment_failures:'assignment',issue_reports:'flag'};
+  var cols={chat_questions:'var(--u-p)',quiz_failures:'#dc2626',repeated_views:'#f59e0b',assignment_failures:'#8b5cf6',issue_reports:'#ef4444'};
+  Object.keys(sources).forEach(function(k){total+=es[k]||0;});
+  if(!total)return '';
+  Object.keys(sources).forEach(function(k){
+    var v=es[k]||0;
+    if(v>0)items.push({key:k,val:v,pct:Math.round(v/total*100),label:sources[k],icon:icons[k],color:cols[k]});
+  });
+  return '<div class="stru-event-bar" title="Struggle signal sources">'+
+    items.map(function(i){
+      return '<span class="stru-event-seg" style="flex:'+i.val+';background:'+i.color+';" title="'+i.label+': '+i.val+'"></span>';
+    }).join('')+
+    '<span class="stru-event-label">'+
+    items.map(function(i){
+      return '<span class="stru-event-tag" style="color:'+i.color+';"><span class="material-symbols-outlined" style="font-size:10px;">'+i.icon+'</span>'+i.val+'</span>';
+    }).join('')+
+    '</span></div>';
 }
 
 /* ── Severity Donut Chart (SVG) ── */

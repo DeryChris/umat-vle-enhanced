@@ -46,6 +46,27 @@ async def lifespan(app: FastAPI):
     logger.info("UMaT AI Service shutting down.")
 
 
+import asyncio
+import logging
+
+# Suppress noisy Windows proactor ConnectionResetError after client disconnect.
+_proactor_logger = logging.getLogger("asyncio")
+_orig_exc_handler = None
+
+def _silent_proactor_errors(loop, context):
+    exc = context.get("exception")
+    if isinstance(exc, ConnectionResetError):
+        return  # silently drop — client disconnected, harmless
+    if _orig_exc_handler:
+        _orig_exc_handler(loop, context)
+
+try:
+    loop = asyncio.get_event_loop()
+    _orig_exc_handler = loop.get_exception_handler()
+    loop.set_exception_handler(_silent_proactor_errors)
+except RuntimeError:
+    pass
+
 app = FastAPI(
     title       = "UMaT AI Service",
     description = "Generative AI backend for UMaT Virtual Learning Environment",

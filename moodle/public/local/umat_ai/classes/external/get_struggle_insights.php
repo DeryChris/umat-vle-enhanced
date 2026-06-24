@@ -36,6 +36,14 @@ class get_struggle_insights extends \external_api {
         self::validate_context($context);
         require_capability('local/umat_ai:viewanalytics', $context);
 
+        // ── Moodle cache: check for cached response ──
+        $cache    = \cache::make('local_umat_ai', 'struggle_insights');
+        $cachekey = "struggle_{$cid}_{$params['days']}";
+        $cached   = $cache->get($cachekey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
         // ──────────────────────────────────────────────────────────────
         // 1. Student chat logs (questions, sources, userid, timecreated)
         // ──────────────────────────────────────────────────────────────
@@ -254,6 +262,72 @@ class get_struggle_insights extends \external_api {
         }
 
         // ──────────────────────────────────────────────────────────────
+        // 5b. Student context events (quiz failures, repeated views,
+        //     assignment failures) and issue reports
+        // ──────────────────────────────────────────────────────────────
+        $eventRecords = $DB->get_records_select('umat_ai_student_context',
+            'courseid = ? AND timemodified > ?', [$cid, $since]);
+        $topicEvents = []; // normalized_label_or_topic => [reason => count]
+        $studentEvents = []; // userid => [reason => count]
+        $eventTopicMap = []; // normalized_label_or_topic => human_label
+
+        foreach ($eventRecords as $er) {
+            $label = trim($er->topic_label ?? '');
+            $reason = $er->struggle_reason;
+            $uid = (int)$er->userid;
+            $norm = strtolower(preg_replace('/[^a-z0-9\s]/', '', $label));
+            if (empty($norm)) $norm = '_unnamed';
+
+            if (!isset($topicEvents[$norm])) $topicEvents[$norm] = [];
+            $topicEvents[$norm][$reason] = ($topicEvents[$norm][$reason] ?? 0) + 1;
+            $eventTopicMap[$norm] = $label
+                ?: ($reason === 'quiz_failure' ? 'Quiz Failure'
+                    : ($reason === 'assignment_failure' ? 'Assignment Failure'
+                        : ($reason === 'repeated_views' ? 'Repeated Views'
+                            : 'Activity')));
+            if (!isset($studentEvents[$uid])) $studentEvents[$uid] = [];
+            $studentEvents[$uid][$reason] = ($studentEvents[$uid][$reason] ?? 0) + 1;
+        }
+
+        // Issue reports (already fetched in step 11, but we need category counts earlier)
+        $issueCategoryCounts = [];
+        $issueRecords = $DB->get_records_select('umat_ai_issue_reports',
+            'courseid = ? AND timecreated > ?', [$cid, $since]);
+        $totalIssues = count($issueRecords);
+        $openIssues = 0;
+        foreach ($issueRecords as $ir) {
+            if ($ir->status === 'open' || $ir->status === 'in_review') $openIssues++;
+            $cat = $ir->category;
+            if (!isset($issueCategoryCounts[$cat])) $issueCategoryCounts[$cat] = 0;
+            $issueCategoryCounts[$cat]++;
+            // If issue has a topic, also increment event-based matches
+            if (!empty(trim($ir->topic ?? ''))) {
+                $irtNorm = strtolower(preg_replace('/[^a-z0-9\s]/', '', $ir->topic));
+                if (!empty($irtNorm)) {
+                    if (!isset($topicEvents[$irtNorm])) $topicEvents[$irtNorm] = [];
+                    $topicEvents[$irtNorm]['issue_reported'] = ($topicEvents[$irtNorm]['issue_reported'] ?? 0) + 1;
+                    if (!isset($eventTopicMap[$irtNorm])) $eventTopicMap[$irtNorm] = trim($ir->topic);
+                }
+            }
+        }
+        $catLabels = [
+            'concept_confusion' => 'Concept Confusion',
+            'material_error'    => 'Material Error',
+            'technical_issue'   => 'Technical Issue',
+            'suggestion'        => 'Suggestion',
+            'other'             => 'Other',
+        ];
+        $topIssueTopics = [];
+        foreach ($issueCategoryCounts as $cat => $cnt) {
+            $topIssueTopics[] = [
+                'category' => $cat,
+                'label'    => $catLabels[$cat] ?? $cat,
+                'count'    => $cnt,
+            ];
+        }
+        usort($topIssueTopics, function ($a, $b) { return $b['count'] - $a['count']; });
+
+        // ──────────────────────────────────────────────────────────────
         // 6. Compute per-topic struggle scores
         // ──────────────────────────────────────────────────────────────
         $enrolledCount = (int) count_enrolled_users($context, '', 0, true);
@@ -326,15 +400,86 @@ class get_struggle_insights extends \external_api {
                 return $b['question_count'] - $a['question_count'];
             });
 
+            // Merge event-based data for this topic
+            $topicName = $allConcepts[$lc] ?? ucwords(str_replace('_', ' ', $lc));
+            $topicNorm = strtolower(preg_replace('/[^a-z0-9\s]/', '', $topicName));
+            $evSrc = ['chat_questions' => $cnt, 'quiz_failures' => 0, 'repeated_views' => 0, 'assignment_failures' => 0, 'issue_reports' => 0];
+            // Try direct match by normalized label
+            if (isset($topicEvents[$topicNorm])) {
+                foreach ($topicEvents[$topicNorm] as $reason => $ec) {
+                    $mapKey = ['quiz_failure' => 'quiz_failures', 'repeated_views' => 'repeated_views',
+                               'assignment_failure' => 'assignment_failures', 'issue_reported' => 'issue_reports'];
+                    $k = $mapKey[$reason] ?? null;
+                    if ($k) $evSrc[$k] = ($evSrc[$k] ?? 0) + $ec;
+                }
+            }
+            // Try partial match: any event whose normalized label overlaps this topic
+            foreach ($topicEvents as $evNorm => $evReasons) {
+                if ($evNorm === $topicNorm) continue;
+                if (strpos($topicNorm, $evNorm) !== false || strpos($evNorm, $topicNorm) !== false) {
+                    foreach ($evReasons as $reason => $ec) {
+                        $mapKey = ['quiz_failure' => 'quiz_failures', 'repeated_views' => 'repeated_views',
+                                   'assignment_failure' => 'assignment_failures', 'issue_reported' => 'issue_reports'];
+                        $k = $mapKey[$reason] ?? null;
+                        if ($k) $evSrc[$k] = ($evSrc[$k] ?? 0) + $ec;
+                    }
+                }
+            }
+
+            // Recalculate struggle score factoring all event sources
+            $eventTotal = array_sum($evSrc) - $evSrc['chat_questions']; // non-chat events
+            $eventBonus = min(30, $eventTotal * 3);
+            $score = round(min(100, $score + $eventBonus));
+
             $topicMatrix[] = [
-                'topic'           => $allConcepts[$lc] ?? ucwords(str_replace('_', ' ', $lc)),
+                'topic'           => $topicName,
                 'question_count'  => $cnt,
                 'student_count'   => $stuCnt,
                 'struggle_score'  => $score,
                 'trend'           => $trend,
                 'trend_pct'       => $trendPct,
                 'difficulty'      => $difficulty,
+                'event_sources'   => $evSrc,
                 'materials'       => $topicMatList,
+            ];
+        }
+
+        // ── Merge event-only topics (topics with quiz/issue/assignment events
+        //     that didn't match any chat-based topic) into the matrix.
+        foreach ($topicEvents as $evNorm => $evReasons) {
+            $alreadyInMatrix = false;
+            foreach ($topicMatrix as $existing) {
+                $existingNorm = strtolower(preg_replace('/[^a-z0-9\s]/', '', $existing['topic']));
+                if ($existingNorm === $evNorm) { $alreadyInMatrix = true; break; }
+            }
+            if ($alreadyInMatrix) continue;
+
+            $totalEvents = array_sum($evReasons);
+            if ($totalEvents < 1) continue;
+
+            $evSrc = ['chat_questions' => 0, 'quiz_failures' => 0, 'repeated_views' => 0,
+                      'assignment_failures' => 0, 'issue_reports' => 0];
+            $mapKey = ['quiz_failure' => 'quiz_failures', 'repeated_views' => 'repeated_views',
+                       'assignment_failure' => 'assignment_failures', 'issue_reported' => 'issue_reports'];
+            foreach ($evReasons as $reason => $ec) {
+                $k = $mapKey[$reason] ?? null;
+                if ($k) $evSrc[$k] = ($evSrc[$k] ?? 0) + $ec;
+            }
+
+            $humanLabel = $eventTopicMap[$evNorm] ?? ucwords(str_replace('_', ' ', $evNorm));
+            $evScore = min(100, 30 + $totalEvents * 5);
+            $evScore = min(100, $evScore + ($evSrc['quiz_failures'] ?? 0) * 8);
+
+            $topicMatrix[] = [
+                'topic'           => $humanLabel,
+                'question_count'  => 0,
+                'student_count'   => 0,
+                'struggle_score'  => $evScore,
+                'trend'           => 'stable',
+                'trend_pct'       => 0,
+                'difficulty'      => 'intermediate',
+                'event_sources'   => $evSrc,
+                'materials'       => [],
             ];
         }
 
@@ -376,6 +521,7 @@ class get_struggle_insights extends \external_api {
                     'trend'          => 'stable',
                     'trend_pct'      => 0,
                     'difficulty'     => 'intermediate',
+                    'event_sources'  => ['chat_questions' => $cnt, 'quiz_failures' => 0, 'repeated_views' => 0, 'assignment_failures' => 0, 'issue_reports' => 0],
                     'materials'      => [],
                 ];
                 $rank++;
@@ -558,12 +704,21 @@ class get_struggle_insights extends \external_api {
             $daysSince = max(0, (time() - $lastTs) / DAYSECS);
             $recencyWeight = $daysSince < 3 ? 20 : ($daysSince < 7 ? 15 : ($daysSince < 14 ? 10 : 5));
 
+            // Event-based risk factors
+            $stuEv = $studentEvents[$uid] ?? [];
+            $evQuizFailures = $stuEv['quiz_failure'] ?? 0;
+            $evAssignmentFails = $stuEv['assignment_failure'] ?? 0;
+            $evRepeatedViews = $stuEv['repeated_views'] ?? 0;
+            $evIssueReports = $stuEv['issue_reported'] ?? 0;
+            $evBonus = min(25, ($evQuizFailures * 8) + ($evAssignmentFails * 6) + ($evRepeatedViews * 3) + ($evIssueReports * 5));
+
             // Risk score
             $riskScore = round(min(100,
                 ($qCnt / 50) * 30 +
                 min(20, $topicDiv * 5) +
                 ($trend === 'up' ? 25 : ($trend === 'stable' ? 10 : 0)) +
-                $recencyWeight
+                $recencyWeight +
+                $evBonus
             ));
 
             $riskLevel = $riskScore >= 60 ? 'high' : ($riskScore >= 30 ? 'medium' : 'low');
@@ -572,7 +727,7 @@ class get_struggle_insights extends \external_api {
             $user = $DB->get_record('user', ['id' => $uid], 'id, firstname, lastname');
             if (!$user) continue;
 
-            $issueCnt = $DB->count_records_select('umat_ai_issue_reports',
+            $issueCnt = $evIssueReports + $DB->count_records_select('umat_ai_issue_reports',
                 'userid = ? AND courseid = ? AND timecreated > ?', [$uid, $cid, $since]);
 
             $atRiskStudents[] = [
@@ -581,6 +736,13 @@ class get_struggle_insights extends \external_api {
                 'profileimageurl' => (new \moodle_url('/user/pix.php/' . $uid . '/f1.jpg'))->out(false),
                 'question_count'  => $qCnt,
                 'issue_count'     => (int)$issueCnt,
+                'event_sources'   => [
+                    'chat_questions'      => $qCnt,
+                    'quiz_failures'       => $evQuizFailures,
+                    'assignment_failures' => $evAssignmentFails,
+                    'repeated_views'      => $evRepeatedViews,
+                    'issue_reports'       => $evIssueReports,
+                ],
                 'struggle_topics' => $stuTopicNames,
                 'risk_score'      => $riskScore,
                 'risk_level'      => $riskLevel,
@@ -660,6 +822,8 @@ class get_struggle_insights extends \external_api {
     // 10. Optional: AI service enhancement
     // ──────────────────────────────────────────────────────────────
     $aiServiceUsed = false;
+    $aiOverallSummary = '';
+    $aiCourseHealth = null;
     $cfg = \local_umat_ai_get_service_config();
     if (!empty($cfg['token'])) {
         try {
@@ -724,6 +888,7 @@ class get_struggle_insights extends \external_api {
                                     'trend' => 'stable',
                                     'trend_pct' => 0,
                                     'difficulty' => 'intermediate',
+                                    'event_sources' => ['chat_questions' => count($tData['question_ids']), 'quiz_failures' => 0, 'repeated_views' => 0, 'assignment_failures' => 0, 'issue_reports' => 0],
                                     'materials' => [],
                                     'ai_classified' => true,
                                 ];
@@ -739,51 +904,156 @@ class get_struggle_insights extends \external_api {
                     }
                 }
             }
+
+            // ── AI struggle-topics enrichment ──
+            if (!empty($topicMatrix)) {
+                $aiStruggleTopics = [];
+                foreach ($topicMatrix as $tm) {
+                    $aiStruggleTopics[] = [
+                        'topic'          => $tm['topic'],
+                        'question_count' => $tm['question_count'],
+                        'student_count'  => $tm['student_count'],
+                        'struggle_score' => $tm['struggle_score'],
+                        'event_sources'  => $tm['event_sources'] ?? [],
+                    ];
+                }
+                $payload = json_encode(['topics' => $aiStruggleTopics]);
+                $raw2 = $client->post($cfg['url'] . '/api/v1/analytics/struggle-topics', $payload);
+                $stResult = json_decode($raw2, true);
+                if ($stResult && isset($stResult['topics'])) {
+                    $aiRecs = [];
+                    foreach ($stResult['topics'] as $aiT) {
+                        $aiRecs[$aiT['topic']] = $aiT['recommendation'] ?? '';
+                    }
+                    foreach ($topicMatrix as &$tm) {
+                        if (isset($aiRecs[$tm['topic']])) {
+                            $tm['ai_recommendation'] = $aiRecs[$tm['topic']];
+                        }
+                    }
+                    unset($tm);
+                }
+                if ($stResult && isset($stResult['summary'])) {
+                    $aiOverallSummary = $stResult['summary'];
+                }
+            }
+
+            // ── AI student-risk enrichment ──
+            if (!empty($atRiskStudents)) {
+                $aiStudentData = [];
+                foreach ($atRiskStudents as $s) {
+                    $aiStudentData[] = [
+                        'user_id'        => $s['userid'],
+                        'fullname'       => $s['fullname'],
+                        'question_count' => $s['question_count'],
+                        'struggle_topics' => $s['struggle_topics'],
+                        'risk_score'     => $s['risk_score'],
+                        'trend'          => $s['trend'],
+                        'event_sources'  => $s['event_sources'] ?? [],
+                    ];
+                }
+                $payload = json_encode(['students' => $aiStudentData]);
+                $raw3 = $client->post($cfg['url'] . '/api/v1/analytics/student-risk', $payload);
+                $srResult = json_decode($raw3, true);
+                if ($srResult && isset($srResult['students'])) {
+                    $aiRiskMap = [];
+                    foreach ($srResult['students'] as $aiS) {
+                        $aiRiskMap[$aiS['user_id']] = [
+                            'risk_factors'    => $aiS['risk_factors'] ?? [],
+                            'recommendation'  => $aiS['recommendation'] ?? '',
+                        ];
+                    }
+                    foreach ($atRiskStudents as &$s) {
+                        if (isset($aiRiskMap[$s['userid']])) {
+                            $s['ai_risk_factors']   = $aiRiskMap[$s['userid']]['risk_factors'];
+                            $s['ai_recommendation'] = $aiRiskMap[$s['userid']]['recommendation'];
+                        }
+                    }
+                    unset($s);
+                }
+            }
+
+            // ── AI course-health report ──
+            if (!empty($topicMatrix)) {
+                $healthPayload = [
+                    'course_id'        => $cid,
+                    'total_questions'  => $totalQuestions,
+                    'total_students'   => $uniqueStudents,
+                    'worst_topic'      => $worstTopic,
+                    'topic_matrix'     => array_map(function($t) {
+                        return [
+                            'topic'          => $t['topic'],
+                            'question_count' => $t['question_count'],
+                            'struggle_score' => $t['struggle_score'],
+                            'trend'          => $t['trend'],
+                            'event_sources'  => $t['event_sources'] ?? [],
+                        ];
+                    }, array_slice($topicMatrix, 0, 10)),
+                    'at_risk_students' => array_map(function($s) {
+                        return [
+                            'fullname'       => $s['fullname'],
+                            'question_count' => $s['question_count'],
+                            'risk_score'     => $s['risk_score'],
+                            'struggle_topics'=> $s['struggle_topics'],
+                        ];
+                    }, array_slice($atRiskStudents, 0, 5)),
+                    'event_breakdown'  => $eventBreakdown,
+                    'total_events'     => $totalEvents,
+                    'total_issues'     => $totalIssues,
+                    'open_issues'      => $openIssues,
+                ];
+                $payload = json_encode($healthPayload);
+                $raw4 = $client->post($cfg['url'] . '/api/v1/analytics/course-health', $payload);
+                $chResult = json_decode($raw4, true);
+                if ($chResult) {
+                    $aiCourseHealth = $chResult;
+                }
+            }
         } catch (\Throwable $e) {
             $aiServiceUsed = false;
         }
     }
 
     // ──────────────────────────────────────────────────────────────
-    // 11. Issue report enrichment
+    // 11. Event breakdown (already fetched in step 5b)
     // ──────────────────────────────────────────────────────────────
-    $totalIssues   = 0;
-    $openIssues    = 0;
-    $topIssueTopics = [];
-    $issueRecords = $DB->get_records_select('umat_ai_issue_reports', 'courseid = ? AND timecreated > ?', [$cid, $since], 'timecreated DESC');
-    if ($issueRecords) {
-        $totalIssues = count($issueRecords);
-        $topicCounts = [];
-        foreach ($issueRecords as $ir) {
-            if ($ir->status === 'open' || $ir->status === 'in_review') {
-                $openIssues++;
-            }
-            if ($ir->topic !== '') {
-                $topicCounts[$ir->topic] = ($topicCounts[$ir->topic] ?? 0) + 1;
-            }
+    $totalEvents = 0;
+    $eventBreakdown = ['quiz_failures' => 0, 'repeated_views' => 0, 'assignment_failures' => 0, 'issue_reports' => 0];
+    foreach ($topicEvents as $evNorm => $evReasons) {
+        foreach ($evReasons as $reason => $ec) {
+            $mapKey = ['quiz_failure' => 'quiz_failures', 'repeated_views' => 'repeated_views',
+                       'assignment_failure' => 'assignment_failures', 'issue_reported' => 'issue_reports'];
+            $k = $mapKey[$reason] ?? null;
+            if ($k) $eventBreakdown[$k] += $ec;
         }
-        arsort($topicCounts);
-        $topIssueTopics = array_slice(array_keys($topicCounts), 0, 5);
     }
+    $totalEvents = array_sum($eventBreakdown);
 
     // ──────────────────────────────────────────────────────────────
     // 12. Summary & return
     // ──────────────────────────────────────────────────────────────
-    return [
+    $aiSummary = $aiOverallSummary ?: '';
+    $aiCourseHealthJson = $aiCourseHealth ? json_encode($aiCourseHealth) : null;
+    $result = [
         'topic_matrix'       => $topicMatrix,
         'material_breakdown' => $sectionList,
         'recording_struggle' => $recordingStruggle,
         'at_risk_students'   => $atRiskStudents,
         'summary' => [
-            'total_questions'  => $totalQuestions,
-            'total_students'   => $uniqueStudents,
-            'worst_topic'      => $worstTopic,
-            'ai_service_used'  => $aiServiceUsed,
-            'total_issues'     => $totalIssues,
-            'open_issues'      => $openIssues,
-            'top_issue_topics' => $topIssueTopics,
+            'total_questions'    => $totalQuestions,
+            'total_students'     => $uniqueStudents,
+            'worst_topic'        => $worstTopic,
+            'ai_service_used'    => $aiServiceUsed,
+            'ai_overall_summary' => $aiSummary,
+            'ai_course_health'   => $aiCourseHealthJson,
+            'total_issues'       => $totalIssues,
+            'open_issues'        => $openIssues,
+            'top_issue_topics'   => $topIssueTopics,
+            'event_breakdown'    => $eventBreakdown,
+            'total_events'       => $totalEvents,
         ],
     ];
+    $cache->set($cachekey, $result);
+    return $result;
 
     }
 
@@ -798,10 +1068,15 @@ class get_struggle_insights extends \external_api {
                     'trend'          => new \external_value(PARAM_TEXT),
                     'trend_pct'      => new \external_value(PARAM_INT),
                     'difficulty'     => new \external_value(PARAM_TEXT),
-                    // Only present on topics enriched by the AI classification
-                    // step — without this declaration Moodle rejects the whole
-                    // response as soon as the AI service is reachable.
-                    'ai_classified'  => new \external_value(PARAM_BOOL, '', VALUE_OPTIONAL),
+                    'ai_classified'     => new \external_value(PARAM_BOOL, '', VALUE_OPTIONAL),
+                    'ai_recommendation' => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                    'event_sources'     => new \external_single_structure([
+                        'chat_questions'      => new \external_value(PARAM_INT),
+                        'quiz_failures'       => new \external_value(PARAM_INT),
+                        'repeated_views'      => new \external_value(PARAM_INT),
+                        'assignment_failures' => new \external_value(PARAM_INT),
+                        'issue_reports'       => new \external_value(PARAM_INT),
+                    ], '', VALUE_OPTIONAL),
                     'materials'      => new \external_multiple_structure(
                         new \external_single_structure([
                             'id'             => new \external_value(PARAM_INT),
@@ -858,25 +1133,45 @@ class get_struggle_insights extends \external_api {
                     'profileimageurl' => new \external_value(PARAM_URL),
                     'question_count'  => new \external_value(PARAM_INT),
                     'issue_count'     => new \external_value(PARAM_INT),
+                    'event_sources'   => new \external_single_structure([
+                        'chat_questions'      => new \external_value(PARAM_INT),
+                        'quiz_failures'       => new \external_value(PARAM_INT),
+                        'repeated_views'      => new \external_value(PARAM_INT),
+                        'assignment_failures' => new \external_value(PARAM_INT),
+                        'issue_reports'       => new \external_value(PARAM_INT),
+                    ], '', VALUE_OPTIONAL),
                     'struggle_topics' => new \external_multiple_structure(
                         new \external_value(PARAM_TEXT)
                     ),
-                    'risk_score' => new \external_value(PARAM_INT),
-                    'risk_level' => new \external_value(PARAM_TEXT),
-                    'trend'      => new \external_value(PARAM_TEXT),
-                    'last_active' => new \external_value(PARAM_TEXT),
+                    'risk_score'        => new \external_value(PARAM_INT),
+                    'risk_level'        => new \external_value(PARAM_TEXT),
+                    'trend'             => new \external_value(PARAM_TEXT),
+                    'last_active'       => new \external_value(PARAM_TEXT),
+                    'ai_risk_factors'   => new \external_multiple_structure(
+                        new \external_value(PARAM_TEXT), '', VALUE_OPTIONAL
+                    ),
+                    'ai_recommendation' => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
                 ])
             ),
             'summary' => new \external_single_structure([
-                'total_questions'  => new \external_value(PARAM_INT),
-                'total_students'   => new \external_value(PARAM_INT),
-                'worst_topic'      => new \external_value(PARAM_TEXT),
-                'ai_service_used'  => new \external_value(PARAM_BOOL),
-                'total_issues'     => new \external_value(PARAM_INT),
-                'open_issues'      => new \external_value(PARAM_INT),
-                'top_issue_topics' => new \external_multiple_structure(
+                'total_questions'    => new \external_value(PARAM_INT),
+                'total_students'     => new \external_value(PARAM_INT),
+                'worst_topic'        => new \external_value(PARAM_TEXT),
+                'ai_service_used'    => new \external_value(PARAM_BOOL),
+                'ai_overall_summary' => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                'ai_course_health'   => new \external_value(PARAM_RAW, '', VALUE_OPTIONAL),
+                'total_issues'       => new \external_value(PARAM_INT),
+                'open_issues'        => new \external_value(PARAM_INT),
+                'top_issue_topics'   => new \external_multiple_structure(
                     new \external_value(PARAM_TEXT)
                 ),
+                'event_breakdown'    => new \external_single_structure([
+                    'quiz_failures'       => new \external_value(PARAM_INT),
+                    'repeated_views'      => new \external_value(PARAM_INT),
+                    'assignment_failures' => new \external_value(PARAM_INT),
+                    'issue_reports'       => new \external_value(PARAM_INT),
+                ], '', VALUE_OPTIONAL),
+                'total_events'     => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
             ]),
         ]);
     }
