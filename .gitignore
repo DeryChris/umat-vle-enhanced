@@ -123,6 +123,7 @@ moodle/public/r.php
 moodle/public/security.txt
 moodle/public/tokenpluginfile.php
 moodle/public/version.php
+moodle/vendor/
 
 # Moodle local config contains database credentials - never commit
 moodle/config.php
@@ -167,6 +168,8 @@ ai_service/chroma_db/*
 # Log files
 ai_service/*.log
 ai_service/logs/
+ai_service_stderr.log
+ai_service_stdout.log
 
 # Pytest
 ai_service/.pytest_cache/
