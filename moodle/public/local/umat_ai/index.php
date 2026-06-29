@@ -67,6 +67,7 @@ $tctx = [
     'has_video'      => !empty($videoUrl),
     'transcript'     => [],
     'has_capability' => true,
+    'is_lecturer'    => has_capability('local/umat_ai:viewanalytics', $context),
     'hub_url'        => (new moodle_url('/local/umat_ai/hub.php'))->out(false),
     'wwwroot'        => $CFG->wwwroot,
 ];
@@ -84,6 +85,13 @@ $PAGE->requires->js_amd_inline("
         });
     });
 ");
+if (has_capability('local/umat_ai:viewanalytics', $context)) {
+    $PAGE->requires->js_amd_inline("
+        require(['local_umat_ai/ai_dashboard'], function(Dashboard) {
+            Dashboard.init({$courseid});
+        });
+    ");
+}
 
 echo $OUTPUT->header();
 echo $OUTPUT->render_from_template('local_umat_ai/ai_workspace', $tctx);

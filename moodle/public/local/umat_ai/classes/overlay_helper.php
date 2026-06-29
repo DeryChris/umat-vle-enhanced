@@ -79,8 +79,8 @@ JS;
         $moodleSesskey = json_encode(sesskey());
 
         $tabs = [
-            ['id' => 'home',      'icon' => 'home',          'label' => 'Home',      'active' => false],
-            ['id' => 'ai-tutor',  'icon' => 'smart_toy',     'label' => 'AI Tutor',  'active' => true],
+            ['id' => 'home',      'icon' => 'home',          'label' => 'Home',      'active' => true],
+            ['id' => 'ai-tutor',  'icon' => 'smart_toy',     'label' => 'AI Tutor',  'active' => false],
             ['id' => 'lectures',  'icon' => 'play_circle',   'label' => 'Lectures',  'active' => false],
             ['id' => 'courses',   'icon' => 'menu_book',     'label' => 'My Courses','active' => false],
             ['id' => 'library',   'icon' => 'local_library', 'label' => 'Library',   'active' => false],
@@ -140,7 +140,6 @@ JS;
       <button class="umat-cp-feature-tab active" data-cp-pane="cp-chat" type="button"><span class="material-symbols-outlined">smart_toy</span><span>Tutor</span></button>
       <button class="umat-cp-feature-tab" data-cp-pane="cp-notes" type="button"><span class="material-symbols-outlined">note_add</span><span>Notes</span></button>
       <button class="umat-cp-feature-tab" data-cp-pane="cp-resources" type="button"><span class="material-symbols-outlined">folder_open</span><span>Files</span></button>
-      <button class="umat-cp-feature-tab" data-cp-open="home" type="button"><span class="material-symbols-outlined">home</span><span>Home</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="lectures" type="button"><span class="material-symbols-outlined">play_circle</span><span>Lectures</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="courses" type="button"><span class="material-symbols-outlined">menu_book</span><span>Courses</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="library" type="button"><span class="material-symbols-outlined">local_library</span><span>Library</span></button>
@@ -509,6 +508,10 @@ var reportLoaded = false;
 var progLoaded = false;
 var ov = document.getElementById('umat-student-ov');
 
+/* ---- Scroll-to-bottom FABs ---- */
+if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('cp-msgs');
+if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('ws-msgs');
+
 /* ---- FAB & compact panel ---- */
 var fab     = document.getElementById('umat-stu-fab');
 var cpOv    = document.getElementById('stu-cp-ov');
@@ -539,12 +542,14 @@ function newSession(){
   if(cm){
     cm.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>New session ready! How can I help you?</p></div></div></div>';
   }
+  if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('ws-msgs');
+  if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('cp-msgs');
   switchToTab('ai-tutor');
   _umatCloseQuiz();qz.data=null;qz.answers={};qz.graded={};qz.idx=0;
   try{sessionStorage.removeItem('qz_state');}catch(e){}
 }
 
-function openOverlay(){ ov.classList.add('open'); populateHomeTab(); updateBodyLock(); }
+function openOverlay(){ ov.classList.add('open'); switchToTab('home'); populateHomeTab(); updateBodyLock(); }
 function closeOverlay(){ ov.classList.remove('open'); cpOv.classList.add('open'); updateBodyLock(); }
 if(ov)ov.addEventListener('click',function(e){if(e.target===ov)closeOverlay();});
 
@@ -1742,6 +1747,7 @@ function doResumeSession(sk,cid){
           if(msg.question)_umatAppendUser('ws-msgs',msg.question);
           if(msg.answer)_umatAppendAi('ws-msgs',msg.answer,msg.sources||[]);
         });
+        if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('ws-msgs');
         if(!msgsArr.length){
           msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>Welcome back! This session had no previous messages. Ask me anything!</p></div></div></div>';
         } else {
@@ -1966,8 +1972,8 @@ HTML;
         // Glassmorphism mobile tab bar (in-overlay)
         $lecGlassTabs = [
             ['id' => 'lec-home',      'icon' => 'home',         'label' => 'Home',     'active' => true],
-            ['id' => 'lec-analytics', 'icon' => 'bar_chart',     'label' => 'Analytics','active' => false],
-            ['id' => 'lec-struggle',  'icon' => 'psychology',    'label' => 'Struggle', 'active' => false],
+            ['id' => 'lec-insights',  'icon' => 'psychology',    'label' => 'Insights','active' => false],
+            ['id' => 'lec-quizgen',   'icon' => 'quiz',          'label' => 'Quiz Gen','active' => false],
             ['id' => 'lec-courses',   'icon' => 'menu_book',     'label' => 'Courses',  'active' => false],
             ['id' => 'lec-library',   'icon' => 'local_library', 'label' => 'Library',  'active' => false],
             ['id' => 'lec-sessions',  'icon' => 'history',       'label' => 'Sessions', 'active' => false],
@@ -1975,6 +1981,12 @@ HTML;
             ['id' => 'lec-issues',   'icon' => 'flag',          'label' => 'Issues',   'active' => false],
         ];
         $lecMobTabs = self::glassmorph_tab_bar($lecGlassTabs, 'lp', 'lec-glass-tabs');
+
+        global $OUTPUT;
+        $struggleDashboardHtml = $OUTPUT->render_from_template('local_umat_ai/struggle_dashboard', [
+            'stream_url' => $wwwroot . '/local/umat_ai/chat_stream.php',
+            'sesskey'    => sesskey(),
+        ]);
 
         return <<<HTML
 <!-- ============================================================
@@ -2005,15 +2017,13 @@ HTML;
     </div>
     <div class="umat-cp-tabs umat-cp-tabs-legacy">
       <button class="umat-cp-tab active" data-lcp-tab="lcp-insights" type="button">Home</button>
-      <button class="umat-cp-tab" data-lcp-tab="lcp-questions" type="button">Questions</button>
       <button class="umat-cp-tab" data-lcp-tab="lcp-ai" type="button">Ask AI</button>
     </div>
     <div class="umat-cp-feature-tabs" aria-label="Quick lecturer tools" role="tablist">
       <button class="umat-cp-feature-tab active" data-lcp-pane="lcp-insights" type="button"><span class="material-symbols-outlined">home</span><span>Home</span></button>
-      <button class="umat-cp-feature-tab" data-lcp-pane="lcp-questions" type="button"><span class="material-symbols-outlined">forum</span><span>Questions</span></button>
       <button class="umat-cp-feature-tab" data-lcp-pane="lcp-ai" type="button"><span class="material-symbols-outlined">smart_toy</span><span>Ask AI</span></button>
-      <button class="umat-cp-feature-tab" data-lcp-open="lec-analytics" type="button"><span class="material-symbols-outlined">bar_chart</span><span>Analytics</span></button>
-      <button class="umat-cp-feature-tab" data-lcp-open="lec-struggle" type="button"><span class="material-symbols-outlined">psychology</span><span>Struggle</span></button>
+      <button class="umat-cp-feature-tab" data-lcp-open="lec-insights" type="button"><span class="material-symbols-outlined">psychology</span><span>Insights</span></button>
+      <button class="umat-cp-feature-tab" data-lcp-open="lec-quizgen" type="button"><span class="material-symbols-outlined">quiz</span><span>Quiz Gen</span></button>
       <button class="umat-cp-feature-tab" data-lcp-open="lec-courses" type="button"><span class="material-symbols-outlined">menu_book</span><span>Courses</span></button>
       <button class="umat-cp-feature-tab" data-lcp-open="lec-library" type="button"><span class="material-symbols-outlined">local_library</span><span>Library</span></button>
       <button class="umat-cp-feature-tab" data-lcp-open="lec-sessions" type="button"><span class="material-symbols-outlined">history</span><span>Sessions</span></button>
@@ -2069,7 +2079,7 @@ HTML;
     <div class="umat-cp-pane" id="lcp-ai" style="flex-direction:column;">
       <div class="umat-msgs" id="lcp-msgs">
         <div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>
-          <div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div>
+          <div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI ASSISTANT</div>
             <div class="umat-bubble-ai"><p>Ask me about your course analytics — e.g. <em>"Which topics are students struggling with?"</em></p></div>
             <div class="umat-chips-row">
               <button class="umat-chip" data-lp="Which topics are students struggling with the most?" type="button">Struggle areas</button>
@@ -2108,13 +2118,13 @@ HTML;
       </div>
       <nav class="umat-sb-nav">
         <button class="umat-sb-item active" data-lp="lec-home" type="button"><span class="material-symbols-outlined">home</span><span class="umat-sb-item-lbl">Home</span></button>
-        <button class="umat-sb-item" data-lp="lec-analytics" type="button"><span class="material-symbols-outlined">bar_chart</span><span class="umat-sb-item-lbl">Analytics</span></button>
-        <button class="umat-sb-item" data-lp="lec-struggle" type="button"><span class="material-symbols-outlined">psychology</span><span class="umat-sb-item-lbl">Struggle</span></button>
+        <button class="umat-sb-item" data-lp="lec-insights" type="button"><span class="material-symbols-outlined">psychology</span><span class="umat-sb-item-lbl">Insights</span></button>
         <button class="umat-sb-item" data-lp="lec-courses" type="button"><span class="material-symbols-outlined">menu_book</span><span class="umat-sb-item-lbl">My Courses</span></button>
         <button class="umat-sb-item" data-lp="lec-library" type="button"><span class="material-symbols-outlined">local_library</span><span class="umat-sb-item-lbl">Library</span></button>
         <button class="umat-sb-item" data-lp="lec-sessions" type="button"><span class="material-symbols-outlined">history</span><span class="umat-sb-item-lbl">Sessions</span></button>
         <button class="umat-sb-item" data-lp="lec-review" type="button"><span class="material-symbols-outlined">fact_check</span><span class="umat-sb-item-lbl">Review Outputs</span></button>
         <button class="umat-sb-item" data-lp="lec-issues" type="button"><span class="material-symbols-outlined">flag</span><span class="umat-sb-item-lbl">Student Issues</span></button>
+        <button class="umat-sb-item" data-lp="lec-quizgen" type="button"><span class="material-symbols-outlined">quiz</span><span class="umat-sb-item-lbl">Quiz Generator</span></button>
       </nav>
       <div class="umat-sb-divider"></div>
       <div class="umat-sb-foot">
@@ -2144,8 +2154,8 @@ HTML;
           <div class="umat-home-section" style="margin-top:20px;">
             <h3>Quick Actions</h3>
             <div class="umat-quick-actions-grid">
-              <button class="umat-qa-btn" data-lp="lec-analytics" type="button"><span class="material-symbols-outlined">bar_chart</span><div class="umat-qa-btn-text"><strong>View Analytics</strong><span>Course performance data</span></div></button>
-              <button class="umat-qa-btn" data-lp="lec-struggle" type="button"><span class="material-symbols-outlined">psychology</span><div class="umat-qa-btn-text"><strong>Struggle Insights</strong><span>Topic &amp; student struggle data</span></div></button>
+              <button class="umat-qa-btn" data-lp="lec-insights" type="button"><span class="material-symbols-outlined">psychology</span><div class="umat-qa-btn-text"><strong>Insights Dashboard</strong><span>Student struggle &amp; course analytics</span></div></button>
+              <button class="umat-qa-btn" data-lp="lec-quizgen" type="button"><span class="material-symbols-outlined">quiz</span><div class="umat-qa-btn-text"><strong>Quiz Generator</strong><span>AI-generated course quizzes</span></div></button>
               <button class="umat-qa-btn" data-lp="lec-courses" type="button"><span class="material-symbols-outlined">menu_book</span><div class="umat-qa-btn-text"><strong>My Courses</strong><span>Switch course analytics</span></div></button>
               <button class="umat-qa-btn" data-lp="lec-library" type="button"><span class="material-symbols-outlined">local_library</span><div class="umat-qa-btn-text"><strong>Library</strong><span>Materials &amp; recordings</span></div></button>
               <button class="umat-qa-btn" data-lp="lec-review" type="button"><span class="material-symbols-outlined">fact_check</span><div class="umat-qa-btn-text"><strong>Review AI Outputs</strong><span>{$pending} pending</span></div></button>
@@ -2154,198 +2164,47 @@ HTML;
         </div>
       </div>
 
-      <!-- ANALYTICS -->
-      <div class="umat-tab-pane" id="lec-analytics" style="overflow:hidden;">
+            <!-- INSIGHTS DASHBOARD (unified analytics + struggle) -->
+      <div class="umat-tab-pane" id="lec-insights" style="overflow-y:auto;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">bar_chart</span> Analytics <span id="lec-an-course-label"></span></h2>
+          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">psychology</span> Struggle Dashboard <span id="ins-course-label"></span></h2>
           <div style="display:flex;gap:6px;align-items:center;">
-            <button class="umat-content-hdr-btn" id="lec-an-cs-btn" type="button" title="Select course"><span class="material-symbols-outlined">menu_book</span><span id="lec-an-cs-label">All Courses</span></button>
-            <button class="umat-content-hdr-btn" id="lec-an-export" type="button" onclick="window.print()"><span class="material-symbols-outlined">download</span>Export</button>
+            <button class="umat-content-hdr-btn" id="ins-cs-btn" type="button" title="Select course"><span class="material-symbols-outlined">menu_book</span><span id="ins-cs-label">All Courses</span></button>
+            <span class="umat-pill pill-info" id="ins-mode-badge">v2.0</span>
           </div>
         </div>
-        <!-- Course picker overlay -->
-        <div class="umat-cs-overlay" id="lec-an-cs-ov">
+        <div class="umat-cs-overlay" id="ins-cs-ov">
           <div class="umat-cs-modal">
             <div class="umat-cs-modal-hdr">
               <h3><span class="material-symbols-outlined">menu_book</span>Select a Course</h3>
-              <button class="umat-cs-close" id="lec-an-cs-close" type="button"><span class="material-symbols-outlined">close</span></button>
+              <button class="umat-cs-close" id="ins-cs-close" type="button"><span class="material-symbols-outlined">close</span></button>
             </div>
-            <div class="umat-cs-search"><input type="text" id="lec-an-cs-search" placeholder="Filter courses…"></div>
-            <div class="umat-cs-list" id="lec-an-cs-list"></div>
+            <div class="umat-cs-search"><input type="text" id="ins-cs-search" placeholder="Filter courses…"></div>
+            <div class="umat-cs-list" id="ins-cs-list"></div>
           </div>
         </div>
-        <div class="umat-an-scroll" id="lec-an-body">
-          <div id="lec-an-overview" style="display:none;">
-            <!-- KPI Summary row -->
-            <div class="ov-kpi-row" id="ov-an-kpis"></div>
-            <!-- Two-column layout: Course comparison + Engagement donut -->
-            <div class="ov-2col">
-              <div class="ov-card">
-                <div class="ov-card-hdr"><span class="material-symbols-outlined">bar_chart</span>Active Students by Course</div>
-                <div class="ov-chart-bars" id="ov-an-bars"><div class="ov-loading">Loading…</div></div>
-              </div>
-              <div class="ov-card">
-                <div class="ov-card-hdr"><span class="material-symbols-outlined">donut_small</span>Engagement Distribution</div>
-                <div class="ov-donut-wrap" id="ov-an-donut"><div class="ov-loading">Loading…</div></div>
-              </div>
-            </div>
-            <!-- Daily Activity Trend -->
-            <div class="ov-card ov-full">
-              <div class="ov-card-hdr"><span class="material-symbols-outlined">trending_up</span>Daily Activity Trend (All Courses)</div>
-              <div class="ov-chart-canvas"><canvas id="ov-an-chart"></canvas><div class="ov-chart-labels" id="ov-an-chart-labels"></div></div>
-            </div>
-            <!-- Top Questions -->
-            <div class="ov-card ov-full">
-              <div class="ov-card-hdr"><span class="material-symbols-outlined">forum</span>Top Questions Across All Courses</div>
-              <div id="ov-an-questions" class="ov-q-list"><div class="ov-loading">Loading…</div></div>
-            </div>
-          </div>
-          <div id="lec-an-detail">
-            <div class="umat-an-kpi-row">
-              <div class="umat-an-kpi"><div class="umat-an-kpi-head"><div class="umat-an-kpi-ico ak-g"><span class="material-symbols-outlined">group</span></div><span class="umat-an-kpi-pill pill-g" id="an-pill-active">active</span></div><div class="umat-an-kpi-lbl">Active Students</div><div class="umat-an-kpi-val" id="an-v-active">—</div><div class="umat-an-kpi-sub" id="an-s-active">of — enrolled</div></div>
-              <div class="umat-an-kpi"><div class="umat-an-kpi-head"><div class="umat-an-kpi-ico ak-s"><span class="material-symbols-outlined">timer</span></div><span class="umat-an-kpi-pill pill-b">avg Q/session</span></div><div class="umat-an-kpi-lbl">Avg Session Depth</div><div class="umat-an-kpi-val" id="an-v-time">—</div><div class="umat-an-kpi-sub">questions per session</div></div>
-              <div class="umat-an-kpi"><div class="umat-an-kpi-head"><div class="umat-an-kpi-ico ak-r"><span class="material-symbols-outlined">psychology_alt</span></div><span class="umat-an-kpi-pill pill-r">High</span></div><div class="umat-an-kpi-lbl">Struggle Index</div><div class="umat-an-kpi-val" style="font-size:18px;" id="an-v-str">—</div><div class="umat-an-kpi-sub">Most-questioned session</div></div>
-              <div class="umat-an-kpi"><div class="umat-an-kpi-head"><div class="umat-an-kpi-ico ak-w"><span class="material-symbols-outlined">forum</span></div><span class="umat-an-kpi-pill pill-b" id="an-pill-int">new</span></div><div class="umat-an-kpi-lbl">AI Interactions</div><div class="umat-an-kpi-val" id="an-v-int">—</div><div class="umat-an-kpi-sub">last 30 days</div></div>
-            </div>
-            <div class="umat-an-2col">
-              <div class="umat-an-card">
-                <div class="umat-an-card-hdr"><h3 class="umat-an-card-title"><span class="material-symbols-outlined">bar_chart</span>Student Engagement Trends</h3>
-                  <div style="display:flex;align-items:center;gap:10px;font-size:11px;color:var(--u-ol);">
-                    <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--u-p);display:inline-block;"></span>Lectures</span>
-                    <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--u-secc);display:inline-block;"></span>Quizzes</span>
-                  </div>
-                </div>
-                <div class="umat-an-card-body">
-                  <canvas id="an-chart" class="umat-chart-canvas"></canvas>
-                  <div id="an-chart-labels" style="display:flex;justify-content:space-around;margin-top:5px;font-size:10px;color:var(--u-ol);overflow:hidden;"></div>
-                </div>
-              </div>
-              <div class="umat-an-card">
-                <div class="umat-an-card-hdr"><h3 class="umat-an-card-title"><span class="material-symbols-outlined">stacked_bar_chart</span>Student Performance</h3></div>
-                <div class="umat-an-card-body">
-                  <div class="umat-perf-item"><div class="umat-perf-row"><span class="umat-perf-lbl">🟢 High Engagement</span><span class="umat-perf-num" id="an-p-high">—</span></div><div class="umat-perf-bar"><div class="umat-perf-fill pf-high" id="an-pb-high" style="width:0%"></div></div></div>
-                  <div class="umat-perf-item"><div class="umat-perf-row"><span class="umat-perf-lbl">🟡 On Track</span><span class="umat-perf-num" id="an-p-track">—</span></div><div class="umat-perf-bar"><div class="umat-perf-fill pf-track" id="an-pb-track" style="width:0%"></div></div></div>
-                  <div class="umat-perf-item"><div class="umat-perf-row"><span class="umat-perf-lbl">🔴 At Risk</span><span class="umat-perf-num" id="an-p-risk">—</span></div><div class="umat-perf-bar"><div class="umat-perf-fill pf-risk" id="an-pb-risk" style="width:0%"></div></div></div>
-                  <div style="font-size:11px;color:var(--u-ol);margin-top:10px;font-style:italic;">Estimated from AI interaction frequency over 30 days.</div>
-                </div>
-              </div>
-            </div>
-            <div class="umat-an-card" style="margin-bottom:18px;">
-              <div class="umat-an-card-hdr"><h3 class="umat-an-card-title"><span class="material-symbols-outlined">grid_view</span>Lecture Rewatch Heatmap</h3>
-                <div class="umat-hm-legend">
-                  <span>Less</span>
-                  <span class="umat-hm-legend-sw" style="background:#dbeafe;"></span>
-                  <span class="umat-hm-legend-sw" style="background:#93c5fd;"></span>
-                  <span class="umat-hm-legend-sw" style="background:#4ade80;"></span>
-                  <span class="umat-hm-legend-sw" style="background:var(--u-p);"></span>
-                  <span>Struggle Zone</span>
-                </div>
-              </div>
-              <div class="umat-an-card-body">
-                <div class="umat-hm-grid" id="an-hm-grid" style="grid-template-columns:40px repeat(10,1fr);"></div>
-                <div class="umat-an-ai-insight" id="an-insight" style="display:none;">
-                  <span class="material-symbols-outlined">lightbulb</span>
-                  <div class="umat-an-insight-text"><strong id="an-insight-title">AI Insight</strong><span id="an-insight-desc"></span></div>
-                </div>
-              </div>
-            </div>
-            <div class="umat-an-card">
-              <div class="umat-an-card-hdr"><h3 class="umat-an-card-title"><span class="material-symbols-outlined">help</span>Common Student Questions</h3><span style="padding:3px 9px;border-radius:999px;background:var(--u-secc);color:var(--u-sec);font-size:10px;font-weight:700;" id="an-q-badge">0+ chats</span></div>
-              <div class="umat-q-list" id="an-q-list"><div style="text-align:center;padding:24px;color:var(--u-ol);font-size:13px;">Loading questions…</div></div>
-            </div>
-          </div>
-        </div>
+        {$struggleDashboardHtml}
       </div>
-
-      <!-- STRUGGLE INSIGHTS -->
-      <div class="umat-tab-pane" id="lec-struggle" style="overflow-y:auto;">
+<!-- QUIZ GENERATOR -->
+      <div class="umat-tab-pane" id="lec-quizgen" style="overflow-y:auto;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">psychology</span> Struggle Insights <span id="stru-course-label"></span></h2>
+          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">quiz</span> Quiz Generator <span id="qgen-course-label"></span></h2>
           <div style="display:flex;gap:8px;align-items:center;">
-            <button class="umat-content-hdr-btn" id="stru-cs-btn" type="button" title="Select course"><span class="material-symbols-outlined">menu_book</span><span id="stru-cs-label">All Courses</span></button>
-            <span class="umat-pill pill-info" id="stru-mode-badge">PHP Engine</span>
+            <button class="umat-content-hdr-btn" id="qgen-cs-btn" type="button" title="Select course"><span class="material-symbols-outlined">menu_book</span><span id="qgen-cs-label">All Courses</span></button>
           </div>
         </div>
-        <!-- Course picker overlay -->
-        <div class="umat-cs-overlay" id="stru-cs-ov">
+        <div class="umat-cs-overlay" id="qgen-cs-ov">
           <div class="umat-cs-modal">
             <div class="umat-cs-modal-hdr">
               <h3><span class="material-symbols-outlined">menu_book</span>Select a Course</h3>
-              <button class="umat-cs-close" id="stru-cs-close" type="button"><span class="material-symbols-outlined">close</span></button>
+              <button class="umat-cs-close" id="qgen-cs-close" type="button"><span class="material-symbols-outlined">close</span></button>
             </div>
-            <div class="umat-cs-search"><input type="text" id="stru-cs-search" placeholder="Filter courses…"></div>
-            <div class="umat-cs-list" id="stru-cs-list"></div>
+            <div class="umat-cs-search"><input type="text" id="qgen-cs-search" placeholder="Filter courses…"></div>
+            <div class="umat-cs-list" id="qgen-cs-list"></div>
           </div>
         </div>
-        <div id="stru-overview" style="display:none;">
-          <!-- Summary bar -->
-          <div class="ov-kpi-row" id="ov-stru-kpis"></div>
-          <!-- Two-column: Course comparison + Topic top -->
-          <div class="ov-2col">
-            <div class="ov-card">
-              <div class="ov-card-hdr"><span class="material-symbols-outlined">leaderboard</span>Struggle Score by Course</div>
-              <div class="ov-chart-bars" id="ov-stru-bars"><div class="ov-loading">Loading…</div></div>
-            </div>
-            <div class="ov-card">
-              <div class="ov-card-hdr"><span class="material-symbols-outlined">psychology</span>Most Struggled Topics</div>
-              <div id="ov-stru-topics" class="ov-topic-mini"><div class="ov-loading">Loading…</div></div>
-            </div>
-          </div>
-          <!-- At-Risk Students -->
-          <div class="ov-card ov-full">
-            <div class="ov-card-hdr"><span class="material-symbols-outlined">warning</span>At-Risk Students (All Courses)</div>
-            <div id="ov-stru-students" class="ov-student-list"><div class="ov-loading">Loading…</div></div>
-          </div>
-        </div>
-        <div id="stru-loading" class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading struggle insights…</p></div>
-        <div id="stru-error" class="umat-empty" style="display:none;"><span class="material-symbols-outlined">error_outline</span><p id="stru-error-text">Could not load struggle insights.</p></div>
-        <div id="stru-content" style="display:none;padding:0 20px 20px;">
-
-          <!-- Summary bar -->
-          <div class="struggle-summary-bar" id="stru-summary-bar">
-            <span><strong id="stru-total-q">0</strong> questions from <strong id="stru-total-s">0</strong> students</span>
-            <span class="struggle-worst-topic">Worst topic: <strong id="stru-worst">—</strong></span>
-          </div>
-          <div id="stru-issues-summary" style="display:none;align-items:center;gap:10px;padding:8px 12px;margin-top:8px;border-radius:10px;background:var(--u-warnbg, rgba(239,68,68,.08));font-size:13px;cursor:pointer;" onclick="switchPane('lec-issues')" title="View student issues"></div>
-
-          <!-- AI Overall Summary -->
-          <div id="stru-ai-summary" style="display:none;align-items:center;gap:10px;padding:10px 14px;margin-top:10px;border-radius:10px;background:linear-gradient(135deg, rgba(99,102,241,.08), rgba(168,85,247,.08));font-size:13px;border:1px solid rgba(99,102,241,.15);"></div>
-
-          <!-- AI Course Health Report -->
-          <div id="stru-course-health" style="display:none;margin-top:12px;border-radius:10px;border:1px solid var(--u-border);overflow:hidden;"></div>
-
-          <!-- Topic Struggle Matrix -->
-          <div class="struggle-section">
-            <div class="struggle-section-header">
-              <h3><span class="material-symbols-outlined" style="font-size:18px;color:var(--u-p);">leaderboard</span> Topic Struggle Matrix</h3>
-              <span class="umat-pill pill-info">Score 0-100</span>
-            </div>
-            <div id="stru-topic-grid" class="struggle-topic-grid">
-              <div class="umat-empty"><span class="material-symbols-outlined">search</span><p>No topic data yet.</p></div>
-            </div>
-          </div>
-
-          <!-- Material Breakdown (grouped by course sections) -->
-          <div class="struggle-section">
-            <div class="struggle-section-header">
-              <h3><span class="material-symbols-outlined" style="font-size:18px;color:var(--u-p);">folder</span> Material Breakdown</h3>
-            </div>
-            <div id="stru-material-list" class="struggle-material-list">
-              <div class="umat-empty"><span class="material-symbols-outlined">inventory_2</span><p>No materials with struggle data.</p></div>
-            </div>
-          </div>
-
-          <!-- At-Risk Students -->
-          <div class="struggle-section">
-            <div class="struggle-section-header">
-              <h3><span class="material-symbols-outlined" style="font-size:18px;color:var(--u-p);">warning</span> At-Risk Students</h3>
-              <span class="umat-pill pill-info">Risk score 0-100</span>
-            </div>
-            <div id="stru-student-list" class="struggle-student-list">
-              <div class="umat-empty"><span class="material-symbols-outlined">person_search</span><p>No at-risk student data yet.</p></div>
-            </div>
-          </div>
-
+        <div id="qgen-body" style="padding:0 20px 20px;">
+          <div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading Quiz Generator…</p></div>
         </div>
       </div>
 
@@ -2449,18 +2308,18 @@ HTML;
   <span class="material-symbols-outlined">smart_toy</span>
   <span class="umat-fab-tip">Ask AI Assistant</span>
 </button>
-    <div id="lec-ai-mini" style="position:fixed;bottom:170px;right:28px;z-index:100002;width:min(340px,92vw);background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r16);box-shadow:var(--u-shadow);display:none;flex-direction:column;overflow:hidden;max-height:440px;">
-      <div style="background:linear-gradient(135deg,var(--u-p),var(--u-pb));padding:11px 14px;color:#fff;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-        <span style="font-size:13px;font-weight:700;">Ask AI About Analytics</span>
-        <button id="lec-ai-mini-close" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;" type="button"><span class="material-symbols-outlined" style="font-size:15px;">close</span></button>
+    <div id="lec-ai-mini" class="umat-ai-glass-mini">
+      <div class="umat-ai-glass-mini-hdr">
+        <div class="umat-ai-glass-mini-title"><span class="material-symbols-outlined">smart_toy</span> AI Assistant</div>
+        <button id="lec-ai-mini-close" class="umat-ai-glass-mini-close" type="button" aria-label="Close"><span class="material-symbols-outlined">close</span></button>
       </div>
-      <div class="umat-msgs" id="lec-mini-msgs" style="max-height:260px;">
-        <div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>Ask me about your course analytics, student patterns, or teaching recommendations.</p></div></div></div>
+      <div class="umat-msgs umat-ai-glass-mini-msgs" id="lec-mini-msgs">
+        <div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI ASSISTANT</div><div class="umat-bubble-ai"><p>Ask me about your course analytics, student patterns, or teaching recommendations.</p></div></div></div>
       </div>
-      <div class="umat-input-area" style="padding:8px 12px;border-top:1px solid var(--u-olv);">
+      <div class="umat-input-area umat-ai-glass-mini-input">
         <div class="umat-input-row">
-          <input type="text" id="lec-mini-input" placeholder="Ask about analytics…" style="flex:1;padding:8px 11px;border:1.5px solid var(--u-olv);border-radius:var(--u-r8);font-size:13px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sf);">
-          <button class="umat-send-btn" id="lec-mini-send" type="button" style="width:36px;height:36px;"><span class="material-symbols-outlined">send</span></button>
+          <textarea id="lec-mini-input" class="umat-textarea" placeholder="Ask about analytics…" rows="2" maxlength="700"></textarea>
+          <button class="umat-send-btn" id="lec-mini-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
         </div>
       </div>
     </div>
@@ -2484,9 +2343,24 @@ var UID   = {$uid};
 var UD    = {$jsUD};
 var streamUrl = {$streamUrl};
 var moodleSesskey = {$moodleSesskey};
+window._umatChatStream = { url: streamUrl, sesskey: moodleSesskey };
 var anLoaded = {};
 var lecLoaded= {};
 var struggleCache = {};
+var insCid = 0;
+
+/* Stub — new Struggle Dashboard auto-loads via AMD */
+function loadAnalytics(cid){
+  if(window.struggleDashboard){window.struggleDashboard.init(cid);}
+  else{switchPane('lec-insights');}
+}
+
+/* ---- Scroll-to-bottom FABs ---- */
+if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('lcp-msgs');
+if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('ws-msgs');
+
+/* Load struggle_dashboard AMD module (fault-tolerant) */
+!function loadStruggleDash(){typeof require==='function'?require(['local_umat_ai/struggle_dashboard'],function(d){window.struggleDashboard=d;},function(){setTimeout(loadStruggleDash,1000);}):setTimeout(loadStruggleDash,50);}();
 
 
 /* ─── LECTURER COURSE TILES ────────────────── */
@@ -2536,7 +2410,7 @@ function renderLecCourses(courses,g){
       var lbl=document.getElementById('lec-an-course-label');if(lbl)lbl.textContent=CN;
       var ctx=document.getElementById('lec-ctx-label');if(ctx)ctx.textContent=CN;
       anLoaded[CID]=false;
-      switchPane('lec-analytics');loadAnalytics(CID);
+      switchPane('lec-insights');loadAnalytics(CID);
     });
     /* Action buttons */
     tile.querySelectorAll('[data-act]').forEach(function(btn){
@@ -2546,7 +2420,7 @@ function renderLecCourses(courses,g){
         var lbl=document.getElementById('lec-an-course-label');if(lbl)lbl.textContent=CN;
         var ctx=document.getElementById('lec-ctx-label');if(ctx)ctx.textContent=CN;
         var act=btn.dataset.act;
-        if(act==='analytics'){anLoaded[CID]=false;switchPane('lec-analytics');loadAnalytics(CID);}
+        if(act==='analytics'){anLoaded[CID]=false;switchPane('lec-insights');loadAnalytics(CID);}
         else if(act==='library'){lecLoaded['lec-library']=false;switchPane('lec-library');loadLibrary();}
         else if(act==='review'){lecLoaded['lec-review']=false;switchPane('lec-review');if(typeof loadReviewPane==='function')loadReviewPane();}
       });
@@ -2569,9 +2443,9 @@ var expand=document.getElementById('lec-expand');
 var panelDataLoaded=false;
 function updateBodyLock(){document.body.classList.toggle('umat-body-lock',!(!document.querySelector('.umat-ov.open,.umat-cp-ov.open')));}
 
-function openPanel(){if(window.innerWidth<640){cpOv.classList.remove('open');lecOv.classList.add('open');if(!anLoaded[CID||lecAnalyticsCourseId]){loadAnalytics(CID||lecAnalyticsCourseId);}}else{cpOv.classList.add('open');}fab.setAttribute('aria-expanded','true');if(!panelDataLoaded){loadPanelData();panelDataLoaded=true;}updateBodyLock();}
+function openPanel(){if(window.innerWidth<640){cpOv.classList.remove('open');lecOv.classList.add('open');switchPane('lec-home');}else{cpOv.classList.add('open');}fab.setAttribute('aria-expanded','true');if(!panelDataLoaded){loadPanelData();panelDataLoaded=true;}updateBodyLock();}
 function closePanel(){cpOv.classList.remove('open');fab.setAttribute('aria-expanded','false');updateBodyLock();}
-function openDash(){closePanel();lecOv.classList.add('open');if(!anLoaded[CID||lecAnalyticsCourseId]){loadAnalytics(CID||lecAnalyticsCourseId);}updateBodyLock();}
+function openDash(){closePanel();lecOv.classList.add('open');switchPane('lec-home');updateBodyLock();}
 function closeDash(){lecOv.classList.remove('open');openPanel();}
 
 if(fab)fab.addEventListener('click',openPanel);
@@ -2604,14 +2478,14 @@ function setLcpFeatureActive(name){
 }
 function renderLcpFeature(name){
   var meta={
-    'lec-analytics':['bar_chart','Analytics','Course performance'],'lec-struggle':['psychology','Struggle','Learning gaps'],'lec-courses':['menu_book','Courses','Your teaching courses'],'lec-library':['local_library','Library','Course materials'],'lec-sessions':['history','Sessions','AI interaction history'],'lec-review':['fact_check','Review','Pending AI outputs'],'lec-issues':['flag','Issues','Student complaints']
+    'lec-insights':['psychology','Insights','Student struggle & course analytics'],'lec-quizgen':['quiz','Quiz Gen','AI quiz generator'],'lec-courses':['menu_book','Courses','Your teaching courses'],'lec-library':['local_library','Library','Course materials'],'lec-sessions':['history','Sessions','AI interaction history'],'lec-review':['fact_check','Review','Pending AI outputs'],'lec-issues':['flag','Issues','Student complaints']
   }[name]||['widgets','Feature','Quick view'];
   showLcpPane('lcp-feature');setLcpFeatureActive(name);
   document.getElementById('lcp-feature-icon').textContent=meta[0];document.getElementById('lcp-feature-title').textContent=meta[1];document.getElementById('lcp-feature-sub').textContent=meta[2];
   var body=document.getElementById('lcp-feature-body');body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading '+meta[1].toLowerCase()+'…</p></div>';
   if(name==='lec-courses')return renderLcpCourses(body);
   if(name==='lec-review')return renderLcpReview(body);
-  if(name==='lec-analytics'||name==='lec-struggle')return renderLcpAnalytics(body,name);
+  if(name==='lec-analytics'||name==='lec-struggle'||name==='lec-insights'){if(window.struggleDashboard)window.struggleDashboard.init(CID||lecInsightsCourseId);return;}
   if(name==='lec-library')return renderLcpLibrary(body);
   if(name==='lec-sessions')return renderLcpSessions(body);
   if(name==='lec-issues')return renderLcpIssues(body);
@@ -2694,13 +2568,15 @@ function initHome(){
 }
 
 function loadPaneData(name){
-  if(name==='lec-analytics'){populateAnalyticsCourseSel();loadAnalytics(CID||lecAnalyticsCourseId);}
-  if(name==='lec-struggle'){populateStruggleCourseSel();loadStruggleInsights(CID||lecStruggleCourseId);}
+  
+  
   if(name==='lec-courses')loadLecturerCourses();
   if(name==='lec-library'){populateLibCourseSel();loadLibrary();}
   if(name==='lec-sessions'){populateSessCourseSel();loadSessions();}
   if(name==='lec-review')loadReviewPane();
   if(name==='lec-issues')loadLecturerIssues();
+  if(name==='lec-insights'){populateInsightsCourseSel();if(window.struggleDashboard){window.struggleDashboard.init(CID||lecInsightsCourseId);}else{loadInsights(CID||lecInsightsCourseId);}}
+  if(name==='lec-quizgen')loadQuizGenUI();
   if(name==='lec-home')initHome();
 }
 
@@ -2742,7 +2618,7 @@ function loadPanelData(){
 }
 
 /* Analytics load & render */
-function loadAnalytics(cid){
+function loadInsightsLegacy(cid){
   anLoaded[cid||'0']=true;
   var label=document.getElementById('lec-an-course-label');
   var overview=document.getElementById('lec-an-overview');
@@ -3053,7 +2929,7 @@ function openLecSessPicker(){
 
 /* Analytics — course overlay selector */
 var lecAnalyticsCourseId = 0;
-function populateAnalyticsCourseSel(){
+function populateInsightsCourseSel_legacy(){
   var list=document.getElementById('lec-an-cs-list');
   if(!list||!UD||!UD.courses)return;
   if(list._anPickerInited)return;list._anPickerInited=true;
@@ -3289,7 +3165,7 @@ function updateReviewCounts(){
 /* ──────────────────────────────────────────────
    STRUGGLE INSIGHTS
    ────────────────────────────────────────────── */
-function loadStruggleInsights(cid){
+function loadInsights(cid){
   var overview=document.getElementById('stru-overview');
   var loading=document.getElementById('stru-loading');
   var error=document.getElementById('stru-error');
@@ -3652,7 +3528,8 @@ function makeSeverityDonut(high,med,low,total){
 
 /* Struggle — course overlay selector */
 var lecStruggleCourseId = 0;
-function populateStruggleCourseSel(){
+var lecInsightsCourseId = 0;
+function populateInsightsCourseSel_legacy(){
   var list=document.getElementById('stru-cs-list');
   if(!list||!UD||!UD.courses)return;
   if(list._struPickerInited)return;list._struPickerInited=true;
@@ -3694,6 +3571,463 @@ function openStrugglePicker(){
   if(ov)ov.classList.add('open');
 }
 
+/* Quiz Generator */
+var qgenCid = 0;
+function populateQuizGenCourseSel(){
+  var list=document.getElementById('qgen-cs-list');
+  if(!list||!UD||!UD.courses)return;
+  if(list._qgenPopulated)return;list._qgenPopulated=true;
+  list.innerHTML='<button class="umat-cs-item" data-cid="0" type="button">'+
+    '<div class="umat-cs-item-icon"><span class="material-symbols-outlined">apps</span></div>'+
+    '<div class="umat-cs-item-info"><div class="umat-cs-item-name">All Courses</div><div class="umat-cs-item-code">Composite overview</div></div></button>'+
+  UD.courses.map(function(c){
+    return '<button class="umat-cs-item" data-cid="'+c.id+'" type="button">'+
+      '<div class="umat-cs-item-icon"><span class="material-symbols-outlined">quiz</span></div>'+
+      '<div class="umat-cs-item-info"><div class="umat-cs-item-name">'+esc(c.fullname)+'</div>'+
+      '<div class="umat-cs-item-code">'+esc(c.shortname)+'</div></div>'+
+      '<span class="umat-cs-item-check material-symbols-outlined">check_circle</span></button>';
+  }).join('');
+  list.querySelectorAll('.umat-cs-item').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      qgenCid=parseInt(this.dataset.cid)||0;
+      document.getElementById('qgen-cs-ov').classList.remove('open');
+      var labelEl=document.getElementById('qgen-cs-label');
+      if(labelEl)labelEl.textContent=qgenCid?(this.querySelector('.umat-cs-item-name')?.textContent||'Course'):'All Courses';
+      require(['local_umat_ai/quizgen_review'],function(QG){QG.init(qgenCid);});
+    });
+  });
+  var srch=document.getElementById('qgen-cs-search');
+  if(srch)srch.addEventListener('input',function(){
+    var q=this.value.toLowerCase();
+    list.querySelectorAll('.umat-cs-item').forEach(function(it){
+      it.style.display=(!q||it.textContent.toLowerCase().includes(q))?'':'none';
+    });
+  });
+}
+function loadQuizGenUI(){
+  populateQuizGenCourseSel();
+  // Auto-select current course if on a course page.
+  if (!qgenCid && typeof CID !== 'undefined' && CID > 0) {
+    qgenCid = CID;
+    var labelEl = document.getElementById('qgen-cs-label');
+    if (labelEl) labelEl.textContent = typeof CN !== 'undefined' && CN ? CN : 'Course #' + CID;
+  }
+  require(['local_umat_ai/quizgen_review'],function(QG){QG.init(qgenCid||0);},function(err){
+    console.error('[quizgen] AMD load error:',err&&err.message?err.message:err);
+    var body=document.getElementById('qgen-body');
+    if(body)body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load Quiz Generator. Check that the AMD build file exists.</p></div>';
+  });
+}
+document.querySelectorAll('#qgen-cs-btn').forEach(function(b){
+  b.addEventListener('click',function(){document.getElementById('qgen-cs-ov').classList.toggle('open');});
+});
+document.getElementById('qgen-cs-ov')?.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+
+
+
+/* ── Insights Dashboard ── */
+var insCid = 0, insCourseId = 0;
+
+function populateInsightsCourseSel(){
+  var list=document.getElementById('ins-cs-list');
+  if(!list||!UD||!UD.courses)return;
+  if(list._insPopulated)return; list._insPopulated=true;
+  list.innerHTML='<button class="umat-cs-item" data-cid="0" type="button">'+
+    '<div class="umat-cs-item-icon"><span class="material-symbols-outlined">apps</span></div>'+
+    '<div class="umat-cs-item-info"><div class="umat-cs-item-name">All Courses</div><div class="umat-cs-item-code">Composite overview</div></div></button>'+
+  UD.courses.map(function(c){
+    return '<button class="umat-cs-item" data-cid="'+c.id+'" type="button">'+
+      '<div class="umat-cs-item-icon"><span class="material-symbols-outlined">school</span></div>'+
+      '<div class="umat-cs-item-info"><div class="umat-cs-item-name">'+esc(c.fullname)+'</div>'+
+      '<div class="umat-cs-item-code">'+esc(c.shortname)+'</div></div>'+
+      '<span class="umat-cs-item-check material-symbols-outlined">check_circle</span></button>';
+  }).join('');
+  list.querySelectorAll('.umat-cs-item').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      insCid=parseInt(this.dataset.cid)||0;
+      document.getElementById('ins-cs-ov').classList.remove('open');
+      var labelEl=document.getElementById('ins-cs-label');
+      if(labelEl)labelEl.textContent=insCid?(this.querySelector('.umat-cs-item-name')?.textContent||'Course'):'All Courses';
+      loadInsights(insCid);
+    });
+  });
+  var srch=document.getElementById('ins-cs-search');
+  if(srch)srch.addEventListener('input',function(){
+    var q=this.value.toLowerCase();
+    list.querySelectorAll('.umat-cs-item').forEach(function(it){
+      it.style.display=(!q||it.textContent.toLowerCase().includes(q))?'':'none';
+    });
+  });
+}
+
+function loadInsights(cid){
+  insCid=cid||0;
+  var overview=document.getElementById('ins-overview');
+  var loading=document.getElementById('ins-loading');
+  var error=document.getElementById('ins-error');
+  var content=document.getElementById('ins-content');
+  var csLabel=document.getElementById('ins-course-label');
+  if(csLabel)csLabel.textContent=cid?':':'';
+  if(overview)overview.style.display='';
+  if(loading)loading.style.display='none';
+  if(error)error.style.display='none';
+  if(content)content.style.display='none';
+  
+  if(!cid){
+    loadInsightsOverview();
+    return;
+  }
+  
+  if(loading)loading.style.display='';
+  ajax('local_umat_ai_get_struggle_insights',{courseid:cid,days:60},
+    function(d){
+      if(loading)loading.style.display='none';
+      if(content)content.style.display='block';
+      renderInsightsHeadsUp(d.summary);
+      renderInsightsStudentList(d.at_risk_students, d.summary);
+      var _tm=d.topic_matrix&&d.topic_matrix.length?d.topic_matrix:(d.summary&&d.summary.total_questions>0?[{topic:"General Course Questions",question_count:d.summary.total_questions,student_count:d.summary.total_students,struggle_score:Math.min(80,20+d.summary.total_questions*5),trend:"stable",trend_pct:0,difficulty:"intermediate",materials:[]}]:[]);
+      renderInsightsTopicGrid(_tm);
+      renderInsightsMaterialBreakdown(d.material_breakdown);
+      renderInsightsQuestions(d);
+      renderInsightsCourseHealth(d.summary);
+    },
+    function(e){
+      if(loading)loading.style.display='none';
+      if(error){
+        error.style.display='';
+        document.getElementById('ins-error-text').textContent=(e&&e.message)?e.message:'No data yet. Insights appear once students start chatting.';
+      }
+    }
+  );
+}
+
+function loadInsightsOverview(){
+  var overview=document.getElementById('ins-overview');
+  if(!overview)return;
+  overview.style.display='';
+  overview.innerHTML='<div class="ov-placeholder"><span class="material-symbols-outlined">info</span><p>Select a course above to view detailed analytics.</p></div>';
+}
+
+function renderInsightsHeadsUp(summary){
+  if(!summary)return;
+  var badge=document.getElementById('ins-mode-badge');
+  if(badge)badge.textContent=summary.ai_service_used?'AI Engine':'PHP Engine';
+  var pct=document.getElementById('ins-engagement-pct');
+  if(pct)pct.textContent=(summary.total_students>0?Math.min(100,Math.round(summary.total_questions/summary.total_students*10)):0)+'%';
+  var atr=document.getElementById('ins-atrisk-count');
+  if(atr)atr.textContent=summary.total_issues||0;
+  var insight=document.getElementById('ins-global-insight');
+  if(insight)insight.textContent=summary.ai_overall_summary||(summary.worst_topic?'Class is struggling most with: '+summary.worst_topic:'No AI insight available yet.');
+}
+
+function renderInsightsStudentList(students, summary){
+  var list=document.getElementById('ins-student-list');
+  if(!list)return;
+  if(!students||!students.length){
+    list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">person_search</span><p>No at-risk student data yet.</p></div>';
+    return;
+  }
+  list.innerHTML=students.slice(0,30).map(function(s){
+    var riskPill=s.risk_level==='high'?'<span class="umat-pill pill-high">High</span>':
+      (s.risk_level==='medium'?'<span class="umat-pill pill-warn">Med</span>':'<span class="umat-pill pill-ok">Low</span>');
+    var topicTags=(s.struggle_topics||[]).slice(0,2).map(function(t){return '<span class="struggle-topic-tag">'+esc(t)+'</span>';}).join('');
+    return '<div class="ins-student-row" data-userid="'+s.userid+'" data-risk="'+s.risk_level+'">'+
+      '<img src="'+esc(s.profileimageurl)+'" alt="" class="struggle-student-avatar" onerror="this.style.display=\'none\'">'+
+      '<div class="ins-student-info"><div class="ins-student-name">'+esc(s.fullname)+'</div><div class="ins-student-meta">'+topicTags+'</div></div>'+
+      '<span class="ins-student-q"><strong>'+s.question_count+'</strong> Q</span>'+
+      riskPill+
+    '</div>';
+  }).join('');
+  list.querySelectorAll('.ins-student-row').forEach(function(row){
+    row.addEventListener('click',function(){renderStudentDetail(row.dataset.userid, students);});
+  });
+}
+
+function renderStudentDetail(userid, students){
+  var s=students.find(function(st){return st.userid==userid;});
+  if(!s)return;
+  var detail=document.getElementById('ins-detail-view');
+  if(!detail)return;
+  var riskPill=s.risk_level==='high'?'<span class="umat-pill pill-high">High</span>':
+    (s.risk_level==='medium'?'<span class="umat-pill pill-warn">Med</span>':'<span class="umat-pill pill-ok">Low</span>');
+  var topicTags=(s.struggle_topics||[]).map(function(t){return '<span class="struggle-topic-tag">'+esc(t)+'</span>';}).join('');
+  var evHtml='';
+  if(s.event_sources){
+    var total=0;Object.keys(s.event_sources).forEach(function(k){total+=s.event_sources[k]||0;});
+    if(total>0){
+      evHtml='<div class="ins-evidence-timeline"><div class="ins-timeline-title">Activity Signals</div>'+
+        Object.keys(s.event_sources).map(function(k){
+          var v=s.event_sources[k]||0;if(!v)return '';
+          var icons={chat_questions:'forum',quiz_failures:'quiz',repeated_views:'visibility',assignment_failures:'assignment',issue_reports:'flag'};
+          var labels={chat_questions:'AI Questions',quiz_failures:'Quiz Failures',repeated_views:'Repeated Views',assignment_failures:'Assignment Issues',issue_reports:'Issue Reports'};
+          return '<div class="ins-evidence-item"><span class="material-symbols-outlined">'+icons[k]+'</span><span>'+labels[k]+': <strong>'+v+'</strong></span></div>';
+        }).join('')+'</div>';
+    }
+  }
+  var aiFactors='';
+  if(s.ai_risk_factors&&s.ai_risk_factors.length){
+    aiFactors='<div class="ins-ai-rootcause"><span class="material-symbols-outlined" style="color:var(--u-p);font-size:15px;">insight</span>'+
+      s.ai_risk_factors.map(function(f){return '<span class="struggle-factor-tag">'+esc(f)+'</span>';}).join('')+'</div>';
+  }
+  var aiRec=s.ai_recommendation?'<div class="ins-ai-recs">'+esc(s.ai_recommendation)+'</div>':'';
+  detail.innerHTML=
+    '<div class="ins-detail-hdr"><div class="ins-detail-user"><img src="'+esc(s.profileimageurl)+'" alt="" class="struggle-student-avatar" onerror="this.style.display=\'none\'"><div><strong>'+esc(s.fullname)+'</strong>'+riskPill+'</div></div>'+
+    '<button class="ins-action-trigger" onclick="openActionDrawer(\''+s.userid+'\',\''+esc(s.fullname)+'\')" type="button"><span class="material-symbols-outlined">handyman</span>Intervene</button></div>'+
+    '<div class="ins-detail-body"><div class="ins-detail-stats">'+
+      '<span><strong>'+s.question_count+'</strong> questions</span>'+
+      '<span><strong>'+(s.issue_count||0)+'</strong> issues</span>'+
+      '<span><strong>'+s.risk_score+'</strong> risk score</span>'+
+      '<span>'+esc(s.last_active)+'</span>'+
+    '</div>'+
+    (topicTags?'<div class="ins-detail-topics"><strong>Struggle Topics:</strong> '+topicTags+'</div>':'')+
+    aiFactors+aiRec+
+    evHtml+'</div>';
+}
+
+function filterAtRisk(mode, btn){
+  if(window.struggleDashboard&&mode){window.struggleDashboard.setFilter(mode,btn);return;}
+  var chips=document.querySelectorAll('.ins-filter-chips .umat-chip');
+  chips.forEach(function(c){c.classList.remove('active');});
+  var highChip=document.querySelector('.ins-filter-chips .umat-chip[data-risk="high"]');
+  if(highChip)highChip.classList.add('active');
+  var rows=document.querySelectorAll('.ins-student-row');
+  rows.forEach(function(r){r.style.display=r.dataset.risk==='high'?'':'none';});
+  var detail=document.getElementById('ins-detail-view');
+  if(detail)detail.innerHTML='<div class="ins-empty-state">Filtered to high-risk students. Click one to view details.</div>';
+}
+
+function toggleLegacySection(id){
+  var el=document.getElementById(id);
+  if(!el)return;
+  var isClosed=el.style.display==='none'||!el.style.display;
+  el.style.display=isClosed?'block':'none';
+  var toggle=el.previousElementSibling;
+  if(toggle){
+    var icon=toggle.querySelector('.material-symbols-outlined:last-child');
+    if(icon)icon.textContent=isClosed?'expand_less':'expand_more';
+  }
+}
+
+function openActionDrawer(userid, fullname){
+  var drawer=document.getElementById('ins-action-drawer');
+  if(!drawer)return;
+  if(typeof userid==='string'){
+    var action=userid;
+    drawer.dataset.action=action;
+    var names={encouragement:'Send Encouragement',meeting:'Schedule 1:1',remedial_quiz:'Assign Remedial Quiz'};
+    var hdr=drawer.querySelector('.ins-drawer-hdr span');
+    if(hdr)hdr.textContent='Intervene: '+(names[action]||action);
+    if(window.struggleDashboard)window.struggleDashboard.openActionDrawer(action);
+    return;
+  }
+  drawer.style.display='block';
+  document.getElementById('ins-drawer-student').textContent=fullname;
+  drawer.dataset.userid=userid;
+  document.getElementById('ins-draft-box').style.display='none';
+}
+
+function closeActionDrawer(){
+  var drawer=document.getElementById('ins-action-drawer');
+  if(drawer)drawer.style.display='none';
+  drawer.dataset.userid='';
+  document.getElementById('ins-draft-message').value='';
+}
+
+function closeDetail(){
+  var panel=document.getElementById('ins-detail-view');
+  if(panel)panel.innerHTML='<div class=\"ins-empty-state\">Select a student to view AI-powered insights and evidence</div>';
+}
+
+function sendIntervention(){
+  var drawer=document.getElementById('ins-action-drawer');
+  var status=document.getElementById('ins-drawer-status');
+  var msg=document.getElementById('ins-draft-message');
+  var uid=parseInt(drawer.dataset.userid||'0');
+  var action=drawer.dataset.action||'message';
+  if(!uid||!msg)return;
+  if(window.struggleDashboard){
+    var btn=document.getElementById('ins-send-intervention');
+    if(btn)btn.disabled=true;
+    if(status){status.style.display='block';status.textContent='Sending...';status.style.color='var(--u-ol)';}
+    ajax('local_umat_ai_execute_intervention',{
+      courseid:CID||insCid,
+      userid:uid,
+      action:action,
+      message:msg.value
+    },function(resp){
+      if(resp.status==='sent'){
+        if(status){status.textContent='Message sent!';status.style.color='var(--u-p)';}
+        setTimeout(closeActionDrawer,1500);
+      }else if(resp.status==='cooldown'){
+        if(status){status.textContent='Already sent within 24h.';status.style.color='#f59e0b';}
+      }else{
+        if(status){status.textContent='Failed: '+(resp.message||'Unknown error');status.style.color='var(--u-ter)';}
+      }
+      if(btn)btn.disabled=false;
+    },function(){
+      if(status){status.textContent='Connection error.';status.style.color='var(--u-ter)';}
+      if(btn)btn.disabled=false;
+    });
+  }
+}
+
+function openQuizGen(){
+  switchPane('lec-quizgen');
+}
+
+function renderInsightsTopicGrid(topics){
+  var grid=document.getElementById('ins-topic-grid');
+  if(!grid)return;
+  if(!topics||!topics.length){grid.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">search</span><p>No topic data yet. Questions will appear once students start asking.</p></div>';return;}
+  var critical=topics.filter(function(t){return (t.struggle_score||0)>=70;});
+  var moderate=topics.filter(function(t){var s=t.struggle_score||0;return s>=40&&s<70;});
+  var minor=topics.filter(function(t){return (t.struggle_score||0)<40;});
+  var html='';
+  if(critical.length){
+    html+='<div class="topic-section severity-critical"><h3><span class="material-symbols-outlined">warning</span>Critical Struggle Areas ('+critical.length+')</h3><div class="topic-grid">'+
+      critical.map(function(t){return renderTopicCard(t,'critical');}).join('')+'</div></div>';
+  }
+  if(moderate.length){
+    html+='<div class="topic-section severity-moderate"><h3><span class="material-symbols-outlined">info</span>Moderate Struggle Areas ('+moderate.length+')</h3><div class="topic-grid">'+
+      moderate.map(function(t){return renderTopicCard(t,'moderate');}).join('')+'</div></div>';
+  }
+  if(minor.length){
+    html+='<div class="topic-section severity-minor"><h3><span class="material-symbols-outlined">check_circle</span>Minor Struggle Areas ('+minor.length+')</h3><div class="topic-grid">'+
+      minor.map(function(t){return renderTopicCard(t,'minor');}).join('')+'</div></div>';
+  }
+  grid.innerHTML=html;
+}
+
+function renderTopicCard(t,sev){
+  var score=t.struggle_score||0;
+  var color=sev==='critical'?'#dc2626':(sev==='moderate'?'#f59e0b':'#16a34a');
+  var ringHtml='<svg class="stru-svg-ring" width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" stroke-width="2.8"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="'+color+'" stroke-width="2.8" stroke-dasharray="100" stroke-dashoffset="'+(100-score)+'" transform="rotate(-90,18,18)" stroke-linecap="round"/><text x="18" y="18" text-anchor="middle" dominant-baseline="central" font-size="10" font-weight="800" fill="'+color+'">'+score+'</text></svg>';
+  var trendHtml='';
+  if(t.trend==='up')trendHtml='<span class="struggle-trend trend-up"><span class="material-symbols-outlined">trending_up</span> +'+t.trend_pct+'%</span>';
+  else if(t.trend==='down')trendHtml='<span class="struggle-trend trend-down"><span class="material-symbols-outlined">trending_down</span> '+t.trend_pct+'%</span>';
+  else trendHtml='<span class="struggle-trend trend-stable"><span class="material-symbols-outlined">trending_flat</span></span>';
+  var matChips=(t.materials||[]).slice(0,4).map(function(m){return '<span class="tag">'+esc(m.name||m)+(m.question_count?' ('+m.question_count+')':'')+'</span>';}).join('');
+  var sqHtml='';
+  if(t.sample_questions&&t.sample_questions.length){
+    sqHtml='<div class="sample-questions"><strong>Student Questions:</strong><ul>'+
+      t.sample_questions.slice(0,3).map(function(q){return '<li>'+esc(q)+'</li>';}).join('')+'</ul></div>';
+  }
+  var matHtml='';
+  if(matChips){matHtml='<div class="related-materials"><strong>Related Materials:</strong><div class="tags">'+matChips+'</div></div>';}
+  var aiHtml='';
+  if(t.ai_recommendation){aiHtml='<div class="struggle-topic-ai"><span class="material-symbols-outlined" style="color:var(--u-p);font-size:16px;">auto_awesome</span><span>'+esc(t.ai_recommendation)+'</span></div>';}
+  return '<div class="struggle-topic-card struggle-'+sev+'">'+
+    '<div class="struggle-topic-header"><div class="struggle-topic-name"><strong>'+esc(t.topic)+'</strong></div>'+ringHtml+'</div>'+
+    '<div class="struggle-topic-body"><span class="stru-topic-stat"><span class="material-symbols-outlined">quiz</span> <strong>'+(t.question_count||0)+'</strong></span>'+
+    '<span class="stru-topic-stat"><span class="material-symbols-outlined">people</span> <strong>'+(t.student_count||0)+'</strong></span>'+
+    '<span class="stru-topic-stat">'+trendHtml+'</span></div>'+
+    matHtml+sqHtml+aiHtml+
+    '<div class="progress-bar"><div class="progress-fill" style="width:'+score+'%;background:'+color+'"></div></div></div>';
+}
+
+function renderInsightsMaterialBreakdown(sections){
+  var list=document.getElementById('ins-material-list');
+  if(!list||!sections||!sections.length){if(list)list.innerHTML='';return;}
+  list.innerHTML=sections.map(function(sec){
+    var mats=(sec.materials||[]).slice(0,5).map(function(m){
+      var diffPill=m.difficulty==='advanced'?'<span class="umat-pill pill-high">Adv</span>':(m.difficulty==='beginner'?'<span class="umat-pill pill-ok">Beg</span>':'<span class="umat-pill pill-warn">Int</span>');
+      return '<div class="struggle-mat-card"><div class="struggle-mat-title">'+esc(m.filename||m.name||'Material')+'</div><div>'+diffPill+' <strong>'+m.question_count+'</strong> Q</div></div>';
+    }).join('');
+    return '<div class="struggle-section-card"><div class="struggle-section-name">'+esc(sec.section_name)+'</div>'+mats+'</div>';
+  }).join('');
+}
+
+function renderInsightsQuestions(d){
+  var list=document.getElementById('ins-q-list');
+  if(!list)return;
+  if(!d.topic_matrix||!d.topic_matrix.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>No question data yet.</p></div>';return;}
+  list.innerHTML=d.topic_matrix.slice(0,10).map(function(t){
+    return '<div class="umat-q-row"><div class="umat-q-content"><div class="umat-q-text"><strong>'+esc(t.topic)+'</strong></div><div class="umat-q-related">'+t.question_count+' questions from '+t.student_count+' students</div></div></div>';
+  }).join('');
+}
+
+function renderInsightsCourseHealth(summary){
+  var healthEl=document.getElementById('ins-course-health');
+  if(!healthEl)return;
+  if(!summary||!summary.ai_course_health){healthEl.innerHTML='';return;}
+  try{
+    var ch=typeof summary.ai_course_health==='string'?JSON.parse(summary.ai_course_health):summary.ai_course_health;
+    var findings=(ch.key_findings||[]).map(function(f){return '<li>'+esc(f)+'</li>';}).join('');
+    var recs=(ch.recommendations||[]).map(function(r){return '<li>'+esc(r)+'</li>';}).join('');
+    healthEl.innerHTML=
+      '<div class="stru-health-header"><strong>Course Health: '+(ch.overall_health||'N/A')+'</strong></div>'+
+      '<div class="stru-health-body">'+
+        (ch.summary?'<p>'+esc(ch.summary)+'</p>':'')+
+        (findings?'<div><strong>Key Findings</strong><ul>'+findings+'</ul></div>':'')+
+        (recs?'<div><strong>Recommendations</strong><ul>'+recs+'</ul></div>':'')+
+      '</div>';
+  }catch(e){healthEl.innerHTML='';}
+}
+
+/* ── Action Drawer Interventions ── */
+document.getElementById('ins-action-drawer')?.addEventListener('click',function(e){
+  var btn=e.target.closest('.ins-action-btn');
+  if(!btn)return;
+  var action=btn.dataset.action;
+  if(action==='message'){
+    document.getElementById('ins-draft-box').style.display='block';
+    document.getElementById('ins-draft-message').value='';
+  }
+});
+
+document.getElementById('ins-send-intervention')?.addEventListener('click',function(){
+  var drawer=document.getElementById('ins-action-drawer');
+  var userid=drawer?.dataset.userid;
+  var msg=document.getElementById('ins-draft-message')?.value;
+  if(!userid||!msg)return;
+  ajax('local_umat_ai_execute_intervention',{studentid:userid,action_type:'message',message_text:msg,courseid:insCid},
+    function(){
+      Notification.addNotification({message:'Message sent successfully!',type:'success'});
+      closeActionDrawer();
+    },
+    function(){
+      Notification.addNotification({message:'Could not deliver message. Student may have disabled notifications.',type:'error'});
+    }
+  );
+});
+
+/* ── Filter chips ── */
+document.querySelector('.ins-filter-chips')?.addEventListener('click',function(e){
+  var chip=e.target.closest('.umat-chip');
+  if(!chip)return;
+  this.querySelectorAll('.umat-chip').forEach(function(c){c.classList.remove('active');});
+  chip.classList.add('active');
+  var risk=chip.dataset.risk;
+  if(risk==='all'){
+    document.querySelectorAll('.ins-student-row').forEach(function(r){r.style.display='flex';});
+  }else{
+    document.querySelectorAll('.ins-student-row').forEach(function(r){r.style.display=r.dataset.risk===risk?'flex':'none';});
+  }
+});
+
+/* ── NLQ Search ── */
+document.getElementById('ins-nlq-submit')?.addEventListener('click',submitNLQ);
+document.getElementById('ins-nlq-input')?.addEventListener('keydown',function(e){if(e.key==='Enter')submitNLQ();});
+
+function submitNLQ(){
+  if(window.struggleDashboard && typeof window.struggleDashboard.submitNLQ==='function'){
+    window.struggleDashboard.submitNLQ();
+    return;
+  }
+  var input=document.getElementById('ins-nlq-input');
+  var query=input?.value.trim();
+  if(!query||!insCid)return;
+  var response=document.getElementById('ins-nlq-response')||document.getElementById('sd-nlq-response');
+  if(response){
+    response.style.display='block';
+    _umatStreamInline({
+      url:streamUrl,sesskey:moodleSesskey,courseid:insCid||CID,question:query,
+      session_key:'lec_nlq_'+(insCid||CID),targetId:response.id,
+      onError:function(err){response.innerHTML='<div class="ins-nlq-error">'+esc(err.message||'Could not process your query.')+'</div>';}
+    });
+  }
+}
+
 /* Compact panel lecturer AI send (streaming) */
 function sendLecQ(q){
   q=(q||'').trim();if(!q)return;
@@ -3710,7 +4044,8 @@ function sendLecQ(q){
     session_key: 'lec_cp_' + CID,
     material_ids: [],
     msgsId: 'lcp-msgs',
-    onMeta: function(meta){},
+    typingId: tid,
+    label: 'AI ASSISTANT',
     onDone: function(meta){ _umatHideTyping(tid); },
     onError: function(err){
       _umatHideTyping(tid);
@@ -3753,7 +4088,8 @@ if(miniSend)miniSend.addEventListener('click',function(){
     session_key: 'lec_mini_' + CID,
     material_ids: [],
     msgsId: 'lec-mini-msgs',
-    onMeta: function(meta){},
+    typingId: tid,
+    label: 'AI ASSISTANT',
     onDone: function(meta){ _umatHideTyping(tid); },
     onError: function(err){
       _umatHideTyping(tid);
@@ -3761,15 +4097,16 @@ if(miniSend)miniSend.addEventListener('click',function(){
     }
   });
 });
-if(miniIn)miniIn.addEventListener('keypress',function(e){if(e.key==='Enter'){e.preventDefault();if(miniSend)miniSend.click();}});
+if(miniIn)miniIn.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(miniSend)miniSend.click();}});
+if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('lec-mini-msgs');
 
 /* Init home on overlay open */
 initHome();
 document.getElementById('lec-home-date').textContent=(function(){var d=new Date();return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});})();
 /* Populate course selectors */
 populateLibCourseSel();
-populateAnalyticsCourseSel();
-populateStruggleCourseSel();
+populateInsightsCourseSel_legacy();
+populateInsightsCourseSel_legacy();
 /* Auto-load analytics + struggle when overlay opens */
 if(expand)expand.addEventListener('click',function(){setTimeout(function(){
   var anCid=CID||lecAnalyticsCourseId;
@@ -4050,6 +4387,9 @@ var qTimes   = [];
 var selMat  = [];
 var loaded  = {};
 var activeCID = 0;
+
+/* ---- Scroll-to-bottom FAB ---- */
+if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('hub-msgs');
 
 /* FAB / overlay toggle */
 var fab=document.getElementById('hub-fab');
@@ -4454,7 +4794,7 @@ var hubDrawerCtrl = _umatInitAttachDrawer({
 })();
 
 /* New session */
-function newSession(){sessKey='hub_'+Math.random().toString(36).substr(2,18);selMat=[];if(hubDrawerCtrl)hubDrawerCtrl.clear();var msgs=document.getElementById('hub-msgs');if(msgs){msgs.innerHTML='';addWelcome('your courses');}updateRate();}
+function newSession(){sessKey='hub_'+Math.random().toString(36).substr(2,18);selMat=[];if(hubDrawerCtrl)hubDrawerCtrl.clear();var msgs=document.getElementById('hub-msgs');if(msgs){msgs.innerHTML='';addWelcome('your courses');}if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('hub-msgs');updateRate();}
 if(newBtn)newBtn.addEventListener('click',newSession);
 if(newBtn2)newBtn2.addEventListener('click',function(){newSession();switchPane('hub-tutor');});
 

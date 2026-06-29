@@ -950,6 +950,40 @@ define([], function() {
         });
     }
 
+    // ─── Scroll-to-Bottom FAB ──────────────────────── //
+    function _umatInitScrollToBottom(containerId) {
+        var c = document.getElementById(containerId);
+        if (!c) return;
+
+        // Clean up any previous state for this container.
+        if (c._umatToggle) {
+            c.removeEventListener('scroll', c._umatToggle);
+            delete c._umatToggle;
+        }
+        var oldFab = c.querySelector('.umat-scroll-bottom-fab');
+        if (oldFab) oldFab.remove();
+
+        c.style.position = 'relative';
+
+        var fab = document.createElement('button');
+        fab.className = 'umat-scroll-bottom-fab';
+        fab.innerHTML = '<span class="material-symbols-outlined">expand_more</span>';
+        fab.setAttribute('aria-label', 'Scroll to bottom');
+        c.appendChild(fab);
+
+        c._umatToggle = function() {
+            var atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 5;
+            fab.classList.toggle('visible', !atBottom);
+        };
+
+        c.addEventListener('scroll', c._umatToggle);
+        c._umatToggle();
+
+        fab.addEventListener('click', function() {
+            c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
+        });
+    }
+
     // ─── Short-name aliases ────────────────────────── //
     var esc = _umatEsc;
     var fmtDuration = _umatFmtT;
@@ -1113,6 +1147,9 @@ define([], function() {
 
         // ESC handler
         _umatInitEsc: _umatInitEsc,
+
+        // Scroll-to-bottom FAB
+        _umatInitScrollToBottom: _umatInitScrollToBottom,
 
         // AJAX
         ajax: ajax,

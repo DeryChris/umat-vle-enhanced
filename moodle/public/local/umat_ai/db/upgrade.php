@@ -186,5 +186,136 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026061500, 'local', 'umat_ai');
     }
 
+    if ($oldversion < 2026062600) {
+        // Create umat_ai_quizgen_jobs table for async quiz generation.
+        $qt = new xmldb_table('umat_ai_quizgen_jobs');
+        if (!$dbman->table_exists($qt)) {
+            $qt->add_field('id',              XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $qt->add_field('courseid',        XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, null);
+            $qt->add_field('userid',          XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, null);
+            $qt->add_field('material_id',     XMLDB_TYPE_INTEGER, '10',  null, null,  null, null);
+            $qt->add_field('source_text',     XMLDB_TYPE_TEXT,    null,  null, null,  null, null);
+            $qt->add_field('config_json',     XMLDB_TYPE_TEXT,    null,  null, XMLDB_NOTNULL,  null, null);
+            $qt->add_field('category_name',   XMLDB_TYPE_CHAR,   '255', null, XMLDB_NOTNULL,  null, null);
+            $qt->add_field('status',          XMLDB_TYPE_CHAR,   '30',  null, XMLDB_NOTNULL,  null, 'pending');
+            $qt->add_field('questions_json',  XMLDB_TYPE_TEXT,    null,  null, null,  null, null);
+            $qt->add_field('xml_content',     XMLDB_TYPE_TEXT,    null,  null, null,  null, null);
+            $qt->add_field('quiz_id',         XMLDB_TYPE_INTEGER, '10',  null, null,  null, null);
+            $qt->add_field('failure_reason',  XMLDB_TYPE_TEXT,    null,  null, null,  null, null);
+            $qt->add_field('timecreated',     XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, '0');
+            $qt->add_field('timemodified',    XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, '0');
+            $qt->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $qt->add_index('course_status', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'status']);
+            $qt->add_index('user_course',   XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid']);
+            $dbman->create_table($qt);
+        }
+        upgrade_plugin_savepoint(true, 2026062600, 'local', 'umat_ai');
+    }
+
+    if ($oldversion < 2026062700) {
+        $dbman = $DB->get_manager();
+
+        $metrics = new xmldb_table('umat_ai_student_metrics');
+        if (!$dbman->table_exists($metrics)) {
+            $metrics->add_field('id',              XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $metrics->add_field('userid',          XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $metrics->add_field('courseid',        XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $metrics->add_field('logins',          XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $metrics->add_field('avg_quiz_grade',  XMLDB_TYPE_NUMBER, '10, 2', null, XMLDB_NOTNULL, null, '0');
+            $metrics->add_field('ai_questions_asked', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $metrics->add_field('risk_score',      XMLDB_TYPE_NUMBER, '10, 2', null, XMLDB_NOTNULL, null, '0');
+            $metrics->add_field('last_active',     XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $metrics->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $metrics->add_index('course_user', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'userid']);
+            $metrics->add_index('course_risk', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'risk_score']);
+            $dbman->create_table($metrics);
+        }
+
+        $interventions = new xmldb_table('umat_ai_interventions');
+        if (!$dbman->table_exists($interventions)) {
+            $interventions->add_field('id',          XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $interventions->add_field('userid',      XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $interventions->add_field('courseid',    XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $interventions->add_field('lecturerid',  XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $interventions->add_field('action_type', XMLDB_TYPE_CHAR,   '50', null, XMLDB_NOTNULL, null, null);
+            $interventions->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $interventions->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $interventions->add_index('user_course_action', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid', 'action_type', 'timecreated']);
+            $dbman->create_table($interventions);
+        }
+
+        upgrade_plugin_savepoint(true, 2026062700, 'local', 'umat_ai');
+    }
+
+    if ($oldversion < 2026062900) {
+        $dbman = $DB->get_manager();
+
+        // 1. umat_ai_chat_log_helpfulness — separate table for student ratings on AI answers
+        $help = new xmldb_table('umat_ai_chat_log_helpfulness');
+        if (!$dbman->table_exists($help)) {
+            $help->add_field('id',          XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $help->add_field('chatlogid',   XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $help->add_field('userid',      XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $help->add_field('rating',      XMLDB_TYPE_INTEGER, '1',  null, XMLDB_NOTNULL, null, '1');
+            $help->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $help->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $help->add_key('chatlog_fk', XMLDB_KEY_FOREIGN, ['chatlogid'], 'umat_ai_chat_logs', ['id'], 'cascade');
+            $help->add_index('userid', XMLDB_INDEX_NOTUNIQUE, ['userid']);
+            $help->add_index('timecreated', XMLDB_INDEX_NOTUNIQUE, ['timecreated']);
+            $dbman->create_table($help);
+        }
+
+        // 2. umat_ai_material_progress — student progress through materials via beacon
+        $mp = new xmldb_table('umat_ai_material_progress');
+        if (!$dbman->table_exists($mp)) {
+            $mp->add_field('id',              XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $mp->add_field('userid',          XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, null, null);
+            $mp->add_field('courseid',        XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, null, null);
+            $mp->add_field('materialid',      XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, null, null);
+            $mp->add_field('progress_pct',    XMLDB_TYPE_NUMBER,  '5, 1', null, XMLDB_NOTNULL, null, '0.0');
+            $mp->add_field('time_spent_sec',  XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, null, '0');
+            $mp->add_field('last_position',   XMLDB_TYPE_INTEGER, '10',  null, null, null, null);
+            $mp->add_field('timemodified',    XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, null, '0');
+            $mp->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $mp->add_key('material_fk', XMLDB_KEY_FOREIGN, ['materialid'], 'umat_ai_materials', ['id'], 'cascade');
+            $mp->add_index('user_course_material', XMLDB_INDEX_UNIQUE, ['userid', 'courseid', 'materialid']);
+            $mp->add_index('courseid', XMLDB_INDEX_NOTUNIQUE, ['courseid']);
+            $dbman->create_table($mp);
+        }
+
+        // 3. umat_ai_topic_friction — materialized per-topic friction scores
+        $tf = new xmldb_table('umat_ai_topic_friction');
+        if (!$dbman->table_exists($tf)) {
+            $tf->add_field('id',              XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $tf->add_field('courseid',        XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, null, null);
+            $tf->add_field('topic_label',     XMLDB_TYPE_CHAR,   '255', null, XMLDB_NOTNULL, null, '');
+            $tf->add_field('question_volume', XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, null, '0');
+            $tf->add_field('friction_score',  XMLDB_TYPE_NUMBER,  '5, 1', null, XMLDB_NOTNULL, null, '0.0');
+            $tf->add_field('student_count',   XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, null, '0');
+            $tf->add_field('severity',        XMLDB_TYPE_CHAR,   '20',  null, XMLDB_NOTNULL, null, 'minor');
+            $tf->add_field('computed_at',     XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, null, '0');
+            $tf->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $tf->add_index('course_topic', XMLDB_INDEX_UNIQUE, ['courseid', 'topic_label']);
+            $tf->add_index('course_severity', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'severity']);
+            $dbman->create_table($tf);
+        }
+
+        // 4. umat_ai_metric_trends — 30-day rolling snapshots for sparkline charts
+        $mt = new xmldb_table('umat_ai_metric_trends');
+        if (!$dbman->table_exists($mt)) {
+            $mt->add_field('id',               XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $mt->add_field('courseid',         XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, null, null);
+            $mt->add_field('engagement_score', XMLDB_TYPE_NUMBER,  '5, 1', null, XMLDB_NOTNULL, null, '0.0');
+            $mt->add_field('at_risk_count',    XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, null, '0');
+            $mt->add_field('total_students',   XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, null, '0');
+            $mt->add_field('snapshot_date',    XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, null, '0');
+            $mt->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $mt->add_index('course_date', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'snapshot_date']);
+            $dbman->create_table($mt);
+        }
+
+        upgrade_plugin_savepoint(true, 2026062900, 'local', 'umat_ai');
+    }
+
     return true;
 }

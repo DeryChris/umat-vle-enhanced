@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="local/umat_ai/db" VERSION="2026061500" COMMENT="UMaT AI plugin v1.6.1 schema">
+<XMLDB PATH="local/umat_ai/db" VERSION="2026062900" COMMENT="UMaT AI plugin v2.0.0 schema">
   <TABLES>
 
     <TABLE NAME="umat_ai_sessions" COMMENT="Tracks BBB recordings being processed by the AI service">
@@ -105,6 +105,82 @@
         <INDEX NAME="userid_courseid" UNIQUE="false" FIELDS="userid,courseid"/>
         <INDEX NAME="session_key"     UNIQUE="false" FIELDS="session_key"/>
         <INDEX NAME="timecreated"     UNIQUE="false" FIELDS="timecreated"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_chat_log_helpfulness" COMMENT="Student feedback ratings on AI answers">
+      <FIELDS>
+        <FIELD NAME="id"                  TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="chatlogid"           TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="userid"              TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="rating"              TYPE="int"  LENGTH="1"   NOTNULL="true" DEFAULT="1"/>
+        <FIELD NAME="timecreated"         TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="chatlog_fk" TYPE="foreign" FIELDS="chatlogid" REFTABLE="umat_ai_chat_logs" REFFIELDS="id" ONDELETE="cascade"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
+        <INDEX NAME="timecreated" UNIQUE="false" FIELDS="timecreated"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_material_progress" COMMENT="Student progress tracking through course materials via beacon">
+      <FIELDS>
+        <FIELD NAME="id"              TYPE="int"    LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid"          TYPE="int"    LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="courseid"        TYPE="int"    LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="materialid"      TYPE="int"    LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="progress_pct"    TYPE="number" LENGTH="5, 1" NOTNULL="true" DEFAULT="0.0"/>
+        <FIELD NAME="time_spent_sec"  TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="last_position"   TYPE="int"    LENGTH="10"  NOTNULL="false"/>
+        <FIELD NAME="timemodified"    TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="material_fk" TYPE="foreign" FIELDS="materialid" REFTABLE="umat_ai_materials" REFFIELDS="id" ONDELETE="cascade"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="user_course_material" UNIQUE="true" FIELDS="userid,courseid,materialid"/>
+        <INDEX NAME="courseid" UNIQUE="false" FIELDS="courseid"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_topic_friction" COMMENT="Materialized per-topic friction scores from chat logs and struggle data">
+      <FIELDS>
+        <FIELD NAME="id"              TYPE="int"    LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid"        TYPE="int"    LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="topic_label"     TYPE="char"   LENGTH="255" NOTNULL="true" DEFAULT=""/>
+        <FIELD NAME="question_volume" TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="friction_score"  TYPE="number" LENGTH="5, 1" NOTNULL="true" DEFAULT="0.0"/>
+        <FIELD NAME="student_count"   TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="severity"        TYPE="char"   LENGTH="20"  NOTNULL="true" DEFAULT="minor"/>
+        <FIELD NAME="computed_at"     TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="course_topic" UNIQUE="true" FIELDS="courseid,topic_label"/>
+        <INDEX NAME="course_severity" UNIQUE="false" FIELDS="courseid,severity"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_metric_trends" COMMENT="30-day rolling snapshots for sparkline charts">
+      <FIELDS>
+        <FIELD NAME="id"               TYPE="int"    LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid"         TYPE="int"    LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="engagement_score" TYPE="number" LENGTH="5, 1" NOTNULL="true" DEFAULT="0.0"/>
+        <FIELD NAME="at_risk_count"    TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="total_students"   TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="snapshot_date"    TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="course_date" UNIQUE="false" FIELDS="courseid,snapshot_date"/>
       </INDEXES>
     </TABLE>
 
@@ -214,6 +290,69 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="tag_type" UNIQUE="false" FIELDS="tag_type,tag_id"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_quizgen_jobs" COMMENT="Tracks AI quiz generation jobs from draft request through XML import">
+      <FIELDS>
+        <FIELD NAME="id"              TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid"        TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="userid"          TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="material_id"     TYPE="int"  LENGTH="10"  NOTNULL="false"/>
+        <FIELD NAME="source_text"     TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="config_json"     TYPE="text" NOTNULL="true"/>
+        <FIELD NAME="category_name"   TYPE="char" LENGTH="255" NOTNULL="true"/>
+        <FIELD NAME="status"          TYPE="char" LENGTH="30"  NOTNULL="true" DEFAULT="pending"/>
+        <FIELD NAME="questions_json"  TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="xml_content"     TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="quiz_id"         TYPE="int"  LENGTH="10"  NOTNULL="false"/>
+        <FIELD NAME="failure_reason"  TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="timecreated"     TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timemodified"    TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="course_status" UNIQUE="false" FIELDS="courseid,status"/>
+        <INDEX NAME="user_course"   UNIQUE="false" FIELDS="userid,courseid"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_student_metrics" COMMENT="Hourly aggregated student engagement and risk metrics">
+      <FIELDS>
+        <FIELD NAME="id"              TYPE="int"    LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid"          TYPE="int"    LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="courseid"        TYPE="int"    LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="logins"          TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="avg_quiz_grade"  TYPE="number" LENGTH="10, 2" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="ai_questions_asked" TYPE="int" LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="risk_score"      TYPE="number" LENGTH="10, 2" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="last_active"     TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="course_user" UNIQUE="false" FIELDS="courseid,userid"/>
+        <INDEX NAME="course_risk" UNIQUE="false" FIELDS="courseid,risk_score"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_interventions" COMMENT="Log of lecturer actions to prevent intervention spam">
+      <FIELDS>
+        <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid"      TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="courseid"    TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="lecturerid"  TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="action_type" TYPE="char" LENGTH="50"  NOTNULL="true"/>
+        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="user_course_action" UNIQUE="false" FIELDS="userid,courseid,action_type,timecreated"/>
       </INDEXES>
     </TABLE>
 

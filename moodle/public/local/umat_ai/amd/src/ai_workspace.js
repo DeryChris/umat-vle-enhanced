@@ -214,6 +214,8 @@ define(['core/ajax', 'core/notification', 'local_umat_ai/umatshared'], function(
             session_key: sessionKey,
             material_ids: [],
             msgsId: msgsId,
+            typingId: tid,
+            label: 'AI ASSISTANT',
             onMeta: function(meta){ hideTyping(); },
             onDone: function(meta){ hideTyping(); },
             onError: function(err){

@@ -40,4 +40,44 @@ $tasks = [
         'dayofweek'   => '*',
         'disabled'    => 0,
     ],
+    [
+        'classname'   => '\local_umat_ai\task\aggregate_student_metrics',
+        'blocking'    => 0,
+        'minute'      => '0',      // Every hour.
+        'hour'        => '*',
+        'day'         => '*',
+        'month'       => '*',
+        'dayofweek'   => '*',
+        'disabled'    => 0,
+    ],
+    [
+        'classname'   => '\local_umat_ai\task\compute_topic_friction',
+        'blocking'    => 0,
+        'minute'      => '5',      // Hourly at :05.
+        'hour'        => '*',
+        'day'         => '*',
+        'month'       => '*',
+        'dayofweek'   => '*',
+        'disabled'    => 0,
+    ],
+    [
+        'classname'   => '\local_umat_ai\task\compute_material_health',
+        'blocking'    => 0,
+        'minute'      => '10',     // Hourly at :10.
+        'hour'        => '*',
+        'day'         => '*',
+        'month'       => '*',
+        'dayofweek'   => '*',
+        'disabled'    => 0,
+    ],
+    [
+        'classname'   => '\local_umat_ai\task\snapshot_metric_trends',
+        'blocking'    => 0,
+        'minute'      => '15',     // Hourly at :15.
+        'hour'        => '*',
+        'day'         => '*',
+        'month'       => '*',
+        'dayofweek'   => '*',
+        'disabled'    => 0,
+    ],
 ];

@@ -99,6 +99,26 @@ class StudentContext(Base):
     updated_at       = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class StudentSnapshot(Base):
+    __tablename__ = "student_snapshots"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    course_id     = Column(Integer, nullable=False, index=True)
+    user_id       = Column(Integer, nullable=False, index=True)
+    snapshot_data = Column(Text, nullable=False)
+    created_at    = Column(DateTime, default=datetime.utcnow)
+
+
+class AnalyticsCache(Base):
+    __tablename__ = "analytics_cache"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    query_hash    = Column(String(64), nullable=False, index=True)
+    query_text    = Column(Text, nullable=False)
+    response_json = Column(Text, nullable=False)
+    created_at    = Column(DateTime, default=datetime.utcnow)
+
+
 class MaterialAnalysis(Base):
     __tablename__ = "material_analyses"
 
@@ -136,6 +156,14 @@ def init_db():
     # Create student_context table if not exists
     if not inspector.has_table('student_context'):
         StudentContext.__table__.create(bind=engine)
+
+    # Create student_snapshots table if not exists
+    if not inspector.has_table('student_snapshots'):
+        StudentSnapshot.__table__.create(bind=engine)
+
+    # Create analytics_cache table if not exists
+    if not inspector.has_table('analytics_cache'):
+        AnalyticsCache.__table__.create(bind=engine)
 
 
 def get_db():

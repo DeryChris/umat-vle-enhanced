@@ -1,9 +1,11 @@
 import hashlib
+import json
 import os
 from typing import List, Optional
 from diskcache import Cache
 from config import get_settings
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
 
 settings = get_settings()
 
@@ -13,7 +15,7 @@ os.makedirs(_cache_dir, exist_ok=True)
 _llm_cache = Cache(_cache_dir, size_limit=500 * 1024 * 1024)  # 500 MB limit.
 
 
-def _make_llm(temperature: float):
+def _make_llm(temperature: float, generation_config: dict = None):
     """Build a chat model for the configured provider (gemini or openai)."""
     if settings.llm_provider == "openai":
         from langchain_openai import ChatOpenAI
@@ -22,11 +24,14 @@ def _make_llm(temperature: float):
             api_key=settings.openai_api_key,
             temperature=temperature,
         )
-    return ChatGoogleGenerativeAI(
+    kwargs = dict(
         model=settings.llm_model,
         google_api_key=settings.google_api_key,
         temperature=temperature,
     )
+    if generation_config:
+        kwargs["generation_config"] = generation_config
+    return ChatGoogleGenerativeAI(**kwargs)
 
 SUMMARY_PROMPT = """You are an academic assistant for the University of Mines and Technology (UMaT), Ghana.
 
@@ -290,6 +295,23 @@ class LLMProcessor:
         """Generate a response from a fully constructed system prompt."""
         temperature = 0.1 if task == "qa" else 0.4
         return self._invoke(prompt, temperature=temperature, max_chars=24000)
+
+    async def generate_assessment(self, prompt: str, temperature: float = 0.3, max_chars: int = 12000) -> str:
+        """Generate questions with strict JSON output via Gemini response_mime_type."""
+        raw = f"assessment___{prompt}___{temperature}___{max_chars}"
+        key = hashlib.sha256(raw.encode()).hexdigest()
+        cached = _llm_cache.get(key)
+        if cached is not None:
+            return cached
+
+        gen_config = {"response_mime_type": "application/json"}
+        llm = _make_llm(temperature=temperature, generation_config=gen_config)
+        prompt = prompt[:max_chars]
+        result = llm.invoke(prompt)
+        text = result.content.strip()
+
+        _llm_cache.set(key, text, expire=900)
+        return text
 
     def stream_prompt(self, prompt: str, task: str = "qa"):
         """Yield text chunks as the LLM generates them."""

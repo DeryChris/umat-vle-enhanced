@@ -601,6 +601,9 @@
       <button class="umat-ws-tab active tab-btn" data-tab="chat" role="tab" type="button">{{#str}}tab_chat, local_umat_ai{{/str}}</button>
       <button class="umat-ws-tab tab-btn" data-tab="notes" role="tab" type="button">{{#str}}tab_notes, local_umat_ai{{/str}}</button>
       <button class="umat-ws-tab tab-btn" data-tab="resources" role="tab" type="button">{{#str}}tab_resources, local_umat_ai{{/str}}</button>
+      {{#is_lecturer}}
+      <button class="umat-ws-tab tab-btn" data-tab="analytics" role="tab" type="button">Analytics</button>
+      {{/is_lecturer}}
     </div>
 
     <!-- Chat pane -->
@@ -616,7 +619,7 @@
         <div class="umat-msg-ai">
           <div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>
           <div class="umat-msg-ai-wrap">
-            <div class="umat-msg-lbl">AI TUTOR</div>
+            <div class="umat-msg-lbl">AI ASSISTANT</div>
             <div class="umat-bubble-ai"><div class="umat-ai-content"><p>{{#str}}workspace_greeting, local_umat_ai{{/str}}</p></div></div>
           </div>
         </div>
@@ -624,7 +627,7 @@
         <div id="workspace-typing" style="display:none;" class="umat-msg-ai">
           <div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>
           <div class="umat-msg-ai-wrap">
-            <div class="umat-msg-lbl">AI TUTOR</div>
+            <div class="umat-msg-lbl">AI ASSISTANT</div>
             <div class="umat-bubble-ai"><div class="umat-typing"><span></span><span></span><span></span></div></div>
           </div>
         </div>
@@ -671,6 +674,13 @@
         <p id="resources-list">{{#str}}no_resources, local_umat_ai{{/str}}</p>
       </div>
     </div>
+
+    <!-- Analytics pane (Lecturers only) -->
+    {{#is_lecturer}}
+    <div class="umat-ws-pane tab-content" id="tab-analytics" style="padding:0; overflow-y:auto; background:var(--sf);">
+      {{> local_umat_ai/ai_dashboard }}
+    </div>
+    {{/is_lecturer}}
 
   </div><!-- /ws-right -->
 

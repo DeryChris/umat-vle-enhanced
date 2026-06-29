@@ -133,6 +133,67 @@ $functions = [
         'description' => 'Student views their personal progress/struggle dashboard', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
+
+    /* ---- Quiz Generator ---- */
+    'local_umat_ai_generate_quiz_draft' => [
+        'classname'   => '\local_umat_ai\external\quizgen', 'methodname' => 'generate_quiz_draft',
+        'description' => 'Lecturer creates an AI quiz generation job and queues it', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_get_quiz_job_status' => [
+        'classname'   => '\local_umat_ai\external\quizgen', 'methodname' => 'get_quiz_job_status',
+        'description' => 'Poll the status of a quiz generation job', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_finalize_quiz' => [
+        'classname'   => '\local_umat_ai\external\quizgen', 'methodname' => 'finalize_quiz',
+        'description' => 'Import generated questions into question bank + create quiz', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_get_quiz_job_history' => [
+        'classname'   => '\local_umat_ai\external\quizgen', 'methodname' => 'get_quiz_job_history',
+        'description' => 'List all quiz generation jobs for a course (history tracking)', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+
+    /* ---- Lecturer Insights Dashboard ---- */
+    'local_umat_ai_get_dashboard_summary' => [
+        'classname'   => '\local_umat_ai\external\get_dashboard_summary', 'methodname' => 'get_dashboard_summary',
+        'description' => 'Lecturer dashboard summary (engagement, at-risk count)', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_query_student_insights' => [
+        'classname'   => '\local_umat_ai\external\query_student_insights', 'methodname' => 'query_student_insights',
+        'description' => 'NLQ-powered student insight query with risk filter', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_get_student_profile' => [
+        'classname'   => '\local_umat_ai\external\get_student_profile', 'methodname' => 'get_student_profile',
+        'description' => 'Deep-dive profile for a single student', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_execute_intervention' => [
+        'classname'   => '\local_umat_ai\external\execute_intervention', 'methodname' => 'execute_intervention',
+        'description' => 'Send intervention message to a student', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+
+    /* ---- Struggle Dashboard (Phase 2) ---- */
+    'local_umat_ai_get_struggle_dashboard_data' => [
+        'classname'   => '\local_umat_ai\external\get_struggle_dashboard_data', 'methodname' => 'get_struggle_dashboard_data',
+        'description' => 'Single aggregated payload for the Struggle Areas Dashboard', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_report_material_progress' => [
+        'classname'   => '\local_umat_ai\external\report_material_progress', 'methodname' => 'report_material_progress',
+        'description' => 'Report material viewing progress via JS beacon', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_rate_answer' => [
+        'classname'   => '\local_umat_ai\external\rate_answer', 'methodname' => 'rate_answer',
+        'description' => 'Rate the helpfulness of an AI answer', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
 ];
 
 $services = [
