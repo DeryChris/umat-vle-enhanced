@@ -172,8 +172,8 @@ class index_course_materials extends \core\task\scheduled_task {
         $file->copy_content_to($filepath);
 
         try {
-            $client = new \curl(['ignoresecurity' => true]);
-            $client->setHeader(['Authorization: Bearer ' . $cfg['token']]);
+            $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($cfg['url'])]);
+            $client->setHeader(['Authorization: Bearer ' . $cfg['token'], 'X-Request-Id: ' . local_umat_ai_request_id()]);
             $client->setopt(['CURLOPT_TIMEOUT' => 120]);
 
             $postData = [

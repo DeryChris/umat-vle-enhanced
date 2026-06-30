@@ -9,8 +9,8 @@ class process_recordings extends \core\task\scheduled_task {
     public function execute(): void {
         global $DB;
         $cfg = local_umat_ai_get_service_config();
-        $client = new \curl(['ignoresecurity' => true]);
-        $client->setHeader(['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['token']]);
+        $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($cfg['url'])]);
+        $client->setHeader(['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['token'], 'X-Request-Id: ' . local_umat_ai_request_id()]);
         $client->setopt(['CURLOPT_TIMEOUT' => 25]);
         $pending = $DB->get_records_select('umat_ai_sessions',
             "status IN ('pending','processing','queued','downloading','transcribing','processing_ai')",
@@ -21,8 +21,7 @@ class process_recordings extends \core\task\scheduled_task {
             if (empty($result['status'])) { mtrace("  [umat_ai] No status for {$sess->sessionid}"); continue; }
             $aiStatus = $result['status'];
             if ($aiStatus === 'completed') {
-                $tjson = (!empty($result['transcript']) && is_array($result['transcript']))
-                    ? json_encode($result['transcript']) : null;
+                $tjson = (!empty($result['transcript'])) ? $result['transcript'] : null;
                 $DB->set_field('umat_ai_sessions', 'status',         'completed', ['id'=>$sess->id]);
                 $DB->set_field('umat_ai_sessions', 'timemodified',   time(),      ['id'=>$sess->id]);
                 if ($tjson) $DB->set_field('umat_ai_sessions', 'transcript_json', $tjson, ['id'=>$sess->id]);

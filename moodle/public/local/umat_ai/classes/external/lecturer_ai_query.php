@@ -59,10 +59,11 @@ class lecturer_ai_query extends \external_api {
             . "Top student questions: {$topQsList}. ";
 
         $cfg    = local_umat_ai_get_service_config();
-        $client = new \curl(['ignoresecurity' => true]);
+        $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($cfg['url'])]);
         $client->setHeader([
             'Content-Type: application/json',
             'Authorization: Bearer ' . $cfg['token'],
+            'X-Request-Id: ' . local_umat_ai_request_id(),
         ]);
         $client->setopt(['CURLOPT_TIMEOUT' => 30]);
 

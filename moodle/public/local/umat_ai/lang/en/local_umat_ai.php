@@ -8,6 +8,7 @@ $string['umat_ai:viewsummary']   = 'View AI-generated summaries and notes';
 $string['umat_ai:approveoutput'] = 'Approve AI-generated content';
 $string['umat_ai:chatwithai']    = 'Chat with the AI assistant';
 $string['umat_ai:viewanalytics'] = 'View lecturer analytics dashboard';
+$string['umat_ai:creategroup']   = 'Create and join study groups';
 
 /* ---- General ---- */
 $string['ai_assistant']          = 'UMaT AI Assistant';
@@ -101,7 +102,40 @@ $string['pendingapproval_subject'] = 'New AI content awaits your review: {$a}';
 $string['pendingapproval_body']    = 'The AI assistant has generated new {$a->types} for a lecture in "{$a->course}". Please review and approve the content so students can see it: {$a->url}';
 $string['pendingapproval_short']   = 'New AI outputs ({$a->types}) await approval in {$a->course}.';
 
-/* ---- Issue Reports ---- */
+/* ---- Group Study ---- */
+$string['group_study']               = 'Study Groups';
+$string['group_study_title']         = 'AI Study Groups';
+$string['group_create']              = 'Create Study Group';
+$string['group_join']                = 'Join Group';
+$string['group_leave']               = 'Leave Group';
+$string['group_delete']              = 'Delete Group';
+$string['group_name']                = 'Group Name';
+$string['group_description']         = 'Description';
+$string['group_max_members']         = 'Max Members';
+$string['group_created']             = 'Study group created successfully';
+$string['group_joined']              = 'You joined the study group';
+$string['group_left']                = 'You left the study group';
+$string['group_deleted']             = 'Study group deleted';
+$string['group_empty']               = 'No study groups yet. Create one to collaborate!';
+$string['group_empty_messages']      = 'No messages yet. Send a chat message or ask AI to start!';
+$string['group_chat_mode']           = 'Chat';
+$string['group_ai_mode']             = 'Ask AI & Share';
+$string['group_chat_placeholder']    = 'Type a message...';
+$string['group_ai_placeholder']      = 'Ask AI a question to share with the group...';
+$string['group_send_chat']           = 'Send';
+$string['group_send_ai']             = 'Ask AI & Share';
+$string['group_full']                = 'This group is full';
+$string['group_already_member']      = 'Already a member';
+$string['group_not_member']          = 'You are not a member of this group';
+$string['group_ask_ai']              = 'Ask the AI…';
+$string['group_send']                = 'Send to Group';
+$string['group_shared_question']     = 'Shared AI Question';
+$string['group_members']             = 'Members';
+$string['group_chat']                = 'Group AI Chat';
+$string['group_back_to_list']        = 'Back to groups';
+$string['group_member_count']        = '{$a} members';
+$string['group_owner']               = 'Owner';
+$string['group_invalid']             = 'Invalid study group';
 $string['issue_report_title']      = 'Report Issue';
 $string['issue_submit_btn']        = 'Submit Report';
 $string['issue_category_label']    = 'Category';

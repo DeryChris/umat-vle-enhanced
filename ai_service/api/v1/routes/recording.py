@@ -139,9 +139,9 @@ def process_recording_background(
         try:
             # Step 5: Generate AI outputs (Gemini)
             logger.info(f"[{job_id}] Generating summary, notes, quiz")
-            llm.generate_summary(transcript)
-            llm.generate_notes(transcript)
-            llm.generate_quiz(transcript)
+            job.summary = llm.generate_summary(transcript)
+            job.notes   = llm.generate_notes(transcript)
+            job.quiz    = llm.generate_quiz(transcript)
         except Exception as e:
             if "gemini" in str(e).lower() or "api" in str(e).lower():
                 step_failed = "llm_generation"
@@ -221,7 +221,9 @@ async def get_job_status(
     db:     Session = Depends(get_db),
     token:  str     = Depends(verify_token),
 ):
-    job = db.query(ProcessingJob).filter(ProcessingJob.job_id == job_id).first()
+    job = db.query(ProcessingJob).filter(
+        (ProcessingJob.job_id == job_id) | (ProcessingJob.session_id == job_id)
+    ).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -231,5 +233,11 @@ async def get_job_status(
         "status":       job.status,
         "created_at":   job.created_at,
         "completed_at": job.completed_at,
+        "transcript":   job.transcript,
+        "outputs": {
+            "summary": job.summary,
+            "notes":   job.notes,
+            "quiz":    job.quiz,
+        },
         "error":        job.error_message,
     }

@@ -84,10 +84,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_FILES['material'])) {
 
             $body .= "--$boundary--\r\n";
 
-            $client = new \curl(['ignoresecurity' => true]);
+            $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($config['url'])]);
             $client->setHeader([
                 'Content-Type: multipart/form-data; boundary=' . $boundary,
                 'Authorization: Bearer ' . $config['token'],
+                'X-Request-Id: ' . local_umat_ai_request_id(),
             ]);
 
             $response = $client->post($config['url'] . '/api/v1/materials/index', $body);
