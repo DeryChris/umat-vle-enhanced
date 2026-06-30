@@ -60,7 +60,17 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
 
     function init(courseId) {
         cid = parseInt(courseId) || 0;
-        if (!cid) return;
+        if (!cid) {
+            showSkeleton(false);
+            var dashboard = document.querySelector('.sd-dashboard');
+            if (dashboard) {
+                dashboard.innerHTML = '<div class="umat-empty" style="padding:60px 20px;text-align:center;">' +
+                    '<span class="material-symbols-outlined" style="font-size:48px;color:var(--u-olv);">menu_book</span>' +
+                    '<p style="color:var(--u-ol);font-size:15px;margin-top:12px;">Select a course using the button above to view the struggle dashboard.</p>' +
+                    '</div>';
+            }
+            return;
+        }
         bindNlqBar();
         showSkeleton(true);
         loadData();
@@ -108,7 +118,11 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
             chartInstances.sparkline = new Chart(sparkCanvas.getContext('2d'), {
                 type: 'line',
                 data: {
-                    labels: kpis.engagement_trend.map(function(v, i) { return ''; }),
+                    labels: kpis.engagement_trend.map(function(v, i) {
+                        var d = new Date();
+                        d.setDate(d.getDate() - (kpis.engagement_trend.length - 1 - i));
+                        return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
+                    }),
                     datasets: [{
                         data: kpis.engagement_trend,
                         borderColor: '#006b2f',
@@ -218,7 +232,11 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
     /* ── Scatter Plot ── */
     function renderScatterPlot(data) {
         var canvas = document.getElementById('sd-scatter-plot');
-        if (!canvas || !data || !data.length) return;
+        if (!canvas) return;
+        if (!data || !data.length) {
+            canvas.parentElement.innerHTML = '<div class="sd-empty">No scatter data yet. Questions will appear once students start asking.</div>';
+            return;
+        }
 
         destroyChart('scatter');
 
@@ -262,12 +280,12 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
                 scales: {
                     x: {
                         title: { display: true, text: 'Question Volume', color: '#666', font: {size: 11} },
-                        min: 0, max: 70,
+                        min: 0, max: data.length ? Math.ceil(Math.max.apply(null, data.map(function(d) { return d.volume; })) / 10) * 10 * 1.2 : 70,
                         grid: { display: false }
                     },
                     y: {
                         title: { display: true, text: 'Friction Score', color: '#666', font: {size: 11} },
-                        min: 0, max: 60,
+                        min: 0, max: data.length ? Math.ceil(Math.max.apply(null, data.map(function(d) { return d.friction; })) / 10) * 10 * 1.2 : 60,
                         grid: { display: false }
                     }
                 },
@@ -405,7 +423,10 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
         var canvas = document.getElementById('sd-material-health-chart');
         if (!canvas) return;
         destroyChart('matHealth');
-        if (!data || !data.length) return;
+        if (!data || !data.length) {
+            canvas.parentElement.innerHTML = '<div class="sd-empty">No material health data yet.</div>';
+            return;
+        }
 
         var labels = data.map(function(m) { return m.name.length > 25 ? m.name.substring(0, 22) + '...' : m.name; });
 
@@ -475,8 +496,13 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
     function renderHealthReport(report) {
         var reportEl = document.getElementById('sd-health-report');
         var recEl = document.getElementById('sd-recommendations');
-        if (reportEl && report) {
-            reportEl.innerHTML = escapeHtml(report.summary || 'No health summary available.');
+        if (!report || !report.summary) {
+            if (reportEl) reportEl.innerHTML = '<div class="sd-empty">AI course health report will appear once enough student data is available.</div>';
+            if (recEl) recEl.innerHTML = '';
+            return;
+        }
+        if (reportEl) {
+            reportEl.innerHTML = escapeHtml(report.summary);
         }
         if (recEl && report && report.recommendations) {
             recEl.innerHTML = report.recommendations.map(function(r) {
@@ -570,7 +596,7 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
             window.open(url, '_blank');
         } else if (action === 'video') {
             // Launch BBB meeting — try BBB module
-            var bbbUrl = '/mod/bigbluebuttonbn/bbb_view.php?action=join&id=' + cid + '&userid=' + uid;
+            var bbbUrl = '/mod/bigbluebuttonbn/index.php?id=' + cid;
             // Show iframe overlay
             var overlay = document.createElement('div');
             overlay.className = 'sd-bbb-overlay open';

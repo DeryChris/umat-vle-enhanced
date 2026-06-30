@@ -26,6 +26,7 @@ class before_footer {
 
         $wwwroot = rtrim($CFG->wwwroot, '/');
         $ts = filemtime(__DIR__ . '/../../styles/umat-dashboard.css');
+        $sdts = filemtime(__DIR__ . '/../../styles/umat-struggle-dashboard.css');
 
         $hook->add_html('<link rel="preconnect" href="https://cdnjs.cloudflare.com">');
         $hook->add_html('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">');
@@ -38,6 +39,7 @@ class before_footer {
         $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-cs-overlay.css?v=' . $ts . '">');
         $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-responsive.css?v=' . $ts . '">');
         $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-glassmorph-nav.css?v=' . $ts . '">');
+        $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-struggle-dashboard.css?v=' . $sdts . '">');
 
         if ($isCourseArea && $courseid) {
             $courseCtx  = \context_course::instance($courseid);
@@ -47,13 +49,7 @@ class before_footer {
 
             if ($isLecturer && get_config('local_umat_ai', 'enable_lecturer_fab')) {
                 $userData = \local_umat_ai\user_data::preload_user_data($USER->id, $wwwroot);
-                $pending = (int)($DB->get_field_sql(
-                    "SELECT COUNT(o.id) FROM {umat_ai_outputs} o
-                     JOIN {umat_ai_sessions} s ON s.id = o.sessionrecordid
-                     WHERE s.courseid = :cid AND o.is_approved = 0",
-                    ['cid' => $courseid]
-                ) ?: 0);
-                $hook->add_html(\local_umat_ai\overlay_helper::lecturer_overlay($courseid, $courseName, $pending, $wwwroot, $USER, $userData));
+                $hook->add_html(\local_umat_ai\overlay_helper::lecturer_overlay($courseid, $courseName, $wwwroot, $USER, $userData));
             } elseif ($isStudent && get_config('local_umat_ai', 'enable_student_fab')) {
                 $userData = \local_umat_ai\user_data::preload_user_data($USER->id, $wwwroot);
                 $hook->add_html(\local_umat_ai\overlay_helper::student_overlay($courseid, $courseName, $wwwroot, $USER, $userData));
@@ -67,12 +63,7 @@ class before_footer {
             );
             if ($isLecturerAnywhere && get_config('local_umat_ai', 'enable_lecturer_fab')) {
                 $userData = \local_umat_ai\user_data::preload_user_data($USER->id, $wwwroot);
-                $totalPending = (int)($DB->get_field_sql(
-                    "SELECT COUNT(o.id) FROM {umat_ai_outputs} o
-                     JOIN {umat_ai_sessions} s ON s.id = o.sessionrecordid
-                     WHERE o.is_approved = 0"
-                ) ?: 0);
-                $hook->add_html(\local_umat_ai\overlay_helper::lecturer_overlay(0, 'All Courses', $totalPending, $wwwroot, $USER, $userData));
+                $hook->add_html(\local_umat_ai\overlay_helper::lecturer_overlay(0, 'All Courses', $wwwroot, $USER, $userData));
             } elseif (get_config('local_umat_ai', 'enable_hub_fab')) {
                 $userData = \local_umat_ai\user_data::preload_user_data($USER->id, $wwwroot);
                 $hook->add_html(\local_umat_ai\overlay_helper::hub_overlay($wwwroot, $USER, $userData));
