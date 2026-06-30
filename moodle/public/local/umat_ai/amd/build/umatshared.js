@@ -159,6 +159,22 @@ define([], function() {
         var contentEl = null;
         var bubbleEl = null;
         var formatTimer = null;
+        var doneReceived = false;
+        var retries = 0;
+        var maxRetries = 3;
+
+        function doRetry() {
+            if (doneReceived || retries >= maxRetries) return;
+            retries++;
+            if (streamRow && contentEl) {
+                var el = contentEl;
+                var existing = el.querySelector('.umat-retry-msg');
+                if (!existing) {
+                    el.insertAdjacentHTML('beforeend', '<div class="umat-retry-msg" style="padding:8px 0;opacity:.6;font-size:12px;">Reconnecting… (' + retries + '/' + maxRetries + ')</div>');
+                }
+            }
+            setTimeout(function() { _umatStreamChat(opts); }, retries * 2000);
+        }
 
         function ensureBubble() {
             if (streamRow) return;
@@ -229,6 +245,7 @@ define([], function() {
                         accumulated = accumulated.replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
                         scheduleRender();
                     } else if (event === 'done') {
+                        doneReceived = true;
                         if (payload.answer) accumulated = payload.answer;
                         accumulated = accumulated.replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
                         ensureBubble();
@@ -242,7 +259,10 @@ define([], function() {
 
                 function pump() {
                     return reader.read().then(function(result) {
-                        if (result.done) return;
+                        if (result.done) {
+                            doRetry();
+                            return;
+                        }
                         buffer += decoder.decode(result.value, { stream: true });
                         var parts = buffer.split('\n\n');
                         buffer = parts.pop() || '';
@@ -255,6 +275,7 @@ define([], function() {
             })
             .catch(function(err) {
                 if (opts.onError) opts.onError({ message: err.message || 'Connection error.' });
+                doRetry();
             });
     }
 
@@ -294,13 +315,13 @@ define([], function() {
                 _umatRenderMatsBar(barId, btnId, remaining, onRemove);
                 if (btn) {
                     btn.style.color = remaining.length ? 'var(--u-p)' : '';
-                    btn.innerHTML = remaining.length ? '<span class="material-symbols-outlined">attach_file</span>' + remaining.length + ' ref' : '<span class="material-symbols-outlined">attach_file</span>Ref Material';
+                    btn.innerHTML = '<span class="material-symbols-outlined">add</span>';
                 }
             });
         });
         if (!btn) return;
         btn.style.color = mats.length ? 'var(--u-p)' : '';
-        btn.innerHTML = mats.length ? '<span class="material-symbols-outlined">attach_file</span>' + mats.length + ' ref' : '<span class="material-symbols-outlined">attach_file</span>Ref Material';
+        btn.innerHTML = '<span class="material-symbols-outlined">add</span>';
     }
 
     // ─── File type icon name ← mime type (drawer) ──── //
@@ -782,6 +803,7 @@ define([], function() {
                 '<button class="yt-btn yt-view-btn"><span class="material-symbols-outlined">visibility</span>View</button>' +
                 '<a class="yt-btn" href="' + _umatEsc(m.url || '#') + '" download="' + _umatEsc(m.filename || '') + '" onclick="event.stopPropagation()"><span class="material-symbols-outlined">download</span>Download</a>' +
                 '<button class="yt-btn yt-analysis-btn" style="display:none" data-analysed="false"><span class="material-symbols-outlined anal-status-dot">circle</span><span class="anal-text">Analyze</span></button>' +
+                '<button class="yt-btn yt-video-btn" data-video-status="none"><span class="material-symbols-outlined">videocam</span><span class="video-text">Gen Video</span></button>' +
                 '</div>' +
                 '</div>';
         }).join('');
@@ -1081,6 +1103,98 @@ define([], function() {
         );
     }
 
+    // ─── Video generation status ──────────────────── //
+    function updateVideoGenerationStatus(courseId) {
+        if (!courseId) return;
+        ajax('local_umat_ai_get_video_status', { courseid: courseId },
+            function (resp) {
+                var materials = resp.materials || [];
+                var lookup = {};
+                materials.forEach(function (m) { lookup[m.fileid] = m; });
+                document.querySelectorAll('.yt-tile').forEach(function (tile) {
+                    var btn = tile.querySelector('.yt-video-btn');
+                    if (!btn) return;
+                    var fileid = parseInt(tile.dataset.fileid) || 0;
+                    var info = lookup[fileid] || null;
+                    var mime = (tile.dataset.mime || '').toLowerCase();
+                    var isDoc = mime.indexOf('pdf') >= 0 || mime.indexOf('wordprocessingml') >= 0
+                        || mime.indexOf('presentationml') >= 0 || mime.indexOf('powerpoint') >= 0
+                        || mime.indexOf('msword') >= 0 || mime.indexOf('text/') === 0;
+                    if (!isDoc) { btn.style.display = 'none'; return; }
+                    btn.style.display = '';
+                    btn.dataset.fileid = fileid;
+                    var txt = btn.querySelector('.video-text');
+                    var ic = btn.querySelector('.material-symbols-outlined');
+                    var setQueuing = function(self) {
+                        ic.textContent = 'sync'; ic.style.color = '#ff9800';
+                        txt.textContent = 'Queuing...'; self.disabled = true;
+                    };
+                    var setGen = function(self) {
+                        ic.textContent = 'sync'; ic.style.color = '#ff9800';
+                        txt.textContent = 'Generating...'; self.disabled = true;
+                    };
+                    var setReady = function(self) {
+                        ic.textContent = 'check_circle'; ic.style.color = '#4caf50';
+                        txt.textContent = 'Watch'; self.disabled = false;
+                    };
+                    var setDefault = function(self) {
+                        ic.textContent = 'videocam'; ic.style.color = '';
+                        txt.textContent = 'Gen Video'; self.disabled = false;
+                    };
+                    var showError = function(self, msg) {
+                        ic.textContent = 'error'; ic.style.color = '#f44336';
+                        txt.textContent = msg || 'Failed';
+                        setTimeout(function() { setDefault(self); }, 3000);
+                    };
+                    if (info && info.has_video) {
+                        btn.title = 'View generated video';
+                        btn.onclick = function (e) {
+                            e.stopPropagation();
+                            if (info.video_url && window.umatMaterialViewer) {
+                                window.umatMaterialViewer.open('video', {
+                                    url: info.video_url,
+                                    name: 'AI-Generated Lecture Video',
+                                    downloadUrl: info.video_url,
+                                    mime: 'video/mp4'
+                                });
+                            } else if (info.video_url) {
+                                window.open(info.video_url, '_blank');
+                            }
+                        };
+                        setReady(btn);
+                    } else if (info && (info.job_status === 'processing' || info.job_status === 'queued')) {
+                        btn.title = 'Video is being generated';
+                        setGen(btn);
+                    } else {
+                        btn.title = 'Generate AI video from this material';
+                        btn.onclick = function (e) {
+                            e.stopPropagation();
+                            var self = this;
+                            setQueuing(self);
+                            ajax('local_umat_ai_request_video_generation', {
+                                courseid: courseId,
+                                fileid: fileid,
+                            }, function (res) {
+                                if (res.success) {
+                                    setGen(self);
+                                    self.title = 'Video generation queued';
+                                    setTimeout(function () {
+                                        if (typeof updateVideoGenerationStatus === 'function')
+                                            updateVideoGenerationStatus(courseId);
+                                    }, 5000);
+                                } else {
+                                    showError(self, res.message || 'Failed');
+                                }
+                            });
+                        };
+                        setDefault(btn);
+                    }
+                });
+            },
+            function () { /* silently fail */ }
+        );
+    }
+
     // ─── Exports ───────────────────────────────────── //
     return {
         // HTML escaping
@@ -1156,5 +1270,8 @@ define([], function() {
 
         // Analysis
         updateMaterialAnalysis: updateMaterialAnalysis,
+
+        // Video generation
+        updateVideoGenerationStatus: updateVideoGenerationStatus,
     };
 });

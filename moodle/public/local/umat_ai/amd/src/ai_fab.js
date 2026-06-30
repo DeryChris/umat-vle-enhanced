@@ -57,6 +57,131 @@ define(['core/ajax'], function(Ajax) {
             #umatFabBtn:hover .fabTooltip {
                 opacity: 1;
             }
+            .umat-group-card {
+                background: white;
+                border-radius: 12px;
+                padding: 14px;
+                margin-bottom: 10px;
+                border: 1px solid #dee5da;
+                transition: box-shadow 0.2s;
+            }
+            .umat-group-card:hover {
+                box-shadow: 0 2px 8px rgba(0,107,47,0.1);
+            }
+            .umat-group-card-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 6px;
+            }
+            .umat-group-name {
+                margin: 0;
+                font-size: 14px;
+                font-weight: 600;
+                color: #333;
+            }
+            .umat-group-desc {
+                font-size: 12px;
+                color: #666;
+                margin: 4px 0 8px;
+                line-height: 1.4;
+            }
+            .umat-group-meta {
+                font-size: 11px;
+                color: #999;
+                margin-bottom: 10px;
+            }
+            .umat-group-actions {
+                display: flex;
+                gap: 6px;
+            }
+            .umat-group-actions .btn {
+                font-size: 12px;
+                padding: 4px 12px;
+            }
+            .umat-group-chat-header {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-bottom: 12px;
+                padding-bottom: 10px;
+                border-bottom: 1px solid #dee5da;
+            }
+            .umat-group-chat-header h4 {
+                margin: 0;
+                font-size: 14px;
+                font-weight: 600;
+                color: #006b2f;
+                flex: 1;
+            }
+            .umat-group-chat-members {
+                font-size: 11px;
+                color: #666;
+                margin-bottom: 12px;
+            }
+            .umat-group-chat-messages {
+                flex: 1;
+                overflow-y: auto;
+                max-height: 300px;
+                margin-bottom: 12px;
+            }
+            .umat-group-msg {
+                background: white;
+                border-radius: 10px;
+                padding: 10px 12px;
+                margin-bottom: 8px;
+                border: 1px solid #dee5da;
+            }
+            .umat-group-msg-header {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 4px;
+                font-size: 12px;
+            }
+            .umat-group-msg-q {
+                font-size: 13px;
+                color: #333;
+                margin-bottom: 4px;
+            }
+            .umat-group-msg-a {
+                font-size: 12px;
+                color: #555;
+                padding-left: 8px;
+                border-left: 2px solid #006b2f;
+            }
+            .umat-group-chat-input {
+                display: flex;
+                gap: 8px;
+                align-items: flex-end;
+            }
+            .umat-group-chat-input textarea {
+                flex: 1;
+                padding: 8px;
+                border: 1px solid #dee5da;
+                border-radius: 8px;
+                font-size: 13px;
+                resize: none;
+                outline: none;
+            }
+            .umat-group-chat-input textarea:focus {
+                border-color: #006b2f;
+            }
+            .umat-group-chat-input button {
+                padding: 8px 16px;
+                background: #006b2f;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 13px;
+                white-space: nowrap;
+            }
+            .umat-group-empty, .umat-group-empty-msg {
+                text-align: center;
+                padding: 24px 16px;
+                color: #999;
+                font-size: 13px;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -129,7 +254,8 @@ define(['core/ajax'], function(Ajax) {
             '<div style="display:flex;border-bottom:1px solid #dee5da;background:white;">' +
             '<button class="umatTab active" data-tab="chat" style="flex:1;padding:10px 8px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;color:#006b2f;border-bottom:2px solid #006b2f;">Chat</button>' +
             '<button class="umatTab" data-tab="notes" style="flex:1;padding:10px 8px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;color:#666;">Notes</button>' +
-            '<button class="umatTab" data-tab="resources" style="flex:1;padding:10px 8px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;color:#666;">Resources</button></div>' +
+            '<button class="umatTab" data-tab="resources" style="flex:1;padding:10px 8px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;color:#666;">Resources</button>' +
+            '<button class="umatTab" data-tab="group" style="flex:1;padding:10px 8px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;color:#666;">Group</button></div>' +
 
             // Chat content
             '<div id="umatChatContent" style="flex:1;overflow-y:auto;padding:16px;background:#f8faf7;display:flex;flex-direction:column;gap:12px;">' +
@@ -165,6 +291,9 @@ define(['core/ajax'], function(Ajax) {
             '<div id="umatResourcesContent" style="display:none;flex:1;overflow-y:auto;padding:24px;text-align:center;color:#666;font-size:14px;">' +
             '<span class="material-symbols-outlined" style="font-size:48px;color:#dee5da;">folder_open</span>' +
             '<p style="margin-top:12px;">Course resources will appear here.</p></div>' +
+
+            // Group study content
+            '<div id="umatGroupContent" style="display:none;flex:1;overflow-y:auto;padding:16px;background:#f8faf7;"></div>' +
 
             // Input area
             '<div id="umatChatInput" style="padding:12px 16px;background:white;border-top:1px solid #dee5da;">' +
@@ -247,22 +376,45 @@ define(['core/ajax'], function(Ajax) {
 
                 var chatContent = document.getElementById('umatChatContent');
                 var chatInput = document.getElementById('umatChatInput');
+                var notesContent = document.getElementById('umatNotesContent');
+                var resourcesContent = document.getElementById('umatResourcesContent');
+                var groupContent = document.getElementById('umatGroupContent');
+
+                chatContent.style.display = 'none';
+                chatInput.style.display = 'none';
+                if (notesContent) notesContent.style.display = 'none';
+                if (resourcesContent) resourcesContent.style.display = 'none';
+                if (groupContent) groupContent.style.display = 'none';
 
                 if (tabName === 'chat') {
                     chatContent.style.display = 'flex';
                     chatInput.style.display = 'block';
-                    document.getElementById('umatNotesContent').style.display = 'none';
-                    document.getElementById('umatResourcesContent').style.display = 'none';
                 } else if (tabName === 'notes') {
-                    chatContent.style.display = 'none';
-                    chatInput.style.display = 'none';
-                    document.getElementById('umatNotesContent').style.display = 'block';
-                    document.getElementById('umatResourcesContent').style.display = 'none';
-                } else {
-                    chatContent.style.display = 'none';
-                    chatInput.style.display = 'none';
-                    document.getElementById('umatNotesContent').style.display = 'none';
-                    document.getElementById('umatResourcesContent').style.display = 'block';
+                    if (notesContent) notesContent.style.display = 'block';
+                } else if (tabName === 'resources') {
+                    if (resourcesContent) resourcesContent.style.display = 'block';
+                } else if (tabName === 'group') {
+                    if (groupContent) {
+                        groupContent.style.display = 'block';
+                        // Lazily initialize group study
+                        if (!groupContent.querySelector('.umat-group-study')) {
+                            require(['local_umat_ai/group_study'], function(GroupStudy) {
+                                var template = '' +
+                                    '<div class="umat-group-study" id="umat-group-study">' +
+                                    '<div class="umat-group-study-header"><h3 style="font-size:15px;font-weight:600;color:#006b2f;margin:0 0 12px;">Study Groups</h3></div>' +
+                                    '<form id="umat-create-group-form" class="umat-group-create-form" style="margin-bottom:16px;">' +
+                                    '<input type="text" id="umat-group-name-input" class="form-control form-control-sm mb-1" placeholder="Group name..." maxlength="255" required style="width:100%;padding:8px;border:1px solid #dee5da;border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">' +
+                                    '<textarea id="umat-group-desc-input" class="form-control form-control-sm mb-1" rows="2" placeholder="Description..." maxlength="500" style="width:100%;padding:8px;border:1px solid #dee5da;border-radius:8px;font-size:13px;margin-bottom:8px;resize:none;box-sizing:border-box;"></textarea>' +
+                                    '<div style="display:flex;gap:8px;">' +
+                                    '<input type="number" id="umat-group-max-input" class="form-control form-control-sm" value="5" min="2" max="20" style="width:70px;padding:6px;border:1px solid #dee5da;border-radius:8px;font-size:13px;">' +
+                                    '<button type="submit" class="btn btn-success btn-sm" style="flex:1;padding:8px;background:#006b2f;color:white;border:none;border-radius:8px;cursor:pointer;font-size:13px;">Create Group</button></div></form>' +
+                                    '<div id="umat-group-list-container" class="umat-group-list-container"></div>' +
+                                    '<div id="umat-group-chat-container" class="umat-group-chat-container"></div></div>';
+                                groupContent.innerHTML = template;
+                                GroupStudy.init(courseId);
+                            });
+                        }
+                    }
                 }
             });
         });

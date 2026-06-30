@@ -77,6 +77,48 @@ $functions = [
         'description' => 'Trigger material analysis on AI service', 'type' => 'write', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
+    /* ---- Group Study ---- */
+    'local_umat_ai_get_study_groups' => [
+        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'get_study_groups',
+        'description' => 'List study groups for a course', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_create_study_group' => [
+        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'create_study_group',
+        'description' => 'Create a new study group', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:creategroup',
+    ],
+    'local_umat_ai_join_study_group' => [
+        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'join_study_group',
+        'description' => 'Join a study group', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_leave_study_group' => [
+        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'leave_study_group',
+        'description' => 'Leave a study group', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_get_group_members' => [
+        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'get_group_members',
+        'description' => 'Get members of a study group', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_get_group_messages' => [
+        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'get_group_messages',
+        'description' => 'Get shared messages in a study group', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_send_group_message' => [
+        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'send_group_message',
+        'description' => 'Post a shared AI Q&A to the group', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_delete_study_group' => [
+        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'delete_study_group',
+        'description' => 'Delete a study group (owner only)', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:creategroup',
+    ],
+
     'local_umat_ai_service_status' => [
         'classname'   => '\local_umat_ai\external\service_status', 'methodname' => 'ping',
         'description' => 'Check AI service availability for the connection indicator', 'type' => 'read', 'ajax' => true,
@@ -124,6 +166,26 @@ $functions = [
     'local_umat_ai_update_issue_status' => [
         'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'update_issue_status',
         'description' => 'Lecturer updates issue status and notes', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_update_issue_response' => [
+        'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'update_issue_response',
+        'description' => 'Lecturer posts a public response to a student issue', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_get_unread_response_count' => [
+        'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'get_unread_response_count',
+        'description' => 'Student checks how many lecturer responses are unread', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_mark_responses_read' => [
+        'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'mark_responses_read',
+        'description' => 'Student marks all lecturer responses as read', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_get_unresponded_issues_count' => [
+        'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'get_unresponded_issues_count',
+        'description' => 'Lecturer counts total issues for notification badge', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
 
@@ -192,6 +254,18 @@ $functions = [
     'local_umat_ai_rate_answer' => [
         'classname'   => '\local_umat_ai\external\rate_answer', 'methodname' => 'rate_answer',
         'description' => 'Rate the helpfulness of an AI answer', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+
+    /* ---- Video Generation ---- */
+    'local_umat_ai_request_video_generation' => [
+        'classname'   => '\local_umat_ai\external\video', 'methodname' => 'request_video_generation',
+        'description' => 'Trigger AI video generation for a course material', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_get_video_status' => [
+        'classname'   => '\local_umat_ai\external\video', 'methodname' => 'get_video_status',
+        'description' => 'Get video generation status for course materials', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
 ];

@@ -181,10 +181,11 @@ function local_umat_ai_push_analytics(array $body): bool {
     $jwt  = local_umat_ai_create_jwt(['sub' => 'moodle_webhook']);
     $auth = $jwt !== '' ? 'Bearer ' . $jwt : 'Bearer ' . $config['token'];
 
-    $client = new \curl(['ignoresecurity' => true]);
+    $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($config['url'])]);
     $client->setHeader([
         'Content-Type: application/json',
         'Authorization: ' . $auth,
+        'X-Request-Id: ' . local_umat_ai_request_id(),
     ]);
 
     $response = $client->post($url, json_encode($body));
@@ -192,4 +193,26 @@ function local_umat_ai_push_analytics(array $body): bool {
     $httpcode = (int) ($info['http_code'] ?? 0);
 
     return $httpcode >= 200 && $httpcode < 300;
+}
+
+/**
+ * Check if a URL points to localhost — safe to skip SSL verification.
+ */
+function local_umat_ai_is_localhost(string $url): bool {
+    $host = parse_url($url, PHP_URL_HOST);
+    return in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+}
+
+/**
+ * Generate a unique request ID for tracing Moodle→AI service calls.
+ */
+function local_umat_ai_request_id(): string {
+    return sprintf(
+        'umt-%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+        random_int(0, 0xffff), random_int(0, 0xffff),
+        random_int(0, 0xffff),
+        random_int(0, 0x0fff) | 0x4000,
+        random_int(0, 0x3fff) | 0x8000,
+        random_int(0, 0xffff), random_int(0, 0xffff), random_int(0, 0xffff)
+    );
 }

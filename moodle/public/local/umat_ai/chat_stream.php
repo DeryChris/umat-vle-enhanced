@@ -17,6 +17,18 @@ $question = required_param('question', PARAM_TEXT);
 $sessionkey = optional_param('session_key', '', PARAM_ALPHANUMEXT);
 $materialidsraw = optional_param('material_ids', '[]', PARAM_RAW);
 
+// Input size limits
+$MAX_Q_LEN = 2000;
+$MAX_MAT_IDS = 50;
+$MAX_SESS_LEN = 64;
+
+if (mb_strlen($question) > $MAX_Q_LEN) {
+    $question = mb_substr($question, 0, $MAX_Q_LEN);
+}
+if (mb_strlen($sessionkey) > $MAX_SESS_LEN) {
+    $sessionkey = mb_substr($sessionkey, 0, $MAX_SESS_LEN);
+}
+
 $context = context_course::instance($courseid);
 $is_lecturer = local_umat_ai_is_lecturer($courseid);
 $role = 'student';
@@ -72,6 +84,9 @@ if ($is_lecturer) {
 $materialids = json_decode($materialidsraw, true);
 if (!is_array($materialids)) {
     $materialids = [];
+}
+if (count($materialids) > $MAX_MAT_IDS) {
+    $materialids = array_slice($materialids, 0, $MAX_MAT_IDS);
 }
 
 // Filter materials by access restrictions (security boundary).
@@ -133,10 +148,12 @@ curl_setopt_array($ch, [
         'Content-Type: application/json',
         'Authorization: Bearer ' . $cfg['token'],
         'Accept: text/event-stream',
+        'X-Request-Id: ' . local_umat_ai_request_id(),
     ],
     CURLOPT_POSTFIELDS     => $payload,
     CURLOPT_RETURNTRANSFER => false,
     CURLOPT_TIMEOUT        => 120,
+    CURLOPT_CONNECTTIMEOUT => 15,
     CURLOPT_WRITEFUNCTION  => function($curl, $data) use (&$buffer, &$fullanswer, &$sources, &$logged, $DB, $USER, $courseid, $question, $sessionkey, $role) {
         echo $data;
         if (function_exists('ob_flush')) {

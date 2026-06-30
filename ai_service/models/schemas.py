@@ -165,3 +165,31 @@ class SyncAnalysisRequest(BaseModel):
     model_version: Optional[str]
     token_count:   Optional[int]
     summary:       Optional[str]
+
+
+# ── Video Generation ────────────────────────────────────
+
+class VideoGenerateRequest(BaseModel):
+    material_id:  int    = Field(..., description="ID of the indexed material")
+    course_id:    int    = Field(...)
+    file_content: str    = Field(..., description="Base64-encoded file content")
+    file_mime:    str    = Field("application/octet-stream", description="MIME type of the file")
+    filename:     str    = Field(..., description="Original filename for display")
+
+
+class VideoGenerateResponse(BaseModel):
+    job_id:  str
+    status:  str
+    message: str
+
+
+class VideoStatusResponse(BaseModel):
+    job_id:         str
+    status:         str
+    progress:       int = 0
+    status_message: str = ""
+    video_url:      Optional[str] = None
+    error:          Optional[str] = None
+    created_at:     Optional[str] = None
+    completed_at:   Optional[str] = None
+
