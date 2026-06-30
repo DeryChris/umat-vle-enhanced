@@ -23,7 +23,8 @@ class service_status extends \external_api {
         self::validate_context(\context_system::instance());
 
         $cfg    = local_umat_ai_get_service_config();
-        $client = new \curl(['ignoresecurity' => true]);
+        $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($cfg['url'])]);
+        $client->setHeader(['X-Request-Id: ' . local_umat_ai_request_id()]);
         // Short timeouts — this is called from the UI, so fail fast.
         $client->setopt(['CURLOPT_TIMEOUT' => 5, 'CURLOPT_CONNECTTIMEOUT' => 3]);
 

@@ -141,9 +141,9 @@
 </html>
 
 {{#js}}
-M.util.js_pending('theme_umat/loader');
-require(['theme_umat/loader', 'theme_boost/drawer'], function(Loader, Drawer) {
+M.util.js_pending('theme_boost/loader');
+require(['theme_boost/loader', 'theme_boost/drawer'], function(Loader, Drawer) {
     Drawer.init();
-    M.util.js_complete('theme_umat/loader');
+    M.util.js_complete('theme_boost/loader');
 });
 {{/js}}

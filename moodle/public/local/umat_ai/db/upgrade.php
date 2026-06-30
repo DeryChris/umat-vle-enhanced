@@ -86,7 +86,7 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
             $nt->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
             $nt->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
             $nt->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
-            $nt->add_field('title', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, '');
+            $nt->add_field('title', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null);
             $nt->add_field('content', XMLDB_TYPE_TEXT, null, null, null, null, null);
             $nt->add_field('pinned', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0');
             $nt->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
@@ -131,9 +131,9 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
             $ctx->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
             $ctx->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
             $ctx->add_field('cmid', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
-            $ctx->add_field('topic_label', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, '');
+            $ctx->add_field('topic_label', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null);
             $ctx->add_field('struggle_reason', XMLDB_TYPE_CHAR, '50', null, null, null, null);
-            $ctx->add_field('struggle_score', XMLDB_TYPE_NUMBER, '10, 2', null, XMLDB_NOTNULL, null, '0');
+            $ctx->add_field('struggle_score', XMLDB_TYPE_NUMBER, '10', null, XMLDB_NOTNULL, null, '0', null, '2');
             $ctx->add_field('is_struggle', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0');
             $ctx->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
             $ctx->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
@@ -184,6 +184,120 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
 
         // Also add the new reportissue capability
         upgrade_plugin_savepoint(true, 2026061500, 'local', 'umat_ai');
+    }
+
+    if ($oldversion < 2026062500) {
+        // Fix XMLDB schema: remove invalid empty defaults on CHAR NOT NULL columns
+        // (topic_label, title) and fix NUMBER comma syntax for struggle_score.
+        // Tables already exist on upgraded installs — no ALTER needed.
+        // This block exists only to absorb the version bump cleanly.
+        upgrade_plugin_savepoint(true, 2026062500, 'local', 'umat_ai');
+    }
+
+    if ($oldversion < 2026062600) {
+        // Create umat_ai_group_study table
+        $gs = new xmldb_table('umat_ai_group_study');
+        if (!$dbman->table_exists($gs)) {
+            $gs->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $gs->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $gs->add_field('name', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null);
+            $gs->add_field('description', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $gs->add_field('max_members', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '5');
+            $gs->add_field('status', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'open');
+            $gs->add_field('created_by', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $gs->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $gs->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $gs->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $gs->add_key('course_fk', XMLDB_KEY_FOREIGN, ['courseid'], 'course', ['id']);
+            $gs->add_key('creator_fk', XMLDB_KEY_FOREIGN, ['created_by'], 'user', ['id']);
+            $gs->add_index('idx_gs_status', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'status']);
+            $dbman->create_table($gs);
+        }
+
+        // Create umat_ai_group_members table
+        $gm = new xmldb_table('umat_ai_group_members');
+        if (!$dbman->table_exists($gm)) {
+            $gm->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $gm->add_field('groupid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $gm->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $gm->add_field('role', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'member');
+            $gm->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $gm->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $gm->add_key('group_fk', XMLDB_KEY_FOREIGN, ['groupid'], 'umat_ai_group_study', ['id']);
+            $gm->add_key('member_fk', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
+            $gm->add_index('idx_gm_user', XMLDB_INDEX_NOTUNIQUE, ['userid', 'groupid']);
+            $dbman->create_table($gm);
+        }
+
+        // Create umat_ai_group_messages table
+        $gmsg = new xmldb_table('umat_ai_group_messages');
+        if (!$dbman->table_exists($gmsg)) {
+            $gmsg->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $gmsg->add_field('groupid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $gmsg->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $gmsg->add_field('question', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
+            $gmsg->add_field('answer', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $gmsg->add_field('sources', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $gmsg->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $gmsg->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $gmsg->add_key('gmsg_group', XMLDB_KEY_FOREIGN, ['groupid'], 'umat_ai_group_study', ['id']);
+            $gmsg->add_key('gmsg_user', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
+            $gmsg->add_index('idx_gm_time', XMLDB_INDEX_NOTUNIQUE, ['groupid', 'timecreated']);
+            $dbman->create_table($gmsg);
+        }
+
+        upgrade_plugin_savepoint(true, 2026062600, 'local', 'umat_ai');
+    }
+
+    if ($oldversion < 2026062700) {
+        $gmsg = new xmldb_table('umat_ai_group_messages');
+        $msg = new xmldb_field('message', XMLDB_TYPE_TEXT, null, null, null, null, null, 'userid');
+        if (!$dbman->field_exists($gmsg, $msg)) {
+            $dbman->add_field($gmsg, $msg);
+        }
+        // Make question nullable (chat messages have no question)
+        $qfield = new xmldb_field('question', XMLDB_TYPE_TEXT, null, null, null, null, null, 'message');
+        $dbman->change_field_notnull($gmsg, $qfield);
+        $dbman->change_field_default($gmsg, $qfield);
+
+        upgrade_plugin_savepoint(true, 2026062700, 'local', 'umat_ai');
+    }
+
+    if ($oldversion < 2026062800) {
+        $table = new xmldb_table('umat_ai_issue_reports');
+        $f = new xmldb_field('lecturer_response', XMLDB_TYPE_TEXT, null, null, null, null, null, 'lecturer_notes');
+        if (!$dbman->field_exists($table, $f)) {
+            $dbman->add_field($table, $f);
+        }
+        upgrade_plugin_savepoint(true, 2026062800, 'local', 'umat_ai');
+    }
+
+    if ($oldversion < 2026062900) {
+        $table = new xmldb_table('umat_ai_issue_reports');
+        $fs = new xmldb_field('response_seen', XMLDB_TYPE_INTEGER, '2', null, XMLDB_NOTNULL, null, '0', 'lecturer_response');
+        if (!$dbman->field_exists($table, $fs)) {
+            $dbman->add_field($table, $fs);
+        }
+        upgrade_plugin_savepoint(true, 2026062900, 'local', 'umat_ai');
+    }
+
+    if ($oldversion < 2026062910) {
+        $table = new xmldb_table('umat_ai_videos');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('materialid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('job_id', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+            $table->add_field('status', XMLDB_TYPE_CHAR, '30', null, XMLDB_NOTNULL, null, 'queued');
+            $table->add_field('video_url', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_key('material_fk', XMLDB_KEY_FOREIGN, ['materialid'], 'umat_ai_materials', ['id']);
+            $table->add_index('courseid', XMLDB_INDEX_NOTUNIQUE, ['courseid']);
+            $dbman->create_table($table);
+        }
+        upgrade_plugin_savepoint(true, 2026062910, 'local', 'umat_ai');
     }
 
     return true;

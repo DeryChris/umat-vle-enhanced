@@ -144,15 +144,15 @@ class issue_report extends \external_api {
             $rows = $DB->get_records_sql($sql, $args);
             return array_values(array_map(function($r) {
                 return [
-                    'id'             => (int)$r->id,
-                    'courseid'       => (int)$r->courseid,
-                    'category'       => $r->category,
-                    'topic'          => $r->topic ?? '',
-                    'description'    => $r->description,
-                    'status'         => $r->status,
-                    'lecturer_notes' => $r->lecturer_notes ?? '',
-                    'timecreated'    => (int)$r->timecreated,
-                    'timemodified'   => (int)$r->timemodified,
+                    'id'                => (int)$r->id,
+                    'courseid'          => (int)$r->courseid,
+                    'category'          => $r->category,
+                    'topic'             => $r->topic ?? '',
+                    'description'       => $r->description,
+                    'status'            => $r->status,
+                    'lecturer_response' => $r->lecturer_response ?? '',
+                    'timecreated'       => (int)$r->timecreated,
+                    'timemodified'      => (int)$r->timemodified,
                 ];
             }, $rows ?: []));
         } catch (\Throwable $e) {
@@ -163,15 +163,15 @@ class issue_report extends \external_api {
     public static function get_student_issues_returns() {
         return new \external_multiple_structure(
             new \external_single_structure([
-                'id'             => new \external_value(PARAM_INT, 'Issue ID'),
-                'courseid'       => new \external_value(PARAM_INT, 'Course ID'),
-                'category'       => new \external_value(PARAM_ALPHAEXT, 'Category'),
-                'topic'          => new \external_value(PARAM_TEXT, 'Optional topic'),
-                'description'    => new \external_value(PARAM_RAW, 'Issue description'),
-                'status'         => new \external_value(PARAM_ALPHAEXT, 'Status: open|in_review|resolved|closed'),
-                'lecturer_notes' => new \external_value(PARAM_RAW, 'Lecturer notes'),
-                'timecreated'    => new \external_value(PARAM_INT, 'Created timestamp'),
-                'timemodified'   => new \external_value(PARAM_INT, 'Modified timestamp'),
+                'id'                => new \external_value(PARAM_INT, 'Issue ID'),
+                'courseid'          => new \external_value(PARAM_INT, 'Course ID'),
+                'category'          => new \external_value(PARAM_ALPHAEXT, 'Category'),
+                'topic'             => new \external_value(PARAM_TEXT, 'Optional topic'),
+                'description'       => new \external_value(PARAM_RAW, 'Issue description'),
+                'status'            => new \external_value(PARAM_ALPHAEXT, 'Status: open|in_review|resolved|closed'),
+                'lecturer_response' => new \external_value(PARAM_RAW, 'Lecturer public response to student'),
+                'timecreated'       => new \external_value(PARAM_INT, 'Created timestamp'),
+                'timemodified'      => new \external_value(PARAM_INT, 'Modified timestamp'),
             ])
         );
     }
@@ -215,17 +215,18 @@ class issue_report extends \external_api {
         foreach ($rows as $r) {
             $userpic = new \user_picture((object)['id' => $r->userid, 'picture' => $r->picture, 'imagealt' => $r->imagealt, 'firstname' => $r->firstname, 'lastname' => $r->lastname, 'email' => $r->email]);
             $result[] = [
-                'id'             => (int)$r->id,
-                'userid'         => (int)$r->userid,
-                'fullname'       => fullname($r),
-                'userpicture'    => $userpic->get_url($PAGE)->out(false),
-                'category'       => $r->category,
-                'topic'          => $r->topic ?? '',
-                'description'    => $r->description,
-                'status'         => $r->status,
-                'lecturer_notes' => $r->lecturer_notes ?? '',
-                'timecreated'    => (int)$r->timecreated,
-                'timemodified'   => (int)$r->timemodified,
+                'id'                => (int)$r->id,
+                'userid'            => (int)$r->userid,
+                'fullname'          => fullname($r),
+                'userpicture'       => $userpic->get_url($PAGE)->out(false),
+                'category'          => $r->category,
+                'topic'             => $r->topic ?? '',
+                'description'       => $r->description,
+                'status'            => $r->status,
+                'lecturer_notes'    => $r->lecturer_notes ?? '',
+                'lecturer_response' => $r->lecturer_response ?? '',
+                'timecreated'       => (int)$r->timecreated,
+                'timemodified'      => (int)$r->timemodified,
             ];
         }
         return ['issues' => $result, 'total' => count($result)];
@@ -235,17 +236,18 @@ class issue_report extends \external_api {
         return new \external_single_structure([
             'issues' => new \external_multiple_structure(
                 new \external_single_structure([
-                    'id'             => new \external_value(PARAM_INT, 'Issue ID'),
-                    'userid'         => new \external_value(PARAM_INT, 'Student user ID'),
-                    'fullname'       => new \external_value(PARAM_TEXT, 'Student full name'),
-                    'userpicture'    => new \external_value(PARAM_URL, 'Student avatar URL'),
-                    'category'       => new \external_value(PARAM_ALPHAEXT, 'Category'),
-                    'topic'          => new \external_value(PARAM_TEXT, 'Optional topic'),
-                    'description'    => new \external_value(PARAM_RAW, 'Issue description'),
-                    'status'         => new \external_value(PARAM_ALPHAEXT, 'Status'),
-                    'lecturer_notes' => new \external_value(PARAM_RAW, 'Lecturer notes'),
-                    'timecreated'    => new \external_value(PARAM_INT, 'Created timestamp'),
-                    'timemodified'   => new \external_value(PARAM_INT, 'Modified timestamp'),
+                    'id'                => new \external_value(PARAM_INT, 'Issue ID'),
+                    'userid'            => new \external_value(PARAM_INT, 'Student user ID'),
+                    'fullname'          => new \external_value(PARAM_TEXT, 'Student full name'),
+                    'userpicture'       => new \external_value(PARAM_URL, 'Student avatar URL'),
+                    'category'          => new \external_value(PARAM_ALPHAEXT, 'Category'),
+                    'topic'             => new \external_value(PARAM_TEXT, 'Optional topic'),
+                    'description'       => new \external_value(PARAM_RAW, 'Issue description'),
+                    'status'            => new \external_value(PARAM_ALPHAEXT, 'Status'),
+                    'lecturer_notes'    => new \external_value(PARAM_RAW, 'Lecturer private notes'),
+                    'lecturer_response' => new \external_value(PARAM_RAW, 'Lecturer public response to student'),
+                    'timecreated'       => new \external_value(PARAM_INT, 'Created timestamp'),
+                    'timemodified'      => new \external_value(PARAM_INT, 'Modified timestamp'),
                 ])
             ),
             'total' => new \external_value(PARAM_INT, 'Total count'),
@@ -297,6 +299,144 @@ class issue_report extends \external_api {
         return new \external_single_structure([
             'success' => new \external_value(PARAM_BOOL, 'Success flag'),
             'message' => new \external_value(PARAM_TEXT, 'Status message'),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // update_issue_response — lecturer posts a public response to student //
+    // ------------------------------------------------------------------ //
+    public static function update_issue_response_parameters() {
+        return new \external_function_parameters([
+            'issue_id' => new \external_value(PARAM_INT, 'Issue ID'),
+            'response' => new \external_value(PARAM_RAW, 'Public response text to show to student'),
+        ]);
+    }
+
+    public static function update_issue_response($issue_id, $response) {
+        global $DB;
+        $params = self::validate_parameters(self::update_issue_response_parameters(), [
+            'issue_id' => $issue_id,
+            'response' => $response,
+        ]);
+        $issue_id = (int)$params['issue_id'];
+        $response = trim((string)$params['response']);
+
+        $record = $DB->get_record('umat_ai_issue_reports', ['id' => $issue_id]);
+        if (!$record) {
+            throw new \moodle_exception('Issue not found.');
+        }
+
+        $context = \context_course::instance($record->courseid);
+        self::validate_context($context);
+        require_capability('local/umat_ai:viewanalytics', $context);
+
+        $DB->update_record('umat_ai_issue_reports', (object)[
+            'id'                => $issue_id,
+            'lecturer_response' => $response !== '' ? $response : null,
+            'timemodified'      => time(),
+        ]);
+
+        return ['success' => true, 'message' => 'Response saved.'];
+    }
+
+    public static function update_issue_response_returns() {
+        return new \external_single_structure([
+            'success' => new \external_value(PARAM_BOOL, 'Success flag'),
+            'message' => new \external_value(PARAM_TEXT, 'Status message'),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // get_unread_response_count — student checks for new lecturer replies //
+    // ------------------------------------------------------------------ //
+    public static function get_unread_response_count_parameters() {
+        return new \external_function_parameters([
+            'courseid' => new \external_value(PARAM_INT, 'Course ID', VALUE_DEFAULT, 0),
+        ]);
+    }
+
+    public static function get_unread_response_count($courseid = 0) {
+        global $DB, $USER;
+        $params = self::validate_parameters(self::get_unread_response_count_parameters(), ['courseid' => $courseid]);
+        $userid = (int)$USER->id;
+        $sql = 'SELECT COUNT(*) FROM {umat_ai_issue_reports} WHERE userid = ? AND lecturer_response IS NOT NULL AND response_seen = 0';
+        $args = [$userid];
+        if (!empty($params['courseid'])) {
+            $sql .= ' AND courseid = ?';
+            $args[] = (int)$params['courseid'];
+        }
+        return ['count' => (int)$DB->get_field_sql($sql, $args)];
+    }
+
+    public static function get_unread_response_count_returns() {
+        return new \external_single_structure([
+            'count' => new \external_value(PARAM_INT, 'Unread response count'),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // mark_responses_read — student marks all responses as seen          //
+    // ------------------------------------------------------------------ //
+    public static function mark_responses_read_parameters() {
+        return new \external_function_parameters([
+            'courseid' => new \external_value(PARAM_INT, 'Course ID', VALUE_DEFAULT, 0),
+        ]);
+    }
+
+    public static function mark_responses_read($courseid = 0) {
+        global $DB, $USER;
+        $params = self::validate_parameters(self::mark_responses_read_parameters(), ['courseid' => $courseid]);
+        $userid = (int)$USER->id;
+        $sql = 'UPDATE {umat_ai_issue_reports} SET response_seen = 1 WHERE userid = ? AND lecturer_response IS NOT NULL AND response_seen = 0';
+        $args = [$userid];
+        if (!empty($params['courseid'])) {
+            $sql .= ' AND courseid = ?';
+            $args[] = (int)$params['courseid'];
+        }
+        $DB->execute($sql, $args);
+        return ['success' => true];
+    }
+
+    public static function mark_responses_read_returns() {
+        return new \external_single_structure([
+            'success' => new \external_value(PARAM_BOOL, 'Success flag'),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // get_unresponded_issues_count — lecturer counts issues needing reply //
+    // ------------------------------------------------------------------ //
+    public static function get_unresponded_issues_count_parameters() {
+        return new \external_function_parameters([
+            'courseid' => new \external_value(PARAM_INT, 'Course ID (0=all)', VALUE_DEFAULT, 0),
+        ]);
+    }
+
+    public static function get_unresponded_issues_count($courseid = 0) {
+        global $DB, $USER;
+        $params = self::validate_parameters(self::get_unresponded_issues_count_parameters(), ['courseid' => $courseid]);
+        $cid = (int)$params['courseid'];
+
+        $ctx = $cid > 0 ? \context_course::instance($cid) : \context_system::instance();
+        self::validate_context($ctx);
+        require_capability('local/umat_ai:viewanalytics', $ctx);
+
+        $sql = 'SELECT COUNT(*) FROM {umat_ai_issue_reports}';
+        $args = [];
+        $wheres = [];
+        if ($cid > 0) {
+            $wheres[] = 'courseid = ?';
+            $args[] = $cid;
+        }
+        if (!empty($wheres)) {
+            $sql .= ' WHERE ' . implode(' AND ', $wheres);
+        }
+        return ['count' => (int)$DB->get_field_sql($sql, $args)];
+    }
+
+    public static function get_unresponded_issues_count_returns() {
+        return new \external_single_structure([
+            'count' => new \external_value(PARAM_INT, 'Total issues count'),
         ]);
     }
 }

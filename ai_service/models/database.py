@@ -35,6 +35,9 @@ class ProcessingJob(Base):
     recording_url = Column(Text, nullable=True)
     status        = Column(String(30), default="queued")  # queued|processing|completed|failed
     transcript    = Column(Text, nullable=True)
+    summary       = Column(Text, nullable=True)
+    notes         = Column(Text, nullable=True)
+    quiz          = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
     created_at    = Column(DateTime, default=datetime.utcnow)
     completed_at  = Column(DateTime, nullable=True)
@@ -116,6 +119,23 @@ class MaterialAnalysis(Base):
     updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class VideoJob(Base):
+    __tablename__ = "video_jobs"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    job_id          = Column(String(100), unique=True, index=True, nullable=False)
+    material_id     = Column(Integer, nullable=False)
+    course_id       = Column(Integer, nullable=False)
+    filename        = Column(String(255), nullable=True)
+    status          = Column(String(30), default="queued")  # queued|processing|completed|failed
+    progress        = Column(Integer, default=0)
+    status_message  = Column(String(255), nullable=True)
+    video_path      = Column(Text, nullable=True)
+    error_message   = Column(Text, nullable=True)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+    completed_at    = Column(DateTime, nullable=True)
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 
@@ -136,6 +156,18 @@ def init_db():
     # Create student_context table if not exists
     if not inspector.has_table('student_context'):
         StudentContext.__table__.create(bind=engine)
+
+    # Create video_jobs table if not exists
+    if not inspector.has_table('video_jobs'):
+        VideoJob.__table__.create(bind=engine)
+
+    # Add summary/notes/quiz columns to processing_jobs if they don't exist (gradual migration)
+    columns = [c['name'] for c in inspector.get_columns('processing_jobs')]
+    for col in ('summary', 'notes', 'quiz'):
+        if col not in columns:
+            with engine.connect() as conn:
+                conn.execute(text(f"ALTER TABLE processing_jobs ADD COLUMN {col} TEXT"))
+                conn.commit()
 
 
 def get_db():

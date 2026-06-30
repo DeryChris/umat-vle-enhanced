@@ -1,0 +1,324 @@
+{{!
+    Template: local/umat_ai/templates/ai_dashboard.mustache
+    Student Struggle Areas Insights Dashboard (Execution 4 UI)
+}}
+
+<style>
+/* CSS Custom Properties from Design System */
+.umat-ai-dashboard {
+    --u-sf: #f5fbf0;
+    --u-sflo: #ffffff;
+    --u-ons: #171d17;
+    --u-olv: #bdcaba;
+    --u-ter: #a5304d;
+    --u-warn: #f59e0b;
+    --u-p: #006b2f;
+    --u-ok: #4ade80;
+    --u-r12: 12px;
+    --u-r16: 16px;
+    --u-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    
+    font-family: 'Inter', sans-serif;
+    background: var(--u-sf);
+    padding: 24px;
+    color: var(--u-ons);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.umat-ai-dashboard h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.dashboard-card {
+    background: var(--u-sflo);
+    border: 1px solid var(--u-olv);
+    border-radius: var(--u-r12);
+    box-shadow: var(--u-shadow);
+    padding: 20px;
+}
+
+/* KPI Ribbon */
+.kpi-ribbon {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+@media (max-width: 900px) {
+    .kpi-ribbon { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+    .kpi-ribbon { grid-template-columns: 1fr; }
+}
+
+.kpi-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.kpi-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--u-ons);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.kpi-value-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: space-between;
+}
+
+.kpi-value {
+    font-size: 32px;
+    font-weight: 800;
+}
+
+.kpi-text {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.kpi-insight {
+    font-size: 12px;
+    color: #4b5563;
+    background: #f3f4f6;
+    padding: 8px;
+    border-radius: 6px;
+    border-left: 3px solid var(--u-p);
+}
+
+.text-green { color: var(--u-p); }
+.text-red { color: var(--u-ter); }
+.text-amber { color: var(--u-warn); }
+
+.kpi-delta {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--u-ok);
+}
+
+/* Avatars */
+.avatar-group {
+    display: flex;
+}
+.avatar-group img {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--u-sflo);
+    margin-left: -8px;
+}
+.avatar-group img:first-child { margin-left: 0; }
+
+/* Middle and Bottom Sections */
+.split-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+@media (max-width: 900px) {
+    .split-section { grid-template-columns: 1fr; }
+}
+
+/* Charts */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* Badges */
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-block;
+}
+.badge-critical { background: var(--u-ter); color: white; }
+.badge-amber { background: #fef3c7; color: var(--u-warn); border: 1px solid var(--u-warn); }
+.badge-healthy { background: #dcfce7; color: var(--u-p); }
+
+/* Triage Table */
+.triage-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.triage-table th {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 2px solid var(--u-olv);
+    color: #4b5563;
+}
+.triage-table td {
+    padding: 12px;
+    border-bottom: 1px solid #e5e7eb;
+}
+.triage-table tr:last-child td {
+    border-bottom: none;
+}
+.action-icons span {
+    font-size: 18px;
+    cursor: pointer;
+    margin-right: 8px;
+    color: #6b7280;
+}
+.action-icons span:hover { color: var(--u-p); }
+
+/* Footer */
+.ai-health-report {
+    background: linear-gradient(145deg, #ffffff, #f0fdf4);
+    border-left: 4px solid var(--u-p);
+}
+.ai-btn {
+    background: var(--u-p);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 12px;
+}
+.ai-btn:hover { background: #005a27; }
+
+/* Topic Mastery List */
+.topic-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+.topic-list-item:last-child { border-bottom: none; }
+.topic-name { font-weight: 600; flex: 1; }
+</style>
+
+<div class="umat-ai-dashboard" id="ai-dashboard-container">
+    
+    <!-- Top KPI Ribbon -->
+    <div class="kpi-ribbon">
+        <div class="dashboard-card kpi-card">
+            <div class="kpi-title">Class Engagement Score</div>
+            <div class="kpi-value-row">
+                <span class="kpi-value text-green" id="kpi-engagement-score">--%</span>
+                <!-- Sparkline placeholder -->
+                <svg width="80" height="30" viewBox="0 0 80 30">
+                    <path d="M0 25 L10 20 L20 22 L30 15 L40 18 L50 10 L60 12 L70 5 L80 8" fill="none" stroke="var(--u-p)" stroke-width="2"/>
+                </svg>
+            </div>
+            <div class="kpi-delta" id="kpi-engagement-delta">--</div>
+        </div>
+
+        <div class="dashboard-card kpi-card">
+            <div class="kpi-title">Total At-Risk Students</div>
+            <div class="kpi-value-row">
+                <span class="kpi-value text-red" id="kpi-at-risk-count">--</span>
+                <span class="material-symbols-outlined text-red" style="font-size: 28px;">warning</span>
+            </div>
+            <div class="avatar-group" id="kpi-at-risk-avatars">
+                <!-- Avatars loaded by JS -->
+            </div>
+        </div>
+
+        <div class="dashboard-card kpi-card">
+            <div class="kpi-title">Top Difficulty Topic</div>
+            <div class="kpi-value-row">
+                <span class="kpi-text text-red" id="kpi-top-topic">--</span>
+            </div>
+            <div class="kpi-insight" id="kpi-topic-insight">Loading insight...</div>
+        </div>
+
+        <div class="dashboard-card kpi-card">
+            <div class="kpi-title">Material with Highest Friction</div>
+            <div class="kpi-value-row">
+                <span class="kpi-text text-amber" id="kpi-top-material">--</span>
+                <span class="material-symbols-outlined text-amber">error</span>
+            </div>
+            <!-- Small bar chart placeholder -->
+            <div style="display:flex; align-items:flex-end; gap:4px; height: 30px; margin-top:8px;">
+                <div style="width:12px; height:40%; background:var(--u-warn)"></div>
+                <div style="width:12px; height:60%; background:var(--u-warn)"></div>
+                <div style="width:12px; height:100%; background:var(--u-warn)"></div>
+                <div style="width:12px; height:70%; background:var(--u-warn)"></div>
+                <div style="width:12px; height:80%; background:var(--u-warn)"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Middle Section: Scatter Plot & Data List -->
+    <div class="split-section">
+        <div class="dashboard-card">
+            <h3>Struggle Friction Analysis</h3>
+            <div class="chart-container">
+                <canvas id="friction-scatter-chart"></canvas>
+            </div>
+        </div>
+        <div class="dashboard-card">
+            <h3>Topic Mastery & Support</h3>
+            <div id="topic-mastery-list">
+                <!-- Topics loaded by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Section: Triage Table & Bar Chart -->
+    <div class="split-section">
+        <div class="dashboard-card">
+            <h3>Actionable At-Risk Student Triage</h3>
+            <table class="triage-table">
+                <thead>
+                    <tr>
+                        <th><input type="checkbox"></th>
+                        <th>Name</th>
+                        <th>Risk Status</th>
+                        <th>Primary Struggle</th>
+                        <th>Last Active</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="triage-table-body">
+                    <!-- Triage rows loaded by JS -->
+                </tbody>
+            </table>
+        </div>
+        <div class="dashboard-card">
+            <h3>Material & Content Health</h3>
+            <div class="chart-container">
+                <canvas id="material-health-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Components -->
+    <div class="split-section">
+        <div style="display:flex; flex-direction:column; gap:24px;">
+            <div class="dashboard-card">
+                <h3>Common Student Questions</h3>
+                <ul id="common-questions-feed" style="margin:0; padding-left:20px; font-size:13px; color:#4b5563;">
+                </ul>
+            </div>
+        </div>
+        <div class="dashboard-card ai-health-report">
+            <h3 style="display:flex; align-items:center; gap:8px;">
+                <span class="material-symbols-outlined text-green">auto_awesome</span>
+                AI Course Health Report
+            </h3>
+            <p id="ai-health-summary" style="line-height:1.6;">Analyzing course health...</p>
+            <button class="ai-btn" id="btn-ask-ai-outreach">Ask AI for tailored student outreach strategies</button>
+        </div>
+    </div>
+
+</div>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="local/umat_ai/db" VERSION="2026061500" COMMENT="UMaT AI plugin v1.6.1 schema">
+<XMLDB PATH="local/umat_ai/db" VERSION="2026062500" COMMENT="UMaT AI plugin v1.6.2 schema">
   <TABLES>
 
     <TABLE NAME="umat_ai_sessions" COMMENT="Tracks BBB recordings being processed by the AI service">
@@ -127,9 +127,9 @@
         <FIELD NAME="userid"          TYPE="int"    LENGTH="10"  NOTNULL="true"/>
         <FIELD NAME="courseid"        TYPE="int"    LENGTH="10"  NOTNULL="true"/>
         <FIELD NAME="cmid"            TYPE="int"    LENGTH="10"  NOTNULL="false"/>
-        <FIELD NAME="topic_label"     TYPE="char"   LENGTH="255" NOTNULL="true" DEFAULT=""/>
+        <FIELD NAME="topic_label"     TYPE="char"   LENGTH="255" NOTNULL="true"/>
         <FIELD NAME="struggle_reason" TYPE="char"   LENGTH="50"  NOTNULL="false"/>
-        <FIELD NAME="struggle_score"  TYPE="number" LENGTH="10, 2" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="struggle_score"  TYPE="number" LENGTH="10" DECIMALS="2" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="is_struggle"     TYPE="int"    LENGTH="1"   NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="timecreated"     TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="timemodified"    TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
@@ -183,7 +183,7 @@
         <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="userid"      TYPE="int"  LENGTH="10"  NOTNULL="true"/>
         <FIELD NAME="courseid"    TYPE="int"  LENGTH="10"  NOTNULL="false"/>
-        <FIELD NAME="title"       TYPE="char" LENGTH="255" NOTNULL="true" DEFAULT=""/>
+        <FIELD NAME="title"       TYPE="char" LENGTH="255" NOTNULL="true"/>
         <FIELD NAME="content"     TYPE="text" NOTNULL="false"/>
         <FIELD NAME="pinned"      TYPE="int"  LENGTH="1"   NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
@@ -214,6 +214,87 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="tag_type" UNIQUE="false" FIELDS="tag_type,tag_id"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_group_study" COMMENT="Study group sessions for collaborative AI chat">
+      <FIELDS>
+        <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid"    TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="name"        TYPE="char" LENGTH="255" NOTNULL="true"/>
+        <FIELD NAME="description" TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="max_members" TYPE="int"  LENGTH="4"   NOTNULL="true" DEFAULT="5"/>
+        <FIELD NAME="status"      TYPE="char" LENGTH="20"  NOTNULL="true" DEFAULT="open"/>
+        <FIELD NAME="created_by"  TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary"    TYPE="primary" FIELDS="id"/>
+        <KEY NAME="course_fk"  TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+        <KEY NAME="creator_fk" TYPE="foreign" FIELDS="created_by" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="idx_gs_status" UNIQUE="false" FIELDS="courseid,status"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_group_members" COMMENT="Membership in study groups">
+      <FIELDS>
+        <FIELD NAME="id"         TYPE="int"  LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="groupid"    TYPE="int"  LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="userid"     TYPE="int"  LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="role"       TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="member"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary"   TYPE="primary" FIELDS="id"/>
+        <KEY NAME="group_fk"  TYPE="foreign" FIELDS="groupid" REFTABLE="umat_ai_group_study" REFFIELDS="id"/>
+        <KEY NAME="member_fk" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="idx_gm_user"  UNIQUE="false" FIELDS="userid,groupid"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_group_messages" COMMENT="Group chat messages and shared AI Q&A">
+      <FIELDS>
+        <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="groupid"     TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="userid"      TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="message"     TYPE="text" NOTNULL="false" COMMENT="Free-form chat text"/>
+        <FIELD NAME="question"    TYPE="text" NOTNULL="false" COMMENT="AI question (null for chat messages)"/>
+        <FIELD NAME="answer"      TYPE="text" NOTNULL="false" COMMENT="AI answer"/>
+        <FIELD NAME="sources"     TYPE="text" NOTNULL="false" COMMENT="AI source citations"/>
+        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary"     TYPE="primary" FIELDS="id"/>
+        <KEY NAME="gmsg_group"  TYPE="foreign" FIELDS="groupid" REFTABLE="umat_ai_group_study" REFFIELDS="id"/>
+        <KEY NAME="gmsg_user"   TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="idx_gm_time"    UNIQUE="false" FIELDS="groupid,timecreated"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_videos" COMMENT="AI-generated lecture videos from course materials">
+      <FIELDS>
+        <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="materialid"  TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="courseid"    TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="job_id"      TYPE="char" LENGTH="100" NOTNULL="false"/>
+        <FIELD NAME="status"      TYPE="char" LENGTH="30"  NOTNULL="true" DEFAULT="queued"/>
+        <FIELD NAME="video_url"   TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary"     TYPE="primary" FIELDS="id"/>
+        <KEY NAME="material_fk" TYPE="foreign" FIELDS="materialid" REFTABLE="umat_ai_materials" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="courseid" UNIQUE="false" FIELDS="courseid"/>
       </INDEXES>
     </TABLE>
 

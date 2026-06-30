@@ -170,6 +170,7 @@ ai_service/*.log
 ai_service/logs/
 ai_service_stderr.log
 ai_service_stdout.log
+ai_service/.llm_cache
 
 # Pytest
 ai_service/.pytest_cache/
@@ -225,11 +226,14 @@ $RECYCLE.BIN/
 secrets/
 *.env
 !*.env.example
+cron.bat
 
 # Miscellaneous
 docs/test_features/
 memories/
 filetree.md
+cookies*.txt
+Chapter_4_*.md
 notes.md
 moodle/public/local/umat_ai.zip
 

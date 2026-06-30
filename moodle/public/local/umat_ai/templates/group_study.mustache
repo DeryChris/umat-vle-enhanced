@@ -1,0 +1,30 @@
+{{!
+    Group Study panel rendered on course pages.
+    Context: courseid (int)
+}}
+<div class="umat-group-study" id="umat-group-study">
+    <div class="umat-group-study-header">
+        <h3>{{#str}} group_study, local_umat_ai {{/str}}</h3>
+    </div>
+
+    {{! Create Group Form }}
+    <form id="umat-create-group-form" class="umat-group-create-form">
+        <input type="text" id="umat-group-name-input" class="form-control form-control-sm mb-1"
+               placeholder="{{#str}} group_name, local_umat_ai {{/str}}" maxlength="255" required>
+        <textarea id="umat-group-desc-input" class="form-control form-control-sm mb-1" rows="2"
+                  placeholder="{{#str}} group_description, local_umat_ai {{/str}}" maxlength="500"></textarea>
+        <div class="d-flex gap-1">
+            <input type="number" id="umat-group-max-input" class="form-control form-control-sm"
+                   value="5" min="2" max="20" style="width:80px">
+            <button type="submit" class="btn btn-success btn-sm flex-grow-1">
+                {{#str}} group_create, local_umat_ai {{/str}}
+            </button>
+        </div>
+    </form>
+
+    {{! Group List }}
+    <div id="umat-group-list-container" class="umat-group-list-container"></div>
+
+    {{! Group Chat View }}
+    <div id="umat-group-chat-container" class="umat-group-chat-container"></div>
+</div>

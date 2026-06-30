@@ -450,4 +450,106 @@ class course_data extends \external_api {
             ])
         )]);
     }
+
+    // ------------------------------------------------------------------ //
+    // get_pending_outputs                                                    //
+    // ------------------------------------------------------------------ //
+    public static function get_pending_outputs_parameters() {
+        return new \external_function_parameters([
+            'courseid' => new \external_value(PARAM_INT, 'Course ID (0 = all)'),
+        ]);
+    }
+
+    public static function get_pending_outputs($courseid = 0) {
+        global $DB, $USER;
+        $params = self::validate_parameters(
+            self::get_pending_outputs_parameters(),
+            ['courseid' => $courseid]);
+        $cid = (int)$params['courseid'];
+
+        $wheres = ['o.is_approved = 0'];
+        $wargs = [];
+        if ($cid > 0) {
+            $wheres[] = 's.courseid = :cid';
+            $wargs['cid'] = $cid;
+        }
+        $where = implode(' AND ', $wheres);
+
+        $rows = $DB->get_records_sql(
+            "SELECT o.id, o.sessionrecordid, o.courseid, o.output_type, o.content,
+                    o.timecreated, s.timecreated AS session_time
+               FROM {umat_ai_outputs} o
+               JOIN {umat_ai_sessions} s ON s.id = o.sessionrecordid
+              WHERE $where
+           ORDER BY s.timecreated DESC, o.timecreated DESC",
+            $wargs);
+
+        $total = count($rows);
+        $sessionMap = [];
+        $courseCache = [];
+
+        foreach ($rows as $r) {
+            $sid = (int)$r->sessionrecordid;
+            if (!isset($sessionMap[$sid])) {
+                if (!isset($courseCache[$r->courseid])) {
+                    $course = $DB->get_record('course', ['id' => $r->courseid], 'fullname');
+                    $courseCache[$r->courseid] = $course ? format_string($course->fullname) : 'Unknown';
+                }
+                $sessionMap[$sid] = [
+                    'session_id'    => $sid,
+                    'courseid'      => (int)$r->courseid,
+                    'course_name'   => $courseCache[$r->courseid],
+                    'timecreated'   => (int)$r->session_time,
+                    'pending_count' => 0,
+                    'outputs'       => [],
+                ];
+            }
+            $sessionMap[$sid]['pending_count']++;
+            $sessionMap[$sid]['outputs'][] = [
+                'id'          => (int)$r->id,
+                'type'        => $r->output_type,
+                'content'     => $r->content,
+                'timecreated' => (int)$r->timecreated,
+            ];
+        }
+
+        $sessions = array_values($sessionMap);
+        usort($sessions, fn($a, $b) => $b['timecreated'] - $a['timecreated']);
+
+        if ($cid > 0) {
+            $ctx = \context_course::instance($cid);
+        } else {
+            $ctx = \context_system::instance();
+        }
+        self::validate_context($ctx);
+        require_capability('local/umat_ai:approveoutput', $ctx);
+
+        return [
+            'total_pending' => $total,
+            'sessions'      => $sessions,
+        ];
+    }
+
+    public static function get_pending_outputs_returns() {
+        return new \external_single_structure([
+            'total_pending' => new \external_value(PARAM_INT),
+            'sessions' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'session_id'    => new \external_value(PARAM_INT),
+                    'courseid'      => new \external_value(PARAM_INT),
+                    'course_name'   => new \external_value(PARAM_TEXT),
+                    'timecreated'   => new \external_value(PARAM_INT),
+                    'pending_count' => new \external_value(PARAM_INT),
+                    'outputs' => new \external_multiple_structure(
+                        new \external_single_structure([
+                            'id'          => new \external_value(PARAM_INT),
+                            'type'        => new \external_value(PARAM_TEXT),
+                            'content'     => new \external_value(PARAM_RAW),
+                            'timecreated' => new \external_value(PARAM_INT),
+                        ])
+                    ),
+                ])
+            ),
+        ]);
+    }
 }
