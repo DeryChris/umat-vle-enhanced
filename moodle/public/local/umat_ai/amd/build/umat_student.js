@@ -112,6 +112,7 @@ function renderCpFeature(name){
   if(name==='report-issue')return renderCpReportIssue(body);
   if(name==='my-progress')return renderCpProgress(body);
   if(name==='group-study')return renderCpGroupStudy(body, courseId);
+  if(name==='quiz-history')return renderCpQuizHistory(body, courseId);
 }
 function renderCpReportIssue(body){
   if(!courseId){var c=(userData&&userData.courses)||[];if(!c.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses available.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course to report an issue:</div><div style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+c.slice(0,12).map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';body.querySelectorAll('.umat-chip').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;renderCpFeature('report-issue');});});return;}
@@ -384,9 +385,10 @@ function switchToTab(name){
   if(name==='courses'    && !coursesLoaded){  renderCourses(userData.courses||[]); coursesLoaded=true; }
   if(name==='my-notes'   && !notesLoaded){   initNotesTab();  notesLoaded=true;    }
   if(name==='sessions'   && !sessionsLoaded){ loadSessions();  sessionsLoaded=true; }
-  if(name==='report-issue'){ if(!reportLoaded){ initReportIssueTab(); reportLoaded=true; }else loadMyIssues(); markResponsesRead(); }
+  if(name==='report-issue'){ if(!reportLoaded){ initReportIssueTab(); reportLoaded=true; }else loadMyIssues(); markResponsesRead(); pollUnreadCount(); }
   if(name==='my-progress' && !progLoaded){ initProgressTab(); progLoaded=true; }
   if(name==='group-study' && !window._umatGroupLoaded){ window._umatGroupLoaded=true; initWsGroupStudy(courseId); }
+  if(name==='quiz-history'){ renderWsQuizHistory(); }
 }
 /* Select course: set context and switch to AI Tutor */
 function selectCourse(cid,cname){
@@ -521,7 +523,7 @@ function sendQuestion(q, msgsId){
 }
 
 /* ---- INTERACTIVE QUIZ ENGINE ---- */
-var qz={data:null,idx:0,answers:{},graded:{},active:false};
+var qz={data:null,idx:0,answers:{},graded:{},active:false,attempt_id:null};
 setTimeout(function(){_umatLoadQuizState();},200);
 function _umatDetectQuiz(msgsId){
   var cont=document.getElementById(msgsId);if(!cont)return;
@@ -601,27 +603,86 @@ function _umatOpenQuiz(containerId){
   _umatRenderCircle();_umatRenderQuestion(qz.idx);
 }
 function _umatSaveQuizState(){
-  try{sessionStorage.setItem('qz_state',JSON.stringify({data:qz.data,answers:qz.answers,graded:qz.graded,idx:qz.idx}));}catch(e){}
+  try{sessionStorage.setItem('qz_state',JSON.stringify({data:qz.data,answers:qz.answers,graded:qz.graded,idx:qz.idx,attempt_id:qz.attempt_id}));}catch(e){}
+  if(qz._saveTimer)clearTimeout(qz._saveTimer);
+  qz._saveTimer=setTimeout(function(){
+    if(!courseId||!qz.data||!qz.data.questions)return;
+    var allGraded=qz.data.questions.every(function(_,i){return qz.graded[i]!==undefined;});
+    var score=0,total=qz.data.questions.length;
+    Object.keys(qz.graded).forEach(function(k){if(qz.graded[k].correct)score++;});
+    require(['core/ajax'],function(Ajax){
+      Ajax.call([{methodname:'local_umat_ai_save_quiz_attempt',args:{
+        attempt_id:qz.attempt_id||0,courseid:courseId,session_key:sessionKey,
+        quiz_title:qz.data.title||'Practice Quiz',
+        questions_json:JSON.stringify(qz.data.questions),
+        answers_json:JSON.stringify(qz.answers),
+        graded_json:JSON.stringify(qz.graded),
+        score:allGraded?score:null,total:total,
+        status:allGraded?'completed':'in_progress'
+      }}])[0]
+      .done(function(r){qz.attempt_id=r.attempt_id;})
+      .fail(function(){});
+    });
+  },800);
 }
 function _umatLoadQuizState(){
   try{
     var raw=sessionStorage.getItem('qz_state');
-    if(!raw)return;
-    var s=JSON.parse(raw);
-    if(s&&s.data&&s.data.questions&&s.data.questions.length){
-      qz.data=s.data;qz.answers=s.answers||{};qz.graded=s.graded||{};qz.idx=s.idx||0;qz.active=false;
-      // Try to restore into whichever container is active
-      var containers=['cp-msgs','ws-msgs'];
-      for(var ci=0;ci<containers.length;ci++){
-        var c=document.getElementById(containers[ci]);
-        if(c){
-          var hasCard=c.querySelector('.umat-quiz-card');
-          if(!hasCard)_umatProcessQuiz({quiz:qz.data}, containers[ci]);
-          else _umatUpdateQuizCard();
-          break;
+    if(raw){
+      var s=JSON.parse(raw);
+      if(s&&s.data&&s.data.questions&&s.data.questions.length){
+        qz.data=s.data;qz.answers=s.answers||{};qz.graded=s.graded||{};qz.idx=s.idx||0;qz.active=false;qz.attempt_id=s.attempt_id||null;
+        var containers=['cp-msgs','ws-msgs'];
+        for(var ci=0;ci<containers.length;ci++){
+          var c=document.getElementById(containers[ci]);
+          if(c){
+            var hasCard=c.querySelector('.umat-quiz-card');
+            if(!hasCard)_umatProcessQuiz({quiz:qz.data}, containers[ci]);
+            else _umatUpdateQuizCard();
+            break;
+          }
         }
+        return;
       }
     }
+    // Fall back to server if sessionStorage is empty
+    if(!courseId)return;
+    require(['core/ajax'],function(Ajax){
+      Ajax.call([{methodname:'local_umat_ai_get_quiz_attempts',args:{courseid:courseId,status:'in_progress'}}])[0]
+        .done(function(r){
+          var attempts=r.attempts||[];
+          if(!attempts.length)return;
+          var latest=attempts[0];
+          var questions=JSON.parse(latest.questions_json||'[]');
+          if(!questions.length)return;
+          qz.data={title:latest.quiz_title,questions:questions};
+          qz.answers=JSON.parse(latest.answers_json||'{}');
+          qz.graded=JSON.parse(latest.graded_json||'{}');
+          qz.idx=0;qz.active=false;qz.attempt_id=latest.attempt_id;
+          var msg='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">quiz</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">QUIZ RESUME</div><div class="umat-bubble-ai"><p>You have an incomplete quiz: <strong>'+_umatEsc(latest.quiz_title)+'</strong></p><div class="umat-chips-row"><button class="umat-chip" id="quiz-resume-yes" type="button">Yes, continue</button><button class="umat-chip" id="quiz-resume-no" type="button">No, start fresh</button></div></div></div></div>';
+          var containers=['cp-msgs','ws-msgs'];
+          for(var ci=0;ci<containers.length;ci++){
+            var c=document.getElementById(containers[ci]);
+            if(c){c.insertAdjacentHTML('beforeend',msg);break;}
+          }
+          setTimeout(function(){
+            var yesBtn=document.getElementById('quiz-resume-yes');
+            if(yesBtn)yesBtn.addEventListener('click',function(){
+              _umatProcessQuiz({quiz:qz.data}, 'ws-msgs');
+              _umatOpenQuiz('ws-msgs');
+            });
+            var noBtn=document.getElementById('quiz-resume-no');
+            if(noBtn)noBtn.addEventListener('click',function(){
+              require(['core/ajax'],function(Ajax){
+                Ajax.call([{methodname:'local_umat_ai_delete_quiz_attempt',args:{attempt_id:latest.attempt_id}}])[0].done(function(){});
+              });
+              qz.data=null;qz.answers={};qz.graded={};qz.idx=0;qz.active=false;qz.attempt_id=null;
+              try{sessionStorage.removeItem('qz_state');}catch(e){}
+            });
+          },100);
+        })
+        .fail(function(){});
+    });
   }catch(e){}
 }
 function _umatCloseQuiz(){
@@ -757,12 +818,159 @@ function _umatGradeObjective(idx){
 function _umatGradeTheoretical(idx){
   if(qz.graded[idx]!==undefined)return;
   var ans=(qz.answers[idx]||'').trim();if(!ans)return;
-  qz.graded[idx]={correct:true,explanation:'Answer recorded. Your instructor can review this for detailed feedback.'};
-  _umatRenderQuestion(idx);_umatSaveQuizState();
-  var allGraded=qz.data.questions.every(function(_,i){return qz.graded[i]!==undefined;});
-  if(allGraded){setTimeout(_umatShowScore,600);}
+  var pref=qz._pref||'ws';
+  var subBtn=_umatQ(pref,'submit-btn')||document.getElementById('qz-submit');
+  if(subBtn){subBtn.disabled=true;subBtn.textContent='Grading\u2026';}
+  var q=qz.data.questions[idx];
+  require(['core/ajax'],function(Ajax){
+    Ajax.call([{methodname:'local_umat_ai_grade_theory_answer',args:{
+      courseid:courseId,
+      question_text:q.question,
+      answer_hint:q.answer_hint||'',
+      student_answer:ans
+    }}])[0]
+    .done(function(result){
+      qz.graded[idx]={correct:!!result.correct,explanation:result.explanation||'Answer graded.',score:result.score||0};
+      _umatSaveQuizState();
+      _umatRenderQuestion(idx);
+      var allGraded=qz.data.questions.every(function(_,i){return qz.graded[i]!==undefined;});
+      if(allGraded){setTimeout(_umatShowScore,600);}
+    })
+    .fail(function(e){
+      var errMsg=(e&&(e.message||e.errorcode))||'Grading service unavailable. Try again.';
+      qz.graded[idx]={correct:false,explanation:errMsg,score:0};
+      _umatRenderQuestion(idx);
+    })
+    .always(function(){
+      if(subBtn){subBtn.disabled=false;subBtn.textContent='Submit Answer';}
+    });
+  });
 }
 function _umatShowScore(){
+  var pref=qz._pref||'ws';
+  var body=_umatQ(pref,'quiz-body');if(!body)body=document.createElement('div');
+  body.innerHTML='';
+  var total=qz.data.questions.length,correct=0;
+  Object.keys(qz.graded).forEach(function(k){if(qz.graded[k].correct)correct++;});
+  var score=_umatQ(pref,'quiz-score');if(score)score.style.display='flex';
+  var pct=total?Math.round(correct/total*100):0;
+  var num=_umatQ(pref,'quiz-score-num');if(num)num.textContent=correct+'/'+total;
+  var lbl=_umatQ(pref,'quiz-score-lbl');if(lbl)lbl.textContent=correct===total?'Perfect!':(pct>=70?'Great job!':'Keep practicing!');
+  var sub=_umatQ(pref,'quiz-score-sub');if(sub)sub.textContent=pct+'% accuracy';
+  var fill=_umatQ(pref,'quiz-score-fill');if(fill)fill.style.width=pct+'%';
+  var icon=_umatQ(pref,'quiz-score-icon');if(icon)icon.textContent=pct>=80?'emoji_events':(pct>=50?'sentiment_satisfied':'school');
+  _umatRenderCircle();
+  _umatUpdateQuizCard();
+}
+
+/* ---- Quiz History (renders in compact panel + workspace tab) ---- */
+function renderCpQuizHistory(body, cid){
+  if(!cid){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">quiz</span><p>Select a course first to view quiz history.</p></div>';return;}
+  body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading quiz history\u2026</p></div>';
+  require(['core/ajax'],function(Ajax){
+    Ajax.call([{methodname:'local_umat_ai_get_quiz_attempts',args:{courseid:cid,status:''}}])[0]
+      .done(function(r){
+        var attempts=r.attempts||[];
+        if(!attempts.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">quiz</span><p>No quiz attempts yet. Ask the AI tutor to create a practice quiz!</p></div>';return;}
+        body.innerHTML=attempts.slice(0,20).map(function(a){
+          var scoreStr=a.score!==null?a.score+'/'+a.total:'-/ '+a.total;
+          var statusLabel=a.status==='completed'?'Completed':'In Progress';
+          var statusCls=a.status==='completed'?'background:#dcfce7;color:#065f46;':'background:#fef3c7;color:#92400e;';
+          var d=new Date(a.timecreated*1000);
+          var dateStr=d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+          return '<button class="umat-cp-list-card as-btn" data-aid="'+a.attempt_id+'" type="button" style="text-align:left;">'+
+            '<div style="display:flex;justify-content:space-between;align-items:center;">'+
+            '<strong style="font-size:13px;">'+_umatEsc(a.quiz_title)+'</strong>'+
+            '<span style="font-size:10px;padding:1px 6px;border-radius:999px;'+statusCls+'font-weight:600;">'+statusLabel+'</span></div>'+
+            '<p style="font-size:11px;margin:3px 0 0;">'+scoreStr+' A &bullet; '+dateStr+'</p></button>';
+        }).join('');
+        body.querySelectorAll('[data-aid]').forEach(function(btn){
+          btn.addEventListener('click',function(){
+            var aid=parseInt(btn.dataset.aid);
+            loadQuizAttemptForReview(aid, body);
+          });
+        });
+      })
+      .fail(function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load quiz history.</p></div>';});
+  });
+}
+function renderWsQuizHistory(){
+  var list=document.getElementById('quiz-history-list');
+  if(!list)return;
+  list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading quiz history\u2026</p></div>';
+  if(!courseId){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>Select a course to view quiz history.</p></div>';return;}
+  require(['core/ajax'],function(Ajax){
+    Ajax.call([{methodname:'local_umat_ai_get_quiz_attempts',args:{courseid:courseId,status:''}}])[0]
+      .done(function(r){
+        var attempts=r.attempts||[];
+        if(!attempts.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">quiz</span><p>No quiz attempts yet. Ask the AI tutor to create a practice quiz!</p></div>';return;}
+        list.innerHTML='<div class="umat-quiz-history-grid" style="display:flex;flex-direction:column;gap:8px;">'+
+          attempts.map(function(a){
+            var scoreStr=a.score!==null?a.score+'/'+a.total:'-/ '+a.total;
+            var statusLabel=a.status==='completed'?'Completed':'In Progress';
+            var statusCls=a.status==='completed'?'background:#dcfce7;color:#065f46;':'background:#fef3c7;color:#92400e;';
+            var d=new Date(a.timecreated*1000);
+            var dateStr=d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+            return '<div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:14px;cursor:pointer;" data-aid="'+a.attempt_id+'">'+
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'+
+              '<strong style="font-size:14px;color:var(--u-head);">'+_umatEsc(a.quiz_title)+'</strong>'+
+              '<span style="font-size:10px;padding:2px 8px;border-radius:999px;'+statusCls+'font-weight:600;">'+statusLabel+'</span></div>'+
+              '<div style="font-size:12px;color:var(--u-onsv);">Score: <strong>'+scoreStr+'</strong> A &bullet; '+dateStr+'</div></div>';
+          }).join('')+'</div>';
+        list.querySelectorAll('[data-aid]').forEach(function(el){
+          el.addEventListener('click',function(){
+            var aid=parseInt(el.dataset.aid);
+            loadQuizAttemptForReview(aid, list);
+          });
+        });
+      })
+      .fail(function(){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load quiz history.</p></div>';});
+  });
+}
+function loadQuizAttemptForReview(aid, container){
+  require(['core/ajax'],function(Ajax){
+    Ajax.call([{methodname:'local_umat_ai_get_quiz_attempts',args:{courseid:0,status:'',attempt_id:aid}}])[0]
+      .done(function(attempt){
+        if(!attempt||!attempt.questions_json){container.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load quiz.</p></div>';return;}
+        var questions=JSON.parse(attempt.questions_json||'[]');
+        var answers=JSON.parse(attempt.answers_json||'{}');
+        var graded=JSON.parse(attempt.graded_json||'{}');
+        if(!questions.length){container.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Quiz data is empty.</p></div>';return;}
+        var html='<div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">'+
+          '<h3 style="margin:0;font-size:16px;">'+_umatEsc(attempt.quiz_title)+'</h3>'+
+          '<button class="umat-chip" id="quiz-review-back" type="button"><span class="material-symbols-outlined" style="font-size:14px;">arrow_back</span> Back</button></div>';
+        questions.forEach(function(q,i){
+          var ans=answers[i];
+          var g=graded[i];
+          var isGraded=g!==undefined;
+          var isCorrect=isGraded&&g.correct;
+          var statusIcon=isGraded?(isCorrect?'check_circle':'cancel'):'hourglass_empty';
+          var statusColor=isGraded?(isCorrect?'var(--u-sec)':'var(--u-ter)'):'var(--u-ol)';
+          var ansDisplay='';
+          if(q.type==='objective'){
+            var selOpt=ans!==undefined&&q.options&&q.options[ans];
+            ansDisplay='<div style="font-size:12px;color:var(--u-onsv);margin-top:4px;"><strong>Your answer:</strong> '+_umatEsc(selOpt||'Not answered')+'</div>'+
+              '<div style="font-size:12px;color:var(--u-sec);"><strong>Correct answer:</strong> '+_umatEsc(q.options[q.correct])+'</div>';
+          } else {
+            ansDisplay='<div style="font-size:12px;color:var(--u-onsv);margin-top:4px;"><strong>Your answer:</strong><br>'+_umatEsc(ans||'Not answered')+'</div>';
+          }
+          var expl=isGraded&&g.explanation?'<div style="font-size:11px;color:var(--u-onsv);margin-top:4px;padding:8px;background:var(--u-sflo);border-radius:6px;"><strong>Feedback:</strong> '+_umatEsc(g.explanation)+'</div>':'';
+          html+='<div style="background:var(--u-bg);border:1px solid var(--u-olv);border-radius:var(--u-r8);padding:12px;margin-bottom:8px;">'+
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'+
+            '<div style="flex:1;"><strong style="font-size:13px;">Q'+(i+1)+':</strong> <span style="font-size:13px;">'+_umatEsc(q.question)+'</span></div>'+
+            '<span class="material-symbols-outlined" style="color:'+statusColor+';font-size:20px;">'+statusIcon+'</span></div>'+
+            ansDisplay+expl+'</div>';
+        });
+        html+='<button class="umat-btn-p" id="quiz-review-close" type="button" style="justify-content:center;margin-top:8px;"><span class="material-symbols-outlined">close</span>Close Review</button>';
+        container.innerHTML=html;
+        var backBtn=document.getElementById('quiz-review-back');
+        if(backBtn)backBtn.addEventListener('click',function(){renderWsQuizHistory();});
+        var closeBtn=document.getElementById('quiz-review-close');
+        if(closeBtn)closeBtn.addEventListener('click',function(){renderWsQuizHistory();});
+      })
+      .fail(function(){container.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load quiz details.</p></div>';});
+  });
+}
   var pref=qz._pref||'ws';
   var body=_umatQ(pref,'quiz-body');if(!body)body=document.createElement('div');
   body.innerHTML='';
@@ -1826,6 +2034,11 @@ function pollUnreadCount(){
     });
   });
 }
+/* Save quiz state to server before page unload */
+window.addEventListener('beforeunload',function(){
+  if(qz.active&&courseId&&qz.data){_umatSaveQuizState();}
+});
+
 pollUnreadCount();
 var _stuBadgeTimer=setInterval(pollUnreadCount,30000);
 })();

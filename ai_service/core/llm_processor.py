@@ -91,6 +91,31 @@ TRANSCRIPT:
 {transcript}"""
 
 
+GRADE_THEORY_PROMPT = """You are an expert academic grader at the University of Mines and Technology (UMaT), Ghana.
+
+Evaluate the student's answer against the expected key points. Be fair but thorough.
+
+QUESTION:
+{question}
+
+KEY POINTS EXPECTED:
+{answer_hint}
+
+STUDENT ANSWER:
+{student_answer}
+
+Respond with a JSON object containing exactly three fields:
+- "correct": true if the answer covers the essential key points, false if it misses critical points
+- "explanation": Specific, constructive feedback (1-3 sentences) explaining what was correct and what was missing
+- "score": an integer from 0 to 100 representing the quality of the answer
+
+Rules:
+- Partial credit is allowed — score reflects how much of the expected answer was covered
+- Be generous with well-reasoned answers even if they differ from exact wording
+- Mark as correct (score >= 60) if the student demonstrates understanding of the core concept
+- The explanation should help the student learn, not just judge"""
+
+
 TUTOR_PROMPT = """You are the UMaT AI Tutor — a sharp, thoughtful, and enthusiastic academic assistant for students at the University of Mines and Technology (UMaT), Ghana.
 
 You have two superpowers:
@@ -312,6 +337,30 @@ class LLMProcessor:
 
         _llm_cache.set(key, text, expire=900)
         return text
+
+    async def grade_theory_answer(self, question: str, answer_hint: str, student_answer: str) -> dict:
+        """Grade a student's theoretical answer using the LLM with JSON output."""
+        prompt = GRADE_THEORY_PROMPT.format(
+            question=question,
+            answer_hint=answer_hint or "(no specific key points provided)",
+            student_answer=student_answer,
+        )
+        raw = await self.generate_assessment(prompt, temperature=0.2, max_chars=8000)
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[-1] if "\n" in cleaned else cleaned[3:]
+            cleaned = cleaned.rsplit("```", 1)[0].strip()
+        try:
+            result = json.loads(cleaned)
+            return {
+                "correct": bool(result.get("correct", False)),
+                "explanation": str(result.get("explanation", "Grading completed.")),
+                "score": min(100, max(0, int(result.get("score", 0)))),
+            }
+        except (json.JSONDecodeError, ValueError, TypeError):
+            logger = __import__("logging").getLogger(__name__)
+            logger.warning(f"Failed to parse grading JSON, raw: {raw[:500]}")
+            return {"correct": False, "explanation": "Grading service returned an invalid response.", "score": 0}
 
     def stream_prompt(self, prompt: str, task: str = "qa"):
         """Yield text chunks as the LLM generates them."""

@@ -11,33 +11,120 @@ define([], function() {
         return d.innerHTML;
     }
 
-    // ─── Format AI response text (markdown → HTML) ─── //
+    // ─── Format AI response text (full Markdown → HTML) ─── //
     function _umatFormatAI(text) {
         if (!text) return '';
+
+        /* Extract fenced code blocks before escaping */
+        var codeBlocks = [];
+        text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, function(m, lang, code) {
+            var idx = codeBlocks.length;
+            var escaped = _umatEsc(code.replace(/^(\s*\n)+|(\s*\n)+$/g, ''));
+            codeBlocks.push('<div class="umat-code-wrap">'
+                + '<button class="umat-code-copy" type="button" onclick="(function(b){var t=b.nextElementSibling.textContent;navigator.clipboard.writeText(t);b.textContent=\'Copied!\';setTimeout(function(){b.textContent=\'Copy\';},2000);})(this)">Copy</button>'
+                + '<pre><code' + (lang ? ' class="lang-' + _umatEsc(lang) + '"' : '') + '>' + escaped + '</code></pre></div>');
+            return '%%CB' + idx + '%%';
+        });
+
+        /* HTML-escape remaining text */
         text = _umatEsc(text);
+
+        /* Inline formatting */
         text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
         text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        text = text.replace(/~~(.+?)~~/g, '<del>$1</del>');
         text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+        /* Block-level: line-by-line */
         var lines = text.split('\n');
         var out = [];
-        var inOl = false, inUl = false;
-        function closeLists() { if (inOl) { out.push('</ol>'); inOl = false; } if (inUl) { out.push('</ul>'); inUl = false; } }
+        var inOl = false, inUl = false, inBq = false, inTbl = false;
+
+        function closeBlock(keepBq) {
+            if (inTbl) { out.push('</tbody></table>'); inTbl = false; }
+            if (!keepBq && inBq) { out.push('</blockquote>'); inBq = false; }
+            if (inUl) { out.push('</ul>'); inUl = false; }
+            if (inOl) { out.push('</ol>'); inOl = false; }
+        }
+
         for (var i = 0; i < lines.length; i++) {
-            var line = lines[i], t = line.trim();
-            if (!t) { closeLists(); continue; }
-            if (/^[-*_]{3,}$/.test(t)) { closeLists(); out.push('<hr>'); continue; }
-            var h3 = t.match(/^###\s+(.*)/); if (h3) { closeLists(); out.push('<h3>' + h3[1] + '</h3>'); continue; }
-            var h2 = t.match(/^##\s+(.*)/); if (h2) { closeLists(); out.push('<h2>' + h2[1] + '</h2>'); continue; }
-            var h1 = t.match(/^#\s+(.*)/);  if (h1) { closeLists(); out.push('<h2>' + h1[1] + '</h2>'); continue; }
+            var line = lines[i];
+            var t = line.trim();
+
+            /* Restore fenced code blocks */
+            var cbMatch = t.match(/^%%CB(\d+)%%$/);
+            if (cbMatch) { closeBlock(); out.push(codeBlocks[parseInt(cbMatch[1])]); continue; }
+
+            if (!t) { closeBlock(); continue; }
+            if (/^[-*_]{3,}$/.test(t)) { closeBlock(); out.push('<hr>'); continue; }
+
+            /* Blockquotes */
+            var bq = t.match(/^(>+)\s?(.*)/);
+            if (bq) {
+                if (!inBq) { closeBlock(true); out.push('<blockquote>'); inBq = true; }
+                out.push('<p>' + bq[2] + '</p>');
+                continue;
+            }
+            if (inBq) { out.push('</blockquote>'); inBq = false; }
+
+            /* Headings */
+            var h3 = t.match(/^###\s+(.*)/); if (h3) { closeBlock(); out.push('<h3>' + h3[1] + '</h3>'); continue; }
+            var h2 = t.match(/^##\s+(.*)/);  if (h2) { closeBlock(); out.push('<h2>' + h2[1] + '</h2>'); continue; }
+            var h1 = t.match(/^#\s+(.*)/);   if (h1) { closeBlock(); out.push('<h1>' + h1[1] + '</h1>'); continue; }
+
+            /* Tables */
+            if (/^\|.+\|$/.test(t)) {
+                var cells = t.split('|').filter(function(c) { return c !== ''; });
+                if (/^\|[\s:-]+\|/.test(t)) continue; /* separator row */
+                if (!inTbl) {
+                    out.push('<table><thead><tr>');
+                    cells.forEach(function(c) { out.push('<th>' + c.trim() + '</th>'); });
+                    out.push('</tr></thead><tbody>');
+                    inTbl = true;
+                } else {
+                    out.push('<tr>');
+                    cells.forEach(function(c) { out.push('<td>' + c.trim() + '</td>'); });
+                    out.push('</tr>');
+                }
+                continue;
+            }
+            if (inTbl) { out.push('</tbody></table>'); inTbl = false; }
+
+            /* Task lists */
+            var task = t.match(/^[-*]\s+\[([ x])\]\s+(.*)/);
+            if (task) {
+                if (inOl) { out.push('</ol>'); inOl = false; }
+                if (!inUl) { out.push('<ul class="umat-task-list">'); inUl = true; }
+                out.push('<li class="' + (task[1] === 'x' ? 'task-checked' : 'task-unchecked') + '">'
+                    + (task[1] === 'x' ? '&#x2611; ' : '&#x2610; ') + task[2] + '</li>');
+                continue;
+            }
+
+            /* Ordered lists */
             var ol = t.match(/^\d+[.)]\s+(.*)/);
-            if (ol) { if (inUl) { out.push('</ul>'); inUl = false; } if (!inOl) { out.push('<ol>'); inOl = true; } out.push('<li>' + ol[1] + '</li>'); continue; }
+            if (ol) {
+                if (inUl) { out.push('</ul>'); inUl = false; }
+                if (!inOl) { out.push('<ol>'); inOl = true; }
+                out.push('<li>' + ol[1] + '</li>');
+                continue;
+            }
+
+            /* Unordered lists */
             var ul = t.match(/^[-*]\s+(.*)/);
-            if (ul) { if (inOl) { out.push('</ol>'); inOl = false; } if (!inUl) { out.push('<ul>'); inUl = true; } out.push('<li>' + ul[1] + '</li>'); continue; }
-            closeLists();
+            if (ul) {
+                if (inOl) { out.push('</ol>'); inOl = false; }
+                if (!inUl) { out.push('<ul>'); inUl = true; }
+                out.push('<li>' + ul[1] + '</li>');
+                continue;
+            }
+
+            closeBlock();
             out.push('<p>' + line + '</p>');
         }
-        closeLists();
+        closeBlock();
+
         return out.join('\n');
     }
 

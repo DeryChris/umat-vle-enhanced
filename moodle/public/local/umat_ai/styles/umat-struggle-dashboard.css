@@ -18,10 +18,10 @@
 }
 
 /* ── NLQ bar (Claude-style) ── */
-.sd-nlq-wrap { display:flex; flex-direction:column; gap:10px; animation:sd-rise .35s ease forwards; }
+.sd-nlq-wrap { display:flex; flex-direction:column; align-items:center; gap:10px; animation:sd-rise .35s ease forwards; }
 .sd-nlq-bar {
   display:flex; align-items:center; gap:10px;
-  padding:10px 12px;
+  width:min(420px,95%); padding:10px 12px;
   background:rgba(255,255,255,.58);
   backdrop-filter:blur(22px) saturate(185%);
   -webkit-backdrop-filter:blur(22px) saturate(185%);

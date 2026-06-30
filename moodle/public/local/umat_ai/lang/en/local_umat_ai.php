@@ -182,6 +182,40 @@ $string['task_snapshot_metric_trends']     = 'Snapshot engagement and at-risk me
 /* ---- Web Services ---- */
 $string['notyourchatlog']      = 'This chat log does not belong to you.';
 
+/* ---- Quiz Persistence & Grading ---- */
+$string['quiz_attempt_saved']        = 'Quiz progress saved';
+$string['quiz_attempt_loaded']       = 'Quiz restored from saved progress';
+$string['quiz_grade_error']          = 'Grading service is currently unavailable. Please try again.';
+$string['quiz_resume_prompt']        = 'You have an incomplete quiz. Would you like to continue?';
+$string['quiz_resume_yes']           = 'Yes, continue';
+$string['quiz_resume_no']            = 'No, start fresh';
+$string['quiz_history']              = 'My Quiz History';
+$string['quiz_history_empty']        = 'No quiz attempts yet. Ask the AI tutor to create a practice quiz!';
+$string['quiz_score']                = 'Score';
+$string['quiz_status_in_progress']   = 'In Progress';
+$string['quiz_status_completed']     = 'Completed';
+$string['quiz_review']               = 'Review Answers';
+$string['quiz_retry']                = 'Try Again';
+$string['quiz_continue']             = 'Continue';
+$string['quiz_grading']              = 'Grading your answer\u2026';
+
+/* ---- Instructor Quiz Review ---- */
+$string['quiz_instructor_review']    = 'Student Quiz Responses';
+$string['quiz_instructor_empty']     = 'No quiz attempts from students yet.';
+$string['quiz_student']              = 'Student';
+$string['quiz_questions_attempted']  = 'Questions attempted';
+$string['quiz_view_student_answers'] = 'View Answers';
+$string['quiz_student_answer']       = 'Student Answer';
+$string['quiz_correct_answer']       = 'Correct Answer';
+$string['quiz_ai_explanation']       = 'AI Explanation';
+
+/* ---- Quiz Analytics ---- */
+$string['quiz_analytics_title']      = 'Quiz Analytics';
+$string['quiz_attempts_total']       = 'Total Attempts';
+$string['quiz_avg_score']            = 'Average Score';
+$string['quiz_completion_rate']      = 'Completion Rate';
+$string['quiz_passing_rate']         = 'Passing Rate (50%+)';
+
 /* ---- Interventions ---- */
 $string['intervention_subject'] = 'Message from your lecturer regarding {$a}';
 $string['intervention_encouragement'] = 'Encouragement';

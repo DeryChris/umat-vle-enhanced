@@ -418,5 +418,32 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026062910, 'local', 'umat_ai');
     }
 
+    if ($oldversion < 2026063000) {
+        // Create umat_ai_quiz_attempts table for student quiz persistence.
+        $table = new xmldb_table('umat_ai_quiz_attempts');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id',              XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('userid',          XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, null);
+            $table->add_field('courseid',        XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, null);
+            $table->add_field('session_key',     XMLDB_TYPE_CHAR,   '64',  null, null,  null, null);
+            $table->add_field('quiz_title',      XMLDB_TYPE_CHAR,   '255', null, null,  null, '');
+            $table->add_field('questions_json',  XMLDB_TYPE_TEXT,    null,  null, null,  null, null);
+            $table->add_field('answers_json',    XMLDB_TYPE_TEXT,    null,  null, null,  null, null);
+            $table->add_field('graded_json',     XMLDB_TYPE_TEXT,    null,  null, null,  null, null);
+            $table->add_field('score',           XMLDB_TYPE_INTEGER, '4',   null, null,  null, null);
+            $table->add_field('total',           XMLDB_TYPE_INTEGER, '4',   null, null,  null, null);
+            $table->add_field('status',          XMLDB_TYPE_CHAR,   '20',  null, XMLDB_NOTNULL,  null, 'in_progress');
+            $table->add_field('timecreated',     XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, '0');
+            $table->add_field('timemodified',    XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, '0');
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_index('idx_qa_user_course', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid']);
+            $table->add_index('idx_qa_status',      XMLDB_INDEX_NOTUNIQUE, ['status']);
+            $dbman->create_table($table);
+        }
+
+        // Add quiz_analytics capability archetype for lecturers.
+        upgrade_plugin_savepoint(true, 2026063000, 'local', 'umat_ai');
+    }
+
     return true;
 }

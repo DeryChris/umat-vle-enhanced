@@ -12,10 +12,11 @@ class overlay_helper {
         foreach ($tabs as $t) {
             $active = !empty($t['active']) ? ' active' : '';
             $badge = !empty($t['badge']) ? ' <span class="umat-sb-badge" id="sb-badge-' . htmlspecialchars($t['badge'], ENT_QUOTES) . '" style="display:none;margin-left:auto;background:var(--u-ter);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;line-height:14px;min-width:16px;text-align:center;"></span>' : '';
+            $safeLabel = htmlspecialchars($t['label'], ENT_QUOTES);
             $tabHtml .= '<button class="umat-sb-item' . $active . '" data-sb-tab="'
-                . htmlspecialchars($t['id'], ENT_QUOTES) . '" type="button">'
+                . htmlspecialchars($t['id'], ENT_QUOTES) . '" type="button" title="' . $safeLabel . '">'
                 . '<span class="material-symbols-outlined">' . htmlspecialchars($t['icon'], ENT_QUOTES) . '</span>'
-                . '<span class="umat-sb-item-lbl">' . htmlspecialchars($t['label'], ENT_QUOTES) . '</span>'
+                . '<span class="umat-sb-item-lbl">' . $safeLabel . '</span>'
                 . $badge . '</button>';
         }
         $safeLabel = htmlspecialchars($newBtnLabel, ENT_QUOTES);
@@ -24,8 +25,11 @@ class overlay_helper {
     <div class="umat-sb-head">
         <div class="umat-sb-logo"><span class="material-symbols-outlined">school</span></div>
         <div class="umat-sb-brand"><strong>UMaT Moodle</strong><span>AI Enhanced Learning</span></div>
-        <button class="umat-sb-close-btn" id="{$closeId}" type="button" title="Close">
-            <span class="material-symbols-outlined">close</span>
+        <button class="umat-sb-close-btn" id="{$closeId}" type="button" title="Collapse sidebar">
+            <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <button class="umat-sb-expand-btn" id="{$closeId}-exp" type="button" title="Expand sidebar">
+            <span class="material-symbols-outlined">chevron_right</span>
         </button>
     </div>
     <nav class="umat-sb-nav">{$tabHtml}</nav>
@@ -46,8 +50,8 @@ HTML;
     public static function shared_js(string $overlayId, string $closeId): string {
         return <<<JS
 <script>
-/* AMD modules handle umatshared loading directly */
-(function(){var cb=document.getElementById('{$closeId}'),ov=document.getElementById('{$overlayId}');if(cb&&ov)cb.addEventListener('click',function(){ov.classList.remove('open');});})();
+/* Sidebar collapse/expand + body scroll lock on overlay open */
+(function(){var cb=document.getElementById('{$closeId}'),ov=document.getElementById('{$overlayId}'),sb=ov?ov.querySelector('.umat-sb'):null;if(cb&&sb)cb.addEventListener('click',function(){sb.classList.toggle('collapsed');});var eb=document.getElementById('{$closeId}-exp');if(eb&&sb)eb.addEventListener('click',function(){sb.classList.remove('collapsed');});if(ov){var mo=new MutationObserver(function(){document.body.classList.toggle('umat-body-lock',ov.classList.contains('open'));});mo.observe(ov,{attributes:true,attributeFilter:['class']});}})();
 /* Mobile nav: slide-to-hide + indicator pill */
 document.querySelectorAll('.umat-glass-tabs').forEach(function(nav){var pill=document.createElement('div');pill.className='umat-glass-pill';nav.appendChild(pill);function mv(){var a=nav.querySelector('.umat-glass-tab.active');if(!a)return;var nr=nav.getBoundingClientRect(),tr=a.getBoundingClientRect();pill.style.left=(tr.left-nr.left)+'px';pill.style.width=tr.width+'px';}mv();nav.addEventListener('click',function(e){if(e.target.closest('.umat-glass-tab'))setTimeout(mv,30);});var ly=0,ti=false;function os(){if(ti)return;ti=true;requestAnimationFrame(function(){var y=window.scrollY;if(y-ly>40)nav.classList.add('umat-navbar-hidden');else if(ly-y>10)nav.classList.remove('umat-navbar-hidden');ly=y;ti=false;});}window.addEventListener('scroll',os,{passive:true});window.addEventListener('resize',mv);});
 /* Thumbnail loader */
@@ -90,6 +94,7 @@ JS;
             ['id' => 'my-notes',  'icon' => 'note_add',      'label' => 'My Notes',  'active' => false],
             ['id' => 'my-progress','icon' => 'trending_up',  'label' => 'My Progress','active' => false],
             ['id' => 'sessions',   'icon' => 'chat_bubble',   'label' => 'Sessions',   'active' => false],
+            ['id' => 'quiz-history', 'icon' => 'quiz',        'label' => 'Quiz History','active' => false],
             ['id' => 'group-study', 'icon' => 'group',       'label' => 'Study Group', 'active' => false],
             ['id' => 'report-issue', 'icon' => 'flag',       'label' => 'Report Issue','active' => false, 'badge' => 'responses'],
         ];
@@ -106,6 +111,7 @@ JS;
             ['id' => 'my-notes', 'icon' => 'note_add',    'label' => 'Notes',    'active' => false],
             ['id' => 'my-progress','icon' => 'trending_up','label' => 'Progress','active' => false],
             ['id' => 'sessions',   'icon' => 'chat_bubble', 'label' => 'Sessions',  'active' => false],
+            ['id' => 'quiz-history','icon' => 'quiz',       'label' => 'Quizzes',   'active' => false],
             ['id' => 'group-study','icon' => 'group',       'label' => 'Group',     'active' => false],
             ['id' => 'report-issue', 'icon' => 'flag',     'label' => 'Report',    'active' => false, 'badge' => 'responses'],
         ];
@@ -150,6 +156,7 @@ JS;
       <button class="umat-cp-feature-tab" data-cp-open="library" type="button"><span class="material-symbols-outlined">local_library</span><span>Library</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="my-progress" type="button"><span class="material-symbols-outlined">trending_up</span><span>Progress</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="sessions" type="button"><span class="material-symbols-outlined">chat_bubble</span><span>Sessions</span></button>
+      <button class="umat-cp-feature-tab" data-cp-open="quiz-history" type="button"><span class="material-symbols-outlined">quiz</span><span>Quizzes</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="group-study" type="button"><span class="material-symbols-outlined">group</span><span>Group</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="report-issue" type="button"><span class="material-symbols-outlined">flag</span><span>Report</span></button>
     </div>
@@ -427,7 +434,18 @@ JS;
       </div>
     </div>
 
-    <!-- REPORT ISSUE TAB -->
+      <div class="umat-tab-pane" data-tab="quiz-history">
+        <div class="umat-content-hdr">
+          <h2><span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px;">quiz</span>Quiz History</h2>
+        </div>
+        <div class="umat-home-wrap">
+          <div id="quiz-history-list" class="umat-home-section">
+            <div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading quiz history\u2026</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REPORT ISSUE TAB -->
     <div class="umat-tab-pane" data-tab="report-issue">
       <div class="umat-content-hdr">
         <h2><span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px;">flag</span>Report Issue</h2>
@@ -540,6 +558,7 @@ HTML;
         $safe        = htmlspecialchars($courseName, ENT_QUOTES, 'UTF-8');
         $jsCid       = (int)$courseid;
         $jsName      = json_encode($courseName);
+        $jsWwwroot   = json_encode(rtrim($wwwroot, '/'));
         $jsUD        = $userData;
         $uid         = (int)$user->id;
         $uName       = json_encode(fullname($user));
@@ -607,6 +626,7 @@ HTML;
       <button class="umat-cp-feature-tab" data-lcp-open="lec-library" type="button"><span class="material-symbols-outlined">local_library</span><span>Library</span></button>
       <button class="umat-cp-feature-tab" data-lcp-open="lec-sessions" type="button"><span class="material-symbols-outlined">history</span><span>Sessions</span></button>
       <button class="umat-cp-feature-tab" data-lcp-open="lec-issues" type="button"><span class="material-symbols-outlined">flag</span><span>Issues</span></button>
+      <button class="umat-cp-feature-tab" data-lcp-open="lec-quiz-review" type="button"><span class="material-symbols-outlined">rate_review</span><span>Quiz Review</span></button>
     </div>
     <div class="umat-cp-pane active" id="lcp-insights" style="overflow-y:auto;">
       <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:9px;" id="lcp-kpi-grid">
@@ -684,22 +704,25 @@ HTML;
       <div class="umat-sb-head">
         <div class="umat-sb-logo"><span class="material-symbols-outlined">school</span></div>
         <div class="umat-sb-brand"><strong>UMaT Moodle</strong><span>AI Enhanced Learning</span></div>
-        <button class="umat-sb-close-btn" id="lec-ov-close" type="button" title="Close Dashboard">
-          <span class="material-symbols-outlined">close</span>
+        <button class="umat-sb-close-btn" id="lec-ov-close" type="button" title="Collapse sidebar">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <button class="umat-sb-expand-btn" id="lec-ov-close-exp" type="button" title="Expand sidebar">
+          <span class="material-symbols-outlined">chevron_right</span>
         </button>
       </div>
       <nav class="umat-sb-nav">
-        <button class="umat-sb-item active" data-lp="lec-home" type="button"><span class="material-symbols-outlined">home</span><span class="umat-sb-item-lbl">Home</span></button>
-        <button class="umat-sb-item" data-lp="lec-insights" type="button"><span class="material-symbols-outlined">psychology</span><span class="umat-sb-item-lbl">Insights</span></button>
-        <button class="umat-sb-item" data-lp="lec-courses" type="button"><span class="material-symbols-outlined">menu_book</span><span class="umat-sb-item-lbl">My Courses</span></button>
-        <button class="umat-sb-item" data-lp="lec-library" type="button"><span class="material-symbols-outlined">local_library</span><span class="umat-sb-item-lbl">Library</span></button>
-        <button class="umat-sb-item" data-lp="lec-sessions" type="button"><span class="material-symbols-outlined">history</span><span class="umat-sb-item-lbl">Sessions</span></button>
-        <button class="umat-sb-item" data-lp="lec-issues" type="button"><span class="material-symbols-outlined">flag</span><span class="umat-sb-item-lbl">Student Issues</span><span class="umat-sb-badge" id="sb-badge-new-issues" style="display:none;margin-left:auto;background:var(--u-ter);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;line-height:14px;min-width:16px;text-align:center;"></span></button>
-        <button class="umat-sb-item" data-lp="lec-quizgen" type="button"><span class="material-symbols-outlined">quiz</span><span class="umat-sb-item-lbl">Quiz Generator</span></button>
+        <button class="umat-sb-item active" data-lp="lec-home" type="button" title="Home"><span class="material-symbols-outlined">home</span><span class="umat-sb-item-lbl">Home</span></button>
+        <button class="umat-sb-item" data-lp="lec-insights" type="button" title="Insights"><span class="material-symbols-outlined">psychology</span><span class="umat-sb-item-lbl">Insights</span></button>
+        <button class="umat-sb-item" data-lp="lec-courses" type="button" title="My Courses"><span class="material-symbols-outlined">menu_book</span><span class="umat-sb-item-lbl">My Courses</span></button>
+        <button class="umat-sb-item" data-lp="lec-library" type="button" title="Library"><span class="material-symbols-outlined">local_library</span><span class="umat-sb-item-lbl">Library</span></button>
+        <button class="umat-sb-item" data-lp="lec-sessions" type="button" title="Sessions"><span class="material-symbols-outlined">history</span><span class="umat-sb-item-lbl">Sessions</span></button>
+        <button class="umat-sb-item" data-lp="lec-issues" type="button" title="Student Issues"><span class="material-symbols-outlined">flag</span><span class="umat-sb-item-lbl">Student Issues</span><span class="umat-sb-badge" id="sb-badge-new-issues" style="display:none;margin-left:auto;background:var(--u-ter);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;line-height:14px;min-width:16px;text-align:center;"></span></button>
+        <button class="umat-sb-item" data-lp="lec-quizgen" type="button" title="Quiz Generator"><span class="material-symbols-outlined">quiz</span><span class="umat-sb-item-lbl">Quiz Generator</span></button>
       </nav>
       <div class="umat-sb-divider"></div>
       <div class="umat-sb-foot">
-        <button class="umat-sb-item" type="button" onclick="window.location.href='{$logUrl}'">
+        <button class="umat-sb-item" type="button" onclick="window.location.href='{$logUrl}'" title="Sign Out">
           <span class="material-symbols-outlined">logout</span><span class="umat-sb-item-lbl">Sign Out</span>
         </button>
       </div>
@@ -891,7 +914,30 @@ HTML;
 
 {$sharedJs}
 
-<script>/* Lecturer JS moved to amd/src/umat_lecturer.js */</script>
+<script>(function(){
+var CID = {$jsCid};
+var CN  = {$jsName};
+var UD  = {$jsUD};
+var lecLoaded = {}, anLoaded = {}, struggleCache = {};
+var wwwroot  = {$jsWwwroot};
+var streamUrl = {$streamUrl};
+var moodleSesskey = {$moodleSesskey};
+
+/* Fallback ajax when AMD is unavailable */
+if(typeof ajax!=='function'){
+  window.ajax=function(m,a,d,f){
+    var x=new XMLHttpRequest();
+    x.open('POST',wwwroot+'/lib/ajax/service.php?sesskey='+encodeURIComponent(moodleSesskey));
+    x.setRequestHeader('Content-Type','application/json');
+    x.onload=function(){if(x.status===200){try{var r=JSON.parse(x.responseText);if(r&&r[0]){if(r[0].error)(f||function(){})(r[0].error);else(d||function(){})(r[0].data);}}catch(e){(f||function(){})(e);}}else(f||function(){})(new Error('HTTP '+x.status));};
+    x.onerror=function(){(f||function(){})(new Error('Network error'));};
+    x.send(JSON.stringify([{index:0,methodname:m,args:a}]));
+  };
+}
+
+/* Fallback esc when AMD module hasn't loaded */
+if(typeof esc!=='function'){
+  window.esc=function(s){if(s==null)return '';var d=document.createElement('div');d.appendChild(document.createTextNode(String(s)));return d.innerHTML;};
 }
 
 /* ---- Scroll-to-bottom FABs ---- */
@@ -989,7 +1035,6 @@ if(fab)fab.addEventListener('click',openPanel);
 if(cpClose)cpClose.addEventListener('click',closePanel);
 if(cpOv)cpOv.addEventListener('click',function(e){if(e.target===cpOv)closePanel();});
 if(expand)expand.addEventListener('click',openDash);
-if(ovClose)ovClose.addEventListener('click',closeDash);
 if(lecOv)lecOv.addEventListener('click',function(e){if(e.target===lecOv)closeDash();});
 var dashBtn=document.getElementById('lcp-dash-btn');if(dashBtn)dashBtn.addEventListener('click',openDash);
 var openDashBtn=document.getElementById('lcp-open-dash');if(openDashBtn)openDashBtn.addEventListener('click',openDash);
@@ -2581,6 +2626,7 @@ _umatInitEsc([
 ]);
 
 })();
+</script>
 HTML;
     }
 
@@ -2588,6 +2634,7 @@ HTML;
         $uid     = (int)$user->id;
         $uName   = json_encode(fullname($user));
         $uInit   = htmlspecialchars(strtoupper(mb_substr($user->firstname,0,1).mb_substr($user->lastname,0,1)), ENT_QUOTES);
+        $jsWwwroot = json_encode(rtrim($wwwroot, '/'));
         $jsUD    = $userData; // raw JSON string from preload_user_data()
         $logUrl  = $wwwroot . '/login/logout.php';
         $streamUrl = json_encode($wwwroot . '/local/umat_ai/chat_stream.php');
@@ -2623,25 +2670,28 @@ HTML;
       <div class="umat-sb-head">
         <div class="umat-sb-logo"><span class="material-symbols-outlined">school</span></div>
         <div class="umat-sb-brand"><strong>UMaT Moodle</strong><span>AI Enhanced Learning</span></div>
-        <button class="umat-sb-close-btn" id="hub-ov-close" type="button" title="Close Hub">
-          <span class="material-symbols-outlined">close</span>
+        <button class="umat-sb-close-btn" id="hub-ov-close" type="button" title="Collapse sidebar">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <button class="umat-sb-expand-btn" id="hub-ov-close-exp" type="button" title="Expand sidebar">
+          <span class="material-symbols-outlined">chevron_right</span>
         </button>
       </div>
       <nav class="umat-sb-nav">
-        <button class="umat-sb-item active" data-hp="hub-home" type="button"><span class="material-symbols-outlined">home</span><span class="umat-sb-item-lbl">Home</span></button>
-        <button class="umat-sb-item" data-hp="hub-tutor" type="button"><span class="material-symbols-outlined">smart_toy</span><span class="umat-sb-item-lbl">AI Tutor</span></button>
-        <button class="umat-sb-item" data-hp="hub-lectures" type="button"><span class="material-symbols-outlined">video_library</span><span class="umat-sb-item-lbl">Lecture Recordings</span></button>
-        <button class="umat-sb-item" data-hp="hub-courses" type="button"><span class="material-symbols-outlined">menu_book</span><span class="umat-sb-item-lbl">My Courses</span></button>
-        <button class="umat-sb-item" data-hp="hub-library" type="button"><span class="material-symbols-outlined">local_library</span><span class="umat-sb-item-lbl">Library</span></button>
-        <button class="umat-sb-item" data-hp="hub-sessions" type="button"><span class="material-symbols-outlined">history</span><span class="umat-sb-item-lbl">Sessions</span></button>
+        <button class="umat-sb-item active" data-hp="hub-home" type="button" title="Home"><span class="material-symbols-outlined">home</span><span class="umat-sb-item-lbl">Home</span></button>
+        <button class="umat-sb-item" data-hp="hub-tutor" type="button" title="AI Tutor"><span class="material-symbols-outlined">smart_toy</span><span class="umat-sb-item-lbl">AI Tutor</span></button>
+        <button class="umat-sb-item" data-hp="hub-lectures" type="button" title="Lecture Recordings"><span class="material-symbols-outlined">video_library</span><span class="umat-sb-item-lbl">Lecture Recordings</span></button>
+        <button class="umat-sb-item" data-hp="hub-courses" type="button" title="My Courses"><span class="material-symbols-outlined">menu_book</span><span class="umat-sb-item-lbl">My Courses</span></button>
+        <button class="umat-sb-item" data-hp="hub-library" type="button" title="Library"><span class="material-symbols-outlined">local_library</span><span class="umat-sb-item-lbl">Library</span></button>
+        <button class="umat-sb-item" data-hp="hub-sessions" type="button" title="Sessions"><span class="material-symbols-outlined">history</span><span class="umat-sb-item-lbl">Sessions</span></button>
       </nav>
       <div class="umat-sb-divider"></div>
-      <button class="umat-sb-new" id="hub-new-sess" type="button">
+      <button class="umat-sb-new" id="hub-new-sess" type="button" title="New Session">
         <span class="material-symbols-outlined">add</span>
         <span class="umat-sb-new-lbl">New Session</span>
       </button>
       <div class="umat-sb-foot">
-        <button class="umat-sb-item" type="button" onclick="window.location.href='{$logUrl}'">
+        <button class="umat-sb-item" type="button" onclick="window.location.href='{$logUrl}'" title="Sign Out">
           <span class="material-symbols-outlined">logout</span><span class="umat-sb-item-lbl">Sign Out</span>
         </button>
       </div>
@@ -2822,7 +2872,26 @@ HTML;
 
 {$sharedJs}
 
-<script>/* Hub JS moved to amd/src/umat_hub.js */</script>
+<script>(function(){
+var wwwroot  = {$jsWwwroot};
+var streamUrl = {$streamUrl};
+var moodleSesskey = {$moodleSesskey};
+
+/* Fallback ajax when AMD is unavailable */
+if(typeof ajax!=='function'){
+  window.ajax=function(m,a,d,f){
+    var x=new XMLHttpRequest();
+    x.open('POST',wwwroot+'/lib/ajax/service.php?sesskey='+encodeURIComponent(moodleSesskey));
+    x.setRequestHeader('Content-Type','application/json');
+    x.onload=function(){if(x.status===200){try{var r=JSON.parse(x.responseText);if(r&&r[0]){if(r[0].error)(f||function(){})(r[0].error);else(d||function(){})(r[0].data);}}catch(e){(f||function(){})(e);}}else(f||function(){})(new Error('HTTP '+x.status));};
+    x.onerror=function(){(f||function(){})(new Error('Network error'));};
+    x.send(JSON.stringify([{index:0,methodname:m,args:a}]));
+  };
+}
+/* Fallback esc when AMD module hasn't loaded */
+if(typeof esc!=='function'){
+  window.esc=function(s){if(s==null)return '';var d=document.createElement('div');d.appendChild(document.createTextNode(String(s)));return d.innerHTML;};
+}
 /* Rolling 60s rate-limit window — mirrors the server check, refills as entries expire */
 var RATE_MAX = 10;
 var qTimes   = [];
@@ -2841,7 +2910,6 @@ var newBtn=document.getElementById('hub-new-sess');
 var newBtn2=document.getElementById('hub-new-sess2');
 
 fab.addEventListener('click',function(){ov.classList.add('open');initHome();});
-ovClose.addEventListener('click',function(){ov.classList.remove('open');});
 ov.addEventListener('click',function(e){if(e.target===ov)ov.classList.remove('open');});
 
 /* Pane switching */
@@ -3172,7 +3240,7 @@ function appendMsg(text,isUser,container,sources){
   var d=document.createElement('div');
   if(isUser)d.innerHTML='<div class="umat-msg-user"><div class="umat-bubble-user"><p>'+esc(text)+'</p></div></div>';
   else{var srcs='';if(sources&&sources.length)srcs='<div class="umat-src-chips">'+sources.map(function(s){return '<span class="umat-src-chip">'+esc(s)+'</span>';}).join('')+'</div>';
-    d.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>'+esc(text)+'</p>'+srcs+'</div></div></div>';}
+    d.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">'+(typeof _umatFormatAI==='function'?_umatFormatAI(text):esc(text))+'</div>'+srcs+'</div></div></div>';}
   container.appendChild(d);container.scrollTop=container.scrollHeight;
 }
 function sendQ(q){
@@ -3247,6 +3315,7 @@ _umatInitEsc([
 ]);
 
 })();
+</script>
 HTML;
     }
 

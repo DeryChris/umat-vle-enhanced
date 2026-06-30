@@ -1,0 +1,7 @@
+# Prevent double gzip compression on Moodle's dynamic JS/CSS serving URLs.
+# Moodle already applies its own compression via lib/javascript.php and lib/styles.php.
+# Apache mod_deflate double-compressing these causes ERR_CONTENT_DECODING_FAILED in browsers.
+<IfModule mod_deflate.c>
+    SetEnvIfNoCase Request_URI "^/lib/javascript\.php" no-gzip dont-vary
+    SetEnvIfNoCase Request_URI "^/lib/styles\.php" no-gzip dont-vary
+</IfModule>

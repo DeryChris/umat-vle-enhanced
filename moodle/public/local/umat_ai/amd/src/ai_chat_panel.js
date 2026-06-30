@@ -7,7 +7,8 @@ define([
     'core/notification',
     'core/str',
     'core/templates',
-], function(Ajax, Notification, Str, Templates) {
+    'local_umat_ai/umatshared',
+], function(Ajax, Notification, Str, Templates, S) {
     'use strict';
 
     const SELECTORS = {
@@ -61,7 +62,9 @@ define([
         const messageDiv = document.createElement('div');
         messageDiv.className = `chat-message ${role}`;
 
-        let bubbleHtml = '<div class="chat-bubble"><p>' + escapeHtml(text) + '</p></div>';
+        var bubbleContent = role === 'ai' ? S._umatFormatAI(text) : escapeHtml(text);
+        var innerTag = role === 'ai' ? 'div' : 'p';
+        let bubbleHtml = '<div class="chat-bubble"><' + innerTag + ' class="umat-ai-content">' + bubbleContent + '</' + innerTag + '></div>';
         messageDiv.innerHTML = bubbleHtml;
 
         if (sources && sources.length > 0 && role === 'ai') {

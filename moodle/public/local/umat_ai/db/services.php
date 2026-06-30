@@ -268,6 +268,40 @@ $functions = [
         'description' => 'Get video generation status for course materials', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
+
+    /* ---- Student Quiz Persistence ---- */
+    'local_umat_ai_save_quiz_attempt' => [
+        'classname'   => '\local_umat_ai\external\quiz_attempt', 'methodname' => 'save_quiz_attempt',
+        'description' => 'Save or update a student quiz attempt', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_get_quiz_attempts' => [
+        'classname'   => '\local_umat_ai\external\quiz_attempt', 'methodname' => 'get_quiz_attempts',
+        'description' => 'Get quiz attempts for the current user', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_delete_quiz_attempt' => [
+        'classname'   => '\local_umat_ai\external\quiz_attempt', 'methodname' => 'delete_quiz_attempt',
+        'description' => 'Delete a quiz attempt', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_grade_theory_answer' => [
+        'classname'   => '\local_umat_ai\external\grade_theory', 'methodname' => 'grade_theory_answer',
+        'description' => 'Grade a theoretical answer via AI service', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+
+    /* ---- Instructor Quiz Review ---- */
+    'local_umat_ai_get_course_quiz_attempts' => [
+        'classname'   => '\local_umat_ai\external\quiz_attempt', 'methodname' => 'get_course_quiz_attempts',
+        'description' => 'Get all quiz attempts for a course (lecturer review)', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_get_quiz_analytics' => [
+        'classname'   => '\local_umat_ai\external\quiz_attempt', 'methodname' => 'get_quiz_analytics',
+        'description' => 'Get aggregate quiz analytics for a course', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
 ];
 
 $services = [
