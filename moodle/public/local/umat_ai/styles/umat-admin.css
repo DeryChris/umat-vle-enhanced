@@ -1,0 +1,190 @@
+/* ── Admin Control FAB ── */
+.umat-fab-admin {
+  background: linear-gradient(135deg, #003580, #1e3a8a) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 16px rgba(0, 53, 128, 0.35) !important;
+}
+.umat-fab-admin:hover {
+  box-shadow: 0 6px 24px rgba(0, 53, 128, 0.5) !important;
+  transform: scale(1.05);
+}
+.umat-fab-admin .umat-fab-tip {
+  background: #1e3a8a !important;
+  color: #fff !important;
+}
+
+/* ── Admin Compact Panel ── */
+.umat-cp-admin .umat-cp-hdr {
+  position: relative;
+  overflow: hidden;
+}
+.umat-cp-admin .umat-cp-hdr::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -30%;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.04);
+  pointer-events: none;
+}
+/* Unhide legacy tab bar for admin CP (overrides umat-overlay.css) */
+.umat-cp-admin .umat-cp-tabs-legacy {
+  display: flex !important;
+}
+
+/* ── Expanded Admin Overlay — Blue Theme ── */
+#admin-ov {
+  background: #f8faff !important;
+  background-color: #f8faff !important;
+}
+/* Sidebar body - dark blue so white text is visible */
+#admin-ov .umat-sb {
+  background: linear-gradient(180deg, #1e3a8a 0%, #0f2557 100%);
+}
+/* Sidebar head */
+#admin-ov .umat-sb-head {
+  background: linear-gradient(135deg, #003580, #1e3a8a);
+  color: #fff;
+}
+#admin-ov .umat-sb-head .umat-sb-brand strong {
+  color: #fff;
+}
+#admin-ov .umat-sb-head .umat-sb-brand span {
+  color: rgba(255,255,255,0.7);
+}
+#admin-ov .umat-sb-head .umat-sb-logo {
+  background: rgba(255,255,255,0.15);
+}
+#admin-ov .umat-sb-head .umat-sb-logo .material-symbols-outlined {
+  color: #fff;
+}
+#admin-ov .umat-sb-head .umat-sb-close-btn,
+#admin-ov .umat-sb-head .umat-sb-expand-btn {
+  color: rgba(255,255,255,0.8);
+}
+#admin-ov .umat-sb-head .umat-sb-close-btn:hover,
+#admin-ov .umat-sb-head .umat-sb-expand-btn:hover {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+/* Sidebar divider & foot */
+#admin-ov .umat-sb-divider {
+  background: rgba(255,255,255,0.12);
+}
+#admin-ov .umat-sb-foot {
+  border-top-color: rgba(255,255,255,0.12);
+}
+#admin-ov .umat-sb-foot .umat-sb-item {
+  color: rgba(255,255,255,0.8);
+}
+#admin-ov .umat-sb-foot .umat-sb-item:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+/* Sidebar nav items */
+#admin-ov .umat-sb-item {
+  color: rgba(255,255,255,0.85);
+}
+#admin-ov .umat-sb-item:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+#admin-ov .umat-sb-item.active {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  border-left-color: #fff;
+}
+#admin-ov .umat-sb-item.active::before {
+  background: #fff;
+}
+/* Content headers — blue gradient */
+#admin-ov .umat-content-hdr {
+  background: linear-gradient(135deg, #003580, #1e3a8a);
+}
+#admin-ov .umat-content-hdr h2 {
+  color: #fff;
+}
+#admin-ov .umat-content-hdr .material-symbols-outlined {
+  color: rgba(255,255,255,0.9) !important;
+}
+#admin-ov .umat-content-hdr .umat-pill {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+/* Close button in content area */
+#admin-ov .umat-ov-close-btn {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+#admin-ov .umat-ov-close-btn:hover {
+  background: rgba(255,255,255,0.35);
+  color: #fff;
+}
+/* Sidebar collapsed tooltip override */
+#admin-ov .umat-sb.collapsed .umat-sb-item:hover::after,
+#admin-ov .umat-sb.collapsed .umat-sb-new:hover::after {
+  background: #1e3a8a;
+  color: #fff;
+}
+
+/* ── Dashboard Health Cards ── */
+#acp-health-grid > div {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+#acp-health-grid > div:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* ── Action Buttons ── */
+.admin-action-btn {
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.admin-action-btn:hover {
+  background: var(--u-sf) !important;
+  transform: translateX(2px);
+}
+.admin-action-btn:active {
+  transform: scale(0.98);
+}
+
+/* ── Theme color input ── */
+#acp-theme-colors input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+#acp-theme-colors input[type="color"]::-webkit-color-swatch {
+  border: 1px solid var(--u-olv);
+  border-radius: 6px;
+}
+
+/* ── Toggle row ── */
+#acp-toggles label {
+  transition: background 0.15s ease;
+}
+#acp-toggles label:hover {
+  background: var(--u-sf) !important;
+}
+
+/* ── Config inputs ── */
+#acp-config input[type="text"],
+#acp-config input[type="number"],
+#acp-config input[type="password"] {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+#acp-config input[type="text"]:focus,
+#acp-config input[type="number"]:focus,
+#acp-config input[type="password"]:focus {
+  outline: none;
+  border-color: var(--u-p) !important;
+  box-shadow: 0 0 0 2px rgba(0,107,47,0.12);
+}
+
+/* ── Mobile responsive ── */
+@media (max-width: 480px) {
+  #acp-health-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

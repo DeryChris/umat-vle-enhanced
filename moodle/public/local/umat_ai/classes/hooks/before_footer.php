@@ -38,9 +38,17 @@ class before_footer {
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-cs-overlay.css">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-yt-grid.css">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-struggle-dashboard.css?v=' . $sdts . '">');
+            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-admin.css?v=' . filemtime(__DIR__ . '/../../styles/umat-admin.css') . '">');
             $hook->add_html('<link rel="preconnect" href="https://cdnjs.cloudflare.com">');
             $hook->add_html('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">');
             $hook->add_html('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">');
+            /* Admin check — site admins see only the admin FAB, bypass all other overlays */
+            $isAdmin = has_capability('local/umat_ai:adminpanel', \context_system::instance());
+            if ($isAdmin && get_config('local_umat_ai', 'enable_admin_fab')) {
+                $hook->add_html(\local_umat_ai\overlay_helper::admin_overlay($wwwroot, $USER));
+                $hook->add_html(\local_umat_ai\overlay_helper::glassmorph_init_js());
+                return;
+            }
             if ($isCourseArea && $courseid) {
                 $courseCtx  = \context_course::instance($courseid);
                 $courseName = format_string($COURSE->fullname ?? '', true, ['context' => $courseCtx]);

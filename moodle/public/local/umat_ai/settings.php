@@ -73,4 +73,12 @@ if ($hassiteconfig) {
         get_string('enable_hub_fab_desc', 'local_umat_ai'),
         '1'
     ));
+
+    /* ---- Enable Admin FAB ---- */
+    $settings->add(new admin_setting_configcheckbox(
+        'local_umat_ai/enable_admin_fab',
+        get_string('enable_admin_fab', 'local_umat_ai'),
+        get_string('enable_admin_fab_desc', 'local_umat_ai'),
+        '1'
+    ));
 }

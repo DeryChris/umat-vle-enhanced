@@ -9,7 +9,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.v1.routes import recording, query, materials, analysis, health, analytics, lti, quizgen, video, quiz
+from api.v1.routes import recording, query, materials, analysis, health, analytics, lti, quizgen, video, quiz, admin
 from models.database import init_db
 from config import get_settings
 
@@ -94,6 +94,7 @@ app.include_router(lti.router,       prefix="/api/v1")
 app.include_router(quizgen.router,   prefix="/api/v1")
 app.include_router(video.router,     prefix="/api/v1")
 app.include_router(quiz.router,      prefix="/api/v1")
+app.include_router(admin.router,     prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn
