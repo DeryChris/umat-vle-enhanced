@@ -302,6 +302,28 @@ $functions = [
         'description' => 'Get aggregate quiz analytics for a course', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
+
+    /* ---- Admin Control Panel ---- */
+    'local_umat_ai_admin_get_config' => [
+        'classname'   => '\local_umat_ai\external\admin_panel', 'methodname' => 'get_config',
+        'description' => 'Get plugin configuration (masks secrets)', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
+    'local_umat_ai_admin_save_config' => [
+        'classname'   => '\local_umat_ai\external\admin_panel', 'methodname' => 'save_config',
+        'description' => 'Save plugin configuration', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
+    'local_umat_ai_admin_execute_action' => [
+        'classname'   => '\local_umat_ai\external\admin_panel', 'methodname' => 'execute_action',
+        'description' => 'Execute admin actions (clear cache, trigger cron)', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
+    'local_umat_ai_admin_system_health' => [
+        'classname'   => '\local_umat_ai\external\admin_panel', 'methodname' => 'system_health',
+        'description' => 'Get AI service and system health', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
 ];
 
 $services = [

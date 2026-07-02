@@ -11,33 +11,120 @@ define([], function() {
         return d.innerHTML;
     }
 
-    // ─── Format AI response text (markdown → HTML) ─── //
+    // ─── Format AI response text (full Markdown → HTML) ─── //
     function _umatFormatAI(text) {
         if (!text) return '';
+
+        /* Extract fenced code blocks before escaping */
+        var codeBlocks = [];
+        text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, function(m, lang, code) {
+            var idx = codeBlocks.length;
+            var escaped = _umatEsc(code.replace(/^(\s*\n)+|(\s*\n)+$/g, ''));
+            codeBlocks.push('<div class="umat-code-wrap">'
+                + '<button class="umat-code-copy" type="button" onclick="(function(b){var t=b.nextElementSibling.textContent;navigator.clipboard.writeText(t);b.textContent=\'Copied!\';setTimeout(function(){b.textContent=\'Copy\';},2000);})(this)">Copy</button>'
+                + '<pre><code' + (lang ? ' class="lang-' + _umatEsc(lang) + '"' : '') + '>' + escaped + '</code></pre></div>');
+            return '%%CB' + idx + '%%';
+        });
+
+        /* HTML-escape remaining text */
         text = _umatEsc(text);
+
+        /* Inline formatting */
         text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
         text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        text = text.replace(/~~(.+?)~~/g, '<del>$1</del>');
         text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+        /* Block-level: line-by-line */
         var lines = text.split('\n');
         var out = [];
-        var inOl = false, inUl = false;
-        function closeLists() { if (inOl) { out.push('</ol>'); inOl = false; } if (inUl) { out.push('</ul>'); inUl = false; } }
+        var inOl = false, inUl = false, inBq = false, inTbl = false;
+
+        function closeBlock(keepBq) {
+            if (inTbl) { out.push('</tbody></table>'); inTbl = false; }
+            if (!keepBq && inBq) { out.push('</blockquote>'); inBq = false; }
+            if (inUl) { out.push('</ul>'); inUl = false; }
+            if (inOl) { out.push('</ol>'); inOl = false; }
+        }
+
         for (var i = 0; i < lines.length; i++) {
-            var line = lines[i], t = line.trim();
-            if (!t) { closeLists(); continue; }
-            if (/^[-*_]{3,}$/.test(t)) { closeLists(); out.push('<hr>'); continue; }
-            var h3 = t.match(/^###\s+(.*)/); if (h3) { closeLists(); out.push('<h3>' + h3[1] + '</h3>'); continue; }
-            var h2 = t.match(/^##\s+(.*)/); if (h2) { closeLists(); out.push('<h2>' + h2[1] + '</h2>'); continue; }
-            var h1 = t.match(/^#\s+(.*)/);  if (h1) { closeLists(); out.push('<h2>' + h1[1] + '</h2>'); continue; }
+            var line = lines[i];
+            var t = line.trim();
+
+            /* Restore fenced code blocks */
+            var cbMatch = t.match(/^%%CB(\d+)%%$/);
+            if (cbMatch) { closeBlock(); out.push(codeBlocks[parseInt(cbMatch[1])]); continue; }
+
+            if (!t) { closeBlock(); continue; }
+            if (/^[-*_]{3,}$/.test(t)) { closeBlock(); out.push('<hr>'); continue; }
+
+            /* Blockquotes */
+            var bq = t.match(/^(>+)\s?(.*)/);
+            if (bq) {
+                if (!inBq) { closeBlock(true); out.push('<blockquote>'); inBq = true; }
+                out.push('<p>' + bq[2] + '</p>');
+                continue;
+            }
+            if (inBq) { out.push('</blockquote>'); inBq = false; }
+
+            /* Headings */
+            var h3 = t.match(/^###\s+(.*)/); if (h3) { closeBlock(); out.push('<h3>' + h3[1] + '</h3>'); continue; }
+            var h2 = t.match(/^##\s+(.*)/);  if (h2) { closeBlock(); out.push('<h2>' + h2[1] + '</h2>'); continue; }
+            var h1 = t.match(/^#\s+(.*)/);   if (h1) { closeBlock(); out.push('<h1>' + h1[1] + '</h1>'); continue; }
+
+            /* Tables */
+            if (/^\|.+\|$/.test(t)) {
+                var cells = t.split('|').filter(function(c) { return c !== ''; });
+                if (/^\|[\s:-]+\|/.test(t)) continue; /* separator row */
+                if (!inTbl) {
+                    out.push('<table><thead><tr>');
+                    cells.forEach(function(c) { out.push('<th>' + c.trim() + '</th>'); });
+                    out.push('</tr></thead><tbody>');
+                    inTbl = true;
+                } else {
+                    out.push('<tr>');
+                    cells.forEach(function(c) { out.push('<td>' + c.trim() + '</td>'); });
+                    out.push('</tr>');
+                }
+                continue;
+            }
+            if (inTbl) { out.push('</tbody></table>'); inTbl = false; }
+
+            /* Task lists */
+            var task = t.match(/^[-*]\s+\[([ x])\]\s+(.*)/);
+            if (task) {
+                if (inOl) { out.push('</ol>'); inOl = false; }
+                if (!inUl) { out.push('<ul class="umat-task-list">'); inUl = true; }
+                out.push('<li class="' + (task[1] === 'x' ? 'task-checked' : 'task-unchecked') + '">'
+                    + (task[1] === 'x' ? '&#x2611; ' : '&#x2610; ') + task[2] + '</li>');
+                continue;
+            }
+
+            /* Ordered lists */
             var ol = t.match(/^\d+[.)]\s+(.*)/);
-            if (ol) { if (inUl) { out.push('</ul>'); inUl = false; } if (!inOl) { out.push('<ol>'); inOl = true; } out.push('<li>' + ol[1] + '</li>'); continue; }
+            if (ol) {
+                if (inUl) { out.push('</ul>'); inUl = false; }
+                if (!inOl) { out.push('<ol>'); inOl = true; }
+                out.push('<li>' + ol[1] + '</li>');
+                continue;
+            }
+
+            /* Unordered lists */
             var ul = t.match(/^[-*]\s+(.*)/);
-            if (ul) { if (inOl) { out.push('</ol>'); inOl = false; } if (!inUl) { out.push('<ul>'); inUl = true; } out.push('<li>' + ul[1] + '</li>'); continue; }
-            closeLists();
+            if (ul) {
+                if (inOl) { out.push('</ol>'); inOl = false; }
+                if (!inUl) { out.push('<ul>'); inUl = true; }
+                out.push('<li>' + ul[1] + '</li>');
+                continue;
+            }
+
+            closeBlock();
             out.push('<p>' + line + '</p>');
         }
-        closeLists();
+        closeBlock();
+
         return out.join('\n');
     }
 
@@ -152,6 +239,52 @@ define([], function() {
         bubble.appendChild(src);
     }
 
+    // ─── Shared SSE block parser (chat + inline panels) ── //
+    function _umatParseSseBlock(block) {
+        var event = 'message';
+        var data = '';
+        block.split('\n').forEach(function(line) {
+            if (line.indexOf('event:') === 0) {
+                event = line.slice(6).trim();
+            } else if (line.indexOf('data:') === 0) {
+                data = line.slice(5).trim();
+            }
+        });
+        if (!data) {
+            return null;
+        }
+        return { event: event, payload: JSON.parse(data) };
+    }
+
+    function _umatConsumeSseStream(response, onBlock) {
+        if (!response.ok || !response.body) {
+            throw new Error('Stream unavailable');
+        }
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+
+        function pump() {
+            return reader.read().then(function(result) {
+                if (result.done) {
+                    return;
+                }
+                buffer += decoder.decode(result.value, { stream: true });
+                var parts = buffer.split('\n\n');
+                buffer = parts.pop() || '';
+                parts.forEach(function(block) {
+                    var parsed = _umatParseSseBlock(block);
+                    if (parsed) {
+                        onBlock(parsed.event, parsed.payload);
+                    }
+                });
+                return pump();
+            });
+        }
+
+        return pump();
+    }
+
     // ─── Stream AI tutor response via SSE proxy ────── //
     function _umatStreamChat(opts) {
         var accumulated = '';
@@ -159,6 +292,9 @@ define([], function() {
         var contentEl = null;
         var bubbleEl = null;
         var formatTimer = null;
+        var typingHidden = false;
+        var label = opts.label || 'AI ASSISTANT';
+        var controller = new AbortController();
         var doneReceived = false;
         var retries = 0;
         var maxRetries = 3;
@@ -176,14 +312,27 @@ define([], function() {
             setTimeout(function() { _umatStreamChat(opts); }, retries * 2000);
         }
 
+        function hideTypingOnce() {
+            if (typingHidden) return;
+            typingHidden = true;
+            if (opts.typingId) _umatHideTyping(opts.typingId);
+            if (typeof opts.onTypingHidden === 'function') opts.onTypingHidden();
+        }
+
         function ensureBubble() {
-            if (streamRow) return;
+            if (streamRow) {
+                return;
+            }
+            hideTypingOnce();
             var c = document.getElementById(opts.msgsId);
-            if (!c) return;
+            if (!c) {
+                return;
+            }
             streamRow = document.createElement('div');
-            streamRow.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>'
-                + '<div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div>'
-                + '<div class="umat-bubble-ai"><div class="umat-ai-stream-content"></div></div></div></div>';
+            streamRow.className = 'umat-msg-ai umat-msg-streaming';
+            streamRow.innerHTML = '<div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>'
+                + '<div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">' + _umatEsc(label) + '</div>'
+                + '<div class="umat-bubble-ai is-streaming"><div class="umat-ai-stream-content"></div></div></div></div>';
             c.appendChild(streamRow);
             bubbleEl = streamRow.querySelector('.umat-bubble-ai');
             contentEl = streamRow.querySelector('.umat-ai-stream-content');
@@ -191,18 +340,40 @@ define([], function() {
         }
 
         function renderContent() {
-            if (!contentEl) return;
+            if (!contentEl) {
+                return;
+            }
             contentEl.innerHTML = _umatFormatAI(accumulated);
             var c = document.getElementById(opts.msgsId);
-            if (c) c.scrollTop = c.scrollHeight;
+            if (c) {
+                c.scrollTop = c.scrollHeight;
+            }
         }
 
         function scheduleRender() {
-            if (formatTimer) return;
+            if (formatTimer) {
+                return;
+            }
             formatTimer = setTimeout(function() {
                 formatTimer = null;
                 renderContent();
-            }, 60);
+            }, 45);
+        }
+
+        function finishStream(payload) {
+            if (payload && payload.answer) {
+                accumulated = payload.answer;
+            }
+            accumulated = accumulated.replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
+            ensureBubble();
+            renderContent();
+            if (bubbleEl) {
+                bubbleEl.classList.remove('is-streaming');
+            }
+            if (streamRow) {
+                streamRow.classList.remove('umat-msg-streaming');
+            }
+            _umatAppendSources(bubbleEl, (payload && payload.sources) || []);
         }
 
         var body = new FormData();
@@ -212,71 +383,135 @@ define([], function() {
         body.append('session_key', opts.session_key || '');
         body.append('material_ids', JSON.stringify(opts.material_ids || []));
 
-        return fetch(opts.url, { method: 'POST', body: body, credentials: 'same-origin' })
-            .then(function(response) {
-                if (!response.ok || !response.body) {
-                    throw new Error('Stream unavailable');
+        var promise = fetch(opts.url, {
+            method: 'POST',
+            body: body,
+            credentials: 'same-origin',
+            signal: controller.signal
+        }).then(function(response) {
+            return _umatConsumeSseStream(response, function(event, payload) {
+                if (event === 'meta') {
+                    hideTypingOnce();
+                    if (opts.onMeta) opts.onMeta(payload);
+                } else if (event === 'token') {
+                    ensureBubble();
+                    accumulated += payload.text || '';
+                    scheduleRender();
+                } else if (event === 'quiz_data') {
+                    if (typeof opts.onQuizData === 'function') opts.onQuizData(payload);
+                    else if (typeof window._umatOnQuizData === 'function') window._umatOnQuizData(payload);
+                    accumulated = accumulated.replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
+                    scheduleRender();
+                } else if (event === 'done') {
+                    doneReceived = true;
+                    finishStream(payload);
+                    if (opts.onDone) opts.onDone(payload, accumulated);
+                } else if (event === 'error') {
+                    hideTypingOnce();
+                    if (opts.onError) opts.onError(payload);
                 }
-                var reader = response.body.getReader();
-                var decoder = new TextDecoder();
-                var buffer = '';
+            });
+        }).catch(function(err) {
+            if (err && err.name === 'AbortError') {
+                finishStream({ answer: accumulated });
+                if (opts.onDone) opts.onDone({ stopped: true }, accumulated);
+                return;
+            }
+            hideTypingOnce();
+            if (opts.onError) opts.onError({ message: err.message || 'Connection error.' });
+            doRetry();
+        });
 
-                function handleBlock(block) {
-                    var event = 'message';
-                    var data = '';
-                    block.split('\n').forEach(function(line) {
-                        if (line.indexOf('event:') === 0) event = line.slice(6).trim();
-                        else if (line.indexOf('data:') === 0) data = line.slice(5).trim();
-                    });
-                    if (!data) return;
-                    var payload = JSON.parse(data);
-                    if (event === 'meta') {
-                        if (opts.onMeta) opts.onMeta(payload);
-                    } else if (event === 'token') {
-                        ensureBubble();
-                        accumulated += payload.text || '';
-                        scheduleRender();
-                    } else if (event === 'quiz_data') {
-                        if (typeof opts.onQuizData === 'function') {
-                            opts.onQuizData(payload);
-                        } else if (typeof window._umatOnQuizData === 'function') {
-                            window._umatOnQuizData(payload);
-                        }
-                        accumulated = accumulated.replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
-                        scheduleRender();
-                    } else if (event === 'done') {
-                        doneReceived = true;
-                        if (payload.answer) accumulated = payload.answer;
-                        accumulated = accumulated.replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
-                        ensureBubble();
-                        renderContent();
-                        _umatAppendSources(bubbleEl, payload.sources || []);
-                        if (opts.onDone) opts.onDone(payload, accumulated);
-                    } else if (event === 'error') {
-                        if (opts.onError) opts.onError(payload);
+        promise.abort = function() { controller.abort(); };
+        return promise;
+    }
+
+    // ─── Stream into a single panel (NLQ, health report) ── //
+    function _umatStreamInline(opts) {
+        var accumulated = '';
+        var formatTimer = null;
+        var controller = new AbortController();
+        var target = document.getElementById(opts.targetId);
+        if (!target) {
+            return Promise.reject(new Error('Target not found'));
+        }
+
+        target.classList.add('umat-ai-stream-panel', 'is-streaming');
+        target.innerHTML = '<div class="umat-ai-stream-content umat-ai-content"></div>';
+        var contentEl = target.querySelector('.umat-ai-stream-content');
+
+        function renderContent() {
+            if (!contentEl) {
+                return;
+            }
+            contentEl.innerHTML = _umatFormatAI(accumulated);
+            if (typeof opts.onRender === 'function') {
+                opts.onRender(contentEl);
+            }
+        }
+
+        function scheduleRender() {
+            if (formatTimer) {
+                return;
+            }
+            formatTimer = setTimeout(function() {
+                formatTimer = null;
+                renderContent();
+            }, 45);
+        }
+
+        function finishStream(payload) {
+            if (payload && payload.answer) {
+                accumulated = payload.answer;
+            }
+            renderContent();
+            target.classList.remove('is-streaming');
+        }
+
+        var body = new FormData();
+        body.append('sesskey', opts.sesskey);
+        body.append('courseid', String(opts.courseid));
+        body.append('question', opts.question);
+        body.append('session_key', opts.session_key || 'inline_' + Date.now());
+        body.append('material_ids', JSON.stringify(opts.material_ids || []));
+
+        var promise = fetch(opts.url, {
+            method: 'POST',
+            body: body,
+            credentials: 'same-origin',
+            signal: controller.signal
+        }).then(function(response) {
+            return _umatConsumeSseStream(response, function(event, payload) {
+                if (event === 'meta') {
+                    if (opts.onMeta) {
+                        opts.onMeta(payload);
+                    }
+                } else if (event === 'token') {
+                    accumulated += payload.text || '';
+                    scheduleRender();
+                } else if (event === 'done') {
+                    finishStream(payload);
+                    if (opts.onDone) {
+                        opts.onDone(payload, accumulated);
+                    }
+                } else if (event === 'error') {
+                    target.classList.remove('is-streaming');
+                    if (opts.onError) {
+                        opts.onError(payload);
                     }
                 }
-
-                function pump() {
-                    return reader.read().then(function(result) {
-                        if (result.done) {
-                            doRetry();
-                            return;
-                        }
-                        buffer += decoder.decode(result.value, { stream: true });
-                        var parts = buffer.split('\n\n');
-                        buffer = parts.pop() || '';
-                        parts.forEach(handleBlock);
-                        return pump();
-                    });
-                }
-
-                return pump();
-            })
-            .catch(function(err) {
-                if (opts.onError) opts.onError({ message: err.message || 'Connection error.' });
-                doRetry();
             });
+        }).catch(function(err) {
+            target.classList.remove('is-streaming');
+            if (opts.onError) {
+                opts.onError({ message: err.message || 'Connection error.' });
+            }
+        });
+
+        promise.abort = function() {
+            controller.abort();
+        };
+        return promise;
     }
 
     // ─── Voice input init ──────────────────────────── //
@@ -1226,6 +1461,8 @@ define([], function() {
         _umatShowTyping: _umatShowTyping,
         _umatHideTyping: _umatHideTyping,
         _umatStreamChat: _umatStreamChat,
+        _umatStreamInline: _umatStreamInline,
+        _umatFormatAI: _umatFormatAI,
 
         // Voice
         _umatInitVoice: _umatInitVoice,

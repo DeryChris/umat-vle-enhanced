@@ -63,6 +63,15 @@ $capabilities = [
         ],
     ],
 
+    // Admin panel access (system-level — site admins/managers only).
+    'local/umat_ai:adminpanel' => [
+        'captype'      => 'read',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes'   => [
+            'manager' => CAP_ALLOW,
+        ],
+    ],
+
     // Create and manage study groups (all enrolled users).
     'local/umat_ai:creategroup' => [
         'captype'      => 'write',

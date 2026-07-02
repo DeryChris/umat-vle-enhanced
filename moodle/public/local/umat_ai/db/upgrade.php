@@ -445,5 +445,16 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026063000, 'local', 'umat_ai');
     }
 
+    if ($oldversion < 2026070100) {
+        // Add admin panel defaults.
+        set_config('enable_admin_fab', '1', 'local_umat_ai');
+        set_config('theme_primary',   '#006b2f', 'local_umat_ai');
+        set_config('theme_secondary', '#16a34a', 'local_umat_ai');
+        set_config('theme_tertiary',  '#a5304d', 'local_umat_ai');
+        set_config('theme_warning',   '#d97706', 'local_umat_ai');
+        set_config('theme_success',   '#16a34a', 'local_umat_ai');
+        upgrade_plugin_savepoint(true, 2026070100, 'local', 'umat_ai');
+    }
+
     return true;
 }

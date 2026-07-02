@@ -8,6 +8,7 @@ $string['umat_ai:viewsummary']   = 'View AI-generated summaries and notes';
 $string['umat_ai:approveoutput'] = 'Approve AI-generated content';
 $string['umat_ai:chatwithai']    = 'Chat with the AI assistant';
 $string['umat_ai:viewanalytics'] = 'View lecturer analytics dashboard';
+$string['umat_ai:adminpanel']    = 'Access the admin control panel (system level)';
 $string['umat_ai:creategroup']   = 'Create and join study groups';
 
 /* ---- General ---- */
@@ -21,6 +22,47 @@ $string['ai_unavailable']        = 'The AI service is currently unavailable. Ple
 $string['rate_limit_hit']        = 'You\'ve reached the question limit for this minute. Please wait a moment and try again.';
 
 /* ---- Settings ---- */
+$string['admin_panel_title']         = 'System Control Panel';
+$string['admin_fab_tip']             = 'System Control';
+$string['admin_tab_dashboard']       = 'Dashboard';
+$string['admin_tab_features']        = 'Features';
+$string['admin_tab_theme']           = 'Theme';
+$string['admin_tab_actions']         = 'Actions';
+$string['admin_health_ok']           = '● AI Service Online';
+$string['admin_health_fail']         = '● AI Service Offline';
+$string['admin_health_checking']     = '● Checking…';
+$string['admin_save_btn']            = 'Save Changes';
+$string['admin_save_success']        = 'Settings saved successfully.';
+$string['admin_save_error']          = 'Failed to save settings.';
+$string['admin_action_clear_cache']  = 'Clear AI Semantic Cache';
+$string['admin_action_trigger_index'] = 'Force Re-index Materials';
+$string['admin_action_purge_cache']  = 'Purge Moodle Caches';
+$string['admin_action_open_settings'] = 'Open Native Admin Settings';
+$string['admin_action_done']         = 'Action executed successfully.';
+$string['admin_config_heading']      = 'Plugin Configuration';
+$string['admin_config_service_url']  = 'AI Service URL';
+$string['admin_config_token']        = 'API Bearer Token';
+$string['admin_config_rate_limit']   = 'Rate Limit (Q/min)';
+$string['admin_config_enable_student'] = 'Enable Student FAB';
+$string['admin_config_enable_lecturer'] = 'Enable Lecturer FAB';
+$string['admin_config_enable_hub']   = 'Enable Hub FAB';
+$string['admin_config_enable_admin'] = 'Enable Admin FAB';
+$string['admin_theme_heading']       = 'Theme Customisation';
+$string['admin_theme_primary']       = 'Primary Color';
+$string['admin_theme_secondary']     = 'Secondary Color';
+$string['admin_theme_tertiary']      = 'Tertiary Color';
+$string['admin_theme_warning']       = 'Warning Color';
+$string['admin_theme_success']       = 'Success Color';
+$string['admin_theme_reset']         = 'Reset to Defaults';
+$string['admin_health_cpu']          = 'Memory';
+$string['admin_health_chroma']       = 'ChromaDB Collections';
+$string['admin_health_docs']         = 'Total Documents';
+$string['admin_health_latency']      = 'Latency';
+$string['admin_health_cron']         = 'Cron Status';
+$string['admin_health_cron_ok']      = 'Running';
+$string['admin_health_cron_stale']   = 'Stale';
+$string['admin_log_no_entries']      = 'No recent admin actions.';
+
 $string['settings_heading']          = 'UMaT AI Configuration';
 $string['ai_service_url']            = 'AI Service Base URL';
 $string['ai_service_url_desc']       = 'Base URL of the FastAPI AI backend (e.g. http://localhost:8000). No trailing slash.';
@@ -34,6 +76,8 @@ $string['enable_lecturer_fab']       = 'Enable Lecturer Analytics FAB';
 $string['enable_lecturer_fab_desc']  = 'Show the floating analytics button + panel on all lecturer course pages.';
 $string['enable_hub_fab']            = 'Enable Hub FAB (non-course pages)';
 $string['enable_hub_fab_desc']       = 'Show a compact hub FAB on non-course pages for enrolled students.';
+$string['enable_admin_fab']          = 'Enable Admin Control FAB';
+$string['enable_admin_fab_desc']     = 'Show the admin system-control FAB + overlay for site managers.';
 
 /* ---- Approval page ---- */
 $string['approval_title']  = 'Review AI-Generated Content';
