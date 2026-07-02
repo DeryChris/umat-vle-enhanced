@@ -86,14 +86,18 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
             methodname: 'local_umat_ai_get_struggle_dashboard_data',
             args: {courseid: cid, days: 60}
         }])[0].done(function(data) {
-            renderKpiRibbon(data.kpis);
-            renderScatterPlot(data.scatter_plot_data);
-            renderTopicMastery(data.topic_mastery);
-            renderStudentTable(data.at_risk_students);
-            renderMaterialHealth(data.material_health);
-            renderQuestionsFeed(data.common_questions);
-            renderTopicsFeed(data.scatter_plot_data);
-            renderHealthReport(data.course_health);
+            try {
+                renderKpiRibbon(data.kpis);
+                renderScatterPlot(data.scatter_plot_data);
+                renderTopicMastery(data.topic_mastery);
+                renderStudentTable(data.at_risk_students);
+                renderMaterialHealth(data.material_health);
+                renderQuestionsFeed(data.common_questions);
+                renderTopicsFeed(data.scatter_plot_data);
+                renderHealthReport(data.course_health);
+            } catch (e) {
+                console.error('Struggle dashboard render error:', e);
+            }
             showSkeleton(false);
         }).fail(function() {
             showSkeleton(false);
@@ -113,7 +117,7 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
 
         // Engagement sparkline
         var sparkCanvas = document.getElementById('sd-eng-sparkline');
-        if (sparkCanvas && kpis.engagement_trend && kpis.engagement_trend.length) {
+        if (sparkCanvas && sparkCanvas.getContext && kpis.engagement_trend && kpis.engagement_trend.length) {
             destroyChart('sparkline');
             chartInstances.sparkline = new Chart(sparkCanvas.getContext('2d'), {
                 type: 'line',
@@ -171,7 +175,7 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
             if (topicInsight) topicInsight.textContent = kpis.top_topic.ai_insight || '';
 
             var gaugeCanvas = document.getElementById('sd-topic-gauge');
-            if (gaugeCanvas) {
+            if (gaugeCanvas && gaugeCanvas.getContext) {
                 destroyChart('gauge');
                 var val = Math.min(100, Math.max(0, kpis.top_topic.gauge_value || 0));
                 chartInstances.gauge = new Chart(gaugeCanvas.getContext('2d'), {
@@ -201,7 +205,7 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
             if (matName) matName.textContent = kpis.top_material.name;
 
             var weekdayCanvas = document.getElementById('sd-mat-weekday-chart');
-            if (weekdayCanvas && kpis.top_material.weekday_volume) {
+            if (weekdayCanvas && weekdayCanvas.getContext && kpis.top_material.weekday_volume) {
                 destroyChart('weekday');
                 chartInstances.weekday = new Chart(weekdayCanvas.getContext('2d'), {
                     type: 'bar',
@@ -232,7 +236,7 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
     /* ── Scatter Plot ── */
     function renderScatterPlot(data) {
         var canvas = document.getElementById('sd-scatter-plot');
-        if (!canvas) return;
+        if (!canvas || !canvas.getContext) return;
         if (!data || !data.length) {
             canvas.parentElement.innerHTML = '<div class="sd-empty">No scatter data yet. Questions will appear once students start asking.</div>';
             return;
@@ -421,7 +425,7 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
     /* ── Material Health Chart ── */
     function renderMaterialHealth(data) {
         var canvas = document.getElementById('sd-material-health-chart');
-        if (!canvas) return;
+        if (!canvas || !canvas.getContext) return;
         destroyChart('matHealth');
         if (!data || !data.length) {
             canvas.parentElement.innerHTML = '<div class="sd-empty">No material health data yet.</div>';

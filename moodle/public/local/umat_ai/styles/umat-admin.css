@@ -150,6 +150,20 @@
   transform: scale(0.98);
 }
 
+/* ── Reset Theme button — danger/warning variant ── */
+#acp-reset-theme, #aexp-reset-theme {
+  border-color: #d97706;
+  color: #d97706;
+}
+#acp-reset-theme:hover, #aexp-reset-theme:hover {
+  background: #d97706;
+  color: #fff;
+  border-color: #d97706;
+}
+#acp-reset-theme:active, #aexp-reset-theme:active {
+  transform: scale(0.96);
+}
+
 /* ── Theme color input ── */
 #acp-theme-colors input[type="color"]::-webkit-color-swatch-wrapper {
   padding: 0;

@@ -3148,7 +3148,7 @@ HTML;
             </div>
           </div>
           <button class="umat-btn-p" id="aexp-save-theme" style="justify-content:center;margin-bottom:6px;" type="button"><span class="material-symbols-outlined">palette</span>Save Theme</button>
-          <button class="umat-btn" id="aexp-reset-theme" style="justify-content:center;" type="button"><span class="material-symbols-outlined">refresh</span>Reset to Defaults</button>
+          <button class="umat-btn-o" id="aexp-reset-theme" style="justify-content:center;" type="button"><span class="material-symbols-outlined">refresh</span>Reset to Defaults</button>
           <div id="aexp-theme-msg" style="margin-top:6px;font-size:11px;display:none;"></div>
         </div>
       </div>
@@ -3279,7 +3279,7 @@ HTML;
           </div>
         </div>
         <button class="umat-btn-p" id="acp-save-theme" style="width:100%;justify-content:center;margin-bottom:6px;" type="button"><span class="material-symbols-outlined">palette</span>Save Theme</button>
-        <button class="umat-btn" id="acp-reset-theme" style="width:100%;justify-content:center;" type="button"><span class="material-symbols-outlined">refresh</span>Reset to Defaults</button>
+        <button class="umat-btn-o" id="acp-reset-theme" style="width:100%;justify-content:center;" type="button"><span class="material-symbols-outlined">refresh</span>Reset to Defaults</button>
         <div id="acp-theme-msg" style="margin-top:6px;font-size:11px;display:none;"></div>
       </div>
     </div>
