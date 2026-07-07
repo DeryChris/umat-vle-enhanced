@@ -41,14 +41,27 @@ class AudioProcessor:
         return audio_path
 
     def download_recording(self, recording_url: str) -> str:
-        """Download BBB recording to local storage."""
+        """Download BBB recording to local storage using the correct extension."""
         import httpx
+        from urllib.parse import urlparse
 
-        filename = f"{uuid.uuid4()}.mp4"
+        ext = ".webm"
+        parsed = urlparse(recording_url)
+        path = parsed.path
+        if path and "." in path:
+            ext_from_url = "." + path.rsplit(".", 1)[-1].lower()
+            if ext_from_url in (".mp4", ".webm", ".mov", ".avi", ".mkv"):
+                ext = ext_from_url
+
+        filename = f"{uuid.uuid4()}{ext}"
         filepath = str(self.upload_dir / filename)
 
         with httpx.stream("GET", recording_url, timeout=300.0) as response:
             response.raise_for_status()
+            ct = response.headers.get("content-type", "")
+            if ext == ".webm" and "webm" not in ct and "mp4" in ct:
+                filepath = filepath.rsplit(".", 1)[0] + ".mp4"
+                filename = os.path.basename(filepath)
             with open(filepath, "wb") as f:
                 for chunk in response.iter_bytes(chunk_size=8192):
                     f.write(chunk)

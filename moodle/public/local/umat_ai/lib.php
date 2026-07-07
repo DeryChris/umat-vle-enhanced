@@ -216,3 +216,36 @@ function local_umat_ai_request_id(): string {
         random_int(0, 0xffff), random_int(0, 0xffff), random_int(0, 0xffff)
     );
 }
+
+/**
+ * Serve recording files stored in Moodle's file system.
+ *
+ * URL: /pluginfile.php/{contextid}/local_umat_ai/recordings/{sessionid}/{filename}
+ */
+function local_umat_ai_pluginfile($course, $cm, \context $context, $filearea, $args, $forcedownload, array $options = []) {
+    global $DB;
+
+    if ($filearea !== 'recordings') {
+        return false;
+    }
+
+    $sessionid = (int)array_shift($args);
+    $filename  = array_pop($args);
+    $filepath  = $args ? '/' . implode('/', $args) . '/' : '/';
+
+    $session = $DB->get_record('umat_ai_sessions', ['id' => $sessionid]);
+    if (!$session) {
+        return false;
+    }
+
+    $coursecontext = \context_course::instance($session->courseid);
+    require_capability('local/umat_ai:chatwithai', $coursecontext);
+
+    $fs = get_file_storage();
+    $file = $fs->get_file($context->id, 'local_umat_ai', 'recordings', $sessionid, $filepath, $filename);
+    if (!$file) {
+        return false;
+    }
+
+    send_stored_file($file, null, 0, true);
+}

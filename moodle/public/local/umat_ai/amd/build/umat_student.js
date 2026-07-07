@@ -971,21 +971,6 @@ function loadQuizAttemptForReview(aid, container){
       .fail(function(){container.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load quiz details.</p></div>';});
   });
 }
-  var pref=qz._pref||'ws';
-  var body=_umatQ(pref,'quiz-body');if(!body)body=document.createElement('div');
-  body.innerHTML='';
-  var total=qz.data.questions.length,correct=0;
-  Object.keys(qz.graded).forEach(function(k){if(qz.graded[k].correct)correct++;});
-  var score=_umatQ(pref,'quiz-score');if(score)score.style.display='flex';
-  var pct=total?Math.round(correct/total*100):0;
-  var num=_umatQ(pref,'quiz-score-num');if(num)num.textContent=correct+'/'+total;
-  var lbl=_umatQ(pref,'quiz-score-lbl');if(lbl)lbl.textContent=correct===total?'Perfect!':(pct>=70?'Great job!':'Keep practicing!');
-  var sub=_umatQ(pref,'quiz-score-sub');if(sub)sub.textContent=pct+'% accuracy';
-  var fill=_umatQ(pref,'quiz-score-fill');if(fill)fill.style.width=pct+'%';
-  var icon=_umatQ(pref,'quiz-score-icon');if(icon)icon.textContent=pct>=80?'emoji_events':(pct>=50?'sentiment_satisfied':'school');
-  _umatRenderCircle();
-  _umatUpdateQuizCard();
-}
 function _umatWireQuizBtns(pref){
   var back=_umatQ(pref,'quiz-back');if(back)back.addEventListener('click',_umatCloseQuiz);
   var close=_umatQ(pref,'quiz-close-pane');if(close)close.addEventListener('click',_umatCloseQuiz);

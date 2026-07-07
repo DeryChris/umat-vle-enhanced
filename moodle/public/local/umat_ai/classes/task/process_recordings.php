@@ -2,12 +2,15 @@
 namespace local_umat_ai\task;
 defined('MOODLE_INTERNAL') || die();
 
+require_once(__DIR__ . '/../../lib.php');
+
 class process_recordings extends \core\task\scheduled_task {
     public function get_name(): string {
         return get_string('pluginname', 'local_umat_ai') . ': Process Recordings';
     }
     public function execute(): void {
-        global $DB;
+        global $DB, $CFG;
+        require_once($CFG->libdir . '/filelib.php');
         $cfg = local_umat_ai_get_service_config();
         $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($cfg['url'])]);
         $client->setHeader(['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['token'], 'X-Request-Id: ' . local_umat_ai_request_id()]);

@@ -11,6 +11,16 @@ defined('MOODLE_INTERNAL') || die();
 
 $tasks = [
     [
+        'classname'   => '\local_umat_ai\task\process_recording',
+        'blocking'    => 0,
+        'minute'      => '*/5',    // Every 5 minutes — fetch BBB recording URL & submit to AI.
+        'hour'        => '*',
+        'day'         => '*',
+        'month'       => '*',
+        'dayofweek'   => '*',
+        'disabled'    => 0,
+    ],
+    [
         'classname'   => '\local_umat_ai\task\process_recordings',
         'blocking'    => 0,
         'minute'      => '*/15',   // Every 15 minutes.

@@ -12,6 +12,8 @@ namespace local_umat_ai\task;
 
 defined('MOODLE_INTERNAL') || die();
 
+require_once(__DIR__ . '/../../lib.php');
+
 class index_course_materials extends \core\task\scheduled_task {
 
     public function get_name(): string {

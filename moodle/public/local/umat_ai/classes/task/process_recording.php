@@ -9,6 +9,8 @@ namespace local_umat_ai\task;
 
 defined('MOODLE_INTERNAL') || die();
 
+require_once(__DIR__ . '/../../lib.php');
+
 class process_recording extends \core\task\scheduled_task {
 
     /** How long to wait before retrying sessions with no recording yet (seconds). */
@@ -22,7 +24,8 @@ class process_recording extends \core\task\scheduled_task {
     }
 
     public function execute() {
-        global $DB;
+        global $DB, $CFG;
+        require_once($CFG->libdir . '/filelib.php');
 
         $aiserviceurl = get_config('local_umat_ai', 'ai_service_url');
         $token        = get_config('local_umat_ai', 'ai_service_token');
@@ -76,10 +79,12 @@ class process_recording extends \core\task\scheduled_task {
         );
 
         if ($url !== null) {
-            // Recording found — store URL and submit to AI service.
+            $storeurl = $url;
+
+            // Store the URL (BBB playback or local) and submit to AI service.
             $DB->update_record('umat_ai_sessions', (object)[
                 'id'           => $session->id,
-                'recording_url' => $url,
+                'recording_url' => $storeurl,
                 'status'        => 'pending',
                 'timemodified'  => time(),
             ]);
@@ -130,7 +135,7 @@ class process_recording extends \core\task\scheduled_task {
         ]);
         $material_ids = array_column((array)$materials, 'id');
 
-        $client = new \curl();
+        $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($aiserviceurl)]);
         $client->setHeader([
             'Content-Type: application/json',
             'Authorization: Bearer ' . $token,

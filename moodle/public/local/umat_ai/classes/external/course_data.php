@@ -296,22 +296,22 @@ class course_data extends \external_api {
         list($inSql, $inParams) = $DB->get_in_or_equal($courseIds, SQL_PARAMS_NAMED);
         $sessions = $DB->get_records_sql(
             "SELECT * FROM {umat_ai_sessions}
-              WHERE courseid $inSql AND status = 'completed'
+              WHERE courseid $inSql
                 AND recording_url IS NOT NULL AND recording_url != ''
            ORDER BY timecreated DESC",
             $inParams, 0, 60);
 
         $recs = [];
         foreach ($sessions as $sess) {
-            // AI-generated title from approved summary output.
+            // AI-generated title from approved summary output (if available).
             $sumOut = $DB->get_record('umat_ai_outputs', [
                 'sessionrecordid' => $sess->id,
                 'output_type'     => 'summary',
                 'is_approved'     => 1,
             ]);
-            $title = 'Lecture Session — ' . date('d M Y', $sess->timecreated);
+            $title = ($sess->status === 'completed') ? 'Lecture Session — ' . date('d M Y', $sess->timecreated) : 'Recording — processing...';
             $desc  = '';
-            if ($sumOut && $sumOut->content) {
+            if ($sess->status === 'completed' && $sumOut && $sumOut->content) {
                 $lines = array_values(array_filter(explode("\n", $sumOut->content)));
                 if (!empty($lines)) {
                     $title = mb_substr($lines[0], 0, 80);
