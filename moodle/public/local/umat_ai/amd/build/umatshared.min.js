@@ -232,7 +232,7 @@ define([], function() {
         var mid = 'msg_' + (++_msgIdCounter);
         d.setAttribute('data-msg-id', mid);
         d.setAttribute('data-msg-role', 'user');
-        d.innerHTML = '<div class="umat-msg-user"><div class="umat-bubble-user"><p>' + _umatEsc(q) + '</p><button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div></div>';
+        d.innerHTML = '<div class="umat-msg-user"><div class="umat-bubble-user"><p>' + _umatEsc(q) + '</p></div><button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div>';
         d.querySelector('.umat-reply-btn').addEventListener('click', _umatHandleReply);
         c.appendChild(d);
         c.scrollTop = c.scrollHeight;
@@ -253,7 +253,7 @@ define([], function() {
         var mid = 'msg_' + (++_msgIdCounter);
         d.setAttribute('data-msg-id', mid);
         d.setAttribute('data-msg-role', 'ai');
-        d.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">' + _umatFormatAI(t) + '</div>' + src + '<button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div></div></div>';
+        d.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">' + _umatFormatAI(t) + '</div>' + src + '</div><button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div></div>';
         d.querySelector('.umat-reply-btn').addEventListener('click', _umatHandleReply);
         c.appendChild(d);
         c.scrollTop = c.scrollHeight;

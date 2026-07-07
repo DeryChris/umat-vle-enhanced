@@ -1632,10 +1632,6 @@ function _rebuildMsgNav(){
   var msgNodes=msgs.querySelectorAll(':scope > [data-msg-id]');
   var count=msgNodes.length;
   if(!count){nav.innerHTML='';return;}
-  var navH=nav.clientHeight-20;
-  if(navH<10)navH=100;
-  var step=navH/Math.max(count-1,1);
-  var html=[];
   var activeMid=null;
   var activeEl=msgs.querySelector('.umat-msg-ai.umat-msg-streaming')||msgs.querySelector('[data-msg-id].umat-msg-user:last-child');
   if(!activeEl)activeEl=msgs.querySelector('[data-msg-id]:last-child');
@@ -1644,33 +1640,46 @@ function _rebuildMsgNav(){
   var sampleInterval=Math.max(1,Math.floor((count-1)/(sampledCount-1||1)));
   var activeIdx=-1;
   msgNodes.forEach(function(m,i){
-    var mid=m.getAttribute('data-msg-id');
-    if(mid===activeMid)activeIdx=i;
+    if(m.getAttribute('data-msg-id')===activeMid)activeIdx=i;
   });
   if(activeIdx<0)activeIdx=count-1;
   var sampleSet={};
   for(var si=0;si<count;si+=sampleInterval)sampleSet[si]=true;
-  if(!sampleSet[activeIdx]&&activeIdx>=0)sampleSet[activeIdx]=true;
+  if(!sampleSet[activeIdx])sampleSet[activeIdx]=true;
   var sampleKeys=Object.keys(sampleSet).map(Number).sort(function(a,b){return a-b;});
-  while(sampleKeys.length>sampledCount+1){
+  while(sampleKeys.length>sampledCount){
     var removed=false;
     for(var sii=1;sii<sampleKeys.length-1;sii++){
       if(sampleKeys[sii]!==activeIdx){sampleKeys.splice(sii,1);removed=true;break;}
     }
     if(!removed)break;
   }
-  msgNodes.forEach(function(m,i){
+  /* Store sampleKeys on nav for active tracking fallback */
+  nav._sampleKeys=sampleKeys;
+  nav._msgNodes=msgNodes;
+  /* Find active index within sampled set */
+  var activeSampIdx=-1;
+  sampleKeys.forEach(function(sk,i){
+    if(msgNodes[sk]&&msgNodes[sk].getAttribute('data-msg-id')===activeMid)activeSampIdx=i;
+  });
+  if(activeSampIdx<0)activeSampIdx=sampleKeys.length-1;
+  var navH=140;
+  var gap=navH/(sampleKeys.length-1||1);
+  var html=[];
+  sampleKeys.forEach(function(sk,i){
+    var m=msgNodes[sk];
     var mid=m.getAttribute('data-msg-id');
-    var top=Math.round(i*step)+10;
-    var isActive=mid===activeMid;
+    var top=Math.round(i*gap)+8;
+    var isActive=i===activeSampIdx;
+    /* Dial width: widest at active, taper outward */
+    var dist=Math.abs(i-activeSampIdx);
+    var clamped=Math.min(dist,3);
+    var pad=3+clamped*((8-3)/3);
+    pad=Math.round(pad*10)/10;
     var preview='';
     var txt=(m.textContent||'').trim().replace(/\s+/g,' ');
     preview=txt.substring(0,70)+(txt.length>70?'...':'');
-    var cls='umat-msg-nav-dash';
-    if(sampleSet[i])cls+=' sampled';
-    if(isActive)cls+=' active';
-    html.push('<div class="'+cls+'" data-target="'+mid+'" style="top:'+top+'px;">'+
-      '<div class="umat-msg-nav-dash-tip">'+_umatEsc(preview)+'</div></div>');
+    html.push('<div class="umat-msg-nav-dash sampled'+(isActive?' active':'')+'" data-target="'+mid+'" style="top:'+top+'px;left:'+pad+'px;right:'+pad+'px;"><div class="umat-msg-nav-dash-tip">'+_umatEsc(preview)+'</div></div>');
   });
   nav.innerHTML=html.join('');
   nav.querySelectorAll('.umat-msg-nav-dash').forEach(function(d){
@@ -1685,29 +1694,15 @@ function _updateMsgNavActive(){
   var msgs=document.getElementById('ws-msgs');
   var nav=document.getElementById('ws-msg-nav');
   if(!msgs||!nav)return;
-  var msgNodes=msgs.querySelectorAll(':scope > [data-msg-id]');
-  var scrollTop=msgs.scrollTop;
-  var clientH=msgs.clientHeight;
-  var bestIdx=-1,bestOverlap=0;
-  msgNodes.forEach(function(m,i){
-    var top=m.offsetTop-msgs.offsetTop;
-    var bot=top+m.offsetHeight;
-    var visTop=Math.max(top,scrollTop);
-    var visBot=Math.min(bot,scrollTop+clientH);
-    var overlap=Math.max(0,visBot-visTop);
-    if(overlap>bestOverlap){bestOverlap=overlap;bestIdx=i;}
-  });
-  if(bestIdx<0)return;
   var dashes=nav.querySelectorAll('.umat-msg-nav-dash');
+  if(!dashes.length)return;
+  var scrollH=msgs.scrollHeight-msgs.clientHeight;
+  var frac=scrollH>0?msgs.scrollTop/scrollH:0;
+  var idx=Math.round(frac*(dashes.length-1));
+  idx=Math.max(0,Math.min(idx,dashes.length-1));
   dashes.forEach(function(d,i){
-    d.classList.toggle('active',i===bestIdx);
+    d.classList.toggle('active',i===idx);
   });
-  if(dashes[bestIdx]){
-    var dTop=dashes[bestIdx].offsetTop;
-    var navMid=nav.clientHeight/2;
-    var dMid=dTop+6;
-    nav.scrollTop=dMid-navMid;
-  }
 }
 function _initMsgNav(){
   var msgs=document.getElementById('ws-msgs');

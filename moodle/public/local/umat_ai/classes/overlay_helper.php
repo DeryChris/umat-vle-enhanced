@@ -338,9 +338,9 @@ JS;
           </div>
         </div>
         <div class="umat-msg-nav" id="ws-msg-nav"></div>
-        <button class="umat-scroll-bottom" id="ws-scroll-bottom" type="button"><span class="material-symbols-outlined">expand_more</span></button>
       </div>
       <div class="umat-chat-overlay">
+        <button class="umat-scroll-bottom" id="ws-scroll-bottom" type="button"><span class="material-symbols-outlined">expand_more</span></button>
         <div class="umat-chatbar">
           <button class="umat-chatbar-btn" id="ws-attach-btn" type="button"><span class="material-symbols-outlined">add</span></button>
           <textarea id="ws-input" class="umat-chatbar-input" placeholder="Ask AI about this course…" rows="1" maxlength="900"></textarea>
