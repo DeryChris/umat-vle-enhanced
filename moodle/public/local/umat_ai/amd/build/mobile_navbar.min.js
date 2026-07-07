@@ -1,10 +1,3 @@
-// ============================================================
-// AMD module: local_umat_ai/mobile_navbar
-// Handles floating glass tab bar scroll hide/show on mobile.
-// Hides bar on scroll down, shows on scroll up (threshold 30px).
-// Works with overlay scrollable containers.
-// ============================================================
-
 define([], function() {
     'use strict';
 
@@ -13,6 +6,7 @@ define([], function() {
     var scrollTimeout = null;
     var scrollTargets = [];
     var isMobileView = false;
+    var listenersAttached = false;
 
     function checkMobileView() {
         isMobileView = window.innerWidth < 640;
@@ -45,6 +39,8 @@ define([], function() {
         }
         var content = document.querySelector('.umat-ov-content');
         if (content) content.style.paddingBottom = '80px';
+        var chips = document.getElementById('ws-chips');
+        if (chips) chips.classList.remove('umat-chips-hidden');
     }
 
     function hideNavbar() {
@@ -55,6 +51,8 @@ define([], function() {
         }
         var content = document.querySelector('.umat-ov-content');
         if (content) content.style.paddingBottom = '16px';
+        var chips = document.getElementById('ws-chips');
+        if (chips) chips.classList.add('umat-chips-hidden');
     }
 
     function handleScroll(e) {
@@ -70,7 +68,7 @@ define([], function() {
 
         if (isNavbarHidden && currentScrollY < lastScrollY) {
             showNavbar();
-        } else if (!isNavbarHidden && currentScrollY > lastScrollY + 30) {
+        } else if (!isNavbarHidden && currentScrollY > lastScrollY + 15) {
             hideNavbar();
         }
 
@@ -81,6 +79,23 @@ define([], function() {
         }, 600);
     }
 
+    function attachScrollListeners() {
+        if (listenersAttached) detachScrollListeners();
+        scrollTargets = findScrollTargets();
+        for (var j = 0; j < scrollTargets.length; j++) {
+            scrollTargets[j].addEventListener('scroll', handleScroll, { passive: true });
+        }
+        listenersAttached = true;
+    }
+
+    function detachScrollListeners() {
+        for (var j = 0; j < scrollTargets.length; j++) {
+            scrollTargets[j].removeEventListener('scroll', handleScroll);
+        }
+        scrollTargets = [];
+        listenersAttached = false;
+    }
+
     function handleTabClick() {
         if (scrollTimeout) clearTimeout(scrollTimeout);
         lastScrollY = 0;
@@ -88,18 +103,25 @@ define([], function() {
     }
 
     function handleResize() {
+        var wasMobile = isMobileView;
         checkMobileView();
-        if (!isMobileView && isNavbarHidden) showNavbar();
-        if (isMobileView) {
-            scrollTargets = findScrollTargets();
+        if (isMobileView && !wasMobile) {
+            attachScrollListeners();
+        } else if (!isMobileView && wasMobile) {
+            if (isNavbarHidden) showNavbar();
+            detachScrollListeners();
+        } else if (isMobileView) {
+            attachScrollListeners();
         }
     }
 
     function init() {
         checkMobileView();
+        window.addEventListener('resize', handleResize);
+
         if (!isMobileView) return;
 
-        scrollTargets = findScrollTargets();
+        attachScrollListeners();
 
         var glassContainer = document.querySelector('.umat-glass-tabs');
         if (glassContainer) {
@@ -109,23 +131,12 @@ define([], function() {
             }
         }
 
-        for (var j = 0; j < scrollTargets.length; j++) {
-            scrollTargets[j].addEventListener('scroll', handleScroll, { passive: true });
-        }
-
-        window.addEventListener('resize', handleResize);
-
-        // Re-scan scroll targets when overlay opens
         var ov = document.querySelector('.umat-ov');
         if (ov) {
             var ovObserver = new MutationObserver(function() {
                 if (ov.classList.contains('open')) {
                     setTimeout(function() {
-                        scrollTargets = findScrollTargets();
-                        for (var k = 0; k < scrollTargets.length; k++) {
-                            scrollTargets[k].removeEventListener('scroll', handleScroll);
-                            scrollTargets[k].addEventListener('scroll', handleScroll, { passive: true });
-                        }
+                        if (isMobileView) attachScrollListeners();
                     }, 100);
                 }
             });

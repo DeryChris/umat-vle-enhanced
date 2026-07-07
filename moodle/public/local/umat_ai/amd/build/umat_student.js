@@ -73,10 +73,6 @@ function openOverlay(){ ov.classList.add('open'); populateHomeTab(); updateBodyL
 function closeOverlay(){ ov.classList.remove('open'); cpOv.classList.add('open'); updateBodyLock(); }
 if(ov)ov.addEventListener('click',function(e){if(e.target===ov)closeOverlay();});
 
-/* Wire up the workspace close button */
-var wsClose=document.getElementById('stu-ws-close');
-if(wsClose)wsClose.addEventListener('click',closeOverlay);
-
 /* ---- compact panel tabs ---- */
 function showCpPane(id){
   document.querySelectorAll('#stu-cp [data-cp-tab]').forEach(function(b){b.classList.toggle('active',b.dataset.cpTab===id);});
@@ -99,7 +95,7 @@ function setCpFeatureActive(name){
 }
 function renderCpFeature(name){
   var meta={
-    home:['home','Home','Course snapshot'],lectures:['play_circle','Lectures','Recent recordings'],courses:['menu_book','Courses','Your enrolled courses'],library:['local_library','Library','Course materials'],sessions:['chat_bubble','Sessions','Recent AI chats'],'group-study':['group','Study Groups','Collaborative AI chat'],'report-issue':['flag','Report Issue','Submit a complaint'],'my-progress':['trending_up','My Progress','Personal learning insights']
+    home:['home','Home','Course snapshot'],lectures:['play_circle','Lectures','Recent recordings'],courses:['menu_book','Courses','Your enrolled courses'],library:['local_library','Library','Course materials'],sessions:['chat_bubble','Sessions','Recent AI chats'],'report-issue':['flag','Report Issue','Submit a complaint'],'my-progress':['trending_up','My Progress','Personal learning insights']
   }[name]||['widgets','Feature','Quick view'];
   showCpPane('cp-feature');setCpFeatureActive(name);
   document.getElementById('cp-feature-icon').textContent=meta[0];document.getElementById('cp-feature-title').textContent=meta[1];document.getElementById('cp-feature-sub').textContent=meta[2];
@@ -111,8 +107,6 @@ function renderCpFeature(name){
   if(name==='library')return renderCpLibrary(body);
   if(name==='report-issue')return renderCpReportIssue(body);
   if(name==='my-progress')return renderCpProgress(body);
-  if(name==='group-study')return renderCpGroupStudy(body, courseId);
-  if(name==='quiz-history')return renderCpQuizHistory(body, courseId);
 }
 function renderCpReportIssue(body){
   if(!courseId){var c=(userData&&userData.courses)||[];if(!c.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses available.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course to report an issue:</div><div style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+c.slice(0,12).map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';body.querySelectorAll('.umat-chip').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;renderCpFeature('report-issue');});});return;}
@@ -190,7 +184,7 @@ function renderCpSessions(body){
   var sessions=(userData&&userData.sessions)||[];
   if(!sessions.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">chat_bubble</span><p>No AI sessions yet.</p></div>';return;}
   body.innerHTML=sessions.slice(0,10).map(function(s){return '<button class="umat-cp-list-card as-btn" data-sk="'+_umatEsc(s.session_key)+'" data-cid="'+(s.courseid||courseId)+'" type="button"><strong>'+_umatEsc(s.course_name||'AI Session')+'</strong><p>'+_umatEsc(s.preview||'Resume chat')+'</p><small>'+_umatEsc(s.time_label||'')+'</small></button>';}).join('');
-  body.querySelectorAll('[data-sk]').forEach(function(b){b.addEventListener('click',function(){sessionKey=b.dataset.sk;courseId=parseInt(b.dataset.cid)||courseId;showCpPane('cp-chat');_umatAppendAi('cp-msgs','Session resumed. Ask a follow-up question to continue.',[]);});});
+  body.querySelectorAll('[data-sk]').forEach(function(b){b.addEventListener('click',function(){var sk=b.dataset.sk;var cid=parseInt(b.dataset.cid)||courseId;sessionKey=sk;courseId=cid;showCpPane('cp-chat');var msgs=document.getElementById('cp-msgs');if(!msgs)return;msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p><em>Loading conversation history\u2026</em></p></div></div></div>';require(['core/ajax'],function(A){A.call([{methodname:'local_umat_ai_get_chat_history',args:{courseid:cid,session_key:sk,limit:50}}])[0].done(function(r){msgs.innerHTML='';(r.messages||[]).forEach(function(msg){if(msg.question)_umatAppendUser('cp-msgs',msg.question);if(msg.answer)_umatAppendAi('cp-msgs',msg.answer,msg.sources||[]);});if(!(r.messages||[]).length){msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>Welcome back! This session had no previous messages. Ask me anything!</p></div></div></div>';}}).fail(function(){msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>Welcome back! Ready to continue.</p></div></div></div>';});});});});
 }
 function renderCpLectures(body){
   if(!courseId){var c=(userData&&userData.courses)||[];if(!c.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses found.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course to view recordings:</div><div style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+c.slice(0,12).map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';body.querySelectorAll('.umat-chip').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;renderCpFeature('lectures');});});return;}
@@ -221,161 +215,6 @@ function renderCpProgress(body){
   });
 }
 
-function renderCpGroupStudy(body, cid){
-  if(!cid){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">group</span><p>Open a course first to use Study Groups.</p></div>';return;}
-  body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading study groups\u2026</p></div>';
-  require(['local_umat_ai/group_study'],function(GS){
-    var html='<div class="umat-group-study-cp">'+
-      '<div style="margin-bottom:12px;">'+
-        '<input type="text" id="cp-group-name" class="form-control form-control-sm" placeholder="Group name\u2026" maxlength="255" style="width:100%;padding:7px;border:1px solid #dee5da;border-radius:8px;font-size:12px;margin-bottom:6px;box-sizing:border-box;">'+
-        '<textarea id="cp-group-desc" class="form-control form-control-sm" rows="2" placeholder="Description\u2026" maxlength="500" style="width:100%;padding:7px;border:1px solid #dee5da;border-radius:8px;font-size:12px;margin-bottom:6px;resize:none;box-sizing:border-box;"></textarea>'+
-        '<div style="display:flex;gap:6px;">'+
-          '<input type="number" id="cp-group-max" class="form-control form-control-sm" value="5" min="2" max="20" style="width:60px;padding:5px;border:1px solid #dee5da;border-radius:8px;font-size:12px;">'+
-          '<button class="umat-btn-p" id="cp-group-create" type="button" style="flex:1;justify-content:center;font-size:12px;padding:6px;"><span class="material-symbols-outlined" style="font-size:14px;">add</span>Create Group</button>'+
-        '</div>'+
-      '</div>'+
-      '<div id="cp-group-list"></div>'+
-      '<div id="cp-group-chat" style="display:none;"></div>'+
-    '</div>';
-    body.innerHTML=html;
-    document.getElementById('cp-group-create').addEventListener('click',function(){
-      var n=document.getElementById('cp-group-name').value.trim();
-      var d=document.getElementById('cp-group-desc').value.trim();
-      var m=parseInt(document.getElementById('cp-group-max').value)||5;
-      if(!n)return;
-      require(['core/ajax'],function(Ajax){
-        Ajax.call([{methodname:'local_umat_ai_create_study_group',args:{courseid:cid,name:n,description:d,max_members:m}}])[0]
-          .done(function(){document.getElementById('cp-group-name').value='';document.getElementById('cp-group-desc').value='';renderCpGroupStudy(body,cid);})
-          .fail(function(e){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to create group.</p></div>';});
-      });
-    });
-    refreshCpGroupList(body,cid);
-  });
-}
-
-function refreshCpGroupList(body,cid){
-  require(['core/ajax'],function(Ajax){
-    Ajax.call([{methodname:'local_umat_ai_get_study_groups',args:{courseid:cid}}])[0]
-      .done(function(groups){
-        var list=document.getElementById('cp-group-list');
-        if(!list)return;
-        var chat=document.getElementById('cp-group-chat');
-        if(!groups||!groups.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">group</span><p>No study groups yet. Create one above!</p></div>';return;}
-        list.innerHTML=groups.map(function(g){
-          var card='<div class="umat-cp-list-card" style="margin-bottom:6px;cursor:default;">'+
-            '<div style="float:right;">'+(g.member_count||0)+'/'+(g.max_members||5)+'</div>'+
-            '<strong style="font-size:13px;">'+_umatEsc(g.name)+'</strong>'+
-            (g.description?'<p style="font-size:11px;margin:2px 0 4px;">'+_umatEsc(g.description)+'</p>':'')+
-            '<div style="margin-top:6px;">';
-          if(g.is_member){
-            card+='<button class="umat-chip umat-group-open-btn" data-gid="'+g.id+'" data-gname="'+_umatEsc(g.name)+'" type="button" style="font-size:11px;">Open</button> '+
-              '<button class="umat-chip umat-group-leave-btn" data-gid="'+g.id+'" type="button" style="font-size:11px;">Leave</button>';
-          } else if(g.status==='open'&&g.member_count<g.max_members){
-            card+='<button class="umat-chip umat-group-join-btn" data-gid="'+g.id+'" type="button" style="font-size:11px;">Join</button>';
-          } else {
-            card+='<span style="font-size:11px;color:#999;">Full</span>';
-          }
-          card+='</div></div>';
-          return card;
-        }).join('');
-        list.querySelectorAll('.umat-group-join-btn').forEach(function(b){b.addEventListener('click',function(){
-          require(['core/ajax','core/notification'],function(Ajax,Notification){Ajax.call([{methodname:'local_umat_ai_join_study_group',args:{groupid:parseInt(b.dataset.gid)}}])[0].done(function(){refreshCpGroupList(body,cid);}).fail(function(e){Notification.error({message:'Failed to join group.'});});});
-        });});
-        list.querySelectorAll('.umat-group-leave-btn').forEach(function(b){b.addEventListener('click',function(){
-          require(['core/ajax','core/notification'],function(Ajax,Notification){Ajax.call([{methodname:'local_umat_ai_leave_study_group',args:{groupid:parseInt(b.dataset.gid)}}])[0].done(function(){refreshCpGroupList(body,cid);}).fail(function(e){Notification.error({message:'Failed to leave group.'});});});
-        });});
-        list.querySelectorAll('.umat-group-open-btn').forEach(function(b){b.addEventListener('click',function(){
-          var gid=parseInt(b.dataset.gid);
-          var gname=b.dataset.gname;
-          list.style.display='none';
-          chat.style.display='block';
-          chat.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading chat\u2026</p></div>';
-          var chatHtml='<div style="margin-bottom:8px;display:flex;align-items:center;gap:6px;">'+
-            '<button class="umat-chip" id="cp-group-back" type="button" style="font-size:11px;"><span class="material-symbols-outlined" style="font-size:14px;">arrow_back</span>Back</button>'+
-            '<strong style="font-size:13px;flex:1;">'+_umatEsc(gname)+'</strong></div>'+
-            '<div id="cp-group-msgs" style="max-height:300px;overflow-y:auto;margin-bottom:8px;"></div>'+
-            '<div style="display:flex;gap:4px;margin-bottom:6px;">'+
-              '<button class="umat-chip umat-group-mode-btn active" id="cp-group-chat-mode" type="button" style="font-size:10px;flex:1;"> Chat</button>'+
-              '<button class="umat-chip umat-group-mode-btn" id="cp-group-ai-mode" type="button" style="font-size:10px;flex:1;"> - Ask AI</button>'+
-            '</div>'+
-            '<div style="display:flex;gap:6px;"><textarea id="cp-group-q" class="form-control form-control-sm" rows="1" placeholder="Type a message\u2026" style="flex:1;padding:7px;border:1px solid #dee5da;border-radius:8px;font-size:12px;resize:none;"></textarea>'+
-            '<button class="umat-send-btn" id="cp-group-send" type="button" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:18px;">send</span></button></div>';
-          chat.innerHTML=chatHtml;
-          document.getElementById('cp-group-back').addEventListener('click',function(){chat.style.display='none';list.style.display='block';});
-          loadCpGroupMsgs(gid);
-          document.getElementById('cp-group-send').addEventListener('click',function(){sendCpGroupMsg(gid,body,cid);});
-          document.getElementById('cp-group-q').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendCpGroupMsg(gid,body,cid);}});
-          document.querySelectorAll('.umat-group-mode-btn').forEach(function(b){b.addEventListener('click',function(){
-            document.querySelectorAll('.umat-group-mode-btn').forEach(function(x){x.classList.remove('active');});
-            b.classList.add('active');
-            var input=document.getElementById('cp-group-q');
-            if(b.id==='cp-group-chat-mode'){input.placeholder='Type a message\u2026';}else{input.placeholder='Ask AI a question\u2026';}
-          });});
-        });});
-      })
-      .fail(function(){var list=document.getElementById('cp-group-list');if(list)list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load groups.</p></div>';});
-  });
-}
-
-function loadCpGroupMsgs(gid){
-  require(['core/ajax'],function(Ajax){
-    Ajax.call([{methodname:'local_umat_ai_get_group_messages',args:{groupid:gid}}])[0]
-      .done(function(msgs){
-        var c=document.getElementById('cp-group-msgs');
-        if(!c)return;
-        if(!msgs||!msgs.length){c.innerHTML='<div class="umat-empty" style="padding:12px;"><span class="material-symbols-outlined">chat</span><p>No messages yet. Send a chat or ask AI!</p></div>';return;}
-        c.innerHTML=msgs.map(function(m){
-          var t=_umatFmtTime(m.timecreated);
-          if(m.message){
-            return '<div class="umat-cp-list-card" style="margin-bottom:6px;padding:8px 10px;">'+
-              '<div style="font-size:10px;color:#999;margin-bottom:3px;display:flex;justify-content:space-between;">'+_umatEsc(m.fullname||'User')+'<span style="font-size:9px;color:#bbb;">'+t+'</span></div>'+
-              '<div style="font-size:12px;">'+_umatEsc(m.message)+'</div></div>';
-          }
-          return '<div class="umat-cp-list-card" style="margin-bottom:6px;padding:8px 10px;">'+
-            '<div style="font-size:10px;color:#999;margin-bottom:3px;display:flex;justify-content:space-between;">'+_umatEsc(m.fullname||'User')+'<span style="font-size:9px;color:#bbb;">'+t+'</span></div>'+
-            '<div style="font-size:12px;margin-bottom:3px;"><strong>Q:</strong> '+_umatEsc(m.question)+'</div>'+
-            (m.answer?'<div style="font-size:11px;padding-left:8px;border-left:2px solid #006b2f;"><strong>A:</strong> '+_umatEsc(m.answer)+'</div>':'')+
-          '</div>';
-        }).join('');
-        c.scrollTop=c.scrollHeight;
-      })
-      .fail(function(){});
-  });
-}
-
-function sendCpGroupMsg(gid,body,cid){
-  var input=document.getElementById('cp-group-q');
-  var text=input.value.trim();
-  if(!text)return;
-  input.value='';
-  var isChat=document.getElementById('cp-group-chat-mode').classList.contains('active');
-  var msgs=document.getElementById('cp-group-msgs');
-  require(['core/ajax'],function(Ajax){
-    if(isChat){
-      if(msgs)msgs.innerHTML+='<div style="padding:8px 10px;margin-bottom:6px;background:#d1fae5;border-radius:8px;font-size:12px;align-self:flex-end;"><strong>You:</strong> '+_umatEsc(text)+'</div>';
-      if(msgs)msgs.scrollTop=msgs.scrollHeight;
-      Ajax.call([{methodname:'local_umat_ai_send_group_message',args:{groupid:gid,message:text}}])[0]
-        .done(function(){loadCpGroupMsgs(gid);})
-        .fail(function(){loadCpGroupMsgs(gid);});
-    } else {
-      if(msgs)msgs.innerHTML+='<div style="padding:8px 10px;margin-bottom:6px;background:#d1fae5;border-radius:8px;font-size:12px;"><strong>You (AI):</strong> '+_umatEsc(text)+'</div>';
-      if(msgs)msgs.scrollTop=msgs.scrollHeight;
-      Ajax.call([{methodname:'local_umat_ai_ask_question',args:{courseid:cid,question:text}}])[0]
-        .done(function(r){
-          var answer=r.success&&r.answer?r.answer:'Could not get answer.';
-          var sources=r.sources||[];
-          Ajax.call([{methodname:'local_umat_ai_send_group_message',args:{groupid:gid,question:text,answer:answer,sources:sources.join('\\n')}}])[0]
-            .done(function(){loadCpGroupMsgs(gid);})
-            .fail(function(){loadCpGroupMsgs(gid);});
-        })
-        .fail(function(){
-          Ajax.call([{methodname:'local_umat_ai_send_group_message',args:{groupid:gid,question:text,answer:'AI service unavailable.',sources:''}}])[0]
-            .always(function(){loadCpGroupMsgs(gid);});
-        });
-    }
-  });
-}
-
 /* ---- workspace tab switching ---- */
 function switchToTab(name){
   ov.querySelectorAll('[data-sb-tab]').forEach(function(b){b.classList.toggle('active',b.dataset.sbTab===name);});
@@ -387,8 +226,6 @@ function switchToTab(name){
   if(name==='sessions'   && !sessionsLoaded){ loadSessions();  sessionsLoaded=true; }
   if(name==='report-issue'){ if(!reportLoaded){ initReportIssueTab(); reportLoaded=true; }else loadMyIssues(); markResponsesRead(); pollUnreadCount(); }
   if(name==='my-progress' && !progLoaded){ initProgressTab(); progLoaded=true; }
-  if(name==='group-study' && !window._umatGroupLoaded){ window._umatGroupLoaded=true; initWsGroupStudy(courseId); }
-  if(name==='quiz-history'){ renderWsQuizHistory(); }
 }
 /* Select course: set context and switch to AI Tutor */
 function selectCourse(cid,cname){
@@ -483,10 +320,22 @@ function populateHomeTab(){
 }
 
 /* ---- AI TUTOR chat (streaming) ---- */
+function _detectTaskHint(q){
+  if(/practice.?question|quiz|test me|generate.?quiz|multiple.?choice/i.test(q)) return 'Generating quiz\u2026';
+  if(/summarize|summary|overview of|give me an? (overview|summary)/i.test(q)) return 'Summarizing content\u2026';
+  return null;
+}
 function sendQuestion(q, msgsId){
   q=(q||'').trim();if(!q)return;
   if(qRemaining()<=0){_umatAppendAi(msgsId,'Rate limit reached. Please wait a moment before asking again.',[]); return;}
   qTimes.push(Date.now());updateRate();
+  var replyTxt = (typeof _getReplyContext === 'function') ? _getReplyContext() : null;
+  if (replyTxt) {
+    q = '[Replying to: "' + replyTxt + '"] ' + q;
+    _clearReplyContext();
+    var rp = document.getElementById('umat-reply-preview');
+    if (rp) rp.remove();
+  }
   _umatAppendUser(msgsId,q);
   var tid='typ_'+Date.now();_umatShowTyping(msgsId,tid);
 
@@ -501,6 +350,7 @@ function sendQuestion(q, msgsId){
     session_key: sessionKey,
     material_ids: matIds,
     msgsId: msgsId,
+    statusText: _detectTaskHint(q),
     onMeta: function(meta){ syncRemaining(meta.remaining); updateRate(); markConn(true); },
     onQuizData: function(payload){
       try{
@@ -863,129 +713,6 @@ function _umatShowScore(){
   _umatUpdateQuizCard();
 }
 
-/* ---- Quiz History (renders in compact panel + workspace tab) ---- */
-function renderCpQuizHistory(body, cid){
-  if(!cid){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">quiz</span><p>Select a course first to view quiz history.</p></div>';return;}
-  body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading quiz history\u2026</p></div>';
-  require(['core/ajax'],function(Ajax){
-    Ajax.call([{methodname:'local_umat_ai_get_quiz_attempts',args:{courseid:cid,status:''}}])[0]
-      .done(function(r){
-        var attempts=r.attempts||[];
-        if(!attempts.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">quiz</span><p>No quiz attempts yet. Ask the AI tutor to create a practice quiz!</p></div>';return;}
-        body.innerHTML=attempts.slice(0,20).map(function(a){
-          var scoreStr=a.score!==null?a.score+'/'+a.total:'-/ '+a.total;
-          var statusLabel=a.status==='completed'?'Completed':'In Progress';
-          var statusCls=a.status==='completed'?'background:#dcfce7;color:#065f46;':'background:#fef3c7;color:#92400e;';
-          var d=new Date(a.timecreated*1000);
-          var dateStr=d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-          return '<button class="umat-cp-list-card as-btn" data-aid="'+a.attempt_id+'" type="button" style="text-align:left;">'+
-            '<div style="display:flex;justify-content:space-between;align-items:center;">'+
-            '<strong style="font-size:13px;">'+_umatEsc(a.quiz_title)+'</strong>'+
-            '<span style="font-size:10px;padding:1px 6px;border-radius:999px;'+statusCls+'font-weight:600;">'+statusLabel+'</span></div>'+
-            '<p style="font-size:11px;margin:3px 0 0;">'+scoreStr+' A &bullet; '+dateStr+'</p></button>';
-        }).join('');
-        body.querySelectorAll('[data-aid]').forEach(function(btn){
-          btn.addEventListener('click',function(){
-            var aid=parseInt(btn.dataset.aid);
-            loadQuizAttemptForReview(aid, body);
-          });
-        });
-      })
-      .fail(function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load quiz history.</p></div>';});
-  });
-}
-function renderWsQuizHistory(){
-  var list=document.getElementById('quiz-history-list');
-  if(!list)return;
-  list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading quiz history\u2026</p></div>';
-  if(!courseId){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>Select a course to view quiz history.</p></div>';return;}
-  require(['core/ajax'],function(Ajax){
-    Ajax.call([{methodname:'local_umat_ai_get_quiz_attempts',args:{courseid:courseId,status:''}}])[0]
-      .done(function(r){
-        var attempts=r.attempts||[];
-        if(!attempts.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">quiz</span><p>No quiz attempts yet. Ask the AI tutor to create a practice quiz!</p></div>';return;}
-        list.innerHTML='<div class="umat-quiz-history-grid" style="display:flex;flex-direction:column;gap:8px;">'+
-          attempts.map(function(a){
-            var scoreStr=a.score!==null?a.score+'/'+a.total:'-/ '+a.total;
-            var statusLabel=a.status==='completed'?'Completed':'In Progress';
-            var statusCls=a.status==='completed'?'background:#dcfce7;color:#065f46;':'background:#fef3c7;color:#92400e;';
-            var d=new Date(a.timecreated*1000);
-            var dateStr=d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-            return '<div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:14px;cursor:pointer;" data-aid="'+a.attempt_id+'">'+
-              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'+
-              '<strong style="font-size:14px;color:var(--u-head);">'+_umatEsc(a.quiz_title)+'</strong>'+
-              '<span style="font-size:10px;padding:2px 8px;border-radius:999px;'+statusCls+'font-weight:600;">'+statusLabel+'</span></div>'+
-              '<div style="font-size:12px;color:var(--u-onsv);">Score: <strong>'+scoreStr+'</strong> A &bullet; '+dateStr+'</div></div>';
-          }).join('')+'</div>';
-        list.querySelectorAll('[data-aid]').forEach(function(el){
-          el.addEventListener('click',function(){
-            var aid=parseInt(el.dataset.aid);
-            loadQuizAttemptForReview(aid, list);
-          });
-        });
-      })
-      .fail(function(){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load quiz history.</p></div>';});
-  });
-}
-function loadQuizAttemptForReview(aid, container){
-  require(['core/ajax'],function(Ajax){
-    Ajax.call([{methodname:'local_umat_ai_get_quiz_attempts',args:{courseid:0,status:'',attempt_id:aid}}])[0]
-      .done(function(attempt){
-        if(!attempt||!attempt.questions_json){container.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load quiz.</p></div>';return;}
-        var questions=JSON.parse(attempt.questions_json||'[]');
-        var answers=JSON.parse(attempt.answers_json||'{}');
-        var graded=JSON.parse(attempt.graded_json||'{}');
-        if(!questions.length){container.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Quiz data is empty.</p></div>';return;}
-        var html='<div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">'+
-          '<h3 style="margin:0;font-size:16px;">'+_umatEsc(attempt.quiz_title)+'</h3>'+
-          '<button class="umat-chip" id="quiz-review-back" type="button"><span class="material-symbols-outlined" style="font-size:14px;">arrow_back</span> Back</button></div>';
-        questions.forEach(function(q,i){
-          var ans=answers[i];
-          var g=graded[i];
-          var isGraded=g!==undefined;
-          var isCorrect=isGraded&&g.correct;
-          var statusIcon=isGraded?(isCorrect?'check_circle':'cancel'):'hourglass_empty';
-          var statusColor=isGraded?(isCorrect?'var(--u-sec)':'var(--u-ter)'):'var(--u-ol)';
-          var ansDisplay='';
-          if(q.type==='objective'){
-            var selOpt=ans!==undefined&&q.options&&q.options[ans];
-            ansDisplay='<div style="font-size:12px;color:var(--u-onsv);margin-top:4px;"><strong>Your answer:</strong> '+_umatEsc(selOpt||'Not answered')+'</div>'+
-              '<div style="font-size:12px;color:var(--u-sec);"><strong>Correct answer:</strong> '+_umatEsc(q.options[q.correct])+'</div>';
-          } else {
-            ansDisplay='<div style="font-size:12px;color:var(--u-onsv);margin-top:4px;"><strong>Your answer:</strong><br>'+_umatEsc(ans||'Not answered')+'</div>';
-          }
-          var expl=isGraded&&g.explanation?'<div style="font-size:11px;color:var(--u-onsv);margin-top:4px;padding:8px;background:var(--u-sflo);border-radius:6px;"><strong>Feedback:</strong> '+_umatEsc(g.explanation)+'</div>':'';
-          html+='<div style="background:var(--u-bg);border:1px solid var(--u-olv);border-radius:var(--u-r8);padding:12px;margin-bottom:8px;">'+
-            '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'+
-            '<div style="flex:1;"><strong style="font-size:13px;">Q'+(i+1)+':</strong> <span style="font-size:13px;">'+_umatEsc(q.question)+'</span></div>'+
-            '<span class="material-symbols-outlined" style="color:'+statusColor+';font-size:20px;">'+statusIcon+'</span></div>'+
-            ansDisplay+expl+'</div>';
-        });
-        html+='<button class="umat-btn-p" id="quiz-review-close" type="button" style="justify-content:center;margin-top:8px;"><span class="material-symbols-outlined">close</span>Close Review</button>';
-        container.innerHTML=html;
-        var backBtn=document.getElementById('quiz-review-back');
-        if(backBtn)backBtn.addEventListener('click',function(){renderWsQuizHistory();});
-        var closeBtn=document.getElementById('quiz-review-close');
-        if(closeBtn)closeBtn.addEventListener('click',function(){renderWsQuizHistory();});
-      })
-      .fail(function(){container.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load quiz details.</p></div>';});
-  });
-}
-  var pref=qz._pref||'ws';
-  var body=_umatQ(pref,'quiz-body');if(!body)body=document.createElement('div');
-  body.innerHTML='';
-  var total=qz.data.questions.length,correct=0;
-  Object.keys(qz.graded).forEach(function(k){if(qz.graded[k].correct)correct++;});
-  var score=_umatQ(pref,'quiz-score');if(score)score.style.display='flex';
-  var pct=total?Math.round(correct/total*100):0;
-  var num=_umatQ(pref,'quiz-score-num');if(num)num.textContent=correct+'/'+total;
-  var lbl=_umatQ(pref,'quiz-score-lbl');if(lbl)lbl.textContent=correct===total?'Perfect!':(pct>=70?'Great job!':'Keep practicing!');
-  var sub=_umatQ(pref,'quiz-score-sub');if(sub)sub.textContent=pct+'% accuracy';
-  var fill=_umatQ(pref,'quiz-score-fill');if(fill)fill.style.width=pct+'%';
-  var icon=_umatQ(pref,'quiz-score-icon');if(icon)icon.textContent=pct>=80?'emoji_events':(pct>=50?'sentiment_satisfied':'school');
-  _umatRenderCircle();
-  _umatUpdateQuizCard();
-}
 function _umatWireQuizBtns(pref){
   var back=_umatQ(pref,'quiz-back');if(back)back.addEventListener('click',_umatCloseQuiz);
   var close=_umatQ(pref,'quiz-close-pane');if(close)close.addEventListener('click',_umatCloseQuiz);
@@ -1083,6 +810,7 @@ function loadMyIssues(){
 
 /* voice */
 var wsMic=document.getElementById('ws-mic-btn');
+console.log('[umat] wsMic:',!!wsMic,'wsInput:',!!wsInput,'SR:',!!(window.SpeechRecognition||window.webkitSpeechRecognition));
 if(wsMic&&wsInput)_umatInitVoice(wsInput,wsMic);
 var cpMic=document.getElementById('cp-mic');
 if(cpMic&&cpInput)_umatInitVoice(cpInput,cpMic);
@@ -1792,149 +1520,6 @@ function initProgressTab(){
   });
 }
 
-function initWsGroupStudy(cid){
-  if(!cid){document.getElementById('ws-group-list').innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">group</span><p>No course selected.</p></div>';return;}
-  document.getElementById('ws-group-list').innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading study groups\u2026</p></div>';
-  document.getElementById('ws-group-create').addEventListener('click',function(){
-    var n=document.getElementById('ws-group-name').value.trim();
-    var d=document.getElementById('ws-group-desc').value.trim();
-    var m=parseInt(document.getElementById('ws-group-max').value)||5;
-    if(!n)return;
-    require(['core/ajax','core/notification'],function(Ajax,Notification){
-      Ajax.call([{methodname:'local_umat_ai_create_study_group',args:{courseid:cid,name:n,description:d,max_members:m}}])[0]
-        .done(function(){document.getElementById('ws-group-name').value='';document.getElementById('ws-group-desc').value='';refreshWsGroupList(cid);})
-        .fail(function(){Notification.error({message:'Failed to create group.'});});
-    });
-  });
-  refreshWsGroupList(cid);
-}
-
-function refreshWsGroupList(cid){
-  require(['core/ajax'],function(Ajax){
-    Ajax.call([{methodname:'local_umat_ai_get_study_groups',args:{courseid:cid}}])[0]
-      .done(function(groups){
-        var list=document.getElementById('ws-group-list');
-        if(!list)return;
-        var chat=document.getElementById('ws-group-chat');
-        if(chat)chat.style.display='none';
-        if(!groups||!groups.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">group</span><p>No study groups yet. Create one above!</p></div>';return;}
-        list.innerHTML=groups.map(function(g){
-          var card='<div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:14px;margin-bottom:10px;">'+
-            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'+
-              '<strong style="font-size:14px;color:var(--u-head);">'+_umatEsc(g.name)+'</strong>'+
-              '<span class="badge badge-'+ (g.status==='open'?'success':'secondary')+'">'+g.status+'</span>'+
-            '</div>'+
-            (g.description?'<p style="font-size:12px;color:#666;margin:4px 0 8px;">'+_umatEsc(g.description)+'</p>':'')+
-            '<div style="font-size:11px;color:#999;margin-bottom:8px;">'+(g.member_count||0)+'/'+(g.max_members||5)+' members</div>'+
-            '<div style="display:flex;gap:6px;">';
-          if(g.is_member){
-            card+='<button class="btn btn-primary btn-sm ws-group-open" data-gid="'+g.id+'" data-gname="'+_umatEsc(g.name)+'" type="button" style="font-size:12px;padding:4px 12px;">Open</button>'+
-              '<button class="btn btn-outline-secondary btn-sm ws-group-leave" data-gid="'+g.id+'" type="button" style="font-size:12px;padding:4px 12px;">Leave</button>';
-          } else if(g.status==='open'&&g.member_count<g.max_members){
-            card+='<button class="btn btn-success btn-sm ws-group-join" data-gid="'+g.id+'" type="button" style="font-size:12px;padding:4px 12px;">Join</button>';
-          } else {
-            card+='<span class="text-muted small">Full</span>';
-          }
-          card+='</div></div>';
-          return card;
-        }).join('');
-        list.querySelectorAll('.ws-group-join').forEach(function(b){b.addEventListener('click',function(){
-          require(['core/ajax','core/notification'],function(Ajax,Notification){Ajax.call([{methodname:'local_umat_ai_join_study_group',args:{groupid:parseInt(b.dataset.gid)}}])[0].done(function(){refreshWsGroupList(cid);}).fail(function(){Notification.error({message:'Failed to join.'});});});
-        });});
-        list.querySelectorAll('.ws-group-leave').forEach(function(b){b.addEventListener('click',function(){
-          require(['core/ajax','core/notification'],function(Ajax,Notification){Ajax.call([{methodname:'local_umat_ai_leave_study_group',args:{groupid:parseInt(b.dataset.gid)}}])[0].done(function(){refreshWsGroupList(cid);}).fail(function(){Notification.error({message:'Failed to leave.'});});});
-        });});
-        list.querySelectorAll('.ws-group-open').forEach(function(b){b.addEventListener('click',function(){
-          var gid=parseInt(b.dataset.gid),gname=b.dataset.gname;
-          list.style.display='none';
-          var chat=document.getElementById('ws-group-chat');
-          chat.style.display='block';
-          chat.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading chat\u2026</p></div>';
-          var h='<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--u-olv);">'+
-            '<button class="btn btn-outline-secondary btn-sm" id="ws-group-chat-back" type="button"><span class="material-symbols-outlined" style="font-size:16px;">arrow_back</span></button>'+
-            '<h4 style="margin:0;font-size:14px;font-weight:600;color:var(--u-p);flex:1;">'+_umatEsc(gname)+'</h4></div>'+
-            '<div id="ws-group-msgs" style="flex:1;overflow-y:auto;max-height:350px;margin-bottom:12px;"></div>'+
-            '<div style="display:flex;gap:6px;margin-bottom:6px;">'+
-              '<button class="umat-chip umat-group-mode-btn active" id="ws-group-chat-mode" type="button" style="font-size:11px;flex:1;"> Chat</button>'+
-              '<button class="umat-chip umat-group-mode-btn" id="ws-group-ai-mode" type="button" style="font-size:11px;flex:1;"> - Ask AI</button>'+
-            '</div>'+
-            '<div style="display:flex;gap:8px;"><textarea id="ws-group-q" class="form-control form-control-sm" rows="1" placeholder="Type a message\u2026" style="flex:1;padding:8px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:13px;resize:none;"></textarea>'+
-            '<button class="umat-send-btn" id="ws-group-send" type="button" style="width:40px;height:40px;"><span class="material-symbols-outlined" style="font-size:20px;">send</span></button></div>';
-          chat.innerHTML=h;
-          document.getElementById('ws-group-chat-back').addEventListener('click',function(){chat.style.display='none';list.style.display='block';});
-          loadWsGroupMsgs(gid);
-          document.getElementById('ws-group-send').addEventListener('click',function(){sendWsGroupMsg(gid,cid);});
-          document.getElementById('ws-group-q').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendWsGroupMsg(gid,cid);}});
-          document.querySelectorAll('.umat-group-mode-btn').forEach(function(b){b.addEventListener('click',function(){
-            document.querySelectorAll('.umat-group-mode-btn').forEach(function(x){x.classList.remove('active');});
-            b.classList.add('active');
-            var input=document.getElementById('ws-group-q');
-            if(b.id==='ws-group-chat-mode'){input.placeholder='Type a message\u2026';}else{input.placeholder='Ask AI a question\u2026';}
-          });});
-        });});
-      })
-      .fail(function(){document.getElementById('ws-group-list').innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load groups.</p></div>';});
-  });
-}
-
-function loadWsGroupMsgs(gid){
-  require(['core/ajax'],function(Ajax){
-    Ajax.call([{methodname:'local_umat_ai_get_group_messages',args:{groupid:gid}}])[0]
-      .done(function(msgs){
-        var c=document.getElementById('ws-group-msgs');
-        if(!c)return;
-        if(!msgs||!msgs.length){c.innerHTML='<div style="text-align:center;padding:20px;color:#999;font-size:13px;"><span class="material-symbols-outlined" style="font-size:36px;display:block;margin-bottom:8px;color:#dee5da;">chat</span>No messages yet. Send a chat or ask AI!</div>';return;}
-        c.innerHTML=msgs.map(function(m){
-          var t=_umatFmtTime(m.timecreated);
-          if(m.message){
-            return '<div style="background:white;border-radius:10px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--u-olv);">'+
-              '<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px;"><strong>'+_umatEsc(m.fullname||'User')+'</strong><span style="font-size:10px;color:#bbb;">'+t+'</span></div>'+
-              '<div style="font-size:13px;">'+_umatEsc(m.message)+'</div></div>';
-          }
-          return '<div style="background:white;border-radius:10px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--u-olv);">'+
-            '<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px;"><strong>'+_umatEsc(m.fullname||'User')+'</strong><span style="font-size:10px;color:#bbb;">'+t+'</span></div>'+
-            '<div style="font-size:13px;margin-bottom:4px;"><strong>Q:</strong> '+_umatEsc(m.question)+'</div>'+
-            (m.answer?'<div style="font-size:12px;padding-left:8px;border-left:2px solid var(--u-p);"><strong>A:</strong> '+_umatEsc(m.answer)+'</div>':'')+
-          '</div>';
-        }).join('');
-        c.scrollTop=c.scrollHeight;
-      });
-  });
-}
-
-function sendWsGroupMsg(gid,cid){
-  var input=document.getElementById('ws-group-q');
-  var text=input.value.trim();
-  if(!text)return;
-  input.value='';
-  var isChat=document.getElementById('ws-group-chat-mode').classList.contains('active');
-  var msgs=document.getElementById('ws-group-msgs');
-  require(['core/ajax'],function(Ajax){
-    if(isChat){
-      if(msgs)msgs.innerHTML+='<div style="padding:10px 12px;margin-bottom:8px;background:#d1fae5;border-radius:8px;font-size:13px;"><strong>You:</strong> '+_umatEsc(text)+'</div>';
-      if(msgs)msgs.scrollTop=msgs.scrollHeight;
-      Ajax.call([{methodname:'local_umat_ai_send_group_message',args:{groupid:gid,message:text}}])[0]
-        .done(function(){loadWsGroupMsgs(gid);})
-        .fail(function(){loadWsGroupMsgs(gid);});
-    } else {
-      if(msgs)msgs.innerHTML+='<div style="padding:10px 12px;margin-bottom:8px;background:#d1fae5;border-radius:8px;font-size:13px;"><strong>You (AI):</strong> '+_umatEsc(text)+'</div>';
-      if(msgs)msgs.scrollTop=msgs.scrollHeight;
-      Ajax.call([{methodname:'local_umat_ai_ask_question',args:{courseid:cid,question:text}}])[0]
-        .done(function(r){
-          var answer=r.success&&r.answer?r.answer:'Could not get answer.';
-          var sources=r.sources||[];
-          Ajax.call([{methodname:'local_umat_ai_send_group_message',args:{groupid:gid,question:text,answer:answer,sources:sources.join('\\n')}}])[0]
-            .done(function(){loadWsGroupMsgs(gid);})
-            .fail(function(){loadWsGroupMsgs(gid);});
-        })
-        .fail(function(){
-          Ajax.call([{methodname:'local_umat_ai_send_group_message',args:{groupid:gid,question:text,answer:'AI service unavailable.',sources:''}}])[0]
-            .always(function(){loadWsGroupMsgs(gid);});
-        });
-    }
-  });
-}
-
 function renderProgress(d){
   if(!d)return;
   /* KPI cards */
@@ -2038,6 +1623,126 @@ function pollUnreadCount(){
 window.addEventListener('beforeunload',function(){
   if(qz.active&&courseId&&qz.data){_umatSaveQuizState();}
 });
+
+/* ─── Message Nav Strip + Scroll-to-Bottom ─── */
+function _rebuildMsgNav(){
+  var nav=document.getElementById('ws-msg-nav');
+  var msgs=document.getElementById('ws-msgs');
+  if(!nav||!msgs)return;
+  var msgNodes=msgs.querySelectorAll(':scope > [data-msg-id]');
+  var count=msgNodes.length;
+  if(!count){nav.innerHTML='';return;}
+  var navH=nav.clientHeight-20;
+  if(navH<10)navH=100;
+  var step=navH/Math.max(count-1,1);
+  var html=[];
+  var activeMid=null;
+  var activeEl=msgs.querySelector('.umat-msg-ai.umat-msg-streaming')||msgs.querySelector('[data-msg-id].umat-msg-user:last-child');
+  if(!activeEl)activeEl=msgs.querySelector('[data-msg-id]:last-child');
+  if(activeEl)activeMid=activeEl.getAttribute('data-msg-id');
+  var sampledCount=Math.min(7,count);
+  var sampleInterval=Math.max(1,Math.floor((count-1)/(sampledCount-1||1)));
+  var activeIdx=-1;
+  msgNodes.forEach(function(m,i){
+    var mid=m.getAttribute('data-msg-id');
+    if(mid===activeMid)activeIdx=i;
+  });
+  if(activeIdx<0)activeIdx=count-1;
+  var sampleSet={};
+  for(var si=0;si<count;si+=sampleInterval)sampleSet[si]=true;
+  if(!sampleSet[activeIdx]&&activeIdx>=0)sampleSet[activeIdx]=true;
+  var sampleKeys=Object.keys(sampleSet).map(Number).sort(function(a,b){return a-b;});
+  while(sampleKeys.length>sampledCount+1){
+    var removed=false;
+    for(var sii=1;sii<sampleKeys.length-1;sii++){
+      if(sampleKeys[sii]!==activeIdx){sampleKeys.splice(sii,1);removed=true;break;}
+    }
+    if(!removed)break;
+  }
+  msgNodes.forEach(function(m,i){
+    var mid=m.getAttribute('data-msg-id');
+    var top=Math.round(i*step)+10;
+    var isActive=mid===activeMid;
+    var preview='';
+    var txt=(m.textContent||'').trim().replace(/\s+/g,' ');
+    preview=txt.substring(0,70)+(txt.length>70?'...':'');
+    var cls='umat-msg-nav-dash';
+    if(sampleSet[i])cls+=' sampled';
+    if(isActive)cls+=' active';
+    html.push('<div class="'+cls+'" data-target="'+mid+'" style="top:'+top+'px;">'+
+      '<div class="umat-msg-nav-dash-tip">'+_umatEsc(preview)+'</div></div>');
+  });
+  nav.innerHTML=html.join('');
+  nav.querySelectorAll('.umat-msg-nav-dash').forEach(function(d){
+    d.addEventListener('click',function(e){
+      e.stopPropagation();
+      var target=document.querySelector('[data-msg-id="'+d.getAttribute('data-target')+'"]');
+      if(target)target.scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  });
+}
+function _updateMsgNavActive(){
+  var msgs=document.getElementById('ws-msgs');
+  var nav=document.getElementById('ws-msg-nav');
+  if(!msgs||!nav)return;
+  var msgNodes=msgs.querySelectorAll(':scope > [data-msg-id]');
+  var scrollTop=msgs.scrollTop;
+  var clientH=msgs.clientHeight;
+  var bestIdx=-1,bestOverlap=0;
+  msgNodes.forEach(function(m,i){
+    var top=m.offsetTop-msgs.offsetTop;
+    var bot=top+m.offsetHeight;
+    var visTop=Math.max(top,scrollTop);
+    var visBot=Math.min(bot,scrollTop+clientH);
+    var overlap=Math.max(0,visBot-visTop);
+    if(overlap>bestOverlap){bestOverlap=overlap;bestIdx=i;}
+  });
+  if(bestIdx<0)return;
+  var dashes=nav.querySelectorAll('.umat-msg-nav-dash');
+  dashes.forEach(function(d,i){
+    d.classList.toggle('active',i===bestIdx);
+  });
+  if(dashes[bestIdx]){
+    var dTop=dashes[bestIdx].offsetTop;
+    var navMid=nav.clientHeight/2;
+    var dMid=dTop+6;
+    nav.scrollTop=dMid-navMid;
+  }
+}
+function _initMsgNav(){
+  var msgs=document.getElementById('ws-msgs');
+  var nav=document.getElementById('ws-msg-nav');
+  var scrollBtn=document.getElementById('ws-scroll-bottom');
+  if(!msgs||!nav||!scrollBtn)return;
+  _rebuildMsgNav();
+  var scrollTimer=null;
+  msgs.addEventListener('scroll',function(){
+    if(scrollTimer)clearTimeout(scrollTimer);
+    scrollTimer=setTimeout(function(){_updateMsgNavActive();},80);
+    var nearBottom=msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight<100;
+    scrollBtn.classList.toggle('visible',!nearBottom);
+  });
+  scrollBtn.addEventListener('click',function(){
+    msgs.scrollTo({top:msgs.scrollHeight,behavior:'smooth'});
+  });
+  var msgObserver=new MutationObserver(function(){
+    _rebuildMsgNav();
+    _updateMsgNavActive();
+    var nearBottom=msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight<100;
+    scrollBtn.classList.toggle('visible',!nearBottom);
+  });
+  msgObserver.observe(msgs,{childList:true,subtree:false});
+}
+/* Init nav on first AI tutor tab activation */
+var _origSwitchToTab=switchToTab;
+var _navInited=false;
+switchToTab=function(name){
+  if(name==='ai-tutor'&&!_navInited){
+    _navInited=true;
+    setTimeout(_initMsgNav,200);
+  }
+  _origSwitchToTab(name);
+};
 
 pollUnreadCount();
 var _stuBadgeTimer=setInterval(pollUnreadCount,30000);

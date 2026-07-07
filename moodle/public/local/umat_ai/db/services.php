@@ -77,47 +77,6 @@ $functions = [
         'description' => 'Trigger material analysis on AI service', 'type' => 'write', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
-    /* ---- Group Study ---- */
-    'local_umat_ai_get_study_groups' => [
-        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'get_study_groups',
-        'description' => 'List study groups for a course', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
-    ],
-    'local_umat_ai_create_study_group' => [
-        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'create_study_group',
-        'description' => 'Create a new study group', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:creategroup',
-    ],
-    'local_umat_ai_join_study_group' => [
-        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'join_study_group',
-        'description' => 'Join a study group', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
-    ],
-    'local_umat_ai_leave_study_group' => [
-        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'leave_study_group',
-        'description' => 'Leave a study group', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
-    ],
-    'local_umat_ai_get_group_members' => [
-        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'get_group_members',
-        'description' => 'Get members of a study group', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
-    ],
-    'local_umat_ai_get_group_messages' => [
-        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'get_group_messages',
-        'description' => 'Get shared messages in a study group', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
-    ],
-    'local_umat_ai_send_group_message' => [
-        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'send_group_message',
-        'description' => 'Post a shared AI Q&A to the group', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
-    ],
-    'local_umat_ai_delete_study_group' => [
-        'classname'   => '\local_umat_ai\external\group_study', 'methodname' => 'delete_study_group',
-        'description' => 'Delete a study group (owner only)', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:creategroup',
-    ],
 
     'local_umat_ai_service_status' => [
         'classname'   => '\local_umat_ai\external\service_status', 'methodname' => 'ping',

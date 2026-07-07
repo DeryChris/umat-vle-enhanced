@@ -4,6 +4,8 @@
 define([], function() {
     'use strict';
 
+    var _msgIdCounter = 0;
+
     // ─── HTML Escaping ─────────────────────────────── //
     function _umatEsc(s) {
         var d = document.createElement('div');
@@ -181,11 +183,57 @@ define([], function() {
     }
 
     // ─── Append user message bubble ────────────────── //
+    var _replyContext = null;
+
+    function _umatGetReplyText(el) {
+        var txt = '';
+        if (el.classList.contains('umat-bubble-user')) {
+            txt = el.textContent || '';
+        } else {
+            var content = el.querySelector('.umat-ai-content');
+            txt = content ? content.textContent : (el.textContent || '');
+        }
+        return txt.replace(/\s+/g, ' ').trim().substring(0, 200);
+    }
+
+    function _umatHandleReply(e) {
+        var btn = e.currentTarget;
+        var bubble = btn.closest('.umat-bubble-ai,.umat-bubble-user');
+        if (!bubble) return;
+        var txt = _umatGetReplyText(bubble);
+        if (!txt) return;
+        _replyContext = txt;
+        var prev = document.getElementById('umat-reply-preview');
+        if (prev) prev.remove();
+        var preview = document.createElement('div');
+        preview.id = 'umat-reply-preview';
+        preview.className = 'umat-reply-preview';
+        preview.innerHTML = '<span class="umat-reply-icon material-symbols-outlined">reply</span><span class="umat-reply-text">Replying to: ' + _umatEsc(txt) + '</span><button class="umat-reply-cancel" type="button">&times;</button>';
+        preview.querySelector('.umat-reply-cancel').addEventListener('click', function() {
+            _replyContext = null;
+            preview.remove();
+        });
+        var chatbar = bubble.closest('.umat-tab-pane,.umat-cp-pane') || document;
+        var cb = chatbar.querySelector ? chatbar.querySelector('.umat-chatbar') : null;
+        if (cb && cb.parentNode) {
+            cb.parentNode.insertBefore(preview, cb);
+        } else {
+            var msgs = document.getElementById(bubble.closest('[id$="msgs"]') ? bubble.closest('[id$="msgs"]').id : '');
+            if (msgs && msgs.parentNode) {
+                msgs.parentNode.insertBefore(preview, msgs.nextSibling);
+            }
+        }
+    }
+
     function _umatAppendUser(cid, q) {
         var c = document.getElementById(cid);
         if (!c) return;
         var d = document.createElement('div');
-        d.innerHTML = '<div class="umat-msg-user"><div class="umat-bubble-user"><p>' + _umatEsc(q) + '</p></div></div>';
+        var mid = 'msg_' + (++_msgIdCounter);
+        d.setAttribute('data-msg-id', mid);
+        d.setAttribute('data-msg-role', 'user');
+        d.innerHTML = '<div class="umat-msg-user"><div class="umat-bubble-user"><p>' + _umatEsc(q) + '</p><button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div></div>';
+        d.querySelector('.umat-reply-btn').addEventListener('click', _umatHandleReply);
         c.appendChild(d);
         c.scrollTop = c.scrollHeight;
     }
@@ -194,6 +242,7 @@ define([], function() {
     function _umatAppendAi(cid, t, s) {
         var c = document.getElementById(cid);
         if (!c) return;
+        t = (t || '').replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
         var src = '';
         if (s && s.length) {
             src = '<div class="umat-src-chips">' + s.map(function(x) {
@@ -201,7 +250,11 @@ define([], function() {
             }).join('') + '</div>';
         }
         var d = document.createElement('div');
-        d.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">' + _umatFormatAI(t) + '</div>' + src + '</div></div></div>';
+        var mid = 'msg_' + (++_msgIdCounter);
+        d.setAttribute('data-msg-id', mid);
+        d.setAttribute('data-msg-role', 'ai');
+        d.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">' + _umatFormatAI(t) + '</div>' + src + '<button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div></div></div>';
+        d.querySelector('.umat-reply-btn').addEventListener('click', _umatHandleReply);
         c.appendChild(d);
         c.scrollTop = c.scrollHeight;
     }
@@ -286,7 +339,7 @@ define([], function() {
     }
 
     // ─── Stream AI tutor response via SSE proxy ────── //
-    function _umatStreamChat(opts) {
+        function _umatStreamChat(opts) {
         var accumulated = '';
         var streamRow = null;
         var contentEl = null;
@@ -298,6 +351,10 @@ define([], function() {
         var doneReceived = false;
         var retries = 0;
         var maxRetries = 3;
+        var statusText = opts.statusText || null;
+        var statusPending = !!statusText && !opts._noStatus;
+        var statusEl = null;
+        var quizDataHandled = false;
 
         function doRetry() {
             if (doneReceived || retries >= maxRetries) return;
@@ -330,12 +387,24 @@ define([], function() {
             }
             streamRow = document.createElement('div');
             streamRow.className = 'umat-msg-ai umat-msg-streaming';
+            streamRow.setAttribute('data-msg-id', 'msg_' + (++_msgIdCounter));
+            streamRow.setAttribute('data-msg-role', 'ai');
+            var innerHtml;
+            if (statusPending) {
+                innerHtml = '<div class="umat-ai-stream-content" style="display:none"></div>'
+                    + '<div class="umat-status-text"><span class="umat-status-spinner"></span>' + _umatEsc(statusText) + '</div>';
+            } else {
+                innerHtml = '<div class="umat-ai-stream-content"></div>';
+            }
             streamRow.innerHTML = '<div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>'
                 + '<div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">' + _umatEsc(label) + '</div>'
-                + '<div class="umat-bubble-ai is-streaming"><div class="umat-ai-stream-content"></div></div></div></div>';
+                + '<div class="umat-bubble-ai is-streaming">' + innerHtml + '</div></div></div>';
             c.appendChild(streamRow);
             bubbleEl = streamRow.querySelector('.umat-bubble-ai');
             contentEl = streamRow.querySelector('.umat-ai-stream-content');
+            if (statusPending) {
+                statusEl = streamRow.querySelector('.umat-status-text');
+            }
             c.scrollTop = c.scrollHeight;
         }
 
@@ -365,6 +434,11 @@ define([], function() {
                 accumulated = payload.answer;
             }
             accumulated = accumulated.replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
+            if (statusPending && !quizDataHandled) {
+                if (statusEl) statusEl.style.display = 'none';
+                if (contentEl) contentEl.style.display = '';
+                statusPending = false;
+            }
             ensureBubble();
             renderContent();
             if (bubbleEl) {
@@ -396,8 +470,16 @@ define([], function() {
                 } else if (event === 'token') {
                     ensureBubble();
                     accumulated += payload.text || '';
-                    scheduleRender();
+                    if (!statusPending) {
+                        scheduleRender();
+                    }
                 } else if (event === 'quiz_data') {
+                    quizDataHandled = true;
+                    if (statusPending && statusEl) {
+                        statusEl.style.display = 'none';
+                        if (contentEl) contentEl.style.display = '';
+                        statusPending = false;
+                    }
                     if (typeof opts.onQuizData === 'function') opts.onQuizData(payload);
                     else if (typeof window._umatOnQuizData === 'function') window._umatOnQuizData(payload);
                     accumulated = accumulated.replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
@@ -870,6 +952,7 @@ define([], function() {
         // ─── Event binding ──────────────────────────── //
         ab.addEventListener('click', function() {
             d.classList.toggle('open');
+            console.log('[umat] drawer open:', d.classList.contains('open'));
             if (d.classList.contains('open')) {
                 loadMats();
                 setTimeout(function() {
@@ -1463,6 +1546,9 @@ define([], function() {
         _umatStreamChat: _umatStreamChat,
         _umatStreamInline: _umatStreamInline,
         _umatFormatAI: _umatFormatAI,
+        _umatHandleReply: _umatHandleReply,
+        _getReplyContext: function() { return _replyContext; },
+        _clearReplyContext: function() { _replyContext = null; },
 
         // Voice
         _umatInitVoice: _umatInitVoice,
