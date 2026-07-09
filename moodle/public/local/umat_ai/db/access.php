@@ -71,15 +71,4 @@ $capabilities = [
             'manager' => CAP_ALLOW,
         ],
     ],
-
-    // Create and manage study groups (all enrolled users).
-    'local/umat_ai:creategroup' => [
-        'captype'      => 'write',
-        'contextlevel' => CONTEXT_COURSE,
-        'archetypes'   => [
-            'student'        => CAP_ALLOW,
-            'editingteacher' => CAP_ALLOW,
-            'teacher'        => CAP_ALLOW,
-        ],
-    ],
 ];

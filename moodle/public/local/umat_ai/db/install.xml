@@ -354,65 +354,6 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="user_course_action" UNIQUE="false" FIELDS="userid,courseid,action_type,timecreated"/>
-=======
-    <TABLE NAME="umat_ai_group_study" COMMENT="Study group sessions for collaborative AI chat">
-      <FIELDS>
-        <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
-        <FIELD NAME="courseid"    TYPE="int"  LENGTH="10"  NOTNULL="true"/>
-        <FIELD NAME="name"        TYPE="char" LENGTH="255" NOTNULL="true"/>
-        <FIELD NAME="description" TYPE="text" NOTNULL="false"/>
-        <FIELD NAME="max_members" TYPE="int"  LENGTH="4"   NOTNULL="true" DEFAULT="5"/>
-        <FIELD NAME="status"      TYPE="char" LENGTH="20"  NOTNULL="true" DEFAULT="open"/>
-        <FIELD NAME="created_by"  TYPE="int"  LENGTH="10"  NOTNULL="true"/>
-        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
-        <FIELD NAME="timemodified" TYPE="int" LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
-      </FIELDS>
-      <KEYS>
-        <KEY NAME="primary"    TYPE="primary" FIELDS="id"/>
-        <KEY NAME="course_fk"  TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
-        <KEY NAME="creator_fk" TYPE="foreign" FIELDS="created_by" REFTABLE="user" REFFIELDS="id"/>
-      </KEYS>
-      <INDEXES>
-        <INDEX NAME="idx_gs_status" UNIQUE="false" FIELDS="courseid,status"/>
-      </INDEXES>
-    </TABLE>
-
-    <TABLE NAME="umat_ai_group_members" COMMENT="Membership in study groups">
-      <FIELDS>
-        <FIELD NAME="id"         TYPE="int"  LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
-        <FIELD NAME="groupid"    TYPE="int"  LENGTH="10" NOTNULL="true"/>
-        <FIELD NAME="userid"     TYPE="int"  LENGTH="10" NOTNULL="true"/>
-        <FIELD NAME="role"       TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="member"/>
-        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
-      </FIELDS>
-      <KEYS>
-        <KEY NAME="primary"   TYPE="primary" FIELDS="id"/>
-        <KEY NAME="group_fk"  TYPE="foreign" FIELDS="groupid" REFTABLE="umat_ai_group_study" REFFIELDS="id"/>
-        <KEY NAME="member_fk" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
-      </KEYS>
-      <INDEXES>
-        <INDEX NAME="idx_gm_user"  UNIQUE="false" FIELDS="userid,groupid"/>
-      </INDEXES>
-    </TABLE>
-
-    <TABLE NAME="umat_ai_group_messages" COMMENT="Group chat messages and shared AI Q&A">
-      <FIELDS>
-        <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
-        <FIELD NAME="groupid"     TYPE="int"  LENGTH="10"  NOTNULL="true"/>
-        <FIELD NAME="userid"      TYPE="int"  LENGTH="10"  NOTNULL="true"/>
-        <FIELD NAME="message"     TYPE="text" NOTNULL="false" COMMENT="Free-form chat text"/>
-        <FIELD NAME="question"    TYPE="text" NOTNULL="false" COMMENT="AI question (null for chat messages)"/>
-        <FIELD NAME="answer"      TYPE="text" NOTNULL="false" COMMENT="AI answer"/>
-        <FIELD NAME="sources"     TYPE="text" NOTNULL="false" COMMENT="AI source citations"/>
-        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
-      </FIELDS>
-      <KEYS>
-        <KEY NAME="primary"     TYPE="primary" FIELDS="id"/>
-        <KEY NAME="gmsg_group"  TYPE="foreign" FIELDS="groupid" REFTABLE="umat_ai_group_study" REFFIELDS="id"/>
-        <KEY NAME="gmsg_user"   TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
-      </KEYS>
-      <INDEXES>
-        <INDEX NAME="idx_gm_time"    UNIQUE="false" FIELDS="groupid,timecreated"/>
       </INDEXES>
     </TABLE>
 

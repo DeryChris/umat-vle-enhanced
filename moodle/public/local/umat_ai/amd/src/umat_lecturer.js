@@ -92,7 +92,6 @@ var fab=document.getElementById('lec-fab');
 var cpOv=document.getElementById('lec-cp-ov');
 var lecOv=document.getElementById('lec-ov');
 var cpClose=document.getElementById('lec-cp-close');
-var ovClose=document.getElementById('lec-ov-close');
 var expand=document.getElementById('lec-expand');
 var panelDataLoaded=false;
 function updateBodyLock(){document.body.classList.toggle('umat-body-lock',!(!document.querySelector('.umat-ov.open,.umat-cp-ov.open')));}
@@ -106,7 +105,6 @@ if(fab)fab.addEventListener('click',openPanel);
 if(cpClose)cpClose.addEventListener('click',closePanel);
 if(cpOv)cpOv.addEventListener('click',function(e){if(e.target===cpOv)closePanel();});
 if(expand)expand.addEventListener('click',openDash);
-if(ovClose)ovClose.addEventListener('click',closeDash);
 if(lecOv)lecOv.addEventListener('click',function(e){if(e.target===lecOv)closeDash();});
 var dashBtn=document.getElementById('lcp-dash-btn');if(dashBtn)dashBtn.addEventListener('click',openDash);
 var openDashBtn=document.getElementById('lcp-open-dash');if(openDashBtn)openDashBtn.addEventListener('click',openDash);
@@ -200,6 +198,7 @@ function switchPane(name){
   var pane=document.getElementById(name);if(pane)pane.classList.add('active');
   if(!lecLoaded[name]){lecLoaded[name]=true;loadPaneData(name);}
 }
+window.switchPane=switchPane;
 /* Handle data-lp clicks from compact panel ï¿½+' open full overlay */
 document.querySelectorAll('#lec-cp [data-lp^="lec-"]').forEach(function(b){
   b.addEventListener('click',function(){closePanel();openDash();switchPane(b.dataset.lp);});

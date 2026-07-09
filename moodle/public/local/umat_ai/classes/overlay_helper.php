@@ -53,7 +53,7 @@ HTML;
 /* Sidebar collapse/expand + body scroll lock on overlay open */
 (function(){var cb=document.getElementById('{$closeId}'),ov=document.getElementById('{$overlayId}'),sb=ov?ov.querySelector('.umat-sb'):null;if(cb&&sb)cb.addEventListener('click',function(){sb.classList.toggle('collapsed');});var eb=document.getElementById('{$closeId}-exp');if(eb&&sb)eb.addEventListener('click',function(){sb.classList.remove('collapsed');});if(ov){var mo=new MutationObserver(function(){document.body.classList.toggle('umat-body-lock',ov.classList.contains('open'));});mo.observe(ov,{attributes:true,attributeFilter:['class']});}})();
 /* Mobile nav: slide-to-hide + indicator pill */
-document.querySelectorAll('.umat-glass-tabs').forEach(function(nav){var pill=document.createElement('div');pill.className='umat-glass-pill';nav.appendChild(pill);function mv(){var a=nav.querySelector('.umat-glass-tab.active');if(!a)return;var nr=nav.getBoundingClientRect(),tr=a.getBoundingClientRect();pill.style.left=(tr.left-nr.left)+'px';pill.style.width=tr.width+'px';}mv();nav.addEventListener('click',function(e){if(e.target.closest('.umat-glass-tab'))setTimeout(mv,30);});var ly=0,ti=false;function os(){if(ti)return;ti=true;requestAnimationFrame(function(){var y=window.scrollY;if(y-ly>40)nav.classList.add('umat-navbar-hidden');else if(ly-y>10)nav.classList.remove('umat-navbar-hidden');ly=y;ti=false;});}window.addEventListener('scroll',os,{passive:true});window.addEventListener('resize',mv);});
+document.querySelectorAll('.umat-glass-tabs').forEach(function(nav){var pill=document.createElement('div');pill.className='umat-glass-pill';nav.appendChild(pill);function mv(){var a=nav.querySelector('.umat-glass-tab.active');if(!a)return;var nr=nav.getBoundingClientRect(),tr=a.getBoundingClientRect();pill.style.left=(tr.left-nr.left)+'px';pill.style.width=tr.width+'px';}mv();nav.addEventListener('click',function(e){if(e.target.closest('.umat-glass-tab'))setTimeout(mv,30);});window.addEventListener('resize',mv);});
 /* Thumbnail loader */
 window.loadYtThumbnails=window.loadYtThumbnails||function(g){if(!g)return;g.querySelectorAll('.yt-tile[data-url]').forEach(function(tile){var th=tile.querySelector('.yt-thumb');if(!th||th._td)return;th._td=1;var url=tile.dataset.url||'',mime=(tile.dataset.mime||'').toLowerCase();if(!url)return;if(mime.includes('image')){var img=document.createElement('img');img.className='yt-thumb-img';img.loading='lazy';img.src=url;th.appendChild(img);}else if(mime.includes('video')){var v=document.createElement('video');v.src=url;v.preload='metadata';v.muted=true;v.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:12px;';v.addEventListener('loadedmetadata',function(){v.currentTime=Math.min(2,v.duration*0.1);});v.addEventListener('seeked',function(){th.appendChild(v);});v.load();}else if(mime.includes('pdf')){var lo=document.createElement('div');lo.className='yt-thumb-loading';th.appendChild(lo);(function(){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';s.onload=function(){window.pdfjsLib&&(window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',pdfjsLib.getDocument(url).promise.then(function(p){return p.getPage(1);}).then(function(pg){var vp=pg.getViewport({scale:1}),sc=Math.min(th.offsetWidth/vp.width,th.offsetHeight/vp.height)||1,vp2=pg.getViewport({scale:sc}),c=document.createElement('canvas');c.className='yt-thumb-canvas';c.width=vp2.width;c.height=vp2.height;lo.remove();th.appendChild(c);pg.render({canvasContext:c.getContext('2d'),viewport:vp2});}).catch(function(){lo.remove();}));};document.head.appendChild(s);})();}else if(mime.includes('word')||mime.includes('document')||mime.includes('presentation')||mime.includes('powerpoint')||mime.includes('spreadsheet')||mime.includes('excel')){var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';for(var i=0;i<6;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl);}th.appendChild(dv);}});};
 new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.nodeType!==1)return;if(n.classList&&n.classList.contains('yt-grid'))window.loadYtThumbnails(n);var gs=n.querySelectorAll&&n.querySelectorAll('.yt-grid');if(gs&&gs.length)gs.forEach(function(g){window.loadYtThumbnails(g);});});});}).observe(document.body,{childList:true,subtree:true});
@@ -94,8 +94,6 @@ JS;
             ['id' => 'my-notes',  'icon' => 'note_add',      'label' => 'My Notes',  'active' => false],
             ['id' => 'my-progress','icon' => 'trending_up',  'label' => 'My Progress','active' => false],
             ['id' => 'sessions',   'icon' => 'chat_bubble',   'label' => 'Sessions',   'active' => false],
-            ['id' => 'quiz-history', 'icon' => 'quiz',        'label' => 'Quiz History','active' => false],
-            ['id' => 'group-study', 'icon' => 'group',       'label' => 'Study Group', 'active' => false],
             ['id' => 'report-issue', 'icon' => 'flag',       'label' => 'Report Issue','active' => false, 'badge' => 'responses'],
         ];
         $sidebar = self::sidebar_html($tabs, 'New Session', 'stu-ws-close');
@@ -111,8 +109,6 @@ JS;
             ['id' => 'my-notes', 'icon' => 'note_add',    'label' => 'Notes',    'active' => false],
             ['id' => 'my-progress','icon' => 'trending_up','label' => 'Progress','active' => false],
             ['id' => 'sessions',   'icon' => 'chat_bubble', 'label' => 'Sessions',  'active' => false],
-            ['id' => 'quiz-history','icon' => 'quiz',       'label' => 'Quizzes',   'active' => false],
-            ['id' => 'group-study','icon' => 'group',       'label' => 'Group',     'active' => false],
             ['id' => 'report-issue', 'icon' => 'flag',     'label' => 'Report',    'active' => false, 'badge' => 'responses'],
         ];
         $stuMobTabs = self::glassmorph_tab_bar($stuGlassTabs, 'sb-tab', 'stu-glass-tabs');
@@ -156,8 +152,6 @@ JS;
       <button class="umat-cp-feature-tab" data-cp-open="library" type="button"><span class="material-symbols-outlined">local_library</span><span>Library</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="my-progress" type="button"><span class="material-symbols-outlined">trending_up</span><span>Progress</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="sessions" type="button"><span class="material-symbols-outlined">chat_bubble</span><span>Sessions</span></button>
-      <button class="umat-cp-feature-tab" data-cp-open="quiz-history" type="button"><span class="material-symbols-outlined">quiz</span><span>Quizzes</span></button>
-      <button class="umat-cp-feature-tab" data-cp-open="group-study" type="button"><span class="material-symbols-outlined">group</span><span>Group</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="report-issue" type="button"><span class="material-symbols-outlined">flag</span><span>Report</span></button>
     </div>
     <div class="umat-cp-pane active" id="cp-chat">
@@ -194,12 +188,10 @@ JS;
           <button class="umat-quiz-close" id="cp-quiz-close-pane" type="button"><span class="material-symbols-outlined">chat</span>Back to Chat</button>
         </div>
       </div>
-      <div class="umat-input-area">
-        <div class="umat-chatbar">
-          <textarea id="cp-input" class="umat-chatbar-input" placeholder="Ask anything…" rows="1" maxlength="900"></textarea>
-          <button class="umat-chatbar-btn" id="cp-mic" type="button" title="Voice input"><span class="material-symbols-outlined">mic</span></button>
-          <button class="umat-chatbar-send" id="cp-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
-        </div>
+      <div class="umat-chatbar">
+        <textarea id="cp-input" class="umat-chatbar-input" placeholder="Ask anything…" rows="1" maxlength="900"></textarea>
+        <button class="umat-chatbar-btn" id="cp-mic" type="button" title="Voice input"><span class="material-symbols-outlined">mic</span></button>
+        <button class="umat-chatbar-send" id="cp-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
       </div>
     </div>
     <div class="umat-cp-pane" id="cp-notes">
@@ -303,17 +295,16 @@ JS;
       <div class="umat-content-hdr">
         <h2>AI Tutor</h2>
       </div>
-      <div style="display:flex;flex:1;overflow:hidden;">
-        <!-- Left: full-width chat -->
-        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
-          <div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-bottom:1px solid var(--u-olv);flex-shrink:0;" id="ws-chips">
+      <div style="display:flex;flex:1;overflow:hidden;position:relative;">
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;">
+          <div id="ws-chips">
             <button class="umat-chip" data-q="Explain the key concept discussed in the most recent lecture." type="button">Explain key concept</button>
             <button class="umat-chip" data-q="Can you compare this topic with what was covered earlier in the course?" type="button">Compare topics</button>
             <button class="umat-chip" data-q="Create a practice quiz on this week's material." type="button">Practice quiz</button>
             <button class="umat-chip" data-q="What are the most common exam questions for this topic?" type="button">Exam prep</button>
           </div>
           <div class="umat-msgs" id="ws-msgs">
-            <div class="umat-msg-ai">
+            <div class="umat-msg-ai" data-msg-id="msg_0" data-msg-role="ai">
               <div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>
               <div class="umat-msg-ai-wrap">
                 <div class="umat-msg-lbl">AI TUTOR</div>
@@ -321,40 +312,42 @@ JS;
               </div>
             </div>
           </div>
-          <div class="umat-input-area" style="position:relative;">
-            <div class="umat-attach-drawer umat-drawer-enhanced" id="ws-attach-drawer">
-              <div class="umat-drawer-hdr">
-                <div class="umat-drawer-hdr-left">
-                  <span class="material-symbols-outlined" style="font-size:17px;color:var(--u-p);">attach_file</span>
-                  <h4>Select Materials</h4>
-                  <span class="umat-drawer-count" id="ws-drawer-count">0 selected</span>
-                </div>
-                <div class="umat-drawer-hdr-actions">
-                  <button class="umat-drawer-clear-btn" id="ws-drawer-clear" type="button">Clear</button>
-                  <button class="umat-drawer-close-btn" id="ws-drawer-close" type="button"><span class="material-symbols-outlined">close</span></button>
-                </div>
+          <div class="umat-attach-drawer umat-drawer-enhanced" id="ws-attach-drawer">
+            <div class="umat-drawer-hdr">
+              <div class="umat-drawer-hdr-left">
+                <span class="material-symbols-outlined" style="font-size:17px;color:var(--u-p);">attach_file</span>
+                <h4>Select Materials</h4>
+                <span class="umat-drawer-count" id="ws-drawer-count">0 selected</span>
               </div>
-              <div class="umat-drawer-search-wrap">
-                <span class="material-symbols-outlined umat-drawer-search-icon">search</span>
-                <input type="text" id="ws-drawer-search" placeholder="Search materials…">
-              </div>
-              <div class="umat-drawer-cats" id="ws-drawer-cats"></div>
-              <div class="umat-drawer-recent" id="ws-drawer-recent"></div>
-              <div class="umat-drawer-list" id="ws-drawer-list"><div class="umat-drawer-loading"><div class="umat-vw-spinner"></div><span>Loading materials&hellip;</span></div></div>
-              <div class="umat-drawer-foot">
-                <span class="umat-drawer-foot-info">Select materials for AI</span>
-                <button class="umat-drawer-confirm" id="ws-drawer-confirm" type="button"><span class="material-symbols-outlined">check</span> Use Selected</button>
+              <div class="umat-drawer-hdr-actions">
+                <button class="umat-drawer-clear-btn" id="ws-drawer-clear" type="button">Clear</button>
+                <button class="umat-drawer-close-btn" id="ws-drawer-close" type="button"><span class="material-symbols-outlined">close</span></button>
               </div>
             </div>
-            <div class="umat-chatbar">
-              <button class="umat-chatbar-btn" id="ws-attach-btn" type="button"><span class="material-symbols-outlined">add</span></button>
-              <textarea id="ws-input" class="umat-chatbar-input" placeholder="Ask AI about this course…" rows="1" maxlength="900"></textarea>
-              <button class="umat-chatbar-btn" id="ws-mic-btn" type="button" title="Voice input"><span class="material-symbols-outlined">mic</span></button>
-              <button class="umat-chatbar-send" id="ws-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
+            <div class="umat-drawer-search-wrap">
+              <span class="material-symbols-outlined umat-drawer-search-icon">search</span>
+              <input type="text" id="ws-drawer-search" placeholder="Search materials…">
             </div>
-            <div class="umat-mat-bar" id="ws-mat-bar"></div>
+            <div class="umat-drawer-cats" id="ws-drawer-cats"></div>
+            <div class="umat-drawer-recent" id="ws-drawer-recent"></div>
+            <div class="umat-drawer-list" id="ws-drawer-list"><div class="umat-drawer-loading"><div class="umat-vw-spinner"></div><span>Loading materials&hellip;</span></div></div>
+            <div class="umat-drawer-foot">
+              <span class="umat-drawer-foot-info">Select materials for AI</span>
+              <button class="umat-drawer-confirm" id="ws-drawer-confirm" type="button"><span class="material-symbols-outlined">check</span> Use Selected</button>
+            </div>
           </div>
         </div>
+        <div class="umat-msg-nav" id="ws-msg-nav"></div>
+      </div>
+      <div class="umat-chat-overlay">
+        <button class="umat-scroll-bottom" id="ws-scroll-bottom" type="button"><span class="material-symbols-outlined">expand_more</span></button>
+        <div class="umat-chatbar">
+          <button class="umat-chatbar-btn" id="ws-attach-btn" type="button"><span class="material-symbols-outlined">add</span></button>
+          <textarea id="ws-input" class="umat-chatbar-input" placeholder="Ask AI about this course…" rows="1" maxlength="900"></textarea>
+          <button class="umat-chatbar-btn" id="ws-mic-btn" type="button" title="Voice input"><span class="material-symbols-outlined">mic</span></button>
+          <button class="umat-chatbar-send" id="ws-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
+        </div>
+        <div class="umat-mat-bar" id="ws-mat-bar"></div>
       </div>
       <!-- QUIZ PANE (overlays chat when active) -->
       <div class="umat-quiz-pane" id="ws-quiz-pane" style="display:none;">
@@ -434,17 +427,6 @@ JS;
       </div>
     </div>
 
-      <div class="umat-tab-pane" data-tab="quiz-history">
-        <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px;">quiz</span>Quiz History</h2>
-        </div>
-        <div class="umat-home-wrap">
-          <div id="quiz-history-list" class="umat-home-section">
-            <div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading quiz history\u2026</p></div>
-          </div>
-        </div>
-      </div>
-
       <!-- REPORT ISSUE TAB -->
     <div class="umat-tab-pane" data-tab="report-issue">
       <div class="umat-content-hdr">
@@ -490,30 +472,6 @@ JS;
             <div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No issues reported yet.</p></div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- STUDY GROUP TAB -->
-    <div class="umat-tab-pane" data-tab="group-study">
-      <div class="umat-content-hdr">
-        <h2><span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px;">group</span>Study Groups</h2>
-      </div>
-      <div class="umat-home-wrap" id="ws-group-wrap">
-        <div class="umat-home-section">
-          <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:16px;margin-bottom:16px;">
-            <div style="margin-bottom:10px;">
-              <input type="text" id="ws-group-name" class="form-control form-control-sm" placeholder="Group name\u2026" maxlength="255" style="width:100%;padding:8px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r8);background:var(--u-bg);font-size:13px;margin-bottom:6px;box-sizing:border-box;">
-              <textarea id="ws-group-desc" class="form-control form-control-sm" rows="2" placeholder="Description\u2026" maxlength="500" style="width:100%;padding:8px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r8);background:var(--u-bg);font-size:13px;margin-bottom:6px;resize:none;box-sizing:border-box;"></textarea>
-              <div style="display:flex;gap:8px;">
-                <input type="number" id="ws-group-max" class="form-control form-control-sm" value="5" min="2" max="20" style="width:70px;padding:6px 8px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:13px;">
-                <button class="umat-btn-p" id="ws-group-create" type="button" style="flex:1;justify-content:center;"><span class="material-symbols-outlined" style="font-size:16px;">add</span>Create Group</button>
-              </div>
-            </div>
-          </div>
-          <h3 style="display:flex;align-items:center;gap:6px;margin-bottom:12px;"><span class="material-symbols-outlined" style="font-size:18px;">group</span>Available Groups</h3>
-          <div id="ws-group-list"></div>
-        </div>
-        <div id="ws-group-chat" style="display:none;"></div>
       </div>
     </div>
 
@@ -681,11 +639,9 @@ HTML;
           </div>
         </div>
       </div>
-      <div class="umat-input-area">
-        <div class="umat-chatbar">
-          <textarea id="lcp-input" class="umat-chatbar-input" placeholder="Ask about your course…" rows="1" maxlength="700"></textarea>
-          <button class="umat-chatbar-send" id="lcp-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
-        </div>
+      <div class="umat-chatbar">
+        <textarea id="lcp-input" class="umat-chatbar-input" placeholder="Ask about your course…" rows="1" maxlength="700"></textarea>
+        <button class="umat-chatbar-send" id="lcp-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
       </div>
     </div>
     <div class="umat-cp-pane" id="lcp-feature">
@@ -900,11 +856,9 @@ HTML;
       <div class="umat-msgs umat-ai-glass-mini-msgs" id="lec-mini-msgs">
         <div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI ASSISTANT</div><div class="umat-bubble-ai"><p>Ask me about your course analytics, student patterns, or teaching recommendations.</p></div></div></div>
       </div>
-      <div class="umat-input-area">
-        <div class="umat-chatbar">
-          <textarea id="lec-mini-input" class="umat-chatbar-input" placeholder="Ask about analytics…" rows="1"></textarea>
-          <button class="umat-chatbar-send" id="lec-mini-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
-        </div>
+      <div class="umat-chatbar">
+        <textarea id="lec-mini-input" class="umat-chatbar-input" placeholder="Ask about analytics…" rows="1"></textarea>
+        <button class="umat-chatbar-send" id="lec-mini-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
       </div>
     </div>
   </div><!-- /ov-body -->
@@ -2425,50 +2379,52 @@ HTML;
             <option value="0">All Courses</option>
           </select>
         </div>
-        <div class="umat-msgs" id="hub-msgs">
-          <div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>
-            <div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div>
-              <div class="umat-bubble-ai"><p>Hello! I'm your cross-course AI tutor. Ask me anything about your engineering studies or campus inquiries. Select a course above to get course-specific answers! 🎓</p></div>
-              <div class="umat-chips-row">
-                <button class="umat-chip" data-q="What are the main differences between open-pit and underground mining?" type="button">Mining methods</button>
-                <button class="umat-chip" data-q="Explain the Mohr-Coulomb failure criterion." type="button">Rock mechanics</button>
-                <button class="umat-chip" data-q="How does electrical impedance affect circuit design?" type="button">Circuit theory</button>
+        <div style="display:flex;flex:1;overflow:hidden;">
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+            <div class="umat-msgs" id="hub-msgs">
+              <div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>
+                <div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div>
+                  <div class="umat-bubble-ai"><p>Hello! I'm your cross-course AI tutor. Ask me anything about your engineering studies or campus inquiries. Select a course above to get course-specific answers! 🎓</p></div>
+                  <div class="umat-chips-row">
+                    <button class="umat-chip" data-q="What are the main differences between open-pit and underground mining?" type="button">Mining methods</button>
+                    <button class="umat-chip" data-q="Explain the Mohr-Coulomb failure criterion." type="button">Rock mechanics</button>
+                    <button class="umat-chip" data-q="How does electrical impedance affect circuit design?" type="button">Circuit theory</button>
+                  </div>
+                </div>
               </div>
             </div>
+            <div class="umat-chatbar">
+              <button class="umat-chatbar-btn" id="hub-attach-btn" type="button"><span class="material-symbols-outlined">add</span></button>
+              <textarea id="hub-input" class="umat-chatbar-input" placeholder="Ask anything about your courses…" rows="1" maxlength="900"></textarea>
+              <button class="umat-chatbar-btn" id="hub-mic-btn" type="button" title="Voice input"><span class="material-symbols-outlined">mic</span></button>
+              <button class="umat-chatbar-send" id="hub-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
+            </div>
+            <div class="umat-mat-bar" id="hub-mat-bar"></div>
           </div>
         </div>
-        <div class="umat-input-area" style="position:relative;">
-          <div class="umat-attach-drawer umat-drawer-enhanced" id="hub-attach-drawer">
-            <div class="umat-drawer-hdr">
-              <div class="umat-drawer-hdr-left">
-                <span class="material-symbols-outlined" style="font-size:17px;color:var(--u-p);">attach_file</span>
-                <h4>Select Materials</h4>
-                <span class="umat-drawer-count" id="hub-drawer-count">0 selected</span>
-              </div>
-              <div class="umat-drawer-hdr-actions">
-                <button class="umat-drawer-clear-btn" id="hub-drawer-clear" type="button">Clear</button>
-                <button class="umat-drawer-close-btn" id="hub-drawer-close" type="button"><span class="material-symbols-outlined">close</span></button>
-              </div>
+        <div class="umat-attach-drawer umat-drawer-enhanced" id="hub-attach-drawer">
+          <div class="umat-drawer-hdr">
+            <div class="umat-drawer-hdr-left">
+              <span class="material-symbols-outlined" style="font-size:17px;color:var(--u-p);">attach_file</span>
+              <h4>Select Materials</h4>
+              <span class="umat-drawer-count" id="hub-drawer-count">0 selected</span>
             </div>
-            <div class="umat-drawer-search-wrap">
-              <span class="material-symbols-outlined umat-drawer-search-icon">search</span>
-              <input type="text" id="hub-drawer-search" placeholder="Search materials…">
-            </div>
-            <div class="umat-drawer-cats" id="hub-drawer-cats"></div>
-            <div class="umat-drawer-recent" id="hub-drawer-recent"></div>
-            <div class="umat-drawer-list" id="hub-drawer-list"><div class="umat-drawer-loading"><div class="umat-vw-spinner"></div><span>Select a course first.</span></div></div>
-            <div class="umat-drawer-foot">
-<span class="umat-drawer-foot-info">Select materials for AI</span>
-                <button class="umat-drawer-confirm" id="hub-drawer-confirm" type="button"><span class="material-symbols-outlined">check</span> Use Selected</button>
+            <div class="umat-drawer-hdr-actions">
+              <button class="umat-drawer-clear-btn" id="hub-drawer-clear" type="button">Clear</button>
+              <button class="umat-drawer-close-btn" id="hub-drawer-close" type="button"><span class="material-symbols-outlined">close</span></button>
             </div>
           </div>
-          <div class="umat-chatbar">
-            <button class="umat-chatbar-btn" id="hub-attach-btn" type="button"><span class="material-symbols-outlined">add</span></button>
-            <textarea id="hub-input" class="umat-chatbar-input" placeholder="Ask anything about your courses…" rows="1" maxlength="900"></textarea>
-            <button class="umat-chatbar-btn" id="hub-mic-btn" type="button" title="Voice input"><span class="material-symbols-outlined">mic</span></button>
-            <button class="umat-chatbar-send" id="hub-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
+          <div class="umat-drawer-search-wrap">
+            <span class="material-symbols-outlined umat-drawer-search-icon">search</span>
+            <input type="text" id="hub-drawer-search" placeholder="Search materials…">
           </div>
-          <div class="umat-mat-bar" id="hub-mat-bar"></div>
+          <div class="umat-drawer-cats" id="hub-drawer-cats"></div>
+          <div class="umat-drawer-recent" id="hub-drawer-recent"></div>
+          <div class="umat-drawer-list" id="hub-drawer-list"><div class="umat-drawer-loading"><div class="umat-vw-spinner"></div><span>Select a course first.</span></div></div>
+          <div class="umat-drawer-foot">
+            <span class="umat-drawer-foot-info">Select materials for AI</span>
+            <button class="umat-drawer-confirm" id="hub-drawer-confirm" type="button"><span class="material-symbols-outlined">check</span> Use Selected</button>
+          </div>
         </div>
       </div>
 
@@ -3639,7 +3595,7 @@ HTML;
         return '<script>'
             . 'M.util.js_pending("local_umat_ai/glassmorph_nav");'
             . 'M.util.js_pending("local_umat_ai/mobile_navbar");'
-            . '!function c(){typeof require===\'function\'?require(["local_umat_ai/glassmorph_nav","local_umat_ai/mobile_navbar"],function(gm,mn){gm.init();mn.init();M.util.js_complete("local_umat_ai/glassmorph_nav");M.util.js_complete("local_umat_ai/mobile_navbar");}):setTimeout(c,20);}();'
+            . '!function c(){typeof require===\'function\'?require(["local_umat_ai/glassmorph_nav","local_umat_ai/mobile_navbar"],function(gm,mn){try{gm&&gm.init&&gm.init();}catch(e){}try{mn&&mn.init&&mn.init();}catch(e){}M.util.js_complete("local_umat_ai/glassmorph_nav");M.util.js_complete("local_umat_ai/mobile_navbar");},function(){M.util.js_complete("local_umat_ai/glassmorph_nav");M.util.js_complete("local_umat_ai/mobile_navbar");}):setTimeout(c,20);}();'
             . '</script>';
     }
 }
