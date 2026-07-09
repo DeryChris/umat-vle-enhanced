@@ -162,9 +162,9 @@ class analysis extends \external_api {
         )->out(false);
 
         // Call AI service
-        $cfg = local_umat_ai_get_service_config();
-        $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($cfg['url'])]);
-        $client->setHeader(['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['token'], 'X-Request-Id: ' . local_umat_ai_request_id()]);
+        $cfg = \local_umat_ai_get_service_config();
+        $client = new \curl(['ignoresecurity' => \local_umat_ai_is_localhost($cfg['url'])]);
+        $client->setHeader(['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['token'], 'X-Request-Id: ' . \local_umat_ai_request_id()]);
         $client->setopt(['CURLOPT_TIMEOUT' => 120]);
 
         $payload = [

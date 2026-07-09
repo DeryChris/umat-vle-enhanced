@@ -172,7 +172,7 @@ function renderCpHome(body){
     '<div class="umat-cp-mini-card"><span class="material-symbols-outlined">history</span><strong>'+(d.week_sessions||0)+'</strong><small>sessions this week</small></div>'+
     '<div class="umat-cp-mini-card"><span class="material-symbols-outlined">menu_book</span><strong>'+courses.length+'</strong><small>courses</small></div>'+
     '<div class="umat-cp-mini-card"><span class="material-symbols-outlined">task_alt</span><strong>'+(d.goal_progress||0)+'%</strong><small>goal progress</small></div></div>'+
-    (sessions[0]?'<div class="umat-cp-list-card"><strong>Recent session</strong><p>'+_umatEsc(sessions[0].preview||'Continue your last chat')+'</p></div>':'');
+    (sessions[0]?'<div class="umat-cp-list-card"><strong>Recent session</strong><p>'+_umatEsc(_umatCleanPreview(sessions[0].preview,'Continue your last chat'))+'</p></div>':'');
 }
 function renderCpCourses(body){
   var courses=(userData&&userData.courses)||[];
@@ -183,8 +183,8 @@ function renderCpCourses(body){
 function renderCpSessions(body){
   var sessions=(userData&&userData.sessions)||[];
   if(!sessions.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">chat_bubble</span><p>No AI sessions yet.</p></div>';return;}
-  body.innerHTML=sessions.slice(0,10).map(function(s){return '<button class="umat-cp-list-card as-btn" data-sk="'+_umatEsc(s.session_key)+'" data-cid="'+(s.courseid||courseId)+'" type="button"><strong>'+_umatEsc(s.course_name||'AI Session')+'</strong><p>'+_umatEsc(s.preview||'Resume chat')+'</p><small>'+_umatEsc(s.time_label||'')+'</small></button>';}).join('');
-  body.querySelectorAll('[data-sk]').forEach(function(b){b.addEventListener('click',function(){var sk=b.dataset.sk;var cid=parseInt(b.dataset.cid)||courseId;sessionKey=sk;courseId=cid;showCpPane('cp-chat');var msgs=document.getElementById('cp-msgs');if(!msgs)return;msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p><em>Loading conversation history\u2026</em></p></div></div></div>';require(['core/ajax'],function(A){A.call([{methodname:'local_umat_ai_get_chat_history',args:{courseid:cid,session_key:sk,limit:50}}])[0].done(function(r){msgs.innerHTML='';(r.messages||[]).forEach(function(msg){if(msg.question)_umatAppendUser('cp-msgs',msg.question);if(msg.answer)_umatAppendAi('cp-msgs',msg.answer,msg.sources||[]);});if(!(r.messages||[]).length){msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>Welcome back! This session had no previous messages. Ask me anything!</p></div></div></div>';}}).fail(function(){msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>Welcome back! Ready to continue.</p></div></div></div>';});});});});
+  body.innerHTML=sessions.slice(0,10).map(function(s){return '<button class="umat-cp-list-card as-btn" data-sk="'+_umatEsc(s.session_key)+'" data-cid="'+(s.courseid||courseId)+'" type="button"><strong>'+_umatEsc(s.course_name||'AI Session')+'</strong><p>'+_umatEsc(_umatCleanPreview(s.preview,'Resume chat'))+'</p><small>'+_umatEsc(s.time_label||'')+'</small></button>';}).join('');
+  body.querySelectorAll('[data-sk]').forEach(function(b){b.addEventListener('click',function(){sessionKey=b.dataset.sk;courseId=parseInt(b.dataset.cid)||courseId;showCpPane('cp-chat');_umatAppendAi('cp-msgs','Session resumed. Ask a follow-up question to continue.',[]);});});
 }
 function renderCpLectures(body){
   if(!courseId){var c=(userData&&userData.courses)||[];if(!c.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses found.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course to view recordings:</div><div style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+c.slice(0,12).map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';body.querySelectorAll('.umat-chip').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;renderCpFeature('lectures');});});return;}
@@ -309,7 +309,7 @@ function populateHomeTab(){
       cont.innerHTML='<div class="umat-session-tile" id="ws-recent-sess-tile" data-sk="'+_umatEsc(s.session_key)+'" data-cid="'+((d.courses&&d.courses[0])?d.courses[0].id:courseId)+'" style="max-width:480px;">'
         +'<div class="umat-session-tile-hdr"><span class="umat-session-badge">'+_umatEsc(s.course_short||'')+'</span><span class="umat-session-time">'+_umatEsc(s.time_label)+'</span></div>'
         +'<h4>'+_umatEsc(s.course_name)+' AI Session</h4>'
-        +'<p>'+_umatEsc(s.preview)+'</p>'
+        +'<p>'+_umatEsc(_umatCleanPreview(s.preview))+'</p>'
         +'<div class="umat-session-tile-foot"><span class="umat-session-meta"><span class="material-symbols-outlined">chat</span>'+s.msg_count+' messages</span>'
         +'<button class="umat-resume-btn" data-sk="'+_umatEsc(s.session_key)+'" type="button">Resume' + '</button></div></div>';
       var tile=cont.querySelector('.umat-session-tile');
@@ -337,6 +337,8 @@ function sendQuestion(q, msgsId){
     if (rp) rp.remove();
   }
   _umatAppendUser(msgsId,q);
+  // Reset quiz state so a new quiz from this message doesn't collide with a previous one.
+  qz.answers={};qz.graded={};qz.idx=0;qz.active=false;qz.attempt_id=null;qz.data=null;
   var tid='typ_'+Date.now();_umatShowTyping(msgsId,tid);
 
   var contextQ=selectedMats.length>0?'[Referencing: '+selectedMats.map(function(m){return m.name;}).join(', ')+'] '+q:q;
@@ -422,9 +424,7 @@ function _umatProcessQuiz(data, containerId){
   }
   card.innerHTML=progHtml
     +'<div class="umat-quiz-card-info"><strong>'+_umatEsc(data.quiz.title||'Practice Quiz')+'</strong>'
-    +'<span>'+total+' questions \u00B7 '
-    +data.quiz.questions.filter(function(q){return q.type==='objective';}).length+' objective, '
-    +data.quiz.questions.filter(function(q){return q.type!=='objective';}).length+' theory'
+    +'<span>'+total+' questions</span>'
     +(hasProg?' \u00B7 <strong style="color:var(--u-p);">'+gradedCnt+'/'+total+' completed</strong>':'')
     +'</span></div>'
     +'<button class="umat-quiz-card-btn ws-start-quiz" type="button"><span class="material-symbols-outlined">'+(hasProg?'play_circle':'play_arrow')+'</span>'+(hasProg?'Continue Quiz':'Start Quiz')+'</button>';
@@ -444,12 +444,12 @@ function _umatOpenQuiz(containerId){
   var title=_umatQ(pref,'quiz-title');if(title)title.textContent=qz.data.title||'Practice Quiz';
   var total=_umatQ(pref,'quiz-total');if(total)total.textContent=qz.data.questions.length;
   qz._pref=pref;
-  // Find first unanswered question or continue from last
+  // Find first unanswered question or show score if all done
   var found=false;
   for(var i=0;i<qz.data.questions.length;i++){
     if(qz.graded[i]===undefined){qz.idx=i;found=true;break;}
   }
-  if(!found)qz.idx=qz.data.questions.length-1;
+  if(!found){_umatShowScore();return;}
   _umatRenderCircle();_umatRenderQuestion(qz.idx);
 }
 function _umatSaveQuizState(){
@@ -470,8 +470,11 @@ function _umatSaveQuizState(){
         score:allGraded?score:null,total:total,
         status:allGraded?'completed':'in_progress'
       }}])[0]
-      .done(function(r){qz.attempt_id=r.attempt_id;})
-      .fail(function(){});
+      .done(function(r){
+        qz.attempt_id=r.attempt_id;
+        if(allGraded)try{sessionStorage.removeItem('qz_state');}catch(e){}
+      })
+      .fail(function(e){console.error('Quiz save failed:',e);});
     });
   },800);
 }
@@ -571,7 +574,9 @@ function _umatRenderQuestion(idx){
     +'<span class="umat-quiz-nav-idx">'+(idx+1)+'/'+qz.data.questions.length+'</span>'
     +'<button class="umat-quiz-nav-btn" id="qz-next" type="button"'+(idx>=qz.data.questions.length-1?' disabled':'')+'>Next <span class="material-symbols-outlined">chevron_right</span></button>'
     +'</div>';
-  if(q.type==='objective'){
+  var isOptType=q.type==='objective'||q.type==='truefalse';
+  var isTextType=q.type==='fill_in'||q.type==='theoretical';
+  if(isOptType){
     var opts=(q.options||[]).map(function(o,i){
       var sel=qz.answers[idx]===i?' selected':'';
       var res='';
@@ -590,7 +595,6 @@ function _umatRenderQuestion(idx){
       +'<div class="umat-quiz-qhead">'+head+'</div>'
       +'<div class="umat-quiz-opts">'+opts+'</div>'
       +expl
-      +(graded?'':'')
       +'</div>'
       +navHtml;
     if(!graded){
@@ -598,14 +602,16 @@ function _umatRenderQuestion(idx){
         b.addEventListener('click',function(){_umatSelectOption(idx,parseInt(b.dataset.opt));});
       });
     }
-  } else {
+  } else if(isTextType){
     var val=qz.answers[idx]||'';
     var gradedInfo=graded?'<div class="umat-quiz-expl"><strong>Your answer:</strong> '+_umatEsc(qz.answers[idx])+'</div>':'';
     body.innerHTML='<div class="umat-quiz-qcard">'
       +'<div class="umat-quiz-qhead">'+head+'</div>'
       +(q.answer_hint?'<div class="umat-quiz-hint"><span class="material-symbols-outlined">lightbulb</span>'+_umatEsc(q.answer_hint)+'</div>':'')
       +(graded?'':('<textarea class="umat-quiz-ta" id="qz-ta" placeholder="Type your answer here\u2026" rows="4">'+_umatEsc(val)+'</textarea>'))
+      +(graded&&q.correct?'<div class="umat-quiz-expl"><strong>Expected answer:</strong> '+_umatEsc(q.correct)+'</div>':'')
       +gradedInfo
+      +(graded&&q.explanation?'<div class="umat-quiz-expl">'+_umatEsc(q.explanation)+'</div>':'')
       +(graded?'':('<div class="umat-quiz-actions"><button class="umat-quiz-submit" id="qz-submit" type="button">Submit Answer</button></div>'))
       +'</div>'
       +navHtml;
@@ -613,7 +619,7 @@ function _umatRenderQuestion(idx){
       var ta=document.getElementById('qz-ta');
       if(ta)ta.addEventListener('input',function(){qz.answers[idx]=ta.value;});
       var sub=document.getElementById('qz-submit');
-      if(sub)sub.addEventListener('click',function(){_umatGradeTheoretical(idx);});
+      if(sub)sub.addEventListener('click',function(){_umatGradeText(idx);});
     }
   }
   // Wire nav buttons
@@ -631,23 +637,33 @@ function _umatUpdateQuizCard(){
   var total=qz.data?qz.data.questions.length:0;
   var gradedCnt=Object.keys(qz.graded).length;
   var hasProg=gradedCnt>0;
+  var allDone=total>0&&gradedCnt===total;
+  var correct=0;
+  if(allDone){Object.keys(qz.graded).forEach(function(k){if(qz.graded[k].correct)correct++;});}
   var svg=card.querySelector('.umat-quiz-card-progress svg');
   if(svg){
     var r=16,circ=2*Math.PI*r,pct=total?Math.round(gradedCnt/total*100):0;
     var circles=svg.querySelectorAll('circle');
     if(circles.length>1)circles[1].setAttribute('stroke-dashoffset',circ-(pct/100*circ));
     var txt=svg.querySelector('text');
-    if(txt)txt.textContent=gradedCnt+'/'+total;
+    if(txt)txt.textContent=allDone?correct+'/'+total:gradedCnt+'/'+total;
   }
   var info=card.querySelector('.umat-quiz-card-info span');
   if(info){
     var base=total+' questions';
-    if(hasProg)base+=' \u00B7 <strong style="color:var(--u-p);">'+gradedCnt+'/'+total+' completed</strong>';
+    if(allDone){
+      base+=' \u00B7 <strong style="color:var(--u-sec);">\u2713 Completed</strong>'
+        +' \u00B7 <strong style="color:var(--u-p);">'+correct+'/'+total+'</strong>';
+    } else if(hasProg){
+      base+=' \u00B7 <strong style="color:var(--u-p);">'+gradedCnt+'/'+total+' completed</strong>';
+    }
     info.innerHTML=base;
   }
   var btn=card.querySelector('.umat-quiz-card-btn');
   if(btn){
-    btn.innerHTML='<span class="material-symbols-outlined">'+(hasProg?'play_circle':'play_arrow')+'</span>'+(hasProg?'Continue Quiz':'Start Quiz');
+    var label=allDone?'View Results':(hasProg?'Continue Quiz':'Start Quiz');
+    var icon=allDone?'rate_review':(hasProg?'play_circle':'play_arrow');
+    btn.innerHTML='<span class="material-symbols-outlined">'+icon+'</span>'+label;
   }
 }
 function _umatSelectOption(idx,optIdx){
@@ -658,43 +674,40 @@ function _umatSelectOption(idx,optIdx){
 }
 function _umatGradeObjective(idx){
   if(qz.graded[idx]!==undefined||qz.answers[idx]===undefined)return;
-  var q=qz.data.questions[idx];if(!q||q.type!=='objective')return;
+  var q=qz.data.questions[idx];if(!q)return;
+  if(q.type!=='objective'&&q.type!=='truefalse')return;
   var correct=qz.answers[idx]===q.correct;
   qz.graded[idx]={correct:correct,explanation:q.explanation||''};
   _umatRenderQuestion(idx);_umatSaveQuizState();
   var allGraded=qz.data.questions.every(function(_,i){return qz.graded[i]!==undefined;});
   if(allGraded){setTimeout(_umatShowScore,600);}
 }
-function _umatGradeTheoretical(idx){
+function _umatGradeText(idx){
   if(qz.graded[idx]!==undefined)return;
   var ans=(qz.answers[idx]||'').trim();if(!ans)return;
-  var pref=qz._pref||'ws';
-  var subBtn=_umatQ(pref,'submit-btn')||document.getElementById('qz-submit');
-  if(subBtn){subBtn.disabled=true;subBtn.textContent='Grading\u2026';}
-  var q=qz.data.questions[idx];
-  require(['core/ajax'],function(Ajax){
-    Ajax.call([{methodname:'local_umat_ai_grade_theory_answer',args:{
-      courseid:courseId,
-      question_text:q.question,
-      answer_hint:q.answer_hint||'',
-      student_answer:ans
-    }}])[0]
-    .done(function(result){
-      qz.graded[idx]={correct:!!result.correct,explanation:result.explanation||'Answer graded.',score:result.score||0};
-      _umatSaveQuizState();
-      _umatRenderQuestion(idx);
-      var allGraded=qz.data.questions.every(function(_,i){return qz.graded[i]!==undefined;});
-      if(allGraded){setTimeout(_umatShowScore,600);}
-    })
-    .fail(function(e){
-      var errMsg=(e&&(e.message||e.errorcode))||'Grading service unavailable. Try again.';
-      qz.graded[idx]={correct:false,explanation:errMsg,score:0};
-      _umatRenderQuestion(idx);
-    })
-    .always(function(){
-      if(subBtn){subBtn.disabled=false;subBtn.textContent='Submit Answer';}
-    });
-  });
+  var q=qz.data.questions[idx];if(!q)return;
+  if(q.type!=='fill_in'&&q.type!=='theoretical')return;
+  var expected=(q.correct||'').trim();
+  var correct=false;
+  var explanation=q.explanation||'';
+  if(!expected){
+    // No expected answer defined — accept any response as correct (backward compat)
+    correct=true;
+    explanation=explanation||'Answer submitted.';
+  } else {
+    var alts=expected.split('/').map(function(a){return a.trim().toLowerCase();});
+    var sl=ans.toLowerCase();
+    for(var ai=0;ai<alts.length;ai++){
+      if(sl===alts[ai]||sl.indexOf(alts[ai])!==-1||alts[ai].indexOf(sl)!==-1){
+        correct=true;break;
+      }
+    }
+    if(!explanation)explanation=correct?'Correct!':'Incorrect. Expected: '+_umatEsc(expected);
+  }
+  qz.graded[idx]={correct:correct,explanation:explanation,score:correct?100:0};
+  _umatRenderQuestion(idx);_umatSaveQuizState();
+  var allGraded=qz.data.questions.every(function(_,i){return qz.graded[i]!==undefined;});
+  if(allGraded){setTimeout(_umatShowScore,600);}
 }
 function _umatShowScore(){
   var pref=qz._pref||'ws';
@@ -711,6 +724,8 @@ function _umatShowScore(){
   var icon=_umatQ(pref,'quiz-score-icon');if(icon)icon.textContent=pct>=80?'emoji_events':(pct>=50?'sentiment_satisfied':'school');
   _umatRenderCircle();
   _umatUpdateQuizCard();
+  // Remove from sessionStorage so completed quiz doesn't restore on page load
+  try{sessionStorage.removeItem('qz_state');}catch(e){}
 }
 
 /* ---- Quiz History (renders in compact panel + workspace tab) ---- */
@@ -780,7 +795,8 @@ function renderWsQuizHistory(){
 function loadQuizAttemptForReview(aid, container){
   require(['core/ajax'],function(Ajax){
     Ajax.call([{methodname:'local_umat_ai_get_quiz_attempts',args:{courseid:0,status:'',attempt_id:aid}}])[0]
-      .done(function(attempt){
+      .done(function(r){
+        var attempt=r.attempts?r.attempts[0]:r;
         if(!attempt||!attempt.questions_json){container.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load quiz.</p></div>';return;}
         var questions=JSON.parse(attempt.questions_json||'[]');
         var answers=JSON.parse(attempt.answers_json||'{}');
@@ -797,12 +813,15 @@ function loadQuizAttemptForReview(aid, container){
           var statusIcon=isGraded?(isCorrect?'check_circle':'cancel'):'hourglass_empty';
           var statusColor=isGraded?(isCorrect?'var(--u-sec)':'var(--u-ter)'):'var(--u-ol)';
           var ansDisplay='';
-          if(q.type==='objective'){
+          var isOptType=q.type==='objective'||q.type==='truefalse';
+          var isTextType=q.type==='fill_in'||q.type==='theoretical';
+          if(isOptType){
             var selOpt=ans!==undefined&&q.options&&q.options[ans];
             ansDisplay='<div style="font-size:12px;color:var(--u-onsv);margin-top:4px;"><strong>Your answer:</strong> '+_umatEsc(selOpt||'Not answered')+'</div>'+
-              '<div style="font-size:12px;color:var(--u-sec);"><strong>Correct answer:</strong> '+_umatEsc(q.options[q.correct])+'</div>';
-          } else {
-            ansDisplay='<div style="font-size:12px;color:var(--u-onsv);margin-top:4px;"><strong>Your answer:</strong><br>'+_umatEsc(ans||'Not answered')+'</div>';
+              '<div style="font-size:12px;color:var(--u-sec);"><strong>Correct answer:</strong> '+_umatEsc(q.options&&q.options[q.correct]||q.correct)+'</div>';
+          } else if(isTextType){
+            ansDisplay='<div style="font-size:12px;color:var(--u-onsv);margin-top:4px;"><strong>Your answer:</strong><br>'+_umatEsc(ans||'Not answered')+'</div>'+
+              (q.correct?'<div style="font-size:12px;color:var(--u-sec);margin-top:4px;"><strong>Expected answer:</strong> '+_umatEsc(q.correct)+'</div>':'');
           }
           var expl=isGraded&&g.explanation?'<div style="font-size:11px;color:var(--u-onsv);margin-top:4px;padding:8px;background:var(--u-sflo);border-radius:6px;"><strong>Feedback:</strong> '+_umatEsc(g.explanation)+'</div>':'';
           html+='<div style="background:var(--u-bg);border:1px solid var(--u-olv);border-radius:var(--u-r8);padding:12px;margin-bottom:8px;">'+
@@ -818,7 +837,7 @@ function loadQuizAttemptForReview(aid, container){
         var closeBtn=document.getElementById('quiz-review-close');
         if(closeBtn)closeBtn.addEventListener('click',function(){renderWsQuizHistory();});
       })
-      .fail(function(){container.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load quiz details.</p></div>';});
+      .fail(function(e){console.error('Quiz review load failed:',e);container.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load quiz details.</p></div>';});
   });
 }
 function _umatWireQuizBtns(pref){
@@ -829,6 +848,10 @@ function _umatWireQuizBtns(pref){
     var score=_umatQ(pref,'quiz-score');if(score)score.style.display='none';
     _umatRenderQuestion(0);_umatUpdateQuizCard();
     try{sessionStorage.removeItem('qz_state');}catch(e){}
+  });
+  var review=_umatQ(pref,'quiz-review');if(review)review.addEventListener('click',function(){
+    var score=_umatQ(pref,'quiz-score');if(score)score.style.display='none';
+    _umatNavTo(0);
   });
 }
 _umatWireQuizBtns('ws');
@@ -998,7 +1021,7 @@ function loadSessions(){
     return'<div class="umat-session-tile" data-sk="'+_umatEsc(s.session_key)+'" data-cid="'+s.courseid+'">'
       +'<div class="umat-session-tile-hdr"><span class="umat-session-badge">'+_umatEsc(s.course_short||'')+'</span><span class="umat-session-time">'+_umatEsc(s.time_label)+'</span></div>'
       +'<h4>'+_umatEsc(s.course_name||'General Session')+'</h4>'
-      +'<p>'+_umatEsc(s.preview)+'</p>'
+      +'<p>'+_umatEsc(_umatCleanPreview(s.preview))+'</p>'
       +'<div class="umat-session-tile-foot"><span class="umat-session-meta"><span class="material-symbols-outlined">chat</span>'+s.msg_count+' messages</span>'
        +'<button class="umat-resume-btn" type="button">Resume' + '</button></div></div>';
   }).join('');
@@ -1497,6 +1520,23 @@ function togglePin(id){
     function(){}
   );
 }
+/* ---- Quiz JSON stripper (for session resume) ---- */
+function _umatStripQuizFromText(txt){
+  var m=txt.match(/\`\`\`(?:json)?\s*(\{[^`]*?"quiz"\s*:[^`]*?\})\s*\`\`\`/s);
+  if(!m)return{text:txt,quiz:null};
+  try{
+    var data=JSON.parse(m[1]);
+    if(data&&data.quiz&&data.quiz.questions&&data.quiz.questions.length){
+      return{text:txt.replace(m[0],'').trim(),quiz:{quiz:data.quiz}};
+    }
+  }catch(e){}
+  return{text:txt,quiz:null};
+}
+function _umatCleanPreview(txt,fallback){
+  if(!txt)return fallback||'';
+  var r=_umatStripQuizFromText(txt);
+  return r.text||fallback||'';
+}
 function doResumeSession(sk,cid){
   _clearNoteCtx();
   sessionKey=sk;
@@ -1510,12 +1550,19 @@ function doResumeSession(sk,cid){
       .done(function(r){
         msgs.innerHTML='';
         var msgsArr=r.messages||[];
+        var foundQuiz=null;
         msgsArr.forEach(function(msg){
           if(msg.question)_umatAppendUser('ws-msgs',msg.question);
-          if(msg.answer)_umatAppendAi('ws-msgs',msg.answer,msg.sources||[]);
+          if(msg.answer){
+            var stripped=_umatStripQuizFromText(msg.answer);
+            if(stripped.quiz)foundQuiz=stripped.quiz;
+            _umatAppendAi('ws-msgs',stripped.text,msg.sources||[]);
+          }
         });
         if(!msgsArr.length){
           msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>Welcome back! This session had no previous messages. Ask me anything!</p></div></div></div>';
+        } else if(foundQuiz){
+          _umatProcessQuiz(foundQuiz,'ws-msgs');
         } else {
           setTimeout(function(){_umatDetectQuiz('ws-msgs');},500);
         }

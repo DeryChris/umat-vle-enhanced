@@ -89,11 +89,11 @@ class admin_panel extends \external_api {
 
         switch ($action) {
             case 'clear_ai_cache':
-                $cfg = local_umat_ai_get_service_config();
-                $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($cfg['url'])]);
+                $cfg = \local_umat_ai_get_service_config();
+                $client = new \curl(['ignoresecurity' => \local_umat_ai_is_localhost($cfg['url'])]);
                 $client->setHeader([
                     'Authorization: Bearer ' . $cfg['token'],
-                    'X-Request-Id: ' . local_umat_ai_request_id(),
+                    'X-Request-Id: ' . \local_umat_ai_request_id(),
                 ]);
                 $client->post($cfg['url'] . '/api/v1/admin/clear-cache');
                 return ['status' => 'success', 'message' => 'AI semantic cache cleared.'];
@@ -137,11 +137,11 @@ class admin_panel extends \external_api {
         self::validate_context($context);
         require_capability('local/umat_ai:adminpanel', $context);
 
-        $cfg  = local_umat_ai_get_service_config();
-        $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($cfg['url'])]);
+        $cfg  = \local_umat_ai_get_service_config();
+        $client = new \curl(['ignoresecurity' => \local_umat_ai_is_localhost($cfg['url'])]);
         $client->setHeader([
             'Authorization: Bearer ' . $cfg['token'],
-            'X-Request-Id: ' . local_umat_ai_request_id(),
+            'X-Request-Id: ' . \local_umat_ai_request_id(),
         ]);
         $client->setopt(['CURLOPT_TIMEOUT' => 5, 'CURLOPT_CONNECTTIMEOUT' => 3]);
 

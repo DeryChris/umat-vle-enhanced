@@ -185,6 +185,7 @@ JS;
           <div class="umat-quiz-score-sub" id="cp-quiz-score-sub"></div>
           <div class="umat-quiz-score-bar"><div class="umat-quiz-score-fill" id="cp-quiz-score-fill"></div></div>
           <button class="umat-quiz-retry" id="cp-quiz-retry" type="button"><span class="material-symbols-outlined">refresh</span>Try Again</button>
+          <button class="umat-quiz-review" id="cp-quiz-review" type="button"><span class="material-symbols-outlined">rate_review</span>Review Answers</button>
           <button class="umat-quiz-close" id="cp-quiz-close-pane" type="button"><span class="material-symbols-outlined">chat</span>Back to Chat</button>
         </div>
       </div>
@@ -365,6 +366,7 @@ JS;
           <div class="umat-quiz-score-sub" id="ws-quiz-score-sub"></div>
           <div class="umat-quiz-score-bar"><div class="umat-quiz-score-fill" id="ws-quiz-score-fill"></div></div>
           <button class="umat-quiz-retry" id="ws-quiz-retry" type="button"><span class="material-symbols-outlined">refresh</span>Try Again</button>
+          <button class="umat-quiz-review" id="ws-quiz-review" type="button"><span class="material-symbols-outlined">rate_review</span>Review Answers</button>
           <button class="umat-quiz-close" id="ws-quiz-close-pane" type="button"><span class="material-symbols-outlined">chat</span>Back to Chat</button>
         </div>
       </div>

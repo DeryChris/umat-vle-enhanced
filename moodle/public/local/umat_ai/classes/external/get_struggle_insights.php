@@ -960,8 +960,8 @@ class get_struggle_insights extends \external_api {
     if (!empty($cfg['token'])) {
         try {
             require_once($CFG->libdir . '/filelib.php');
-            $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($cfg['url'])]);
-            $client->setHeader(['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['token'], 'X-Request-Id: ' . local_umat_ai_request_id()]);
+            $client = new \curl(['ignoresecurity' => \local_umat_ai_is_localhost($cfg['url'])]);
+            $client->setHeader(['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['token'], 'X-Request-Id: ' . \local_umat_ai_request_id()]);
             $client->setopt(['CURLOPT_TIMEOUT' => 15]);
 
             // Collect questions for AI classification

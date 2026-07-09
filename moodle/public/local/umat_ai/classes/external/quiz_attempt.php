@@ -129,11 +129,16 @@ class quiz_attempt extends \external_api {
             'attempt_id' => $attempt_id,
         ]);
 
+        if ($params['courseid'] > 0) {
+            $context = \context_course::instance($params['courseid']);
+            self::validate_context($context);
+        } else {
+            self::validate_context(\context_system::instance());
+        }
+
         $conditions = ['userid' => $USER->id];
         if ($params['courseid'] > 0) {
             $conditions['courseid'] = $params['courseid'];
-            $context = \context_course::instance($params['courseid']);
-            self::validate_context($context);
         }
         if (!empty($params['status'])) {
             $conditions['status'] = $params['status'];
@@ -170,11 +175,6 @@ class quiz_attempt extends \external_api {
             ];
         }
 
-        // If single attempt requested, return it directly (not wrapped in array)
-        if ($params['attempt_id'] > 0 && !empty($attempts)) {
-            return $attempts[0];
-        }
-
         return ['attempts' => $attempts];
     }
 
@@ -190,7 +190,7 @@ class quiz_attempt extends \external_api {
                     'answers_json'   => new \external_value(PARAM_RAW),
                     'graded_json'    => new \external_value(PARAM_RAW),
                     'score'          => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
-                    'total'          => new \external_value(PARAM_INT),
+                    'total'          => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                     'question_count' => new \external_value(PARAM_INT),
                     'graded_count'   => new \external_value(PARAM_INT),
                     'status'         => new \external_value(PARAM_ALPHA),
@@ -322,7 +322,7 @@ class quiz_attempt extends \external_api {
                     'answers_json'   => new \external_value(PARAM_RAW),
                     'graded_json'    => new \external_value(PARAM_RAW),
                     'score'          => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
-                    'total'          => new \external_value(PARAM_INT),
+                    'total'          => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                     'question_count' => new \external_value(PARAM_INT),
                     'status'         => new \external_value(PARAM_ALPHA),
                     'timecreated'    => new \external_value(PARAM_INT),

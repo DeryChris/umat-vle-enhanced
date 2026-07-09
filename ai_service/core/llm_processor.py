@@ -157,13 +157,22 @@ CRITICAL — You MUST structure your response as follows:
 
 The quiz JSON must follow this exact schema:
 ```json
-{"quiz":{"title":"Practice Quiz: [Topic Name]","questions":[{"type":"objective","question":"Question text?","options":["Opt A","Opt B","Opt C","Opt D"],"correct":0,"explanation":"Why this is correct."},{"type":"theoretical","question":"Explain X in your own words.","answer_hint":"Key points: definition, example, importance"}]}}
+{"quiz":{"title":"Practice Quiz: [Topic Name]","questions":[
+  {"type":"objective","question":"Question text?","options":["Opt A","Opt B","Opt C","Opt D"],"correct":0,"explanation":"Why this is correct."},
+  {"type":"truefalse","question":"Statement is true or false?","options":["True","False"],"correct":0,"explanation":"Why this is the case."},
+  {"type":"fill_in","question":"The capital of Ghana is ___","correct":"Accra","explanation":"Accra is the capital city of Ghana."},
+  {"type":"theoretical","question":"Explain X in your own words.","correct":"Key points the answer should cover","answer_hint":"Hint to guide the student","explanation":"Full explanation of the correct answer."}
+]}}
 ```
 
 RULES:
-- Generate an appropriate number of questions (5 if the student did not specify). Mix objective (multiple-choice) and theoretical (explain/essay) questions.
-- Objective questions: exactly 4 options, `correct` is 0-based index of the right answer, include a one-sentence `explanation`.
-- Theoretical questions: include `answer_hint` with key points the answer should cover.
+- Generate an appropriate number of questions (5 if the student did not specify). Mix types for variety.
+- All question types are auto-graded instantly. Every question MUST include an `explanation` field.
+- `objective` (multiple choice): exactly 4 options, `correct` is 0-based index of the right answer.
+- `truefalse`: exactly 2 options ["True","False"], `correct` is 0 (True) or 1 (False).
+- `fill_in` (fill-in-the-blank): `correct` is the expected answer text. For multiple possible answers, separate with `/` (e.g. "Accra / Ghana / Africa").
+- `theoretical` (short essay): `correct` is the key points/concepts the answer should contain. `answer_hint` is a hint shown before answering.
+- All the above types are graded in-browser — no server call needed.
 - Vary difficulty: ~2 straightforward, ~2 moderate, ~1 challenging.
 - Only use information explicitly present in the COURSE CONTEXT.
 - Make distractors (wrong options) plausible but clearly incorrect based on the materials.

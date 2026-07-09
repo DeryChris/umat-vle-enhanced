@@ -896,9 +896,11 @@
 .umat-quiz-score-sub{font-size:14px;color:var(--u-ol);margin-top:2px;}
 .umat-quiz-score-bar{width:220px;height:6px;background:rgba(0,107,47,.1);border-radius:4px;overflow:hidden;margin:14px 0 20px;}
 .umat-quiz-score-fill{height:100%;background:linear-gradient(90deg,var(--u-p),#4ade80,#fbbf24);border-radius:4px;transition:width .8s cubic-bezier(.4,0,.2,1);width:0%;}
-.umat-quiz-retry,.umat-quiz-close{padding:10px 22px;border:none;border-radius:14px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .2s;}
+.umat-quiz-retry,.umat-quiz-review,.umat-quiz-close{padding:10px 22px;border:none;border-radius:14px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .2s;}
 .umat-quiz-retry{background:rgba(0,107,47,.1);color:var(--u-p);}
 .umat-quiz-retry:hover{background:rgba(0,107,47,.18);transform:translateY(-2px);}
+.umat-quiz-review{background:rgba(16,185,129,.1);color:var(--u-sec);}
+.umat-quiz-review:hover{background:rgba(16,185,129,.18);transform:translateY(-2px);}
 .umat-quiz-close{background:linear-gradient(135deg,var(--u-p),var(--u-pb));color:#fff;box-shadow:0 8px 22px rgba(0,107,47,.18);}
 .umat-quiz-close:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,107,47,.25);}
 .umat-quiz-nav{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding:0 4px;gap:8px;}
