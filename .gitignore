@@ -245,6 +245,7 @@ tests/api_keys.py
 # Sreenshots and media
 # ============================================================
 # docs/screenshots/
+docs/thesis documentation
 
 # LLM cache
-ai_service/.llm_cache/
+ai_service/.llm_cache

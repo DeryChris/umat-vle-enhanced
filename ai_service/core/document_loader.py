@@ -111,22 +111,30 @@ class DocumentLoader:
 
     def load_pptx(self, file_path: str) -> str:
         Presentation = _import_pptx()
-        prs = Presentation(file_path)
+        filename = Path(file_path).name
         parts = []
-        for i, slide in enumerate(prs.slides):
-            slide_texts = [f"--- Slide {i + 1} ---"]
-            for shape in slide.shapes:
-                if shape.has_text_frame:
-                    for para in shape.text_frame.paragraphs:
-                        t = para.text.strip()
-                        if t:
-                            slide_texts.append(t)
-                if shape.has_table:
-                    table = shape.table
-                    for row in table.rows:
-                        cells = [cell.text.strip() for cell in row.cells]
-                        slide_texts.append(" | ".join(cells))
-            parts.append("\n".join(slide_texts))
+        try:
+            prs = Presentation(file_path)
+            for i, slide in enumerate(prs.slides):
+                slide_texts = [f"--- Slide {i + 1} ---"]
+                for shape in slide.shapes:
+                    if shape.has_text_frame:
+                        for para in shape.text_frame.paragraphs:
+                            t = para.text.strip()
+                            if t:
+                                slide_texts.append(t)
+                    if shape.has_table:
+                        table = shape.table
+                        for row in table.rows:
+                            cells = [cell.text.strip() for cell in row.cells]
+                            slide_texts.append(" | ".join(cells))
+                parts.append("\n".join(slide_texts))
+        except Exception:
+            return f"[PowerPoint: {filename}]"
+
+        if not parts:
+            return f"[PowerPoint: {filename}]"
+
         return "\n\n".join(parts)
 
     def load_xlsx(self, file_path: str) -> str:

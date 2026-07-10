@@ -273,9 +273,19 @@ class get_struggle_dashboard_data extends \external_api {
         global $DB;
 
         $materials = $DB->get_records('umat_ai_materials', ['courseid' => $cid], '', 'id, filename');
-        $health = [];
+        $grouped = [];
 
         foreach ($materials as $mat) {
+            $fname = $mat->filename;
+            if (!isset($grouped[$fname])) {
+                $grouped[$fname] = [
+                    'pct_complete_sum'  => 0,
+                    'pct_questions_sum' => 0,
+                    'pct_correct_sum'   => 0,
+                    'count'             => 0,
+                ];
+            }
+
             // Completion % from material_progress
             $pctComplete = $DB->get_field_sql(
                 "SELECT AVG(progress_pct) FROM {umat_ai_material_progress}
@@ -300,11 +310,19 @@ class get_struggle_dashboard_data extends \external_api {
             );
             $pctCorrect = $avgRating !== false ? round((float)$avgRating * 20, 1) : 0.0;
 
+            $grouped[$fname]['pct_complete_sum']  += $pctComplete;
+            $grouped[$fname]['pct_questions_sum'] += round($qCount > 0 ? min(100, $qCount * 5) : 0, 1);
+            $grouped[$fname]['pct_correct_sum']   += $pctCorrect;
+            $grouped[$fname]['count']++;
+        }
+
+        $health = [];
+        foreach ($grouped as $fname => $g) {
             $health[] = [
-                'name'          => $mat->filename,
-                'pct_complete'  => $pctComplete,
-                'pct_questions' => round($qCount > 0 ? min(100, $qCount * 5) : 0, 1),
-                'pct_correct'   => $pctCorrect,
+                'name'          => $fname,
+                'pct_complete'  => round($g['pct_complete_sum'] / $g['count'], 1),
+                'pct_questions' => round($g['pct_questions_sum'] / $g['count'], 1),
+                'pct_correct'   => round($g['pct_correct_sum'] / $g['count'], 1),
             ];
         }
 

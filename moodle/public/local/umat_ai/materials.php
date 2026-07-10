@@ -32,82 +32,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_FILES['material'])) {
     $file = $_FILES['material'];
 
     if ($file['error'] === UPLOAD_ERR_OK) {
-        // Save to moodledata/ai_materials
-        $uploadDir = $CFG->dataroot . '/ai_materials/' . $courseid;
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
-        }
-
         $filename = basename($file['name']);
-        $filepath = $uploadDir . '/' . $filename;
 
-        if (move_uploaded_file($file['tmp_name'], $filepath)) {
-            // Record in database
-            global $DB;
+        // Save to a temp location for staging
+        $tempPath = make_temp_directory('ai_uploads') . '/' . uniqid() . '_' . $filename;
+        if (!move_uploaded_file($file['tmp_name'], $tempPath)) {
+            $error = "Failed to save uploaded file.";
+        } else {
+            global $DB, $CFG;
+            $fs = get_file_storage();
 
+            // Remove existing file with same name in the same area
+            $existing = $fs->get_file($context->id, 'local_umat_ai', 'materials', 0, '/', $filename);
+            if ($existing) {
+                $existing->delete();
+            }
+
+            // Import into Moodle File API so it appears in get_course_materials()
+            $filerecord = [
+                'contextid' => $context->id,
+                'component' => 'local_umat_ai',
+                'filearea'  => 'materials',
+                'itemid'    => 0,
+                'filepath'  => '/',
+                'filename'  => $filename,
+            ];
+            $stored = $fs->create_file_from_pathname($filerecord, $tempPath);
+
+            // Record in umat_ai_materials with real Moodle file ID
             $record = new stdClass();
-            $record->courseid = $courseid;
-            $record->fileid = 0;
-            $record->filename = $filename;
-            $record->is_indexed = 0;
+            $record->courseid    = $courseid;
+            $record->fileid      = $stored->get_id();
+            $record->filename    = $filename;
+            $record->is_indexed  = 0;
             $record->timecreated = time();
-
             $record->id = $DB->insert_record('umat_ai_materials', $record);
 
-            // Call AI service to index the file
+            // Send to AI service for indexing (CURLFile — same pattern as index_course_materials.php)
             $config = local_umat_ai_get_service_config();
-
-            // Build multipart request
-            $boundary = '----WebKitFormBoundary' . uniqid();
-            $body = '';
-
-            // Add form fields
-            $body .= "--$boundary\r\n";
-            $body .= 'Content-Disposition: form-data; name="course_id"' . "\r\n\r\n";
-            $body .= $courseid . "\r\n";
-
-            $body .= "--$boundary\r\n";
-            $body .= 'Content-Disposition: form-data; name="material_id"' . "\r\n\r\n";
-            $body .= $record->id . "\r\n";
-
-            $body .= "--$boundary\r\n";
-            $body .= 'Content-Disposition: form-data; name="filename"' . "\r\n\r\n";
-            $body .= $filename . "\r\n";
-
-            // Add file
-            $fileContent = file_get_contents($filepath);
-            $mimeType = mime_content_type($filepath);
-            $body .= "--$boundary\r\n";
-            $body .= 'Content-Disposition: form-data; name="file"; filename="' . $filename . '"' . "\r\n";
-            $body .= 'Content-Type: ' . $mimeType . "\r\n\r\n";
-            $body .= $fileContent . "\r\n";
-
-            $body .= "--$boundary--\r\n";
-
             $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($config['url'])]);
             $client->setHeader([
-                'Content-Type: multipart/form-data; boundary=' . $boundary,
                 'Authorization: Bearer ' . $config['token'],
                 'X-Request-Id: ' . local_umat_ai_request_id(),
             ]);
 
-            $response = $client->post($config['url'] . '/api/v1/materials/index', $body);
+            $payload = [
+                'course_id'    => (string)$courseid,
+                'material_id'  => (string)$stored->get_id(),
+                'filename'     => $filename,
+                'file'         => new \CURLFile($tempPath, mime_content_type($tempPath), $filename),
+            ];
+
+            $response = $client->post($config['url'] . '/api/v1/materials/index', $payload);
             $result = json_decode($response, true);
 
-            // Debug: log the response and show details
             error_log("Material indexing response: " . $response);
-            $debugInfo = "Response: " . substr($response, 0, 500);
 
             if (!empty($result['success'])) {
-                // Update indexed status
                 $record->is_indexed = 1;
                 $DB->update_record('umat_ai_materials', $record);
                 $message = "File uploaded and indexed successfully! " . ($result['message'] ?? '');
             } else {
                 $message = "File uploaded but indexing failed. Debug: " . substr($response, 0, 200);
             }
-        } else {
-            $error = "Failed to move uploaded file.";
+
+            // Clean up temp file
+            unlink($tempPath);
         }
     } else {
         $error = "Upload error: " . $file['error'];
@@ -122,7 +112,7 @@ echo $OUTPUT->header();
 ?>
 
 <h2>Upload Course Materials</h2>
-<p>Upload PDFs, documents, or text files to make them available for AI Q&A.</p>
+<p>Upload PDFs, documents, slides, or text files to make them available for AI Q&A.</p>
 
 <?php if ($message): ?>
 <div class="alert alert-success"><?php echo $message; ?></div>
@@ -134,8 +124,8 @@ echo $OUTPUT->header();
 
 <form method="post" enctype="multipart/form-data" class="mb-4">
     <div class="mb-3">
-        <label for="material" class="form-label">Select File (PDF, DOCX, TXT)</label>
-        <input type="file" name="material" id="material" class="form-control" accept=".pdf,.docx,.doc,.txt" required>
+        <label for="material" class="form-label">Select File (PDF, DOCX, PPTX, TXT)</label>
+        <input type="file" name="material" id="material" class="form-control" accept=".pdf,.docx,.doc,.pptx,.txt" required>
     </div>
     <button type="submit" class="btn btn-primary">Upload and Index</button>
 </form>
