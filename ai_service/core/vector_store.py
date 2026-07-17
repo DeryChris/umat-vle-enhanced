@@ -27,8 +27,10 @@ def get_chroma_client():
 
 
 def embed_texts(texts: List[str]) -> List[List[float]]:
-    """Direct API call for embeddings — provider chosen by LLM_PROVIDER."""
-    if settings.llm_provider == "openai":
+    """Direct API call for embeddings — provider chosen by LLM_PROVIDER.
+    OpenRouter does not support embeddings, so openrouter falls back to
+    text-embedding-3-small via OpenAI's embedding API (requires OPENAI_API_KEY)."""
+    if settings.llm_provider in ("openai", "openrouter"):
         return _embed_texts_openai(texts)
     return _embed_texts_gemini(texts)
 

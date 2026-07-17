@@ -28,8 +28,8 @@ from models.database import get_db, MaterialAnalysis
 from middleware.auth import verify_token
 from core.document_loader import DocumentLoader
 from core.audio_processor import AudioProcessor
+from core.llm_processor import _make_llm
 from config import get_settings
-from langchain_google_genai import ChatGoogleGenerativeAI
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["analysis"])
@@ -143,16 +143,8 @@ Return a structured JSON analysis addressing the user's request. Use these field
 """
 
 
-def _get_llm(temperature: float = 0.3):
-    return ChatGoogleGenerativeAI(
-        model=settings.llm_model,
-        google_api_key=settings.google_api_key,
-        temperature=temperature,
-    )
-
-
 def _invoke_llm(prompt: str, temperature: float = 0.3, max_chars: int = 50000) -> str:
-    llm = _get_llm(temperature)
+    llm = _make_llm(temperature)
     prompt = prompt[:max_chars]
     result = llm.invoke(prompt)
     return result.content.strip()

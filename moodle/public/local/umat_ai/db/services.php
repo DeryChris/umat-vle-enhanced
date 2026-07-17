@@ -54,8 +54,13 @@ $functions = [
     ],
     'local_umat_ai_get_ai_sessions' => [
         'classname'   => '\local_umat_ai\external\course_data', 'methodname' => 'get_ai_sessions',
-        'description' => 'Get AI chat sessions for a user', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => '',
+        'description' => 'Get AI chat sessions', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_delete_session' => [
+        'classname'   => '\local_umat_ai\external\delete_session', 'methodname' => 'delete_session',
+        'description' => 'Delete a single chat session by session_key', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
     'local_umat_ai_get_pending_outputs' => [
         'classname'   => '\local_umat_ai\external\course_data', 'methodname' => 'get_pending_outputs',

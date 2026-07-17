@@ -398,7 +398,7 @@
 .umat-chat-overlay>*{pointer-events:auto;width:min(795px,92%);}
 /* ==== CHATGPT-STYLE CHATBAR ==== */
 .umat-chatbar{display:flex;align-items:flex-end;gap:6px;padding:10px 14px;
-  background:var(--u-sflo,#fff);border:2px solid rgba(255,255,255,.55);border-radius:28px;
+  background:rgba(255,255,255,.78);border:2px solid rgba(255,255,255,.55);border-radius:28px;
   box-shadow:0 8px 40px rgba(0,0,0,.06);transition:border-color .2s,box-shadow .2s;
   margin:10px 0 12px;flex-shrink:0;position:relative;z-index:10;
   backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);}

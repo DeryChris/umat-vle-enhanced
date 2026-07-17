@@ -229,3 +229,9 @@ $string['intervention_encouragement'] = 'Encouragement';
 $string['intervention_meeting'] = 'Schedule 1:1';
 $string['intervention_remedial_quiz'] = 'Assign Remedial Quiz';
 $string['intervention_draft_placeholder'] = 'Draft your message…';
+
+/* ---- Session Management ---- */
+$string['delete_session'] = 'Delete session';
+$string['delete_session_confirm'] = 'Delete this conversation? This cannot be undone.';
+$string['delete_session_done'] = 'Session deleted.';
+$string['delete_session_error'] = 'Could not delete session. Please try again.';

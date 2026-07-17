@@ -183,8 +183,29 @@ function renderCpCourses(body){
 function renderCpSessions(body){
   var sessions=(userData&&userData.sessions)||[];
   if(!sessions.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">chat_bubble</span><p>No AI sessions yet.</p></div>';return;}
-  body.innerHTML=sessions.slice(0,10).map(function(s){return '<button class="umat-cp-list-card as-btn" data-sk="'+_umatEsc(s.session_key)+'" data-cid="'+(s.courseid||courseId)+'" type="button"><strong>'+_umatEsc(s.course_name||'AI Session')+'</strong><p>'+_umatEsc(_umatCleanPreview(s.preview,'Resume chat'))+'</p><small>'+_umatEsc(s.time_label||'')+'</small></button>';}).join('');
-  body.querySelectorAll('[data-sk]').forEach(function(b){b.addEventListener('click',function(){sessionKey=b.dataset.sk;courseId=parseInt(b.dataset.cid)||courseId;showCpPane('cp-chat');var msgs=document.getElementById('cp-msgs');if(!msgs)return;msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p><em>Loading conversation history\u2026</em></p></div></div></div>';require(['core/ajax'],function(A){A.call([{methodname:'local_umat_ai_get_chat_history',args:{courseid:courseId,session_key:sessionKey,limit:50}}])[0].done(function(r){msgs.innerHTML='';var foundQuiz=null;(r.messages||[]).forEach(function(msg){if(msg.question)_umatAppendUser('cp-msgs',msg.question);if(msg.answer){var stripped=_umatStripQuizFromText(msg.answer);if(stripped.quiz)foundQuiz=stripped.quiz;_umatAppendAi('cp-msgs',stripped.text,msg.sources||[]);}});if(!(r.messages||[]).length){msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>Welcome back! This session had no previous messages. Ask me anything!</p></div></div></div>';}else if(foundQuiz){_umatProcessQuiz(foundQuiz,'cp-msgs');}else{setTimeout(function(){_umatDetectQuiz('cp-msgs');},500);}}).fail(function(){msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>Welcome back! Ready to continue.</p></div></div></div>';});});});});
+  body.innerHTML=sessions.slice(0,10).map(function(s){return '<div class="umat-cp-list-card" data-sk="'+_umatEsc(s.session_key)+'" data-cid="'+(s.courseid||courseId)+'" style="cursor:pointer;display:flex;align-items:center;gap:8px;"><div style="flex:1;min-width:0;"><strong>'+_umatEsc(s.course_name||'AI Session')+'</strong><p>'+_umatEsc(_umatCleanPreview(s.preview,'Resume chat'))+'</p><small>'+_umatEsc(s.time_label||'')+'</small></div><button class="umat-cp-del-session" type="button" title="Delete session" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--u-ter);flex-shrink:0;"><span class="material-symbols-outlined" style="font-size:18px;">delete</span></button></div>';}).join('');
+  body.querySelectorAll('[data-sk]').forEach(function(tile){
+    tile.addEventListener('click',function(e){
+      if(e.target.closest('.umat-cp-del-session'))return;
+      sessionKey=tile.dataset.sk;courseId=parseInt(tile.dataset.cid)||courseId;showCpPane('cp-chat');var msgs=document.getElementById('cp-msgs');if(!msgs)return;msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p><em>Loading conversation history\u2026</em></p></div></div></div>';require(['core/ajax'],function(A){A.call([{methodname:'local_umat_ai_get_chat_history',args:{courseid:courseId,session_key:sessionKey,limit:50}}])[0].done(function(r){msgs.innerHTML='';var foundQuiz=null;(r.messages||[]).forEach(function(msg){if(msg.question)_umatAppendUser('cp-msgs',msg.question);if(msg.answer){var stripped=_umatStripQuizFromText(msg.answer);if(stripped.quiz)foundQuiz=stripped.quiz;_umatAppendAi('cp-msgs',stripped.text,msg.sources||[]);}});if(!(r.messages||[]).length){msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>Welcome back! This session had no previous messages. Ask me anything!</p></div></div></div>';}else if(foundQuiz){_umatProcessQuiz(foundQuiz,'cp-msgs');}else{setTimeout(function(){_umatDetectQuiz('cp-msgs');},500);}}).fail(function(){msgs.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><p>Welcome back! Ready to continue.</p></div></div></div>';});});});
+    });
+    tile.querySelector('.umat-cp-del-session').addEventListener('click',function(e){
+      e.stopPropagation();
+      if(!confirm('Delete this conversation? This cannot be undone.'))return;
+      var btn=e.currentTarget;
+      btn.disabled=true;btn.innerHTML='<span class="material-symbols-outlined" style="font-size:18px;">hourglass_empty</span>';
+      ajax('local_umat_ai_delete_session',{session_key:tile.dataset.sk},function(){
+        tile.remove();
+        if(!body.querySelector('[data-sk]')){
+          body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">chat_bubble</span><p>No AI sessions yet.</p></div>';
+        }
+      },function(){
+        btn.disabled=false;btn.innerHTML='<span class="material-symbols-outlined" style="font-size:18px;">delete</span>';
+        alert('Could not delete session. Please try again.');
+      });
+    });
+  });
+}
 }
 function renderCpLectures(body){
   if(!courseId){var c=(userData&&userData.courses)||[];if(!c.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses found.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course to view recordings:</div><div style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+c.slice(0,12).map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';body.querySelectorAll('.umat-chip').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;renderCpFeature('lectures');});});return;}
@@ -871,6 +892,28 @@ ov.addEventListener('click',function(e){
 var cpInput=document.getElementById('cp-input'),cpSend=document.getElementById('cp-send');
 if(cpSend)cpSend.addEventListener('click',function(){sendQuestion(cpInput.value,'cp-msgs');cpInput.value='';});
 if(cpInput)cpInput.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();cpSend.click();}});
+/* compact panel scroll-to-bottom */
+(function(){
+  var cpMsgs=document.getElementById('cp-msgs');
+  var cpScrollBtn=document.getElementById('cp-scroll-bottom');
+  if(!cpMsgs||!cpScrollBtn)return;
+  var timer=null;
+  cpMsgs.addEventListener('scroll',function(){
+    if(timer)clearTimeout(timer);
+    timer=setTimeout(function(){
+      var nearBottom=cpMsgs.scrollHeight-cpMsgs.scrollTop-cpMsgs.clientHeight<100;
+      cpScrollBtn.classList.toggle('visible',!nearBottom);
+    },80);
+  });
+  cpScrollBtn.addEventListener('click',function(){
+    cpMsgs.scrollTo({top:cpMsgs.scrollHeight,behavior:'smooth'});
+  });
+  var obs=new MutationObserver(function(){
+    var nearBottom=cpMsgs.scrollHeight-cpMsgs.scrollTop-cpMsgs.clientHeight<100;
+    cpScrollBtn.classList.toggle('visible',!nearBottom);
+  });
+  obs.observe(cpMsgs,{childList:true,subtree:false});
+})();
 
 /* ---- REPORT ISSUE ---- */
 function initReportIssueTab(){
@@ -1023,15 +1066,33 @@ function loadSessions(){
       +'<h4>'+_umatEsc(s.course_name||'General Session')+'</h4>'
       +'<p>'+_umatEsc(_umatCleanPreview(s.preview))+'</p>'
       +'<div class="umat-session-tile-foot"><span class="umat-session-meta"><span class="material-symbols-outlined">chat</span>'+s.msg_count+' messages</span>'
-       +'<button class="umat-resume-btn" type="button">Resume' + '</button></div></div>';
+       +'<button class="umat-resume-btn" type="button">Resume</button>'
+       +'<button class="umat-del-session-btn" type="button" title="Delete session"><span class="material-symbols-outlined">delete</span></button></div></div>';
   }).join('');
   list.querySelectorAll('.umat-session-tile').forEach(function(tile){
-    tile.addEventListener('click',function(){
+    tile.addEventListener('click',function(e){
+      if(e.target.closest('.umat-del-session-btn'))return;
       doResumeSession(tile.dataset.sk,tile.dataset.cid);
     });
     tile.querySelector('.umat-resume-btn').addEventListener('click',function(e){
       e.stopPropagation();
       doResumeSession(tile.dataset.sk,tile.dataset.cid);
+    });
+    tile.querySelector('.umat-del-session-btn').addEventListener('click',function(e){
+      e.stopPropagation();
+      if(!confirm('Delete this conversation? This cannot be undone.'))return;
+      var btn=e.currentTarget;
+      btn.disabled=true;btn.innerHTML='<span class="material-symbols-outlined">hourglass_empty</span>';
+      ajax('local_umat_ai_delete_session',{session_key:tile.dataset.sk},function(){
+        tile.remove();
+        var wsList=document.getElementById('ws-sessions-list');
+        if(wsList&&!wsList.querySelector('.umat-session-tile')){
+          wsList.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">chat_bubble</span><p>No AI chat sessions yet. Start one in the AI Tutor tab!</p></div>';
+        }
+      },function(){
+        btn.disabled=false;btn.innerHTML='<span class="material-symbols-outlined">delete</span>';
+        alert('Could not delete session. Please try again.');
+      });
     });
   });
 }

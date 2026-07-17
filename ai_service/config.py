@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     ai_service_host: str = "0.0.0.0"
     ai_service_port: int = 8000
 
-    # LLM provider: "gemini" or "openai".
+    # LLM provider: "gemini" or "openai" or "openrouter".
     # Each provider needs its own API key; only the selected one is required.
     llm_provider: str = "gemini"
 
@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_llm_model: str = "gpt-4o-mini"
     openai_embedding_model: str = "text-embedding-3-small"
+
+    # OpenRouter (used when llm_provider=openrouter)
+    # OpenRouter uses OpenAI-compatible API format — reuses ChatOpenAI with custom base_url.
+    # Embeddings fall back to text-embedding-3-small via OpenAI since OpenRouter
+    # does not support embedding endpoints.
+    openrouter_api_key: str = ""
+    openrouter_model: str = "meta-llama/llama-4-maverick"
+    openrouter_site_url: str = "https://umat.edu.gh"
+    openrouter_site_name: str = "UMaT AI VLE"
 
     # Database
     ai_db_host: str = "localhost"
@@ -93,14 +102,17 @@ def _fail_startup(lines: list) -> None:
 
 
 def _validate_provider(s: Settings) -> None:
-    if s.llm_provider not in ("gemini", "openai"):
-        _fail_startup([f"\nLLM_PROVIDER must be 'gemini' or 'openai', got: {s.llm_provider!r}"])
+    if s.llm_provider not in ("gemini", "openai", "openrouter"):
+        _fail_startup([f"\nLLM_PROVIDER must be 'gemini', 'openai', or 'openrouter', got: {s.llm_provider!r}"])
     if s.llm_provider == "gemini" and not s.google_api_key:
         _fail_startup(["\nLLM_PROVIDER is 'gemini' but GOOGLE_API_KEY is not set.",
-                       "Get a key at https://aistudio.google.com/apikey, or set LLM_PROVIDER=openai."])
+                       "Get a key at https://aistudio.google.com/apikey, or set LLM_PROVIDER=openai or openrouter."])
     if s.llm_provider == "openai" and not s.openai_api_key:
         _fail_startup(["\nLLM_PROVIDER is 'openai' but OPENAI_API_KEY is not set.",
-                       "Get a key at https://platform.openai.com/api-keys, or set LLM_PROVIDER=gemini."])
+                       "Get a key at https://platform.openai.com/api-keys, or set LLM_PROVIDER=gemini or openrouter."])
+    if s.llm_provider == "openrouter" and not s.openrouter_api_key:
+        _fail_startup(["\nLLM_PROVIDER is 'openrouter' but OPENAI_API_KEY is not set.",
+                       "Get your OpenRouter API key at https://openrouter.ai/keys."])
 
 
 @lru_cache()

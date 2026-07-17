@@ -155,7 +155,7 @@ JS;
       <button class="umat-cp-feature-tab" data-cp-open="report-issue" type="button"><span class="material-symbols-outlined">flag</span><span>Report</span></button>
     </div>
     <div class="umat-cp-pane active" id="cp-chat">
-      <div class="umat-msgs" id="cp-msgs">
+      <div class="umat-msgs" id="cp-msgs" style="padding-bottom:80px;">
         <div class="umat-msg-ai">
           <div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>
           <div class="umat-msg-ai-wrap">
@@ -189,10 +189,14 @@ JS;
           <button class="umat-quiz-close" id="cp-quiz-close-pane" type="button"><span class="material-symbols-outlined">chat</span>Back to Chat</button>
         </div>
       </div>
-      <div class="umat-chatbar">
-        <textarea id="cp-input" class="umat-chatbar-input" placeholder="Ask anything…" rows="1" maxlength="900"></textarea>
-        <button class="umat-chatbar-btn" id="cp-mic" type="button" title="Voice input"><span class="material-symbols-outlined">mic</span></button>
-        <button class="umat-chatbar-send" id="cp-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
+      <div class="umat-chat-overlay">
+        <button class="umat-scroll-bottom" id="cp-scroll-bottom" type="button"><span class="material-symbols-outlined">expand_more</span></button>
+        <div class="umat-chatbar">
+          <textarea id="cp-input" class="umat-chatbar-input" placeholder="Ask anything…" rows="1" maxlength="900"></textarea>
+          <button class="umat-chatbar-btn" id="cp-mic" type="button" title="Voice input"><span class="material-symbols-outlined">mic</span></button>
+          <button class="umat-chatbar-send" id="cp-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
+        </div>
+        <div class="umat-mat-bar" id="cp-mat-bar"></div>
       </div>
     </div>
     <div class="umat-cp-pane" id="cp-notes">

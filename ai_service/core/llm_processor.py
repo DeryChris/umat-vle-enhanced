@@ -16,12 +16,24 @@ _llm_cache = Cache(_cache_dir, size_limit=500 * 1024 * 1024)  # 500 MB limit.
 
 
 def _make_llm(temperature: float, generation_config: dict = None):
-    """Build a chat model for the configured provider (gemini or openai)."""
+    """Build a chat model for the configured provider (gemini, openai, or openrouter)."""
     if settings.llm_provider == "openai":
         from langchain_openai import ChatOpenAI
         return ChatOpenAI(
             model=settings.openai_llm_model,
             api_key=settings.openai_api_key,
+            temperature=temperature,
+        )
+    if settings.llm_provider == "openrouter":
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            model=settings.openrouter_model,
+            api_key=settings.openrouter_api_key,
+            base_url="https://openrouter.ai/api/v1",
+            default_headers={
+                "HTTP-Referer": settings.openrouter_site_url,
+                "X-Title": settings.openrouter_site_name,
+            },
             temperature=temperature,
         )
     kwargs = dict(
