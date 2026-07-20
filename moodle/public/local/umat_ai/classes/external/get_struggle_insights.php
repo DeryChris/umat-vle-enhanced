@@ -1161,11 +1161,440 @@ class get_struggle_insights extends \external_api {
     $totalEvents = array_sum($eventBreakdown);
 
     // ──────────────────────────────────────────────────────────────
-    // 12. Summary & return
+    // 12. Generate actionable insights (narrative cards)
+    // ──────────────────────────────────────────────────────────────
+
+    // -- 12a. Struggle area narratives (topic cards with stories) --
+    $struggleAreas = [];
+    $nowTs = time();
+    $recent14 = $nowTs - (14 * DAYSECS);
+    $older14 = $nowTs - (28 * DAYSECS);
+    $recent7 = $nowTs - (7 * DAYSECS);
+    $older7 = $nowTs - (14 * DAYSECS);
+
+    foreach ($topicMatrix as $tm) {
+        $stuPct = $enrolledCount > 0 ? round(($tm['student_count'] / $enrolledCount) * 100) : 0;
+        $score  = $tm['struggle_score'] ?? 0;
+
+        // Determine severity
+        if ($stuPct >= 50 || $score >= 70) {
+            $severity = 'critical';
+        } elseif ($stuPct >= 25 || $score >= 40) {
+            $severity = 'attention';
+        } else {
+            $severity = 'watch';
+        }
+
+        // Generate description from data
+        $descParts = [];
+        if ($tm['student_count'] > 0 && $enrolledCount > 0) {
+            $descParts[] = $tm['student_count'] . ' of ' . $enrolledCount . ' students (' . $stuPct . '%)';
+        }
+        // Find what they struggle with from sample questions
+        $sampleQ = $tm['sample_questions'] ?? [];
+        if (!empty($sampleQ)) {
+            $descParts[] = 'asking about: ' . $sampleQ[0];
+        }
+        $description = implode(' are struggling with this concept. They\'ve asked ', [
+            $tm['student_count'] . ' of ' . $enrolledCount . ' students (' . $stuPct . '%) are struggling',
+            $tm['question_count'] . ' questions'
+        ]);
+        if ($tm['trend'] === 'up' && $tm['trend_pct'] > 0) {
+            $description .= ' — up ' . $tm['trend_pct'] . '% from last week';
+        }
+        $description .= '.';
+
+        // Generate suggestion
+        $suggestion = self::generate_topic_suggestion($tm, $stuPct, $enrolledCount);
+
+        // Get sample questions from topic_matrix (may have been added by AI or bigram fallback)
+        $topicSampleQ = $tm['sample_questions'] ?? [];
+        // Also try to pull actual questions from logs for this topic
+        if (empty($topicSampleQ)) {
+            $topicSampleQ = self::get_sample_questions_for_topic($tm['topic'], $logs, 3);
+        }
+
+        // Compute avg quiz score for this topic (from student events)
+        $topicQuizScores = [];
+        foreach ($topicEvents as $evNorm => $evReasons) {
+            $topicNorm2 = strtolower(preg_replace('/[^a-z0-9\s]/', '', $tm['topic']));
+            if ($evNorm === $topicNorm2 || strpos($topicNorm2, $evNorm) !== false || strpos($evNorm, $topicNorm2) !== false) {
+                // We don't have per-topic quiz scores directly, but we have quiz_failures count
+            }
+        }
+
+        $struggleAreas[] = [
+            'topic'              => $tm['topic'],
+            'severity'           => $severity,
+            'student_count'      => $tm['student_count'],
+            'total_students'     => $enrolledCount,
+            'student_pct'        => $stuPct,
+            'question_count'     => $tm['question_count'],
+            'prev_question_count' => 0, // computed below
+            'trend'              => $tm['trend'],
+            'trend_pct'          => $tm['trend_pct'],
+            'struggle_score'     => $score,
+            'description'        => $description,
+            'sample_questions'   => array_slice($topicSampleQ, 0, 3),
+            'suggestion'         => $suggestion['text'],
+            'suggestion_type'    => $suggestion['type'],
+            'materials'          => array_map(function($m) {
+                return ['name' => $m['name'], 'question_count' => $m['question_count']];
+            }, array_slice($tm['materials'] ?? [], 0, 3)),
+            'affected_student_ids' => array_keys($topicStudents[strtolower($tm['topic'])] ?? []),
+        ];
+    }
+
+    // -- 12b. Section struggle breakdown --
+    $sectionStruggle = [];
+    foreach ($sectionList as $sec) {
+        $secQCnt = 0;
+        $secStuCnt = 0;
+        $secTopics = [];
+        foreach ($sec['materials'] as $mat) {
+            $secQCnt += $mat['question_count'];
+            foreach ($mat['key_concepts'] as $kc) {
+                $secTopics[$kc['concept']] = ($secTopics[$kc['concept']] ?? 0) + $kc['question_count'];
+            }
+        }
+        // Count unique students in this section's materials
+        foreach ($topicStudents as $lc => $stuMap) {
+            foreach ($sec['materials'] as $mat) {
+                $matId = $mat['id'];
+                if (isset($topicMaterials[$lc][$matId])) {
+                    $secStuCnt = max($secStuCnt, count($stuMap));
+                }
+            }
+        }
+        arsort($secTopics);
+        $topTopics = array_slice(array_keys($secTopics), 0, 3);
+
+        $secPct = $enrolledCount > 0 ? round(($secStuCnt / $enrolledCount) * 100) : 0;
+        $secSeverity = $secPct >= 50 ? 'critical' : ($secPct >= 25 ? 'attention' : 'watch');
+
+        $hint = '';
+        if ($secSeverity === 'critical') {
+            $hint = '⚠️ Needs recap — ' . implode(', ', $topTopics);
+        } elseif ($secSeverity === 'attention') {
+            $hint = '📎 ' . implode(', ', $topTopics);
+        } else {
+            $hint = '✅ Healthy' . ($secPct > 0 ? ' — minor issues' : ' — no issues');
+        }
+
+        $sectionStruggle[] = [
+            'section_name' => $sec['section_name'],
+            'section_num'  => $sec['section_num'],
+            'struggle_pct' => $secPct,
+            'student_count' => $secStuCnt,
+            'question_count' => $secQCnt,
+            'severity'     => $secSeverity,
+            'top_topics'   => $topTopics,
+            'hint'         => $hint,
+        ];
+    }
+
+    // -- 12c. Material struggle list --
+    $materialStruggle = [];
+    foreach ($sectionList as $sec) {
+        foreach ($sec['materials'] as $mat) {
+            if ($mat['question_count'] < 1) continue;
+            $matTopics = array_map(function($kc) { return $kc['concept']; }, $mat['key_concepts']);
+            $suggestion = '';
+            if (!empty($matTopics)) {
+                $suggestion = 'Review this material — students struggle with: ' . implode(', ', array_slice($matTopics, 0, 2));
+            } else {
+                $suggestion = 'Students have asked ' . $mat['question_count'] . ' question(s) about this material';
+            }
+            $materialStruggle[] = [
+                'material_name'   => $mat['filename'],
+                'question_count'  => $mat['question_count'],
+                'struggle_topics' => $matTopics,
+                'suggestion'      => $suggestion,
+            ];
+        }
+    }
+    usort($materialStruggle, function($a, $b) { return $b['question_count'] - $a['question_count']; });
+    $materialStruggle = array_slice($materialStruggle, 0, 10);
+
+    // -- 12d. Student narratives --
+    $studentNarratives = [];
+    foreach ($atRiskStudents as $s) {
+        $summary = self::generate_student_summary($s, $enrolledCount);
+        $suggestion = self::generate_student_suggestion($s);
+
+        $studentNarratives[] = [
+            'userid'             => $s['userid'],
+            'fullname'           => $s['fullname'],
+            'profileimageurl'    => $s['profileimageurl'],
+            'risk_score'         => $s['risk_score'],
+            'risk_level'         => $s['risk_level'],
+            'summary'            => $summary,
+            'struggle_topics'    => $s['struggle_topics'],
+            'last_active'        => $s['last_active'],
+            'days_since_last_login' => (int)round((time() - ($s['last_active'] === 'Today' ? time() : strtotime('-' . $s['last_active']))) / DAYSECS),
+            'question_count'     => $s['question_count'],
+            'avg_quiz'           => 0, // will be filled from student profile if available
+            'ai_queries'         => 0,
+            'quiz_failures'      => $s['event_sources']['quiz_failures'] ?? 0,
+            'issue_reports'      => $s['event_sources']['issue_reports'] ?? 0,
+            'suggestion'         => $suggestion['text'],
+            'suggestion_type'    => $suggestion['type'],
+        ];
+    }
+
+    // -- 12e. Common questions (question radar) --
+    $questionCounts = []; // question text => ['count' => N, 'students' => [uid => true], 'topic' => '']
+    foreach ($logs as $l) {
+        $qtext = trim($l->question);
+        if (strlen($qtext) < 5) continue;
+        $qkey = strtolower($qtext);
+        if (!isset($questionCounts[$qkey])) {
+            $questionCounts[$qkey] = ['text' => $qtext, 'count' => 0, 'students' => [], 'topic' => ''];
+        }
+        $questionCounts[$qkey]['count']++;
+        $questionCounts[$qkey]['students'][$l->userid] = true;
+    }
+    // Assign topics to questions
+    foreach ($questionCounts as &$qc) {
+        $qLower = strtolower($qc['text']);
+        foreach ($topicMatrix as $tm) {
+            $topicLower = strtolower($tm['topic']);
+            if (strpos($qLower, $topicLower) !== false || strpos($topicLower, $qLower) !== false) {
+                $qc['topic'] = $tm['topic'];
+                break;
+            }
+            // Check sample questions
+            foreach (($tm['sample_questions'] ?? []) as $sq) {
+                if (similar_text(strtolower($sq), $qLower) > strlen($qLower) * 0.4) {
+                    $qc['topic'] = $tm['topic'];
+                    break 2;
+                }
+            }
+        }
+        if (empty($qc['topic'])) {
+            $qc['topic'] = 'General';
+        }
+    }
+    unset($qc);
+    usort($questionCounts, function($a, $b) { return $b['count'] - $a['count']; });
+
+    $commonQuestions = [];
+    foreach (array_slice($questionCounts, 0, 15) as $qc) {
+        if ($qc['count'] < 2) break;
+        $stuCnt = count($qc['students']);
+        $topicName = $qc['topic'];
+        $suggestion = '';
+        // Find matching topic suggestion
+        foreach ($struggleAreas as $sa) {
+            if (strtolower($sa['topic']) === strtolower($topicName)) {
+                $suggestion = $sa['suggestion'];
+                break;
+            }
+        }
+        if (empty($suggestion)) {
+            $suggestion = 'Address this in your next lecture — ' . $stuCnt . ' student(s) are confused about this.';
+        }
+
+        $commonQuestions[] = [
+            'text'          => $qc['text'],
+            'student_count' => $stuCnt,
+            'ask_count'     => $qc['count'],
+            'topic'         => $topicName,
+            'suggestion'    => $suggestion,
+        ];
+    }
+
+    // -- 12f. Course pulse --
+    // Compare this week vs last week
+    $thisWeekStart = $nowTs - (7 * DAYSECS);
+    $lastWeekStart = $nowTs - (14 * DAYSECS);
+    $thisWeekQ = 0;
+    $lastWeekQ = 0;
+    $thisWeekStudents = [];
+    $lastWeekStudents = [];
+    foreach ($logs as $l) {
+        if ($l->timecreated >= $thisWeekStart) {
+            $thisWeekQ++;
+            $thisWeekStudents[$l->userid] = true;
+        } elseif ($l->timecreated >= $lastWeekStart) {
+            $lastWeekQ++;
+            $lastWeekStudents[$l->userid] = true;
+        }
+    }
+
+    $qTrend = 'stable';
+    $qTrendPct = 0;
+    if ($lastWeekQ > 0) {
+        $qTrendPct = round((($thisWeekQ - $lastWeekQ) / $lastWeekQ) * 100);
+        if ($qTrendPct > 10) $qTrend = 'up';
+        elseif ($qTrendPct < -10) $qTrend = 'down';
+    } elseif ($thisWeekQ > 0) {
+        $qTrend = 'up';
+        $qTrendPct = 100;
+    }
+
+    // Top struggle topic for pulse
+    $topStruggle = !empty($struggleAreas) ? $struggleAreas[0]['topic'] : '—';
+    $topStruggleTrend = !empty($struggleAreas) ? ($struggleAreas[0]['trend_pct'] > 0 ? '+' . $struggleAreas[0]['trend_pct'] . '%' : 'stable') : '—';
+
+    // Disengaged students (no login in 7+ days)
+    $disengagedStudents = [];
+    foreach ($atRiskStudents as $s) {
+        $days = (int)round((time() - ($s['last_active'] === 'Today' ? time() : strtotime('-' . $s['last_active']))) / DAYSECS);
+        if ($days >= 7) {
+            $disengagedStudents[] = ['name' => $s['fullname'], 'days' => $days];
+        }
+    }
+
+    // Improving topics
+    $improvingTopics = [];
+    foreach ($topicMatrix as $tm) {
+        if ($tm['trend'] === 'down' && $tm['question_count'] > 0) {
+            $improvingTopics[] = $tm['topic'];
+        }
+    }
+
+    $coursePulse = [
+        'avg_quiz'              => 0, // computed from student metrics if available
+        'quiz_trend'            => 'stable',
+        'quiz_trend_pct'        => 0,
+        'at_risk_count'         => count($atRiskStudents),
+        'at_risk_trend'         => count($atRiskStudents) > 0 ? 'up' : 'stable',
+        'at_risk_trend_delta'   => 0,
+        'top_struggle_topic'    => $topStruggle,
+        'top_struggle_trend'    => $topStruggleTrend,
+        'active_this_week'      => count($thisWeekStudents),
+        'total_students'        => $enrolledCount,
+        'questions_this_week'   => $thisWeekQ,
+        'questions_last_week'   => $lastWeekQ,
+        'questions_trend'       => $qTrend,
+        'questions_trend_pct'   => $qTrendPct,
+    ];
+
+    // Try to get avg quiz from student_metrics
+    $avgQuizRow = $DB->get_record_sql(
+        "SELECT AVG(risk_score) as avg_risk FROM {umat_ai_student_metrics} WHERE courseid = :cid",
+        ['cid' => $cid]
+    );
+    if ($avgQuizRow && $avgQuizRow->avg_risk !== null) {
+        // Invert risk to get a rough engagement/quiz proxy
+        $coursePulse['avg_quiz'] = max(0, min(100, round(100 - $avgQuizRow->avg_risk)));
+    }
+
+    // -- 12g. Priority actions --
+    $priorityActions = [];
+
+    // Recap needed (topics with high struggle + trend up)
+    $recapTopics = [];
+    foreach ($struggleAreas as $sa) {
+        if ($sa['severity'] === 'critical' || ($sa['severity'] === 'attention' && $sa['trend'] === 'up')) {
+            $recapTopics[] = $sa;
+        }
+    }
+    if (!empty($recapTopics)) {
+        $items = array_map(function($sa) {
+            return [
+                'name'     => $sa['topic'],
+                'students' => $sa['student_count'],
+                'pct'      => $sa['student_pct'],
+                'avg_quiz' => 0,
+                'trend'    => $sa['trend'] === 'up' ? '+' . $sa['trend_pct'] . '%' : $sa['trend'],
+            ];
+        }, array_slice($recapTopics, 0, 5));
+        $topicNames = array_map(function($t) { return $t['topic']; }, $recapTopics);
+        $urgency = $recapTopics[0]['severity'] === 'critical' ? 'high' : 'medium';
+        $priorityActions[] = [
+            'type'       => 'recap_needed',
+            'urgency'    => $urgency,
+            'icon'       => 'school',
+            'title'      => 'Recap Needed',
+            'text'       => count($recapTopics) . ' topic' . (count($recapTopics) > 1 ? 's need' : ' needs') . ' immediate attention — students are increasingly confused.',
+            'items'      => $items,
+            'suggestion' => 'Dedicate 20 minutes in your next lecture to recap these topics. Start with ' . $recapTopics[0]['topic'] . ' — it\'s the most urgent.',
+            'action_label' => 'View Affected Students',
+        ];
+    }
+
+    // Students disengaging
+    if (!empty($disengagedStudents)) {
+        $names = array_map(function($d) { return $d['name'] . ' (' . $d['days'] . ' days)'; }, $disengagedStudents);
+        $urgency = count($disengagedStudents) >= 3 ? 'high' : 'medium';
+        $priorityActions[] = [
+            'type'       => 'disengagement',
+            'urgency'    => $urgency,
+            'icon'       => 'person_off',
+            'title'      => 'Students Disengaging',
+            'text'       => count($disengagedStudents) . ' student' . (count($disengagedStudents) > 1 ? 's haven' . "'" . 't' : ' hasn' . "'" . 't') . ' logged in for 7+ days.',
+            'items'      => array_map(function($d) { return ['name' => $d['name'], 'days' => $d['days']]; }, $disengagedStudents),
+            'suggestion' => 'Send a quick encouragement message. A simple check-in can make a difference.',
+            'action_label' => 'Send Encouragement',
+        ];
+    }
+
+    // Improving topics (positive reinforcement)
+    if (!empty($improvingTopics)) {
+        $priorityActions[] = [
+            'type'       => 'improving',
+            'urgency'    => 'low',
+            'icon'       => 'trending_down',
+            'title'      => 'Improving',
+            'text'       => implode(', ', array_slice($improvingTopics, 0, 3)) . ' — student understanding improved this week.',
+            'items'      => [],
+            'suggestion' => 'Your recent approach is working! Consider applying the same format to other struggling topics.',
+            'action_label' => null,
+        ];
+    }
+
+    // Quiz scores dropping
+    if ($qTrend === 'down' && $thisWeekQ > 5) {
+        $priorityActions[] = [
+            'type'       => 'quiz_drop',
+            'urgency'    => 'medium',
+            'icon'       => 'quiz',
+            'title'      => 'Activity Dropping',
+            'text'       => 'Student questions dropped ' . abs($qTrendPct) . '% this week (' . $thisWeekQ . ' vs ' . $lastWeekQ . ' last week). This could indicate disengagement.',
+            'items'      => [],
+            'suggestion' => 'Consider checking if students are facing technical issues or have lost access to materials.',
+            'action_label' => null,
+        ];
+    }
+
+    // Issue reports unresolved
+    if ($openIssues > 0) {
+        $priorityActions[] = [
+            'type'       => 'issues',
+            'urgency'    => 'medium',
+            'icon'       => 'report',
+            'title'      => 'Unresolved Issues',
+            'text'       => $openIssues . ' student issue' . ($openIssues > 1 ? 's' : '') . ' awaiting resolution.',
+            'items'      => [],
+            'suggestion' => 'Review and address open issue reports to prevent student frustration from building up.',
+            'action_label' => 'View Issues',
+        ];
+    }
+
+    // Sort by urgency
+    $urgencyOrder = ['high' => 0, 'medium' => 1, 'low' => 2];
+    usort($priorityActions, function($a, $b) use ($urgencyOrder) {
+        return ($urgencyOrder[$a['urgency']] ?? 2) - ($urgencyOrder[$b['urgency']] ?? 2);
+    });
+
+    // ──────────────────────────────────────────────────────────────
+    // 13. Summary & return
     // ──────────────────────────────────────────────────────────────
     $aiSummary = $aiOverallSummary ?: '';
     $aiCourseHealthJson = $aiCourseHealth ? json_encode($aiCourseHealth) : null;
     $result = [
+        // NEW: Actionable insights
+        'priority_actions'    => $priorityActions,
+        'struggle_areas'      => $struggleAreas,
+        'section_struggle'    => $sectionStruggle,
+        'material_struggle'   => $materialStruggle,
+        'student_narratives'  => $studentNarratives,
+        'common_questions'    => $commonQuestions,
+        'course_pulse'        => $coursePulse,
+
+        // EXISTING: Legacy fields (kept for compatibility)
         'topic_matrix'       => $topicMatrix,
         'material_breakdown' => $sectionList,
         'recording_struggle' => $recordingStruggle,
@@ -1190,7 +1619,131 @@ class get_struggle_insights extends \external_api {
     }
 
     public static function get_struggle_insights_returns() {
-        return new \external_single_structure([
+        $structure = [
+            // NEW: Actionable insights
+            'priority_actions' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'type'         => new \external_value(PARAM_TEXT),
+                    'urgency'      => new \external_value(PARAM_TEXT),
+                    'icon'         => new \external_value(PARAM_TEXT),
+                    'title'        => new \external_value(PARAM_TEXT),
+                    'text'         => new \external_value(PARAM_TEXT),
+                    'items'        => new \external_multiple_structure(
+                        new \external_single_structure([
+                            'name'     => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                            'students' => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                            'pct'      => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                            'avg_quiz' => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                            'trend'    => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                            'days'     => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                        ]), '', VALUE_OPTIONAL
+                    ),
+                    'suggestion'   => new \external_value(PARAM_TEXT),
+                    'action_label' => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                ]), '', VALUE_OPTIONAL
+            ),
+            'struggle_areas' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'topic'              => new \external_value(PARAM_TEXT),
+                    'severity'           => new \external_value(PARAM_TEXT),
+                    'student_count'      => new \external_value(PARAM_INT),
+                    'total_students'     => new \external_value(PARAM_INT),
+                    'student_pct'        => new \external_value(PARAM_INT),
+                    'question_count'     => new \external_value(PARAM_INT),
+                    'prev_question_count'=> new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                    'trend'              => new \external_value(PARAM_TEXT),
+                    'trend_pct'          => new \external_value(PARAM_INT),
+                    'struggle_score'     => new \external_value(PARAM_INT),
+                    'description'        => new \external_value(PARAM_TEXT),
+                    'sample_questions'   => new \external_multiple_structure(
+                        new \external_value(PARAM_TEXT), '', VALUE_OPTIONAL
+                    ),
+                    'suggestion'         => new \external_value(PARAM_TEXT),
+                    'suggestion_type'    => new \external_value(PARAM_TEXT),
+                    'materials'          => new \external_multiple_structure(
+                        new \external_single_structure([
+                            'name'           => new \external_value(PARAM_TEXT),
+                            'question_count' => new \external_value(PARAM_INT),
+                        ]), '', VALUE_OPTIONAL
+                    ),
+                    'affected_student_ids' => new \external_multiple_structure(
+                        new \external_value(PARAM_INT), '', VALUE_OPTIONAL
+                    ),
+                ]), '', VALUE_OPTIONAL
+            ),
+            'section_struggle' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'section_name'  => new \external_value(PARAM_TEXT),
+                    'section_num'   => new \external_value(PARAM_INT),
+                    'struggle_pct'  => new \external_value(PARAM_INT),
+                    'student_count' => new \external_value(PARAM_INT),
+                    'question_count'=> new \external_value(PARAM_INT),
+                    'severity'      => new \external_value(PARAM_TEXT),
+                    'top_topics'    => new \external_multiple_structure(
+                        new \external_value(PARAM_TEXT), '', VALUE_OPTIONAL
+                    ),
+                    'hint'          => new \external_value(PARAM_TEXT),
+                ]), '', VALUE_OPTIONAL
+            ),
+            'material_struggle' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'material_name'   => new \external_value(PARAM_TEXT),
+                    'question_count'  => new \external_value(PARAM_INT),
+                    'struggle_topics' => new \external_multiple_structure(
+                        new \external_value(PARAM_TEXT), '', VALUE_OPTIONAL
+                    ),
+                    'suggestion'      => new \external_value(PARAM_TEXT),
+                ]), '', VALUE_OPTIONAL
+            ),
+            'student_narratives' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'userid'             => new \external_value(PARAM_INT),
+                    'fullname'           => new \external_value(PARAM_TEXT),
+                    'profileimageurl'    => new \external_value(PARAM_URL),
+                    'risk_score'         => new \external_value(PARAM_INT),
+                    'risk_level'         => new \external_value(PARAM_TEXT),
+                    'summary'            => new \external_value(PARAM_TEXT),
+                    'struggle_topics'    => new \external_multiple_structure(
+                        new \external_value(PARAM_TEXT), '', VALUE_OPTIONAL
+                    ),
+                    'last_active'        => new \external_value(PARAM_TEXT),
+                    'days_since_last_login' => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                    'question_count'     => new \external_value(PARAM_INT),
+                    'avg_quiz'           => new \external_value(PARAM_FLOAT, '', VALUE_OPTIONAL),
+                    'ai_queries'         => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                    'quiz_failures'      => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                    'issue_reports'      => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                    'suggestion'         => new \external_value(PARAM_TEXT),
+                    'suggestion_type'    => new \external_value(PARAM_TEXT),
+                ]), '', VALUE_OPTIONAL
+            ),
+            'common_questions' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'text'          => new \external_value(PARAM_TEXT),
+                    'student_count' => new \external_value(PARAM_INT),
+                    'ask_count'     => new \external_value(PARAM_INT),
+                    'topic'         => new \external_value(PARAM_TEXT),
+                    'suggestion'    => new \external_value(PARAM_TEXT),
+                ]), '', VALUE_OPTIONAL
+            ),
+            'course_pulse' => new \external_single_structure([
+                'avg_quiz'              => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'quiz_trend'            => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                'quiz_trend_pct'        => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'at_risk_count'         => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'at_risk_trend'         => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                'at_risk_trend_delta'   => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'top_struggle_topic'    => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                'top_struggle_trend'    => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                'active_this_week'      => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'total_students'        => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'questions_this_week'   => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'questions_last_week'   => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'questions_trend'       => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                'questions_trend_pct'   => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+            ], '', VALUE_OPTIONAL),
+
+            // EXISTING: Legacy fields (kept for compatibility)
             'topic_matrix' => new \external_multiple_structure(
                 new \external_single_structure([
                     'topic'          => new \external_value(PARAM_TEXT),
@@ -1308,6 +1861,203 @@ class get_struggle_insights extends \external_api {
                 ], '', VALUE_OPTIONAL),
                 'total_events'     => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
             ]),
-        ]);
+        ];
+
+        return new \external_single_structure($structure);
+    }
+
+    /**
+     * Generate a plain-English suggestion for a topic based on its data.
+     */
+    private static function generate_topic_suggestion($topic, $stuPct, $enrolledCount) {
+        $score = $topic['struggle_score'] ?? 0;
+        $trend = $topic['trend'] ?? 'stable';
+        $trendPct = $topic['trend_pct'] ?? 0;
+        $qCnt = $topic['question_count'] ?? 0;
+
+        // High struggle + trending up → urgent recap
+        if ($stuPct >= 30 && $trend === 'up') {
+            return [
+                'text' => 'Consider a dedicated recap session on ' . $topic['topic'] . '. ' .
+                          $stuPct . '% of students are confused and the number of questions is increasing.',
+                'type' => 'recap',
+            ];
+        }
+
+        // High struggle but stable → review needed
+        if ($stuPct >= 30) {
+            return [
+                'text' => 'Students are struggling with ' . $topic['topic'] . '. ' .
+                          'Consider reviewing this topic in your next lecture with practical examples.',
+                'type' => 'review',
+            ];
+        }
+
+        // Moderate struggle + many questions → clarify concept
+        if ($qCnt >= 10 && $stuPct >= 15) {
+            return [
+                'text' => 'Students are asking many questions about ' . $topic['topic'] . '. ' .
+                          'Consider a quick concept clarification or worked example.',
+                'type' => 'clarify',
+            ];
+        }
+
+        // Improving → positive reinforcement
+        if ($trend === 'down') {
+            return [
+                'text' => 'Students are understanding ' . $topic['topic'] . ' better — no immediate action needed.',
+                'type' => 'positive',
+            ];
+        }
+
+        // Low struggle → watch
+        if ($stuPct < 15 && $score < 40) {
+            return [
+                'text' => 'Minor issues only — monitor but no immediate action needed.',
+                'type' => 'watch',
+            ];
+        }
+
+        // Default
+        return [
+            'text' => 'Monitor this topic — ' . $stuPct . '% of students have asked questions about it.',
+            'type' => 'monitor',
+        ];
+    }
+
+    /**
+     * Generate a plain-English summary for a student based on their data.
+     */
+    private static function generate_student_summary($student, $enrolledCount) {
+        $parts = [];
+
+        // Topic struggles
+        $topics = $student['struggle_topics'] ?? [];
+        if (!empty($topics)) {
+            if (count($topics) === 1) {
+                $parts[] = 'Struggles with ' . $topics[0];
+            } elseif (count($topics) === 2) {
+                $parts[] = 'Struggles with ' . $topics[0] . ' and ' . $topics[1];
+            } else {
+                $parts[] = 'Struggles with ' . $topics[0] . ', ' . $topics[1] . ', and ' . $topics[2];
+            }
+        }
+
+        // Question volume
+        $qCnt = $student['question_count'] ?? 0;
+        if ($qCnt > 0) {
+            $parts[] = 'asked ' . $qCnt . ' question' . ($qCnt !== 1 ? 's' : '');
+        }
+
+        // Quiz failures
+        $quizFails = $student['event_sources']['quiz_failures'] ?? 0;
+        if ($quizFails > 0) {
+            $parts[] = 'failed ' . $quizFails . ' quiz attempt' . ($quizFails !== 1 ? 's' : '');
+        }
+
+        // Last active
+        $lastActive = $student['last_active'] ?? 'unknown';
+        if ($lastActive === 'Today') {
+            // no need to mention
+        } elseif (strpos($lastActive, 'days ago') !== false) {
+            $days = (int)$lastActive;
+            if ($days > 7) {
+                $parts[] = 'hasn\'t logged in for ' . $days . ' days';
+            } elseif ($days > 3) {
+                $parts[] = 'last active ' . $days . ' days ago';
+            }
+        }
+
+        // Issue reports
+        $issues = $student['event_sources']['issue_reports'] ?? 0;
+        if ($issues > 0) {
+            $parts[] = 'reported ' . $issues . ' issue' . ($issues !== 1 ? 's' : '');
+        }
+
+        if (empty($parts)) {
+            return 'No significant activity recorded for this student.';
+        }
+
+        // Capitalize first letter and join
+        $summary = implode('. ', $parts) . '.';
+        $summary[0] = strtoupper($summary[0]);
+        return $summary;
+    }
+
+    /**
+     * Generate a plain-English suggestion for a student.
+     */
+    private static function generate_student_suggestion($student) {
+        $risk = $student['risk_score'] ?? 0;
+        $qCnt = $student['question_count'] ?? 0;
+        $quizFails = $student['event_sources']['quiz_failures'] ?? 0;
+        $lastActive = $student['last_active'] ?? '';
+        $topics = $student['struggle_topics'] ?? [];
+        $topicStr = !empty($topics) ? $topics[0] : 'the course material';
+
+        // Disengaged (no login in 7+ days)
+        if (strpos($lastActive, 'days ago') !== false) {
+            $days = (int)$lastActive;
+            if ($days >= 7) {
+                return [
+                    'text' => 'This student has disengaged — hasn\'t logged in for ' . $days . ' days. Consider sending an encouragement message to re-engage them.',
+                    'type' => 'encourage',
+                ];
+            }
+        }
+
+        // High risk + not using AI tutor
+        if ($risk >= 60 && $qCnt > 5) {
+            return [
+                'text' => 'This student is asking many questions but may not be using the AI tutor effectively. Consider encouraging them to use it for extra support on ' . $topicStr . '.',
+                'type' => 'ai_tutor',
+            ];
+        }
+
+        // High risk + quiz failures
+        if ($risk >= 60 && $quizFails > 0) {
+            return [
+                'text' => 'Schedule a 1:1 meeting to discuss their understanding of ' . $topicStr . '. They may benefit from a worked example or targeted practice.',
+                'type' => 'meeting',
+            ];
+        }
+
+        // Medium risk + many questions
+        if ($risk >= 30 && $qCnt >= 8) {
+            return [
+                'text' => 'This student is actively seeking help but still struggling. Consider assigning a remedial quiz on ' . $topicStr . ' to reinforce understanding.',
+                'type' => 'quiz',
+            ];
+        }
+
+        // Improving (trend down)
+        if ($student['trend'] === 'down') {
+            return [
+                'text' => 'This student is improving — keep up the positive momentum. Consider assigning advanced problems to challenge them.',
+                'type' => 'challenge',
+            ];
+        }
+
+        // Default
+        return [
+            'text' => 'Monitor this student\'s progress. Check in periodically to ensure they\'re keeping up.',
+            'type' => 'monitor',
+        ];
+    }
+
+    /**
+     * Get sample questions for a topic from chat logs.
+     */
+    private static function get_sample_questions_for_topic($topicName, $logs, $limit = 3) {
+        $topicLower = strtolower($topicName);
+        $matching = [];
+        foreach ($logs as $l) {
+            $qLower = strtolower($l->question);
+            if (strpos($qLower, $topicLower) !== false || strpos($topicLower, $qLower) !== false) {
+                $matching[] = $l->question;
+            }
+            if (count($matching) >= $limit) break;
+        }
+        return $matching;
     }
 }

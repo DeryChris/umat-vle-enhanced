@@ -1,179 +1,157 @@
 {{!
     Template: local/umat_ai/templates/analytics_dashboard.mustache
-    Lecturer Insights Dashboard — 3-zone F-pattern overlay pane.
+    Lecturer Insights Dashboard — 5-zone actionable insights layout.
 
     Context (provided by JS):
       courseid, coursefullname
-      engagement_score, at_risk_count, total_students
-      ai_global_insight (string)
-      student_list (array: userid, firstname, lastname, risk_score)
-      top_issues (array: topic, count)
-      materials (array: name, struggle_count)
-      course_health (object: ai_status, last_updated, uptime_info)
 }}
 <div class="umat-insights-pane">
 
-  <!-- ================================================================ -->
-  <!-- ZONE 1: Heads-Up — engagement ring, at-risk pill, global insight  -->
-  <!-- ================================================================ -->
-  <div class="insights-zone1">
-    <div class="insights-hud-row">
-      <div class="insights-ring-card">
-        <div class="insights-ring" id="ins-engagement-ring">
-          <svg viewBox="0 0 120 120" class="insights-ring-svg">
-            <circle cx="60" cy="60" r="52" fill="none" stroke="var(--sfl)" stroke-width="10"/>
-            <circle cx="60" cy="60" r="52" fill="none" stroke="var(--p)" stroke-width="10"
-              stroke-dasharray="326.73" stroke-dashoffset="0"
-              stroke-linecap="round" transform="rotate(-90 60 60)"
-              id="ins-ring-progress"/>
-          </svg>
-          <span class="insights-ring-label" id="ins-engagement-pct">0%</span>
-        </div>
-        <div class="insights-ring-text">
-          <span class="insights-ring-title">Engagement</span>
-          <span class="insights-ring-sub" id="ins-tracked-count">0 students</span>
-        </div>
-      </div>
-      <div class="insights-atrisk-card" id="ins-atrisk-card">
-        <span class="material-symbols-outlined">priority_high</span>
-        <div>
-          <span class="insights-atrisk-num" id="ins-atrisk-count">0</span>
-          <span class="insights-atrisk-label">At Risk</span>
-        </div>
-      </div>
-    </div>
-    <div class="insights-global-card">
-      <span class="material-symbols-outlined">auto_awesome</span>
-      <p id="ins-global-insight">No insights yet. Use the search below to explore student data.</p>
-    </div>
-    <div class="insights-health-row" id="ins-health-row" style="display:none;">
-      <span class="insights-health-pill" id="ins-health-status">AI Service: <span id="ins-health-text">Checking…</span></span>
-      <button class="insights-chip-sm" onclick="toggleLegacySection('ins-health-detail')">Details</button>
-      <div id="ins-health-detail" style="display:none;font-size:12px;color:var(--ol);padding:8px 12px;background:var(--sfl);border-radius:8px;margin-top:4px;"></div>
-    </div>
-  </div>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 1: Priority Briefing — What needs your attention right now     -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone" id="ins-priority-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">notification_important</span>
+      What Needs Your Attention
+    </h3>
+    <div id="ins-priority-actions" class="ins-priority-list"></div>
+  </section>
 
-  <!-- ================================================================ -->
-  <!-- ZONE 2: Triage — NLQ search, filter chips, student list + detail   -->
-  <!-- ================================================================ -->
-  <div class="insights-zone2">
-    <!-- NLQ Search -->
-    <div class="insights-nlq-bar">
-      <input type="text" id="ins-nlq-input" class="insights-nlq-input"
-        placeholder="Ask about student performance… e.g. 'Who is struggling most?'" />
-      <button class="insights-nlq-btn" onclick="submitNLQ()">
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 2: Struggle Map — Where students are confused                  -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone" id="ins-struggle-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">map</span>
+      Where Students Are Struggling
+    </h3>
+
+    <!-- Topic Struggle Cards (narrative cards) -->
+    <div id="ins-struggle-areas" class="ins-struggle-list"></div>
+
+    <!-- Section Struggle Bars -->
+    <div id="ins-section-breakdown" class="ins-section-bars"></div>
+
+    <!-- Material Struggle List -->
+    <div id="ins-material-struggle" class="ins-material-list"></div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 3: Student Dossiers — Who needs help and why                   -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone" id="ins-students-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">groups</span>
+      Your Students
+    </h3>
+
+    <!-- NLQ Search (secondary) -->
+    <div class="ins-nlq-bar">
+      <input type="text" id="ins-nlq-input" class="ins-nlq-input"
+        placeholder="Ask about student performance…" />
+      <button class="ins-nlq-btn" onclick="window.analyticsDashboard.submitNLQ()">
         <span class="material-symbols-outlined">search</span>
       </button>
-      <div class="insights-nlq-spinner" id="ins-nlq-spinner" style="display:none;"></div>
+      <div class="ins-nlq-spinner" id="ins-nlq-spinner" style="display:none;"></div>
+    </div>
+    <div id="ins-nlq-response" class="ins-nlq-response umat-ai-stream-panel" style="display:none;"></div>
+
+    <!-- Smart Filters -->
+    <div class="ins-filter-row" id="ins-filters">
+      <button class="ins-chip ins-chip-active" data-filter="all" onclick="window.analyticsDashboard.setFilter('all', this)">All</button>
+      <button class="ins-chip" data-filter="disengaged" onclick="window.analyticsDashboard.setFilter('disengaged', this)">
+        <span class="material-symbols-outlined">person_off</span> Disengaged
+      </button>
+      <button class="ins-chip" data-filter="struggling" onclick="window.analyticsDashboard.setFilter('struggling', this)">
+        <span class="material-symbols-outlined">psychology</span> Struggling
+      </button>
+      <button class="ins-chip" data-filter="failing" onclick="window.analyticsDashboard.setFilter('failing', this)">
+        <span class="material-symbols-outlined">trending_down</span> Failing
+      </button>
+      <button class="ins-chip" data-filter="issues" onclick="window.analyticsDashboard.setFilter('issues', this)">
+        <span class="material-symbols-outlined">report</span> Issues
+      </button>
     </div>
 
-    <!-- AI NLQ Response (streaming) -->
-    <div id="ins-nlq-response" class="insights-nlq-response umat-ai-stream-panel" style="display:none;"></div>
-
-    <!-- Filter Chips -->
-    <div class="insights-filter-row">
-      <button class="insights-chip insights-chip-active" data-risk="all" onclick="filterAtRisk('all', this)">All</button>
-      <button class="insights-chip" data-risk="at_risk" onclick="filterAtRisk('at_risk', this)">At Risk</button>
-      <button class="insights-chip" data-risk="struggling" onclick="filterAtRisk('struggling', this)">Struggling</button>
-      <button class="insights-chip" data-risk="engaged" onclick="filterAtRisk('engaged', this)">Engaged</button>
+    <!-- Student Narrative Cards -->
+    <div id="ins-student-list" class="ins-student-cards">
+      <div class="ins-empty">No student data loaded yet.</div>
     </div>
+  </section>
 
-    <!-- Student List -->
-    <div class="insights-student-list" id="ins-student-list">
-      <div class="insights-empty">No student data loaded yet. Run a search above.</div>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 4: Question Radar — What students are asking                   -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone" id="ins-questions-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">question_answer</span>
+      What Students Are Asking
+    </h3>
+    <div id="ins-common-questions" class="ins-question-list"></div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 5: Course Vitals — How your course is performing                -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone" id="ins-vitals-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">monitor_heart</span>
+      Course Pulse
+    </h3>
+    <div id="ins-course-pulse" class="ins-pulse-grid"></div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- Student Detail Panel (slide-in overlay)                             -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <div class="ins-detail-panel" id="ins-detail-panel" style="display:none;">
+    <div class="ins-detail-header">
+      <div>
+        <strong id="ins-detail-name">—</strong>
+        <span class="ins-pill" id="ins-detail-risk-badge">—</span>
+      </div>
+      <button class="ins-chip-sm" onclick="window.analyticsDashboard.closeDetail()">
+        <span class="material-symbols-outlined">close</span>
+      </button>
     </div>
-
-    <!-- Student Detail (shown on click) -->
-    <div class="insights-detail-panel" id="ins-detail-panel" style="display:none;">
-      <div class="insights-detail-header">
-        <div>
-          <strong id="ins-detail-name">—</strong>
-          <span class="insights-pill-risk" id="ins-detail-risk-badge">—</span>
-        </div>
-        <button class="insights-chip-sm" onclick="closeDetail()">
-          <span class="material-symbols-outlined">close</span>
-        </button>
-      </div>
-      <div class="insights-detail-body" id="ins-detail-body">
-        <div class="insights-empty">Loading profile…</div>
-      </div>
-      <div class="insights-detail-actions">
-        <button class="insights-action-btn" onclick="openActionDrawer('encouragement')">
-          <span class="material-symbols-outlined">favorite</span>Encourage
-        </button>
-        <button class="insights-action-btn" onclick="openActionDrawer('meeting')">
-          <span class="material-symbols-outlined">event</span>1:1
-        </button>
-        <button class="insights-action-btn" onclick="openActionDrawer('remedial_quiz')">
-          <span class="material-symbols-outlined">quiz</span>Quiz
-        </button>
-      </div>
+    <div class="ins-detail-body" id="ins-detail-body">
+      <div class="ins-empty">Loading profile…</div>
     </div>
-  </div>
-
-  <!-- ================================================================ -->
-  <!-- Legacy/Extra sections (collapsible) — Topic Grid, Materials, etc.   -->
-  <!-- ================================================================ -->
-  <div class="insights-legacy-sections">
-    <button class="insights-legacy-toggle" onclick="toggleLegacySection('ins-legacy-wrap')">
-      <span class="material-symbols-outlined">expand_more</span> Course Health &amp; Details
-    </button>
-    <div id="ins-legacy-wrap" style="display:none;">
-      <!-- Topic Grid -->
-      <div class="insights-section-card">
-        <h4><span class="material-symbols-outlined">leaderboard</span> Topic Struggle Overview</h4>
-        <div id="ins-topic-grid" class="insights-topic-grid">
-          <div class="insights-empty">No topic data yet.</div>
-        </div>
-      </div>
-
-      <!-- Material Breakdown -->
-      <div class="insights-section-card">
-        <h4><span class="material-symbols-outlined">folder</span> Material Breakdown</h4>
-        <div id="ins-material-list" class="insights-material-list">
-          <div class="insights-empty">No material data yet.</div>
-        </div>
-      </div>
-
-      <!-- Common Questions -->
-      <div class="insights-section-card">
-        <h4><span class="material-symbols-outlined">help</span> Common Questions</h4>
-        <div id="ins-question-list" class="insights-question-list">
-          <div class="insights-empty">No questions yet.</div>
-        </div>
-      </div>
-
-      <!-- Course Health Report -->
-      <div class="insights-section-card">
-        <h4><span class="material-symbols-outlined">monitoring</span> Course Health Report</h4>
-        <div id="ins-course-health" class="insights-health-report">
-          <div class="insights-empty">Loading…</div>
-        </div>
-      </div>
+    <div class="ins-detail-actions">
+      <button class="ins-action-btn" onclick="window.analyticsDashboard.openActionDrawer('encouragement')">
+        <span class="material-symbols-outlined">favorite</span> Encourage
+      </button>
+      <button class="ins-action-btn" onclick="window.analyticsDashboard.openActionDrawer('meeting')">
+        <span class="material-symbols-outlined">event</span> 1:1
+      </button>
+      <button class="ins-action-btn" onclick="window.analyticsDashboard.openActionDrawer('remedial_quiz')">
+        <span class="material-symbols-outlined">quiz</span> Quiz
+      </button>
     </div>
   </div>
 
-  <!-- ================================================================ -->
-  <!-- ZONE 3: Action Drawer (slide-out for interventions)                -->
-  <!-- ================================================================ -->
-  <div class="insights-action-drawer" id="ins-action-drawer" style="display:none;">
-    <div class="insights-drawer-backdrop" onclick="closeActionDrawer()"></div>
-    <div class="insights-drawer-content">
-      <div class="insights-drawer-header">
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- Action Drawer (slide-up for interventions)                          -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <div class="ins-action-drawer" id="ins-action-drawer" style="display:none;">
+    <div class="ins-drawer-backdrop" onclick="window.analyticsDashboard.closeActionDrawer()"></div>
+    <div class="ins-drawer-content">
+      <div class="ins-drawer-header">
         <h3 id="ins-drawer-title">Send Intervention</h3>
-        <button class="insights-chip-sm" onclick="closeActionDrawer()">
+        <button class="ins-chip-sm" onclick="window.analyticsDashboard.closeActionDrawer()">
           <span class="material-symbols-outlined">close</span>
         </button>
       </div>
-      <div class="insights-drawer-body">
-        <p id="ins-drawer-recipient" style="font-size:13px;color:var(--onsv);margin:0 0 12px;"></p>
-        <textarea id="ins-drawer-message" class="insights-drawer-textarea"
+      <div class="ins-drawer-body">
+        <p id="ins-drawer-recipient" style="font-size:13px;color:var(--u-ol);margin:0 0 12px;"></p>
+        <textarea id="ins-drawer-message" class="ins-drawer-textarea"
           placeholder="Draft your message…" rows="4"></textarea>
         <div id="ins-drawer-status" style="font-size:12px;margin-top:8px;display:none;"></div>
       </div>
-      <div class="insights-drawer-footer">
-        <button class="insights-btn insights-btn-secondary" onclick="closeActionDrawer()">Cancel</button>
-        <button class="insights-btn insights-btn-primary" id="ins-drawer-send-btn" onclick="sendIntervention()">
+      <div class="ins-drawer-footer">
+        <button class="ins-btn ins-btn-secondary" onclick="window.analyticsDashboard.closeActionDrawer()">Cancel</button>
+        <button class="ins-btn ins-btn-primary" id="ins-drawer-send-btn" onclick="window.analyticsDashboard.sendIntervention()">
           <span class="material-symbols-outlined">send</span> Send
         </button>
       </div>
@@ -181,9 +159,10 @@
   </div>
 
   <!-- Shimmer skeleton placeholder for initial load -->
-  <div class="insights-skeleton" id="ins-skeleton" style="display:none;">
-    <div class="insights-shimmer-row"><div class="insights-shimmer-block" style="width:40%;height:100px;"></div><div class="insights-shimmer-block" style="width:25%;height:100px;"></div></div>
-    <div class="insights-shimmer-row"><div class="insights-shimmer-block" style="width:100%;height:48px;"></div></div>
-    <div class="insights-shimmer-row"><div class="insights-shimmer-block" style="width:100%;height:300px;"></div></div>
+  <div class="ins-skeleton" id="ins-skeleton" style="display:none;">
+    <div class="ins-shimmer-block" style="width:100%;height:80px;"></div>
+    <div class="ins-shimmer-block" style="width:100%;height:120px;"></div>
+    <div class="ins-shimmer-block" style="width:100%;height:200px;"></div>
+    <div class="ins-shimmer-block" style="width:100%;height:150px;"></div>
   </div>
 </div>

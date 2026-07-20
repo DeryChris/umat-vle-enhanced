@@ -372,26 +372,6 @@ function sendQuestion(q, msgsId){
       _umatHideTyping(tid);
       if(err.error==='rate_limit'){ qTimes.pop(); updateRate(); }
       else { markConn(false); }
-      // Show error message with inline retry button
-      var retryId = 'retry_' + Date.now();
-      _umatAppendAi(msgsId, err.message||'Sorry, an error occurred. Please try again.', []);
-      // Add retry button after error message
-      var msgsCont = document.getElementById(msgsId);
-      if (msgsCont) {
-        var lastBubble = msgsCont.querySelector('.umat-bubble-ai:last-of-type');
-        if (lastBubble) {
-          var retryBtn = document.createElement('button');
-          retryBtn.className = 'umat-retry-btn';
-          retryBtn.type = 'button';
-          retryBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;">refresh</span>Retry';
-          retryBtn.setAttribute('aria-label', 'Retry sending message');
-          retryBtn.addEventListener('click', function() {
-            retryBtn.parentNode.removeChild(retryBtn);
-            sendQuestion(q, msgsId);
-          });
-          lastBubble.parentNode.appendChild(retryBtn);
-        }
-      }
     }
   });
 }

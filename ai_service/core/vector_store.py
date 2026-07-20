@@ -250,8 +250,14 @@ class VectorStoreManager:
         query:         str,
         n_results:     int = 5,
         material_ids:  List[int] = None,
+        role:          str = "student",
     ) -> List[Tuple[str, dict]]:
         """Return top-N relevant chunks for a query string.
+
+        Privacy Layer 2: when role is 'student', chunks whose metadata
+        carry ``visibility`` = ``"lecturer"`` or ``"admin"`` are excluded
+        from the results.  Chunks without a ``visibility`` field (legacy
+        data) are treated as ``"student"`` and therefore visible.
 
         If material_ids is provided and non-empty, restrict search to only chunks
         belonging to those materials (using the material_id metadata field).
@@ -275,17 +281,21 @@ class VectorStoreManager:
         if material_ids:
             where_filter = {"material_id": {"$in": [str(mid) for mid in material_ids]}}
 
+        # Request extra results so we have enough after visibility filtering.
+        fetch_n = n_results * 3 if role not in ("lecturer", "admin") else n_results
+
         try:
             results = collection.query(
                 query_embeddings=[query_embedding],
-                n_results=n_results,
+                n_results=fetch_n,
                 where=where_filter,
                 include=["documents", "metadatas", "distances"],
             )
         except InvalidDimensionException:
             logger.info(
                 "Dimension mismatch for collection '%s' — "
-                "returning empty results (will heal on next add)", coll_name,
+                "returning empty results (will heal on next add)",
+                self.get_collection_name(course_id),
             )
             return []
         except Exception as e:
@@ -294,6 +304,17 @@ class VectorStoreManager:
 
         documents = results["documents"][0] if results["documents"] else []
         metadatas = results["metadatas"][0] if results["metadatas"] else []
+
+        # --- Privacy Layer 2: visibility post-filter --------------------
+        if role not in ("lecturer", "admin"):
+            paired = [
+                (doc, meta)
+                for doc, meta in zip(documents, metadatas)
+                if meta.get("visibility", "student") not in ("lecturer", "admin")
+            ]
+            documents = [doc for doc, _ in paired[:n_results]]
+            metadatas = [meta for _, meta in paired[:n_results]]
+
         return list(zip(documents, metadatas))
 
     def get_documents_by_filter(

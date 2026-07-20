@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from models.schemas import QueryRequest, QuizData
 from models.database import ChatLog
 from core.llm_processor import TASK_GUIDANCE
+from core.content_classifier import is_sensitive_query, get_sensitive_refusal
 from rag.hybrid_retriever import get_hybrid_retriever
 from analytics.student_profile import get_student_profile
 from prompts.system_tutor import build_tutor_system_prompt, build_lecturer_system_prompt
@@ -200,6 +201,18 @@ def prepare_query(request: QueryRequest, db: Session) -> PreparedQuery:
             instant_answer=_get_chitchat_response(request.question), confidence=1.0,
         )
 
+    # --- Privacy Layer 4: block sensitive queries from students ------------
+    if request.role != "lecturer" and is_sensitive_query(request.question):
+        logger.info(
+            "Sensitive query blocked for user %s in course %s: '%s'",
+            request.user_id, request.course_id, request.question[:80],
+        )
+        return PreparedQuery(
+            task=task, sources=[],
+            instant_answer=get_sensitive_refusal(),
+            confidence=1.0,
+        )
+
     conversation_history = _build_conversation_context(
         db, request.user_id, request.course_id, request.session_key or "",
     )
@@ -211,6 +224,7 @@ def prepare_query(request: QueryRequest, db: Session) -> PreparedQuery:
             query=request.question,
             n_results=10 if task in ("quiz", "exam_prep") else 5,
             material_ids=material_ids if material_ids else None,
+            role=request.role,
         )
     except Exception as e:
         logger.error(f"Hybrid retrieval error: {e}")

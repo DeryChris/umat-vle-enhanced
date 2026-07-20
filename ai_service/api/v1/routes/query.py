@@ -5,6 +5,7 @@ from models.schemas import QueryRequest, QueryResponse, QuizData
 from models.database import get_db
 from middleware.auth import verify_token
 from core.llm_processor import LLMProcessor
+from core.content_classifier import check_response_leakage
 from api.v1.query_pipeline import prepare_query, log_chat, extract_quiz_json
 from config import get_settings
 from collections import defaultdict
@@ -101,6 +102,10 @@ async def query_course_ai_stream(
             return
 
         answer = "".join(answer_parts).strip()
+
+        # --- Privacy Layer 5: output leak detection ----------------------
+        answer = check_response_leakage(answer, request.role)
+
         elapsed_ms = (time.time() - start_time) * 1000
         log_chat(db, request, answer, prepared.sources, elapsed_ms)
 
@@ -167,6 +172,9 @@ async def query_course_ai(
             sources=prepared.sources,
             confidence=0.0,
         )
+
+    # --- Privacy Layer 5: output leak detection --------------------------
+    answer = check_response_leakage(answer, request.role)
 
     elapsed_ms = (time.time() - start_time) * 1000
     log_chat(db, request, answer, prepared.sources, elapsed_ms)

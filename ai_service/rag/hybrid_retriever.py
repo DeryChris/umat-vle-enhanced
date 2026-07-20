@@ -87,6 +87,7 @@ class HybridRetriever:
         query: str,
         n_results: int,
         material_ids: Optional[List[int]] = None,
+        role: str = "student",
     ) -> List[Tuple[str, dict]]:
         docs, bm25, metas = self._load_corpus(course_id, material_ids)
         if not docs or bm25 is None:
@@ -102,6 +103,12 @@ class HybridRetriever:
             meta = metas[idx] if idx < len(metas) else {}
             meta = dict(meta) if meta else {}
             meta["bm25_score"] = float(score)
+
+            # --- Privacy Layer 2: visibility filter on BM25 results ---
+            if role not in ("lecturer", "admin"):
+                if meta.get("visibility", "student") in ("lecturer", "admin"):
+                    continue
+
             results.append((docs[idx], meta))
         return results
 
@@ -163,20 +170,35 @@ class HybridRetriever:
         query: str,
         n_results: int = 5,
         material_ids: Optional[List[int]] = None,
+        role: str = "student",
     ) -> List[Tuple[str, dict]]:
-        """Hybrid search: fuse dense (Chroma) with BM25 keyword retrieval."""
-        keyword = self._bm25_search(course_id, query, n_results * 2, material_ids)
+        """Hybrid search: fuse dense (Chroma) with BM25 keyword retrieval.
+
+        Privacy Layer 2: when role is not 'lecturer'/'admin', chunks whose
+        ``visibility`` metadata is ``"lecturer"`` or ``"admin"`` are excluded
+        from both the dense and keyword result sets.
+        """
+        keyword = self._bm25_search(course_id, query, n_results * 2, material_ids, role=role)
         dense = self._vector.similarity_search(
-            course_id, query, n_results * 2, material_ids
+            course_id, query, n_results * 2, material_ids, role=role,
         )
 
         if not dense:
             return keyword[:n_results]
 
         fused = _reciprocal_rank_fusion([dense, keyword])
+
+        # Safety-net visibility filter on fused results
+        if role not in ("lecturer", "admin"):
+            fused = [
+                (doc, meta, score)
+                for doc, meta, score in fused
+                if meta.get("visibility", "student") not in ("lecturer", "admin")
+            ]
+
         return [(doc, meta) for doc, meta, _ in fused[:n_results]]
 
-    def as_langchain_tool(self, course_id: int, material_ids: Optional[List[int]] = None):
+    def as_langchain_tool(self, course_id: int, material_ids: Optional[List[int]] = None, role: str = "student"):
         """Return a LangChain @tool bound to a specific course namespace."""
         from langchain.tools import tool
 
@@ -190,6 +212,7 @@ class HybridRetriever:
                 query=query,
                 n_results=3,
                 material_ids=material_ids,
+                role=role,
             )
             if not nodes:
                 return "No matching course materials found."

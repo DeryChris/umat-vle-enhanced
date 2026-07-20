@@ -10,6 +10,7 @@ from models.database import get_db, IndexedDocument
 from middleware.auth import verify_token
 from core.document_loader import DocumentLoader
 from core.vector_store import VectorStoreManager
+from core.content_classifier import classify_content, validate_visibility
 import os
 import uuid
 from pathlib import Path
@@ -36,12 +37,14 @@ ALLOWED_EXTENSIONS = {
 
 @router.post("/index", response_model=IndexMaterialResponse)
 async def index_material(
-    course_id:   int        = Form(...),
-    material_id: int        = Form(...),
-    filename:    str        = Form(...),
-    file:        UploadFile = File(...),
-    db:          Session    = Depends(get_db),
-    token:       str        = Depends(verify_token),
+    course_id:     int        = Form(...),
+    material_id:   int        = Form(...),
+    filename:      str        = Form(...),
+    file:          UploadFile = File(...),
+    visibility:    str        = Form(""),
+    content_type:  str        = Form(""),
+    db:            Session    = Depends(get_db),
+    token:         str        = Depends(verify_token),
 ):
     file_ext = Path(filename).suffix.lower()
 
@@ -62,11 +65,24 @@ async def index_material(
         if not text.strip():
             raise HTTPException(status_code=400, detail="File is empty or could not be parsed")
 
+        # --- Privacy Layer 1: classify content visibility ----------------
+        # Caller-supplied visibility takes priority; fall back to
+        # filename-based heuristics, then to the default ("student").
+        if visibility:
+            vis = validate_visibility(visibility)
+            ct  = content_type or "lecture_notes"
+        else:
+            auto = classify_content(filename)
+            vis  = auto["visibility"]
+            ct   = content_type or auto["content_type"]
+
         metadata = {
-            "source":      filename,
-            "source_type": "course_material",
-            "material_id": str(material_id),
-            "course_id":   str(course_id),
+            "source":       filename,
+            "source_type":  "course_material",
+            "material_id":  str(material_id),
+            "course_id":    str(course_id),
+            "visibility":   vis,
+            "content_type": ct,
         }
         texts, metadatas, ids = doc_loader.split_text(text, metadata)
         chunk_count = vector_store.add_documents(course_id, texts, metadatas, ids)

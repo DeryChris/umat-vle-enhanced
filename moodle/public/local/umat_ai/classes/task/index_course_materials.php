@@ -68,11 +68,17 @@ class index_course_materials extends \core\task\scheduled_task {
         // Existing records keyed by fileid. Files marked is_indexed=0 are
         // re-sent (failed first attempts, or a deliberate re-index after an
         // LLM provider switch: UPDATE {umat_ai_materials} SET is_indexed=0).
-        // fileid=0 rows come from manual uploads in materials.php and are
-        // not discoverable via the File API, so they are ignored here.
+        // fileid=0 rows may come from legacy code paths that stored files
+        // directly in dataroot/ai_materials/{courseid}/ without going through
+        // the Moodle File API.  These are handled separately below.
         $existingRecords = [];
+        $fileidZeroRecords = [];
         foreach ($DB->get_records('umat_ai_materials', ['courseid' => $courseid]) as $rec) {
-            if ($rec->fileid > 0) $existingRecords[$rec->fileid] = $rec;
+            if ($rec->fileid > 0) {
+                $existingRecords[$rec->fileid] = $rec;
+            } else if (!$rec->is_indexed) {
+                $fileidZeroRecords[] = $rec;
+            }
         }
 
         // Discover files via Moodle File API (mirrors get_course_materials logic)
@@ -157,6 +163,34 @@ class index_course_materials extends \core\task\scheduled_task {
             }
         }
 
+        // Handle fileid=0 records: files stored directly in
+        // dataroot/ai_materials/{courseid}/ without Moodle File API records.
+        if (!empty($fileidZeroRecords) && $result['indexed'] < 20) {
+            global $CFG;
+            foreach ($fileidZeroRecords as $rec) {
+                if ($result['indexed'] >= 20) {
+                    mtrace("  [umat_ai] Reached batch limit (20). Remaining fileid=0 records will be indexed next run.");
+                    break;
+                }
+                $diskPath = $CFG->dataroot . '/ai_materials/' . $courseid . '/' . $rec->filename;
+                if (!file_exists($diskPath) || filesize($diskPath) === 0) {
+                    mtrace("  [umat_ai]   Skipping fileid=0 record (id={$rec->id}): file not found on disk: {$rec->filename}");
+                    continue;
+                }
+                try {
+                    $this->send_disk_file_to_ai_service($diskPath, $rec->filename, $rec->id, $courseid);
+                    $rec->is_indexed  = 1;
+                    $rec->timeindexed = time();
+                    $DB->update_record('umat_ai_materials', $rec);
+                    $result['indexed']++;
+                    mtrace("  [umat_ai]   Indexed (fileid=0): {$rec->filename} (course {$courseid})");
+                } catch (\Exception $e) {
+                    mtrace("  [umat_ai]   Failed (fileid=0): {$rec->filename} - " . $e->getMessage());
+                    $result['failed']++;
+                }
+            }
+        }
+
         return $result;
     }
 
@@ -171,7 +205,16 @@ class index_course_materials extends \core\task\scheduled_task {
         // Save file to temp directory for upload
         $tempdir  = make_temp_directory('umat_ai_index');
         $filepath = $tempdir . '/' . $file->get_filename();
-        $file->copy_content_to($filepath);
+        $copied = $file->copy_content_to($filepath);
+
+        // Guard: if copy failed or file is empty on disk, skip gracefully.
+        if (!$copied || !file_exists($filepath) || filesize($filepath) === 0) {
+            @unlink($filepath);
+            throw new \moodle_exception(
+                'indexfailed', 'local_umat_ai', '',
+                "File content not available on disk (copy returned " . ($copied ? 'true' : 'false') . ")"
+            );
+        }
 
         try {
             $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($cfg['url'])]);
@@ -194,6 +237,36 @@ class index_course_materials extends \core\task\scheduled_task {
             }
         } finally {
             if (file_exists($filepath)) unlink($filepath);
+        }
+    }
+
+    /**
+     * Upload a raw filesystem file (not a stored_file) to the AI service.
+     * Used for fileid=0 records whose files live in dataroot/ai_materials/.
+     */
+    private function send_disk_file_to_ai_service(string $filepath, string $filename, int $materialId, int $courseid): void {
+        $cfg = local_umat_ai_get_service_config();
+        $url = $cfg['url'] . '/api/v1/materials/index';
+
+        $mimetype = mime_content_type($filepath) ?: 'application/octet-stream';
+
+        $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($cfg['url'])]);
+        $client->setHeader(['Authorization: Bearer ' . $cfg['token'], 'X-Request-Id: ' . local_umat_ai_request_id()]);
+        $client->setopt(['CURLOPT_TIMEOUT' => 120]);
+
+        $postData = [
+            'course_id'   => (string)$courseid,
+            'material_id' => (string)$materialId,
+            'filename'    => $filename,
+            'file'        => new \CURLFile($filepath, $mimetype, $filename),
+        ];
+
+        $raw = $client->post($url, $postData);
+        $response = @json_decode($raw, true);
+
+        if (!$response || empty($response['success'])) {
+            $detail = $response['detail'] ?? $response['message'] ?? 'Unknown error';
+            throw new \moodle_exception('indexfailed', 'local_umat_ai', '', $detail);
         }
     }
 }

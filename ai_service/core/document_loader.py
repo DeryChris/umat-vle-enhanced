@@ -334,10 +334,12 @@ class DocumentLoader:
         course_id:  int,
     ) -> Tuple[List[str], List[dict], List[str]]:
         metadata = {
-            "source":      f"transcript_{session_id}",
-            "source_type": "transcript",
-            "session_id":  session_id,
-            "course_id":   str(course_id),
+            "source":       f"transcript_{session_id}",
+            "source_type":  "transcript",
+            "session_id":   session_id,
+            "course_id":    str(course_id),
+            "visibility":   "student",   # transcripts are student-accessible by default
+            "content_type": "transcript",
         }
         return self.split_text(transcript, metadata)
 

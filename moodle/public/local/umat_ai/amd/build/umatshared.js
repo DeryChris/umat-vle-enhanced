@@ -264,24 +264,24 @@ define([], function() {
     function _umatShowTyping(cid, tid) {
         var c = document.getElementById(cid);
         if (!c) return;
+        // Prevent duplicate typing bubbles for the same request
+        if (document.getElementById(tid)) return;
         var d = document.createElement('div');
         d.id = tid;
+        d.className = 'umat-typing-wrap';
         d.setAttribute('role', 'status');
         d.setAttribute('aria-live', 'polite');
-        d.setAttribute('aria-label', 'AI is thinking');
-        d.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-typing"><span></span><span></span><span></span></div></div></div></div>';
+        d.setAttribute('aria-label', 'AI is preparing a response');
+        d.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai umat-typing-bubble"><div class="umat-typing" aria-hidden="true"><span></span><span></span><span></span></div><span class="umat-typing-label">AI is responding&hellip;</span></div></div></div>';
         c.appendChild(d);
         c.scrollTop = c.scrollHeight;
     }
 
     // ─── Hide typing indicator ─────────────────────── //
     function _umatHideTyping(tid) {
+        if (!tid) return;
         var e = document.getElementById(tid);
         if (e && e.parentNode) e.parentNode.removeChild(e);
-        document.querySelectorAll('.umat-typing').forEach(function(el){
-            var r = el.closest('[id^="typ_"]');
-            if (r && r.parentNode) r.parentNode.removeChild(r);
-        });
     }
 
     // ─── Append source chips to a streaming bubble ─── //
@@ -343,6 +343,8 @@ define([], function() {
     }
 
     // ─── Stream AI tutor response via SSE proxy ────── //
+    var _chatState = 'idle';  // idle | submitting | waiting | streaming | completed | failed
+
     function _umatStreamChat(opts) {
         var accumulated = '';
         var streamRow = null;
@@ -361,6 +363,16 @@ define([], function() {
         var firstTokenReceived = false;
         opts._retries = opts._retries || 0;
 
+        // --- State management ---
+        _chatState = 'submitting';
+        if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
+
+        // --- Prevent duplicate submissions ---
+        if (_activeStream && _activeStream !== controller) {
+            try { _activeStream.abort(); } catch(e) {}
+        }
+        _activeStream = controller;
+
         // --- Send-button management ---
         var sendBtnId = opts.sendBtnId || null;
         var sendInputId = opts.sendInputId || null;
@@ -378,29 +390,6 @@ define([], function() {
         }
         _disableSend();
 
-        // --- Cancel any previous active stream ---
-        if (_activeStream && _activeStream !== controller) {
-            try { _activeStream.abort(); } catch(e) {}
-        }
-        _activeStream = controller;
-
-        function doRetry() {
-            if (doneReceived) return;
-            opts._retries++;
-            if (opts._retries > maxRetries) {
-                _finishAll();
-                return;
-            }
-            if (streamRow && contentEl) {
-                var el = contentEl;
-                var existing = el.querySelector('.umat-retry-msg');
-                if (!existing) {
-                    el.insertAdjacentHTML('beforeend', '<div class="umat-retry-msg" style="padding:8px 0;opacity:.6;font-size:12px;">Reconnecting… (' + opts._retries + '/' + maxRetries + ')</div>');
-                }
-            }
-            setTimeout(function() { _umatStreamChat(opts); }, opts._retries * 2000);
-        }
-
         function hideTypingOnce() {
             if (typingHidden) return;
             typingHidden = true;
@@ -413,6 +402,8 @@ define([], function() {
                 return;
             }
             hideTypingOnce();
+            _chatState = 'streaming';
+            if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
             var c = document.getElementById(opts.msgsId);
             if (!c) {
                 return;
@@ -464,6 +455,10 @@ define([], function() {
         function _finishAll() {
             _enableSend();
             if (_activeStream === controller) _activeStream = null;
+            if (_chatState !== 'failed') {
+                _chatState = 'completed';
+                if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
+            }
         }
 
         function finishStream(payload) {
@@ -499,6 +494,55 @@ define([], function() {
             }
         }
 
+        function showFailureUI(message) {
+            hideTypingOnce();
+            _chatState = 'failed';
+            if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
+            // Ensure we have a bubble to show the error in
+            ensureBubble();
+            if (streamRow) {
+                streamRow.classList.remove('umat-msg-streaming');
+            }
+            if (bubbleEl) {
+                bubbleEl.classList.remove('is-streaming');
+            }
+            if (contentEl) {
+                contentEl.innerHTML = '<p class="umat-ai-error-text">The AI could not respond. Please try again.</p>';
+                contentEl.style.display = '';
+            }
+            if (statusEl) {
+                statusEl.style.display = 'none';
+            }
+            // Add retry button
+            if (bubbleEl) {
+                var existingRetry = bubbleEl.querySelector('.umat-retry-btn');
+                if (!existingRetry) {
+                    var retryBtn = document.createElement('button');
+                    retryBtn.className = 'umat-retry-btn';
+                    retryBtn.type = 'button';
+                    retryBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;">refresh</span>Retry';
+                    retryBtn.setAttribute('aria-label', 'Retry sending message');
+                    retryBtn.addEventListener('click', function() {
+                        // Remove the failed bubble and retry
+                        if (streamRow && streamRow.parentNode) {
+                            streamRow.parentNode.removeChild(streamRow);
+                        }
+                        streamRow = null;
+                        contentEl = null;
+                        bubbleEl = null;
+                        typingHidden = false;
+                        firstTokenReceived = false;
+                        opts._retries = 0;
+                        _chatState = 'idle';
+                        _umatStreamChat(opts);
+                    });
+                    bubbleEl.parentNode.appendChild(retryBtn);
+                }
+            }
+            _enableSend();
+            if (_activeStream === controller) _activeStream = null;
+        }
+
         var body = new FormData();
         body.append('sesskey', opts.sesskey);
         body.append('courseid', String(opts.courseid));
@@ -514,6 +558,8 @@ define([], function() {
         }).then(function(response) {
             return _umatConsumeSseStream(response, function(event, payload) {
                 if (event === 'meta') {
+                    _chatState = 'waiting';
+                    if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
                     hideTypingOnce();
                     if (opts.onMeta) opts.onMeta(payload);
                 } else if (event === 'token') {
@@ -548,8 +594,7 @@ define([], function() {
                     _finishAll();
                     if (opts.onDone) opts.onDone(payload, accumulated);
                 } else if (event === 'error') {
-                    hideTypingOnce();
-                    _finishAll();
+                    showFailureUI(payload.message || 'An error occurred.');
                     if (opts.onError) opts.onError(payload);
                 }
             });
@@ -560,10 +605,17 @@ define([], function() {
                 if (opts.onDone) opts.onDone({ stopped: true }, accumulated);
                 return;
             }
-            hideTypingOnce();
-            _finishAll();
+            // Check if we should retry
+            if (opts._retries < maxRetries) {
+                opts._retries++;
+                hideTypingOnce();
+                _chatState = 'waiting';
+                if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
+                setTimeout(function() { _umatStreamChat(opts); }, opts._retries * 2000);
+                return;
+            }
+            showFailureUI(err.message || 'Connection error.');
             if (opts.onError) opts.onError({ message: err.message || 'Connection error.' });
-            doRetry();
         });
 
         promise.abort = function() { controller.abort(); };
@@ -1620,6 +1672,7 @@ define([], function() {
             }
         },
         _isStreamActive: function() { return !!_activeStream; },
+        getChatState: function() { return _chatState; },
 
         // Voice
         _umatInitVoice: _umatInitVoice,

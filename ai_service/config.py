@@ -124,14 +124,17 @@ def _validate_provider(s: Settings) -> None:
 
     # Validate lecturer provider (defaults to openai, falls back to llm_provider).
     lecturer_provider = s.llm_provider_lecturer or s.llm_provider
-    if lecturer_provider not in ("gemini", "openai"):
-        _fail_startup([f"\nLLM_PROVIDER_LECTURER must be 'gemini' or 'openai', got: {lecturer_provider!r}"])
+    if lecturer_provider not in ("gemini", "openai", "openrouter"):
+        _fail_startup([f"\nLLM_PROVIDER_LECTURER must be 'gemini', 'openai', or 'openrouter', got: {lecturer_provider!r}"])
     if lecturer_provider == "gemini" and not s.google_api_key:
         _fail_startup(["\nLLM_PROVIDER_LECTURER is 'gemini' but GOOGLE_API_KEY is not set.",
                        "Get a key at https://aistudio.google.com/apikey"])
     if lecturer_provider == "openai" and not s.openai_api_key:
         _fail_startup(["\nLLM_PROVIDER_LECTURER is 'openai' but OPENAI_API_KEY is not set.",
                        "Get a key at https://platform.openai.com/api-keys"])
+    if lecturer_provider == "openrouter" and not s.openrouter_api_key:
+        _fail_startup(["\nLLM_PROVIDER_LECTURER is 'openrouter' but OPENROUTER_API_KEY is not set.",
+                       "Get your OpenRouter API key at https://openrouter.ai/keys."])
 
 
 @lru_cache()
