@@ -15,16 +15,26 @@ os.makedirs(_cache_dir, exist_ok=True)
 _llm_cache = Cache(_cache_dir, size_limit=500 * 1024 * 1024)  # 500 MB limit.
 
 
-def _make_llm(temperature: float, generation_config: dict = None):
-    """Build a chat model for the configured provider (gemini, openai, or openrouter)."""
-    if settings.llm_provider == "openai":
+def _make_llm(temperature: float, generation_config: dict = None, provider: str = None,
+              response_format: dict = None):
+    """Build a chat model for the given provider ('gemini', 'openai', or 'openrouter').
+    Defaults to settings.llm_provider when provider is None.
+    response_format is OpenAI-specific (e.g. {"type": "json_object"})."""
+    if provider is None:
+        provider = settings.llm_provider
+    if provider == "openai":
         from langchain_openai import ChatOpenAI
-        return ChatOpenAI(
+        kwargs = dict(
             model=settings.openai_llm_model,
             api_key=settings.openai_api_key,
             temperature=temperature,
         )
-    if settings.llm_provider == "openrouter":
+        if settings.openai_base_url:
+            kwargs["base_url"] = settings.openai_base_url
+        if response_format:
+            kwargs["model_kwargs"] = {"response_format": response_format}
+        return ChatOpenAI(**kwargs)
+    if provider == "openrouter":
         from langchain_openai import ChatOpenAI
         return ChatOpenAI(
             model=settings.openrouter_model,
@@ -283,8 +293,9 @@ RESPONSE:"""
 
 
 class LLMProcessor:
-    def __init__(self):
-        self.llm = _make_llm(temperature=0.3)
+    def __init__(self, provider: str = None):
+        self.provider = provider or settings.llm_provider
+        self.llm = _make_llm(temperature=0.3, provider=self.provider)
 
     def _invoke(self, prompt: str, temperature: float, max_chars: int) -> str:
         # Build a deterministic cache key so identical prompts skip the LLM.
@@ -294,7 +305,7 @@ class LLMProcessor:
         if cached is not None:
             return cached
 
-        llm = _make_llm(temperature=temperature)
+        llm = _make_llm(temperature=temperature, provider=self.provider)
         prompt = prompt[:max_chars]
         result = llm.invoke(prompt)
         text = result.content.strip()
@@ -343,20 +354,16 @@ class LLMProcessor:
         return self._invoke(prompt, temperature=temperature, max_chars=24000)
 
     async def generate_assessment(self, prompt: str, temperature: float = 0.3, max_chars: int = 12000) -> str:
-        """Generate questions with strict JSON output via Gemini response_mime_type."""
-        raw = f"assessment___{prompt}___{temperature}___{max_chars}"
-        key = hashlib.sha256(raw.encode()).hexdigest()
-        cached = _llm_cache.get(key)
-        if cached is not None:
-            return cached
-
-        gen_config = {"response_mime_type": "application/json"}
-        llm = _make_llm(temperature=temperature, generation_config=gen_config)
+        """Generate questions with strict JSON output. No caching — every call is fresh."""
+        if self.provider == "openai":
+            llm = _make_llm(temperature=temperature, provider=self.provider,
+                            response_format={"type": "json_object"})
+        else:
+            gen_config = {"response_mime_type": "application/json"}
+            llm = _make_llm(temperature=temperature, generation_config=gen_config, provider=self.provider)
         prompt = prompt[:max_chars]
         result = llm.invoke(prompt)
         text = result.content.strip()
-
-        _llm_cache.set(key, text, expire=900)
         return text
 
     async def grade_theory_answer(self, question: str, answer_hint: str, student_answer: str) -> dict:
@@ -386,9 +393,9 @@ class LLMProcessor:
     def stream_prompt(self, prompt: str, task: str = "qa"):
         """Yield text chunks as the LLM generates them."""
         temperature = 0.1 if task == "qa" else 0.4
-        llm = _make_llm(temperature=temperature)
+        llm = _make_llm(temperature=temperature, provider=self.provider)
         prompt = prompt[:24000]
         for chunk in llm.stream(prompt):
-            text = getattr(chunk, "content", None) or str(chunk)
-            if text:
+            text = getattr(chunk, "content", None)
+            if isinstance(text, str) and text:
                 yield text

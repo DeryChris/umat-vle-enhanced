@@ -405,29 +405,204 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026070100, 'local', 'umat_ai');
     }
 
-    if ($oldversion < 2026070700) {
-        // Ensure umat_ai_quiz_attempts table exists (may have been missed on fresh installs).
-        $table = new xmldb_table('umat_ai_quiz_attempts');
-        if (!$dbman->table_exists($table)) {
-            $table->add_field('id',              XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
-            $table->add_field('userid',          XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, null);
-            $table->add_field('courseid',        XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, null);
-            $table->add_field('session_key',     XMLDB_TYPE_CHAR,   '64',  null, null,  null, null);
-            $table->add_field('quiz_title',      XMLDB_TYPE_CHAR,   '255', null, null,  null, '');
-            $table->add_field('questions_json',  XMLDB_TYPE_TEXT,    null,  null, null,  null, null);
-            $table->add_field('answers_json',    XMLDB_TYPE_TEXT,    null,  null, null,  null, null);
-            $table->add_field('graded_json',     XMLDB_TYPE_TEXT,    null,  null, null,  null, null);
-            $table->add_field('score',           XMLDB_TYPE_INTEGER, '4',   null, null,  null, null);
-            $table->add_field('total',           XMLDB_TYPE_INTEGER, '4',   null, null,  null, null);
-            $table->add_field('status',          XMLDB_TYPE_CHAR,   '20',  null, XMLDB_NOTNULL,  null, 'in_progress');
-            $table->add_field('timecreated',     XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, '0');
-            $table->add_field('timemodified',    XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, '0');
-            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
-            $table->add_index('idx_qa_user_course', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid']);
-            $table->add_index('idx_qa_status',      XMLDB_INDEX_NOTUNIQUE, ['status']);
+    if ($oldversion < 2026070900) {
+        // Defensively create any tables that may have been missed on partial upgrades.
+        // Each table is verified via old-style install.xml definition.
+        $defs = [
+            'chat_log_helpfulness' => [
+                'fields' => [
+                    ['id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null],
+                    ['chatlogid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['rating', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '1'],
+                    ['timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                ],
+                'keys' => [
+                    ['primary', XMLDB_KEY_PRIMARY, ['id']],
+                    ['chatlog_fk', XMLDB_KEY_FOREIGN, ['chatlogid'], 'umat_ai_chat_logs', ['id'], 'cascade'],
+                ],
+                'indexes' => [
+                    ['userid', XMLDB_INDEX_NOTUNIQUE, ['userid']],
+                    ['timecreated', XMLDB_INDEX_NOTUNIQUE, ['timecreated']],
+                ],
+            ],
+            'material_progress' => [
+                'fields' => [
+                    ['id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null],
+                    ['userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['materialid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['progress_pct', XMLDB_TYPE_NUMBER, '5, 1', null, XMLDB_NOTNULL, null, '0.0'],
+                    ['time_spent_sec', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                    ['last_position', XMLDB_TYPE_INTEGER, '10', null, null, null, null],
+                    ['timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                ],
+                'keys' => [
+                    ['primary', XMLDB_KEY_PRIMARY, ['id']],
+                    ['material_fk', XMLDB_KEY_FOREIGN, ['materialid'], 'umat_ai_materials', ['id'], 'cascade'],
+                ],
+                'indexes' => [
+                    ['user_course_material', XMLDB_INDEX_UNIQUE, ['userid', 'courseid', 'materialid']],
+                    ['courseid', XMLDB_INDEX_NOTUNIQUE, ['courseid']],
+                ],
+            ],
+            'topic_friction' => [
+                'fields' => [
+                    ['id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null],
+                    ['courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['topic_label', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, ''],
+                    ['question_volume', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                    ['friction_score', XMLDB_TYPE_NUMBER, '5, 1', null, XMLDB_NOTNULL, null, '0.0'],
+                    ['student_count', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                    ['severity', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'minor'],
+                    ['computed_at', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                ],
+                'keys' => [['primary', XMLDB_KEY_PRIMARY, ['id']]],
+                'indexes' => [
+                    ['course_topic', XMLDB_INDEX_UNIQUE, ['courseid', 'topic_label']],
+                    ['course_severity', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'severity']],
+                ],
+            ],
+            'metric_trends' => [
+                'fields' => [
+                    ['id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null],
+                    ['courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['engagement_score', XMLDB_TYPE_NUMBER, '5, 1', null, XMLDB_NOTNULL, null, '0.0'],
+                    ['at_risk_count', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                    ['total_students', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                    ['snapshot_date', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                ],
+                'keys' => [['primary', XMLDB_KEY_PRIMARY, ['id']]],
+                'indexes' => [['course_date', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'snapshot_date']]],
+            ],
+            'issue_reports' => [
+                'fields' => [
+                    ['id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null],
+                    ['userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['category', XMLDB_TYPE_CHAR, '30', null, XMLDB_NOTNULL, null, 'other'],
+                    ['topic', XMLDB_TYPE_CHAR, '255', null, null, null, null],
+                    ['description', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null],
+                    ['status', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'open'],
+                    ['lecturer_notes', XMLDB_TYPE_TEXT, null, null, null, null, null],
+                    ['lecturer_response', XMLDB_TYPE_TEXT, null, null, null, null, null],
+                    ['response_seen', XMLDB_TYPE_INTEGER, '2', null, XMLDB_NOTNULL, null, '0'],
+                    ['timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                    ['timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                ],
+                'keys' => [['primary', XMLDB_KEY_PRIMARY, ['id']]],
+                'indexes' => [
+                    ['user_course', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid']],
+                    ['course_status', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'status']],
+                ],
+            ],
+            'quizgen_jobs' => [
+                'fields' => [
+                    ['id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null],
+                    ['courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['material_id', XMLDB_TYPE_INTEGER, '10', null, null, null, null],
+                    ['source_text', XMLDB_TYPE_TEXT, null, null, null, null, null],
+                    ['config_json', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null],
+                    ['category_name', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null],
+                    ['status', XMLDB_TYPE_CHAR, '30', null, XMLDB_NOTNULL, null, 'pending'],
+                    ['questions_json', XMLDB_TYPE_TEXT, null, null, null, null, null],
+                    ['xml_content', XMLDB_TYPE_TEXT, null, null, null, null, null],
+                    ['quiz_id', XMLDB_TYPE_INTEGER, '10', null, null, null, null],
+                    ['failure_reason', XMLDB_TYPE_TEXT, null, null, null, null, null],
+                    ['timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                    ['timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                ],
+                'keys' => [['primary', XMLDB_KEY_PRIMARY, ['id']]],
+                'indexes' => [
+                    ['course_status', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'status']],
+                    ['user_course', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid']],
+                ],
+            ],
+            'student_metrics' => [
+                'fields' => [
+                    ['id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null],
+                    ['userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['logins', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                    ['avg_quiz_grade', XMLDB_TYPE_NUMBER, '10, 2', null, XMLDB_NOTNULL, null, '0'],
+                    ['ai_questions_asked', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                    ['risk_score', XMLDB_TYPE_NUMBER, '10, 2', null, XMLDB_NOTNULL, null, '0'],
+                    ['last_active', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                ],
+                'keys' => [['primary', XMLDB_KEY_PRIMARY, ['id']]],
+                'indexes' => [
+                    ['course_user', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'userid']],
+                    ['course_risk', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'risk_score']],
+                ],
+            ],
+            'interventions' => [
+                'fields' => [
+                    ['id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null],
+                    ['userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['lecturerid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['action_type', XMLDB_TYPE_CHAR, '50', null, XMLDB_NOTNULL, null, null],
+                    ['timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                ],
+                'keys' => [['primary', XMLDB_KEY_PRIMARY, ['id']]],
+                'indexes' => [
+                    ['user_course_action', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid', 'action_type', 'timecreated']],
+                ],
+            ],
+            'videos' => [
+                'fields' => [
+                    ['id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null],
+                    ['materialid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null],
+                    ['job_id', XMLDB_TYPE_CHAR, '100', null, null, null, null],
+                    ['status', XMLDB_TYPE_CHAR, '30', null, XMLDB_NOTNULL, null, 'queued'],
+                    ['video_url', XMLDB_TYPE_TEXT, null, null, null, null, null],
+                    ['timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                    ['timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0'],
+                ],
+                'keys' => [
+                    ['primary', XMLDB_KEY_PRIMARY, ['id']],
+                    ['material_fk', XMLDB_KEY_FOREIGN, ['materialid'], 'umat_ai_materials', ['id']],
+                ],
+                'indexes' => [['courseid', XMLDB_INDEX_NOTUNIQUE, ['courseid']]],
+            ],
+        ];
+
+        foreach ($defs as $short_name => $def) {
+            $tname = "umat_ai_{$short_name}";
+            $table = new xmldb_table($tname);
+            if ($dbman->table_exists($table)) {
+                continue;
+            }
+            foreach ($def['fields'] as $fdef) {
+                // xmldb_table::add_field(string $name, $type, $precision, ...)
+                $table->add_field(...$fdef);
+            }
+            foreach ($def['keys'] as $kdef) {
+                // xmldb_table::add_key(string $name, $type, array $fields, ...)
+                $table->add_key(...$kdef);
+            }
+            foreach ($def['indexes'] as $idef) {
+                // xmldb_table::add_index(string $name, $type, array $fields)
+                $table->add_index(...$idef);
+            }
             $dbman->create_table($table);
         }
-        upgrade_plugin_savepoint(true, 2026070700, 'local', 'umat_ai');
+
+        upgrade_plugin_savepoint(true, 2026070900, 'local', 'umat_ai');
+    }
+
+    if ($oldversion < 2026071600) {
+        // Add source_type, userid, upload_filename to umat_ai_sessions for lecture transcription uploads.
+        $table = new xmldb_table('umat_ai_sessions');
+        $f1 = new xmldb_field('source_type', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'bbb', 'cmid');
+        $f2 = new xmldb_field('userid', XMLDB_TYPE_INTEGER, '10', null, null, null, '0', 'courseid');
+        $f3 = new xmldb_field('upload_filename', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'recording_url');
+        if (!$dbman->field_exists($table, $f1)) $dbman->add_field($table, $f1);
+        if (!$dbman->field_exists($table, $f2)) $dbman->add_field($table, $f2);
+        if (!$dbman->field_exists($table, $f3)) $dbman->add_field($table, $f3);
+        upgrade_plugin_savepoint(true, 2026071600, 'local', 'umat_ai');
     }
 
     return true;

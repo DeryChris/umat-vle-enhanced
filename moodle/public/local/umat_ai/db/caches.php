@@ -17,13 +17,4 @@ $definitions = [
         'staticacceleration'     => true,
         'staticaccelerationsize' => 32,
     ],
-    // Student-specific progress dashboard.
-    // Key: "prog_{userid}_{courseid}_{days}"
-    'student_progress' => [
-        'mode'                   => \cache_store::MODE_APPLICATION,
-        'simplekeys'             => true,
-        'ttl'                    => 300,
-        'staticacceleration'     => true,
-        'staticaccelerationsize' => 32,
-    ],
 ];

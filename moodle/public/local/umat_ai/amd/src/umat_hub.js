@@ -14,7 +14,8 @@ var RATE_MAX = 10;
 var qTimes   = [];
 var selMat  = [];
 var loaded  = {};
-var activeCID = 0;
+var defaultCID = (UD.courses && UD.courses.length) ? UD.courses[0].id : 0;
+var activeCID = defaultCID;
 
 /* FAB / overlay toggle */
 var fab=document.getElementById('hub-fab');
@@ -333,7 +334,7 @@ function loadLibrary(cid){
       if(vb)vb.addEventListener('click',function(e){e.stopPropagation();tile.click();});
     });
     var srch=document.getElementById('hub-lib-search');if(srch)srch.addEventListener('input',function(){var q=this.value.toLowerCase();g.querySelectorAll('.yt-tile').forEach(function(t){t.style.display=(!q||t.textContent.toLowerCase().includes(q))?'':'none';});});
-  },function(){g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">error_outline</span><p>Could not load materials.</p></div>';});
+  },function(){console.error('[umat] hub loadLibrary failed');g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">error_outline</span><p>Could not load materials.</p></div>';});
 }
 function openHubLibPicker(){
   var ov=document.getElementById('hub-lib-cs-ov');
@@ -362,19 +363,19 @@ function sendQ(q){
   if(qRemaining()<=0){appendMsg('Rate limit reached. Please wait a moment before asking again.',false,document.getElementById('hub-msgs'),[]);return;}
   qTimes.push(Date.now());updateRate();
   var ctx=selMat.length>0?'[Referencing: '+selMat.map(function(m){return m.name;}).join(', ')+'] '+q:q;
-  var cid=parseInt(document.getElementById('hub-course-sel').value)||activeCID||1;
+  var cid=parseInt(document.getElementById('hub-course-sel').value)||activeCID||defaultCID;
   var msgs=document.getElementById('hub-msgs');
   appendMsg(q,true,msgs);document.getElementById('hub-input').value='';
   var tid='h_'+Date.now();
-  var t=document.createElement('div');t.id=tid;t.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-typing"><span></span><span></span><span></span></div></div></div></div>';
-  msgs.appendChild(t);msgs.scrollTop=msgs.scrollHeight;
+  _umatShowTyping('hub-msgs', tid);
   _umatStreamChat({
     url:streamUrl,sesskey:moodleSesskey,courseid:cid,question:ctx,session_key:sessKey,
     material_ids:selMat.map(function(m){return m.id;}),msgsId:'hub-msgs',
+    typingId:tid,
     onMeta:function(meta){syncRemaining(meta.remaining);updateRate();},
-    onDone:function(meta){var e=document.getElementById(tid);if(e)e.parentNode.removeChild(e);syncRemaining(meta.remaining);updateRate();},
+    onDone:function(meta){_umatHideTyping(tid);syncRemaining(meta.remaining);updateRate();},
     onError:function(err){
-      var e=document.getElementById(tid);if(e)e.parentNode.removeChild(e);
+      _umatHideTyping(tid);
       if(err.error==='rate_limit'){qTimes.pop();updateRate();}
       appendMsg(err.message||'Connection error.',false,msgs,[]);
     }

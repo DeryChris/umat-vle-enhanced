@@ -176,7 +176,7 @@ $string['quizgen_auto_intro']              = 'This quiz was automatically genera
 $string['quizgen_ai_invalid']              = 'The AI service returned an invalid response. Please try again.';
 $string['quizgen_import_preprocess_failed'] = 'Failed to preprocess the quiz XML for import.';
 $string['quizgen_import_process_failed']   = 'Failed to import questions into the question bank.';
-$string['quizgen_not_ready']               = 'Quiz generation is not yet complete.';
+$string['quizgen_not_ready']               = 'Quiz generation is not yet complete. Check the job status and retry if needed.';
 $string['quizgen_no_xml']                  = 'No XML content is available for import.';
 
 /* ---- Tasks ---- */

@@ -16,20 +16,28 @@ require_once($CFG->libdir . '/externallib.php');
 class quizgen extends \external_api {
 
     // ------------------------------------------------------------------ //
-    // generate_quiz_draft — create job + queue adhoc task                 //
+    // generate_quiz_draft — create job + call AI service synchronously    //
     // ------------------------------------------------------------------ //
     public static function generate_quiz_draft_parameters() {
         return new \external_function_parameters([
-            'courseid'        => new \external_value(PARAM_INT, 'Target course ID'),
-            'source_type'     => new \external_value(PARAM_ALPHA, '"text" or "material_id"'),
-            'content'         => new \external_value(PARAM_RAW, 'Raw text content', VALUE_DEFAULT, null),
-            'material_id'     => new \external_value(PARAM_INT, 'ID of an indexed material', VALUE_DEFAULT, null),
-            'bloom_level'     => new \external_value(PARAM_ALPHA, 'Bloom\'s taxonomy level', VALUE_DEFAULT, 'understand'),
-            'question_types'  => new \external_value(PARAM_RAW, 'JSON array of question type strings', VALUE_DEFAULT, '["multichoice"]'),
-            'total_questions' => new \external_value(PARAM_INT, 'Number of questions to generate', VALUE_DEFAULT, 5),
-            'difficulty'      => new \external_value(PARAM_ALPHA, '"easy", "medium", or "hard"', VALUE_DEFAULT, 'medium'),
-            'category_name'   => new \external_value(PARAM_TEXT, 'Name for the question category (and quiz name)', VALUE_DEFAULT, ''),
-            'ai_instructions' => new \external_value(PARAM_RAW, 'Custom instructions for the AI', VALUE_DEFAULT, ''),
+            'courseid'              => new \external_value(PARAM_INT, 'Target course ID'),
+            'source_type'           => new \external_value(PARAM_ALPHA, '"text" or "material_id"'),
+            'content'               => new \external_value(PARAM_RAW, 'Raw text content', VALUE_DEFAULT, null),
+            'material_ids'          => new \external_value(PARAM_RAW, 'JSON array of material IDs', VALUE_DEFAULT, '[]'),
+            'bloom_level'           => new \external_value(PARAM_RAW, 'Bloom level string or JSON distribution', VALUE_DEFAULT, 'understand'),
+            'question_types'        => new \external_value(PARAM_RAW, 'JSON object mapping type to count', VALUE_DEFAULT, '{"multichoice":5}'),
+            'difficulty'            => new \external_value(PARAM_RAW, 'Difficulty string or JSON distribution', VALUE_DEFAULT, 'medium'),
+            'marks_per_question'    => new \external_value(PARAM_FLOAT, 'Marks per question', VALUE_DEFAULT, 1.0),
+            'category_name'         => new \external_value(PARAM_TEXT, 'Quiz/category name', VALUE_DEFAULT, ''),
+            'ai_instructions'       => new \external_value(PARAM_RAW, 'Custom instructions for the AI', VALUE_DEFAULT, ''),
+            'grounding_mode'        => new \external_value(PARAM_ALPHA, 'Grounding mode: strict, applied, enriched', VALUE_DEFAULT, 'applied'),
+            'instruction_presets'   => new \external_value(PARAM_RAW, 'JSON array of selected preset keys', VALUE_DEFAULT, '[]'),
+            'quiz_description'      => new \external_value(PARAM_RAW, 'Quiz introduction text', VALUE_DEFAULT, ''),
+            'shuffle_questions'     => new \external_value(PARAM_INT, 'Shuffle question order (0/1)', VALUE_DEFAULT, 0),
+            'shuffle_answers'       => new \external_value(PARAM_INT, 'Shuffle answer order (0/1)', VALUE_DEFAULT, 1),
+            'show_feedback'         => new \external_value(PARAM_INT, 'Show feedback during review (0/1)', VALUE_DEFAULT, 1),
+            'time_limit'            => new \external_value(PARAM_INT, 'Time limit in minutes (0=unlimited)', VALUE_DEFAULT, 0),
+            'max_attempts'          => new \external_value(PARAM_INT, 'Max attempts (-1=unlimited)', VALUE_DEFAULT, -1),
         ]);
     }
 
@@ -37,83 +45,228 @@ class quizgen extends \external_api {
         $courseid,
         $source_type,
         $content = null,
-        $material_id = null,
+        $material_ids = '[]',
         $bloom_level = 'understand',
-        $question_types = '["multichoice"]',
-        $total_questions = 5,
+        $question_types = '{"multichoice":5}',
         $difficulty = 'medium',
+        $marks_per_question = 1.0,
         $category_name = '',
-        $ai_instructions = ''
+        $ai_instructions = '',
+        $grounding_mode = 'applied',
+        $instruction_presets = '[]',
+        $quiz_description = '',
+        $shuffle_questions = 0,
+        $shuffle_answers = 1,
+        $show_feedback = 1,
+        $time_limit = 0,
+        $max_attempts = -1
     ) {
         global $DB, $USER;
 
         $params = self::validate_parameters(self::generate_quiz_draft_parameters(), [
-            'courseid'        => $courseid,
-            'source_type'     => $source_type,
-            'content'         => $content,
-            'material_id'     => $material_id,
-            'bloom_level'     => $bloom_level,
-            'question_types'  => $question_types,
-            'total_questions' => $total_questions,
-            'difficulty'      => $difficulty,
-            'category_name'   => $category_name,
-            'ai_instructions' => $ai_instructions,
+            'courseid'             => $courseid,
+            'source_type'          => $source_type,
+            'content'              => $content,
+            'material_ids'         => $material_ids,
+            'bloom_level'          => $bloom_level,
+            'question_types'       => $question_types,
+            'difficulty'           => $difficulty,
+            'marks_per_question'   => $marks_per_question,
+            'category_name'        => $category_name,
+            'ai_instructions'      => $ai_instructions,
+            'grounding_mode'       => $grounding_mode,
+            'instruction_presets'  => $instruction_presets,
+            'quiz_description'     => $quiz_description,
+            'shuffle_questions'    => $shuffle_questions,
+            'shuffle_answers'      => $shuffle_answers,
+            'show_feedback'        => $show_feedback,
+            'time_limit'           => $time_limit,
+            'max_attempts'         => $max_attempts,
         ]);
 
         $context = \context_course::instance($params['courseid']);
         self::validate_context($context);
         require_capability('local/umat_ai:viewanalytics', $context);
 
+        @set_time_limit(180);
+
+        // Parse question_types as dict.
         $qtypes = json_decode($params['question_types'], true);
         if (!is_array($qtypes) || empty($qtypes)) {
-            $qtypes = ['multichoice'];
+            $qtypes = ['multichice' => 5];
         }
 
+        // Parse bloom_level — can be a string or a dict.
+        $bloom = json_decode($params['bloom_level'], true);
+        if (!is_array($bloom)) {
+            $bloom = $params['bloom_level'];
+        }
+
+        // Parse difficulty — can be a string or a dict.
+        $diff = json_decode($params['difficulty'], true);
+        if (!is_array($diff)) {
+            $diff = $params['difficulty'];
+        }
+
+        // Parse material_ids.
+        $matids = json_decode($params['material_ids'], true);
+        if (!is_array($matids)) {
+            $matids = [];
+        }
+
+        // Parse instruction_presets.
+        $instrPresets = json_decode($params['instruction_presets'], true);
+        if (!is_array($instrPresets)) {
+            $instrPresets = [];
+        }
+
+        // Validate grounding_mode.
+        $validGrounding = ['strict', 'applied', 'enriched'];
+        $groundingMode = in_array($params['grounding_mode'], $validGrounding) ? $params['grounding_mode'] : 'applied';
+
+        // Calculate total questions.
+        $total = array_sum($qtypes);
+        if ($total <= 0) {
+            $total = 5;
+            $qtypes = ['multichoice' => 5];
+        }
+
+        // Quiz name.
         $catname = $params['category_name'];
         if (empty(trim($catname))) {
             $course = $DB->get_record('course', ['id' => $params['courseid']]);
             $catname = 'AI Quiz — ' . ($course->shortname ?? 'Course ' . $params['courseid']) . ' (' . date('Y-m-d') . ')';
         }
 
+        // Build config_json with all settings.
         $config = json_encode([
-            'bloom_level'     => $params['bloom_level'],
-            'question_types'  => $qtypes,
-            'total_questions' => (int)$params['total_questions'],
-            'difficulty'      => $params['difficulty'],
-            'ai_instructions' => $params['ai_instructions'],
+            'bloom_level'         => $bloom,
+            'question_types'      => $qtypes,
+            'total_questions'     => $total,
+            'difficulty'          => $diff,
+            'marks_per_question'  => $params['marks_per_question'],
+            'ai_instructions'     => $params['ai_instructions'],
+            'grounding_mode'      => $groundingMode,
+            'instruction_presets' => $instrPresets,
+            'quiz_description'    => $params['quiz_description'],
+            'shuffle_questions'   => (int)$params['shuffle_questions'],
+            'shuffle_answers'     => (int)$params['shuffle_answers'],
+            'show_feedback'       => (int)$params['show_feedback'],
+            'time_limit'          => (int)$params['time_limit'],
+            'max_attempts'        => (int)$params['max_attempts'],
+            'material_ids'        => $matids,
         ]);
 
         $job = (object)[
             'courseid'      => (int)$params['courseid'],
             'userid'        => (int)$USER->id,
-            'material_id'   => (int)$params['material_id'] ?: null,
+            'material_id'   => !empty($matids) ? (int)$matids[0] : null,
             'source_text'   => $params['source_type'] === 'text' ? $params['content'] : null,
             'config_json'   => $config,
             'category_name' => $catname,
-            'status'        => 'pending',
+            'status'        => 'generating',
             'timecreated'   => time(),
             'timemodified'  => time(),
         ];
         $job->id = $DB->insert_record('umat_ai_quizgen_jobs', $job);
 
-        $task = new \local_umat_ai\task\generate_quiz_adhoc();
-        $task->set_component('local_umat_ai');
-        $task->set_custom_data(['jobid' => $job->id]);
-        $task->set_userid($USER->id);
-        \core\task\manager::queue_adhoc_task($task);
+        // Call AI service synchronously.
+        try {
+            $cfg = get_config('local_umat_ai');
+            $payload = [
+                'source_type'          => $params['source_type'] === 'material' ? 'material_id' : 'text',
+                'content'              => $params['content'],
+                'material_ids'         => !empty($matids) ? $matids : null,
+                'course_id'            => (int)$params['courseid'],
+                'bloom_level'          => $bloom,
+                'question_types'       => $qtypes,
+                'difficulty'           => $diff,
+                'marks_per_question'   => (float)$params['marks_per_question'],
+                'ai_instructions'      => $params['ai_instructions'],
+                'grounding_mode'       => $groundingMode,
+                'instruction_presets'  => $instrPresets,
+            ];
 
-        return [
-            'job_id'        => (int)$job->id,
-            'status'        => 'pending',
-            'category_name' => $catname,
-        ];
+            $url = rtrim($cfg->ai_service_url, '/') . '/api/v1/quizgen/generate';
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => json_encode($payload),
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $cfg->ai_service_token,
+                ],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 160,
+                CURLOPT_CONNECTTIMEOUT => 10,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode !== 200) {
+                $detail = $response ? ': ' . mb_substr($response, 0, 300) : '';
+                if ($httpCode === 0) {
+                    throw new \moodle_exception('Cannot reach AI service at ' . $cfg->ai_service_url . '. Please ensure the AI service is running and try again.');
+                }
+                throw new \moodle_exception('AI service returned HTTP ' . $httpCode . $detail);
+            }
+
+            $result = json_decode($response, true);
+            if (!$result || !isset($result['questions'])) {
+                throw new \moodle_exception('Invalid AI response: ' . mb_substr($response, 0, 500));
+            }
+
+            $questions = $result['questions'];
+
+            $DB->update_record('umat_ai_quizgen_jobs', (object)[
+                'id'             => $job->id,
+                'status'         => 'processing_xml',
+                'questions_json' => json_encode($questions),
+                'timemodified'   => time(),
+            ]);
+
+            require_once(__DIR__ . '/../quiz/xml_builder.php');
+            $xml = \local_umat_ai\quiz\xml_builder::build_moodle_xml($questions, $catname, (float)$params['marks_per_question']);
+
+            $DB->update_record('umat_ai_quizgen_jobs', (object)[
+                'id'          => $job->id,
+                'status'      => 'completed',
+                'xml_content' => $xml,
+                'timemodified'=> time(),
+            ]);
+
+            return [
+                'job_id'        => (int)$job->id,
+                'status'        => 'completed',
+                'category_name' => $catname,
+                'questions'     => json_encode($questions),
+            ];
+        } catch (\Throwable $e) {
+            $DB->update_record('umat_ai_quizgen_jobs', (object)[
+                'id'             => $job->id,
+                'status'         => 'failed',
+                'failure_reason' => $e->getMessage(),
+                'timemodified'   => time(),
+            ]);
+
+            return [
+                'job_id'         => (int)$job->id,
+                'status'         => 'failed',
+                'category_name'  => $catname,
+                'failure_reason' => $e->getMessage(),
+                'questions'      => null,
+            ];
+        }
     }
 
     public static function generate_quiz_draft_returns() {
         return new \external_single_structure([
-            'job_id'        => new \external_value(PARAM_INT, 'Job ID for polling'),
-            'status'        => new \external_value(PARAM_ALPHAEXT, 'Initial status (pending)'),
-            'category_name' => new \external_value(PARAM_TEXT, 'Question category / quiz name'),
+            'job_id'         => new \external_value(PARAM_INT, 'Job ID'),
+            'status'         => new \external_value(PARAM_ALPHAEXT, 'completed|failed|pending'),
+            'category_name'  => new \external_value(PARAM_TEXT, 'Question category / quiz name'),
+            'failure_reason' => new \external_value(PARAM_TEXT, 'Error message if failed', VALUE_OPTIONAL),
+            'questions'      => new \external_value(PARAM_RAW, 'JSON array of generated questions', VALUE_OPTIONAL),
         ]);
     }
 
@@ -187,8 +340,17 @@ class quizgen extends \external_api {
 
         $job = $DB->get_record('umat_ai_quizgen_jobs', ['id' => $params['jobid']], '*', MUST_EXIST);
 
-        if ($job->status !== 'completed') {
-            throw new \moodle_exception('quizgen_not_ready', 'local_umat_ai', '', null, "Job status: $job->status");
+        $canImport = ($job->status === 'completed' && !empty($job->xml_content))
+                  || ($job->status === 'importing' && !empty($job->xml_content));
+
+        if (!$canImport) {
+            $hint = '';
+            if ($job->status === 'failed') {
+                $hint = ' The generation failed: ' . ($job->failure_reason ?: 'unknown error') . '. Please go back and generate a new quiz.';
+            } elseif (in_array($job->status, ['generating', 'processing_xml'])) {
+                $hint = ' The AI is still working. Please wait a moment and try again.';
+            }
+            throw new \moodle_exception('quizgen_not_ready', 'local_umat_ai', '', null, "Job status: {$job->status}.$hint");
         }
         if (!$job->xml_content) {
             throw new \moodle_exception('quizgen_no_xml', 'local_umat_ai');
@@ -197,6 +359,9 @@ class quizgen extends \external_api {
         $context = \context_course::instance($job->courseid);
         self::validate_context($context);
         require_capability('local/umat_ai:viewanalytics', $context);
+
+        // Parse quiz settings from config_json.
+        $config = json_decode($job->config_json, true) ?: [];
 
         $DB->update_record('umat_ai_quizgen_jobs', (object)[
             'id'           => $job->id,
@@ -207,6 +372,15 @@ class quizgen extends \external_api {
         require_once(__DIR__ . '/../quiz/importer.php');
 
         try {
+            $quizSettings = [
+                'intro'             => $config['quiz_description'] ?? '',
+                'shufflequestions'  => $config['shuffle_questions'] ?? 0,
+                'shuffleanswers'    => $config['shuffle_answers'] ?? 1,
+                'showfeedback'      => $config['show_feedback'] ?? 1,
+                'timelimit'         => $config['time_limit'] ?? 0,
+                'attempts'          => $config['max_attempts'] ?? -1,
+            ];
+
             if ($params['category_choice'] === 'existing' && $params['existing_job_id'] > 0) {
                 $existingJob = $DB->get_record('umat_ai_quizgen_jobs', ['id' => $params['existing_job_id']], '*', MUST_EXIST);
                 $importResult = \local_umat_ai\quiz\importer::append_to_existing_quiz(
@@ -221,7 +395,8 @@ class quizgen extends \external_api {
                     $job->xml_content,
                     (int)$job->courseid,
                     $job->category_name,
-                    (int)$job->userid
+                    (int)$job->userid,
+                    $quizSettings
                 );
             }
 
@@ -280,26 +455,29 @@ class quizgen extends \external_api {
         self::validate_context($context);
         require_capability('local/umat_ai:viewanalytics', $context);
 
-        $jobs = $DB->get_records('umat_ai_quizgen_jobs', ['courseid' => $params['courseid']], 'timecreated DESC');
+        $limit = 50;
+        $sql = "SELECT id, status, category_name, quiz_id, failure_reason, timecreated, timemodified, config_json,
+                       LENGTH(questions_json) AS qjson_len
+                  FROM {umat_ai_quizgen_jobs}
+                 WHERE courseid = :courseid
+              ORDER BY timecreated DESC
+                 LIMIT :lim";
+
+        $rows = $DB->get_records_sql($sql, ['courseid' => $params['courseid'], 'lim' => $limit]);
 
         $history = [];
-        foreach ($jobs as $job) {
-            $config = json_decode($job->config_json, true) ?: [];
-            $qcount = 0;
-            if ($job->questions_json) {
-                $qdata = json_decode($job->questions_json, true);
-                $qcount = is_array($qdata) ? count($qdata) : 0;
-            }
+        foreach ($rows as $row) {
+            $config = json_decode($row->config_json, true) ?: [];
 
             $history[] = [
-                'job_id'         => (int)$job->id,
-                'status'         => $job->status,
-                'question_count' => $qcount,
-                'category_name'  => $job->category_name,
-                'quiz_id'        => (int)$job->quiz_id ?: 0,
-                'failure_reason' => $job->failure_reason ?? '',
-                'timecreated'    => (int)$job->timecreated,
-                'timemodified'   => (int)$job->timemodified,
+                'job_id'         => (int)$row->id,
+                'status'         => $row->status,
+                'question_count' => $row->qjson_len > 2 ? max(1, intval($row->qjson_len / 200)) : 0,
+                'category_name'  => $row->category_name,
+                'quiz_id'        => (int)($row->quiz_id ?: 0),
+                'failure_reason' => $row->failure_reason ?? '',
+                'timecreated'    => (int)$row->timecreated,
+                'timemodified'   => (int)$row->timemodified,
                 'config_summary' => json_encode([
                     'bloom_level'     => $config['bloom_level'] ?? 'understand',
                     'difficulty'      => $config['difficulty'] ?? 'medium',
@@ -327,6 +505,339 @@ class quizgen extends \external_api {
                     'config_summary' => new \external_value(PARAM_RAW, 'JSON summary of generation config'),
                 ])
             ),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // export_quiz_word — generate .docx via AI service and return base64  //
+    // ------------------------------------------------------------------ //
+    public static function export_quiz_word_parameters() {
+        return new \external_function_parameters([
+            'questions_json' => new \external_value(PARAM_RAW, 'JSON array of question objects'),
+            'export_type'    => new \external_value(PARAM_ALPHAEXT, 'question_paper | answer_key | examiner_copy', VALUE_DEFAULT, 'question_paper'),
+            'version'        => new \external_value(PARAM_ALPHA, 'A | B | C', VALUE_DEFAULT, 'A'),
+            'doc_settings'   => new \external_value(PARAM_RAW, 'JSON object of document settings', VALUE_DEFAULT, '{}'),
+        ]);
+    }
+
+    public static function export_quiz_word(
+        $questions_json,
+        $export_type = 'question_paper',
+        $version = 'A',
+        $doc_settings = '{}'
+    ) {
+        global $CFG;
+
+        $params = self::validate_parameters(self::export_quiz_word_parameters(), [
+            'questions_json' => $questions_json,
+            'export_type'    => $export_type,
+            'version'        => $version,
+            'doc_settings'   => $doc_settings,
+        ]);
+
+        $questions = json_decode($params['questions_json'], true);
+        if (!is_array($questions) || empty($questions)) {
+            throw new \moodle_exception('No questions provided for Word export.');
+        }
+
+        $settings = json_decode($params['doc_settings'], true) ?: [];
+
+        $cfg = get_config('local_umat_ai');
+        $payload = [
+            'questions'    => $questions,
+            'export_type'  => $params['export_type'],
+            'version'      => $params['version'],
+            'doc_settings' => $settings,
+        ];
+
+        error_log('[UMaT AI] export_quiz_word called: export_type=' . $params['export_type'] .
+            ' version=' . $params['version'] . ' questions=' . count($questions));
+
+        $url = rtrim($cfg->ai_service_url, '/') . '/api/v1/quizgen/export-word';
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $cfg->ai_service_token,
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_CONNECTTIMEOUT => 10,
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            $detail = $response ? ': ' . mb_substr($response, 0, 300) : '';
+            error_log('[UMaT AI] export_quiz_word failed: HTTP ' . $httpCode . ' curl_error=' . $curlError . ' response=' . $detail);
+            if ($httpCode === 0) {
+                throw new \moodle_exception('Cannot reach AI service. Please ensure it is running.');
+            }
+            throw new \moodle_exception('AI service returned HTTP ' . $httpCode . $detail);
+        }
+
+        $result = json_decode($response, true);
+        if (!$result || !isset($result['docx_base64'])) {
+            error_log('[UMaT AI] export_quiz_word: invalid response: ' . mb_substr($response, 0, 200));
+            throw new \moodle_exception('Invalid response from AI service.');
+        }
+
+        error_log('[UMaT AI] export_quiz_word OK: filename=' . ($result['filename'] ?? '?'));
+        return [
+            'docx_base64'    => $result['docx_base64'],
+            'filename'       => $result['filename'] ?? 'assessment.docx',
+            'total_marks'    => (float)($result['total_marks'] ?? 0),
+            'question_count' => (int)($result['question_count'] ?? 0),
+        ];
+    }
+
+    public static function export_quiz_word_returns() {
+        return new \external_single_structure([
+            'docx_base64'    => new \external_value(PARAM_RAW, 'Base64-encoded .docx file content'),
+            'filename'       => new \external_value(PARAM_TEXT, 'Suggested filename'),
+            'total_marks'    => new \external_value(PARAM_FLOAT, 'Total marks'),
+            'question_count' => new \external_value(PARAM_INT, 'Number of questions in document'),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // save_quizgen_questions — persist edited questions + rebuild XML     //
+    // ------------------------------------------------------------------ //
+    public static function save_quizgen_questions_parameters() {
+        return new \external_function_parameters([
+            'jobid'          => new \external_value(PARAM_INT, 'Job ID'),
+            'questions_json' => new \external_value(PARAM_RAW, 'JSON array of edited question objects'),
+        ]);
+    }
+
+    public static function save_quizgen_questions($jobid, $questions_json) {
+        global $DB;
+
+        $params = self::validate_parameters(self::save_quizgen_questions_parameters(), [
+            'jobid'          => $jobid,
+            'questions_json' => $questions_json,
+        ]);
+
+        $job = $DB->get_record('umat_ai_quizgen_jobs', ['id' => $params['jobid']], '*', MUST_EXIST);
+
+        if (!in_array($job->status, ['completed', 'importing'])) {
+            throw new \moodle_exception('Cannot edit questions in current status: ' . $job->status);
+        }
+
+        $context = \context_course::instance($job->courseid);
+        self::validate_context($context);
+        require_capability('local/umat_ai:viewanalytics', $context);
+
+        $questions = json_decode($params['questions_json'], true);
+        if (!is_array($questions) || empty($questions)) {
+            throw new \moodle_exception('No questions provided.');
+        }
+
+        // Rebuild XML from the edited questions.
+        $config = json_decode($job->config_json, true) ?: [];
+        $marksPerQ = $config['marks_per_question'] ?? 1.0;
+
+        require_once(__DIR__ . '/../quiz/xml_builder.php');
+        $xml = \local_umat_ai\quiz\xml_builder::build_moodle_xml($questions, $job->category_name, (float)$marksPerQ);
+
+        $DB->update_record('umat_ai_quizgen_jobs', (object)[
+            'id'             => $job->id,
+            'questions_json' => json_encode($questions),
+            'xml_content'    => $xml,
+            'timemodified'   => time(),
+        ]);
+
+        return [
+            'status'         => 'saved',
+            'question_count' => count($questions),
+        ];
+    }
+
+    public static function save_quizgen_questions_returns() {
+        return new \external_single_structure([
+            'status'         => new \external_value(PARAM_ALPHAEXT, 'saved on success'),
+            'question_count' => new \external_value(PARAM_INT, 'Number of questions saved'),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // regenerate_quizgen_question — regenerate a single question via AI   //
+    // ------------------------------------------------------------------ //
+    public static function regenerate_quizgen_question_parameters() {
+        return new \external_function_parameters([
+            'jobid'                    => new \external_value(PARAM_INT, 'Job ID'),
+            'question_index'           => new \external_value(PARAM_INT, 'Index of the question to regenerate (0-based)'),
+            'question_json'            => new \external_value(PARAM_RAW, 'Current question object as JSON'),
+            'regeneration_instruction' => new \external_value(PARAM_RAW, 'Additional instruction for regeneration', VALUE_DEFAULT, ''),
+        ]);
+    }
+
+    public static function regenerate_quizgen_question($jobid, $question_index, $question_json, $regeneration_instruction = '') {
+        global $DB;
+
+        $params = self::validate_parameters(self::regenerate_quizgen_question_parameters(), [
+            'jobid'                    => $jobid,
+            'question_index'           => $question_index,
+            'question_json'            => $question_json,
+            'regeneration_instruction' => $regeneration_instruction,
+        ]);
+
+        $job = $DB->get_record('umat_ai_quizgen_jobs', ['id' => $params['jobid']], '*', MUST_EXIST);
+
+        if (!in_array($job->status, ['completed', 'importing'])) {
+            throw new \moodle_exception('Cannot regenerate questions in current status: ' . $job->status);
+        }
+
+        $context = \context_course::instance($job->courseid);
+        self::validate_context($context);
+        require_capability('local/umat_ai:viewanalytics', $context);
+
+        $currentQuestion = json_decode($params['question_json'], true);
+        if (!$currentQuestion) {
+            throw new \moodle_exception('Invalid question data.');
+        }
+
+        $config = json_decode($job->config_json, true) ?: [];
+
+        // Call AI service to regenerate this single question.
+        try {
+            $cfg = get_config('local_umat_ai');
+
+            // Build context: use original source text if available, otherwise use the question itself.
+            $sourceContext = $job->source_text ?: 'Generate a similar question based on the following question and its properties.';
+
+            // Build instruction-aware regeneration prompt.
+            $groundingMode = $config['grounding_mode'] ?? 'applied';
+            $instrPresets = $config['instruction_presets'] ?? [];
+            $customInstr = $config['ai_instructions'] ?? '';
+            $additionalInstr = $params['regeneration_instruction'];
+
+            $prompt = "You are an expert assessment writer at the University of Mines and Technology (UMaT), Ghana.\n";
+            $prompt .= "Regenerate the following question to be different but of the same type, difficulty, and Bloom's taxonomy level.\n\n";
+
+            $prompt .= "ORIGINAL QUESTION:\n" . json_encode($currentQuestion, JSON_PRETTY_PRINT) . "\n\n";
+
+            // Grounding mode instructions.
+            $prompt .= "GROUNDING MODE: " . strtoupper($groundingMode) . "\n";
+            if ($groundingMode === 'strict') {
+                $prompt .= "Use ONLY information explicitly stated in the source material. Do not construct new scenarios.\n";
+            } elseif ($groundingMode === 'applied') {
+                $prompt .= "The tested concept must come from the source material. You MAY construct new realistic scenarios, case studies, and examples that are not in the source. Students must be able to answer correctly by applying concepts taught in the material.\n";
+            } else {
+                $prompt .= "The tested concept must come from the source material. You MAY use limited, widely accepted external context to make scenarios realistic. Do not use unverifiable facts or make the answer depend on external information.\n";
+            }
+
+            // Structured preset instructions.
+            if (!empty($instrPresets)) {
+                $presetLabels = [
+                    'critical_thinking'        => 'Ask critical-thinking questions requiring analysis and evaluation',
+                    'application_based'        => 'Use application-based questions testing concept application',
+                    'scenario_based'           => 'Create scenario-based questions with realistic situations',
+                    'case_study'               => 'Include a short meaningful case study scenario',
+                    'real_world_examples'      => 'Use real-world examples and practical applications',
+                    'ghanaian_examples'        => 'Use Ghanaian examples and contexts',
+                    'industry_examples'        => 'Use industry-specific examples',
+                    'problem_solving'          => 'Test problem-solving ability',
+                    'comparison_justification' => 'Require comparison and justification',
+                    'avoid_direct_recall'      => 'Avoid direct recall or definition questions',
+                    'avoid_trick_ambiguous'    => 'Avoid trick or ambiguous questions',
+                    'include_calculations'     => 'Include calculations where supported by material',
+                    'provide_explanations'     => 'Provide answer explanations',
+                ];
+                $prompt .= "\nLECTURER INSTRUCTIONS (follow these precisely):\n";
+                foreach ($instrPresets as $preset) {
+                    if (isset($presetLabels[$preset])) {
+                        $prompt .= "- " . $presetLabels[$preset] . "\n";
+                    }
+                }
+            }
+
+            // Custom instructions.
+            if (!empty($customInstr)) {
+                $prompt .= "\nADDITIONAL LECTURER INSTRUCTIONS:\n" . $customInstr . "\n";
+            }
+
+            // Regeneration-specific instruction.
+            if (!empty($additionalInstr)) {
+                $prompt .= "\nREGENERATION REQUEST:\n" . $additionalInstr . "\n";
+            }
+
+            $prompt .= "\nREQUIREMENTS:\n";
+            $prompt .= "- Keep the same question type: " . ($currentQuestion['type'] ?? 'multichoice') . "\n";
+            $prompt .= "- Keep approximately the same difficulty and Bloom's taxonomy level.\n";
+            $prompt .= "- Generate a DIFFERENT question — do not copy the original.\n";
+            $prompt .= "- The scenario or context must be fresh and different from the original.\n";
+            $prompt .= "- Output ONLY valid JSON matching the original question schema.\n";
+            $prompt .= "- No markdown, no code fences, no extra text.\n\n";
+            $prompt .= "SOURCE CONTEXT:\n" . mb_substr($sourceContext, 0, 5000);
+
+            $payload = [
+                'prompt'       => $prompt,
+                'temperature'  => 0.7,
+                'max_chars'    => 2000,
+            ];
+
+            $url = rtrim($cfg->ai_service_url, '/') . '/api/v1/quizgen/regenerate-single';
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => json_encode($payload),
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $cfg->ai_service_token,
+                ],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 60,
+                CURLOPT_CONNECTTIMEOUT => 10,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode !== 200) {
+                // Fallback: return the original with a note.
+                return [
+                    'status'          => 'completed',
+                    'question'        => $currentQuestion,
+                    'failure_reason'  => 'AI service returned HTTP ' . $httpCode . '. Returning original.',
+                ];
+            }
+
+            $result = json_decode($response, true);
+            if (!$result || !isset($result['question'])) {
+                return [
+                    'status'          => 'completed',
+                    'question'        => $currentQuestion,
+                    'failure_reason'  => 'Invalid AI response. Returning original.',
+                ];
+            }
+
+            $newQuestion = $result['question'];
+            // Preserve the original marks.
+            $newQuestion['marks'] = $currentQuestion['marks'] ?? 1.0;
+
+            return [
+                'status'   => 'completed',
+                'question' => json_encode($newQuestion),
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'status'          => 'completed',
+                'question'        => $currentQuestion,
+                'failure_reason'  => 'Error: ' . $e->getMessage() . '. Returning original.',
+            ];
+        }
+    }
+
+    public static function regenerate_quizgen_question_returns() {
+        return new \external_single_structure([
+            'status'         => new \external_value(PARAM_ALPHAEXT, 'completed'),
+            'question'       => new \external_value(PARAM_RAW, 'Regenerated question as JSON', VALUE_OPTIONAL),
+            'failure_reason' => new \external_value(PARAM_TEXT, 'Error message if regeneration failed', VALUE_OPTIONAL),
         ]);
     }
 }

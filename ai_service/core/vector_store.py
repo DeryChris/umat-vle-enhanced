@@ -36,30 +36,26 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
 
 
 def _embed_texts_openai(texts: List[str]) -> List[List[float]]:
+    """Local sentence-transformers embeddings (no API key needed)."""
     import logging
+    from langchain_community.embeddings import HuggingFaceEmbeddings
     logger = logging.getLogger(__name__)
 
+    global _local_embedder
+    if '_local_embedder' not in globals():
+        _local_embedder = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        logger.info("Loaded local HuggingFace embedding model (all-MiniLM-L6-v2, 384-dim)")
+
     embeddings = []
-    # OpenAI accepts batched input — one request per 100 chunks.
     for i in range(0, len(texts), 100):
         batch = [t[:8000] for t in texts[i:i + 100]]
         try:
-            response = requests.post(
-                "https://api.openai.com/v1/embeddings",
-                headers={"Authorization": f"Bearer {settings.openai_api_key}"},
-                json={"model": settings.openai_embedding_model, "input": batch},
-                timeout=30,
-            )
-            logger.info(f"Embedding batch {i // 100}: status={response.status_code}")
-            if response.status_code == 200:
-                data = response.json().get("data", [])
-                embeddings.extend(item["embedding"] for item in data)
-            else:
-                logger.error(f"Embedding failed: {response.status_code} - {response.text[:200]}")
-                embeddings.extend([[0.0] * 1536] * len(batch))
+            batch_embeds = _local_embedder.embed_documents(batch)
+            embeddings.extend(batch_embeds)
+            logger.info(f"Embedded batch {i // 100}: {len(batch)} texts")
         except Exception as e:
             logger.error(f"Embedding error for batch {i // 100}: {str(e)}")
-            embeddings.extend([[0.0] * 1536] * len(batch))
+            embeddings.extend([[0.0] * 384] * len(batch))
 
     return embeddings
 
@@ -122,12 +118,29 @@ def get_embedding_function():
 class VectorStoreManager:
 
     def get_collection_name(self, course_id: int) -> str:
-        # Provider-scoped: Gemini and OpenAI embeddings have different
+        # Provider-scoped: different embedding models have different
         # dimensions, so each provider keeps its own collection per course.
-        # Gemini keeps the legacy name for backward compatibility.
         if settings.llm_provider == "openai":
-            return f"course_{course_id}_openai"
+            return f"course_{course_id}_local"
         return f"course_{course_id}"
+
+    def _resolve_collection(self, course_id: int):
+        """Get the collection, falling back to legacy name if needed."""
+        client = get_chroma_client()
+        name = self.get_collection_name(course_id)
+        try:
+            return client.get_collection(name=name)
+        except Exception:
+            pass
+        # Fallback: try the legacy collection names
+        for fallback in [f"course_{course_id}", f"course_{course_id}_openai"]:
+            if fallback == name:
+                continue
+            try:
+                return client.get_collection(name=fallback)
+            except Exception:
+                continue
+        return client.get_collection(name=name)
 
     def add_documents(
         self,
@@ -172,12 +185,10 @@ class VectorStoreManager:
         If material_ids is provided and non-empty, restrict search to only chunks
         belonging to those materials (using the material_id metadata field).
         """
-        client   = get_chroma_client()
         embedder = get_embedding_function()
-        coll_name = self.get_collection_name(course_id)
 
         try:
-            collection = client.get_collection(name=coll_name)
+            collection = self._resolve_collection(course_id)
         except Exception:
             return []  # No documents indexed for this course yet
 
@@ -187,15 +198,46 @@ class VectorStoreManager:
         if material_ids:
             where_filter = {"material_id": {"$in": [str(mid) for mid in material_ids]}}
 
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=n_results,
-            where=where_filter,
-            include=["documents", "metadatas", "distances"],
-        )
+        try:
+            results = collection.query(
+                query_embeddings=[query_embedding],
+                n_results=n_results,
+                where=where_filter,
+                include=["documents", "metadatas", "distances"],
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Dense search failed (likely dimension mismatch): {e}")
+            return []
 
         documents = results["documents"][0] if results["documents"] else []
         metadatas = results["metadatas"][0] if results["metadatas"] else []
+        return list(zip(documents, metadatas))
+
+    def get_documents_by_filter(
+        self,
+        course_id: int,
+        where_filter: dict,
+        limit: int = 50,
+    ) -> List[Tuple[str, dict]]:
+        """Retrieve documents from ChromaDB by metadata filter without similarity search.
+
+        Uses collection.get() instead of collection.query() — no embedding needed.
+        Useful for fetching all chunks belonging to a specific material_id.
+        """
+        try:
+            collection = self._resolve_collection(course_id)
+        except Exception:
+            return []
+
+        results = collection.get(
+            where=where_filter,
+            limit=limit,
+            include=["documents", "metadatas"],
+        )
+
+        documents = results.get("documents", []) or []
+        metadatas = results.get("metadatas", []) or []
         return list(zip(documents, metadatas))
 
     def delete_course_documents(self, course_id: int, source_filter: str = None):

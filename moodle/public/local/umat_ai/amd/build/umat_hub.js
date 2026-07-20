@@ -14,7 +14,8 @@ var RATE_MAX = 10;
 var qTimes   = [];
 var selMat  = [];
 var loaded  = {};
-var activeCID = 0;
+var defaultCID = (UD.courses && UD.courses.length) ? UD.courses[0].id : 0;
+var activeCID = defaultCID;
 
 /* FAB / overlay toggle */
 var fab=document.getElementById('hub-fab');
@@ -333,7 +334,7 @@ function loadLibrary(cid){
       if(vb)vb.addEventListener('click',function(e){e.stopPropagation();tile.click();});
     });
     var srch=document.getElementById('hub-lib-search');if(srch)srch.addEventListener('input',function(){var q=this.value.toLowerCase();g.querySelectorAll('.yt-tile').forEach(function(t){t.style.display=(!q||t.textContent.toLowerCase().includes(q))?'':'none';});});
-  },function(){g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">error_outline</span><p>Could not load materials.</p></div>';});
+  },function(){console.error('[umat] hub loadLibrary failed');g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">error_outline</span><p>Could not load materials.</p></div>';});
 }
 function openHubLibPicker(){
   var ov=document.getElementById('hub-lib-cs-ov');
@@ -362,7 +363,7 @@ function sendQ(q){
   if(qRemaining()<=0){appendMsg('Rate limit reached. Please wait a moment before asking again.',false,document.getElementById('hub-msgs'),[]);return;}
   qTimes.push(Date.now());updateRate();
   var ctx=selMat.length>0?'[Referencing: '+selMat.map(function(m){return m.name;}).join(', ')+'] '+q:q;
-  var cid=parseInt(document.getElementById('hub-course-sel').value)||activeCID||1;
+  var cid=parseInt(document.getElementById('hub-course-sel').value)||activeCID||defaultCID;
   var msgs=document.getElementById('hub-msgs');
   appendMsg(q,true,msgs);document.getElementById('hub-input').value='';
   var tid='h_'+Date.now();

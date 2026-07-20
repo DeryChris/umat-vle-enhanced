@@ -164,7 +164,7 @@ class admin_panel extends \external_api {
             'python_memory_mb'   => (float)($data['python_memory_mb'] ?? 0),
             'cron_last_run'   => $cronlast ? (int)$cronlast : 0,
             'cron_fresh'      => $cronfresh,
-            'plugin_version'  => get_config('local_umat_ai', 'version') ?: 'unknown',
+            'plugin_version'  => function_exists('get_component_version') ? 'v'.(get_component_version('local_umat_ai') ?: 'unknown') : 'unknown',
         ];
     }
 

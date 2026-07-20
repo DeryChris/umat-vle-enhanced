@@ -6,6 +6,7 @@ from models.database import get_db
 from middleware.auth import verify_token
 from core.llm_processor import LLMProcessor
 from api.v1.query_pipeline import prepare_query, log_chat, extract_quiz_json
+from config import get_settings
 from collections import defaultdict
 from threading import Lock
 import time
@@ -14,7 +15,9 @@ import logging
 
 router = APIRouter(prefix="/query", tags=["query"])
 logger = logging.getLogger(__name__)
-llm = LLMProcessor()
+settings = get_settings()
+_student_llm = LLMProcessor()  # Gemini for students
+_lecturer_llm = LLMProcessor(provider=settings.effective_lecturer_provider)  # OpenAI for lecturers
 
 RATE_LIMIT_SECONDS = 60
 RATE_LIMIT_MAX = 10
@@ -83,6 +86,7 @@ async def query_course_ai_stream(
             })
             return
 
+        llm = _lecturer_llm if request.role == "lecturer" else _student_llm
         answer_parts: list[str] = []
         try:
             for chunk in llm.stream_prompt(prepared.prompt, task=prepared.task):
@@ -153,6 +157,7 @@ async def query_course_ai(
             confidence=prepared.confidence,
         )
 
+    llm = _lecturer_llm if request.role == "lecturer" else _student_llm
     try:
         answer = llm.answer_with_prompt(prepared.prompt, task=prepared.task)
     except Exception as e:

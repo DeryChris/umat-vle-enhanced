@@ -54,11 +54,8 @@ class HybridRetriever:
         if cache_key in self._bm25_cache:
             return self._bm25_cache[cache_key]
 
-        client = get_chroma_client()
-        coll_name = self._vector.get_collection_name(course_id)
-
         try:
-            collection = client.get_collection(name=coll_name)
+            collection = self._vector._resolve_collection(course_id)
         except Exception:
             self._bm25_cache[cache_key] = ([], None, [])
             return self._bm25_cache[cache_key]
@@ -125,9 +122,7 @@ class HybridRetriever:
             from llama_index.core.schema import TextNode
             from llama_index.vector_stores.chroma import ChromaVectorStore
 
-            client = get_chroma_client()
-            coll_name = self._vector.get_collection_name(course_id)
-            chroma_collection = client.get_collection(name=coll_name)
+            chroma_collection = self._vector._resolve_collection(course_id)
             vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
 
             embed_fn = get_embedding_function()
@@ -169,14 +164,16 @@ class HybridRetriever:
         n_results: int = 5,
         material_ids: Optional[List[int]] = None,
     ) -> List[Tuple[str, dict]]:
-        """Hybrid search: fuse dense (LlamaIndex/Chroma), BM25 keyword, and legacy dense."""
-        dense = self._llamaindex_search(course_id, query, n_results * 2, material_ids)
+        """Hybrid search: fuse dense (Chroma) with BM25 keyword retrieval."""
         keyword = self._bm25_search(course_id, query, n_results * 2, material_ids)
-        legacy = self._vector.similarity_search(
+        dense = self._vector.similarity_search(
             course_id, query, n_results * 2, material_ids
         )
 
-        fused = _reciprocal_rank_fusion([dense, keyword, legacy])
+        if not dense:
+            return keyword[:n_results]
+
+        fused = _reciprocal_rank_fusion([dense, keyword])
         return [(doc, meta) for doc, meta, _ in fused[:n_results]]
 
     def as_langchain_tool(self, course_id: int, material_ids: Optional[List[int]] = None):

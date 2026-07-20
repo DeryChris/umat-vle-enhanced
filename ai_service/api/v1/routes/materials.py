@@ -23,7 +23,7 @@ vector_store = VectorStoreManager()
 
 ALLOWED_EXTENSIONS = {
     ".pdf", ".txt", ".md", ".markdown",
-    ".docx", ".pptx", ".xlsx", ".csv",
+    ".doc", ".docx", ".ppt", ".pptx", ".xlsx", ".csv",
     ".py", ".js", ".ts", ".jsx", ".tsx", ".php", ".rb", ".go", ".rs",
     ".java", ".kt", ".swift", ".c", ".cpp", ".h", ".hpp", ".cs",
     ".sql", ".sh", ".bash", ".ps1", ".bat", ".pl", ".lua", ".r",
@@ -90,6 +90,29 @@ async def index_material(
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
+
+@router.get("/{material_id}/text")
+async def get_material_text(
+    material_id: int,
+    course_id:   int,
+    token:       str = Depends(verify_token),
+):
+    """Return the indexed text content for a material from ChromaDB."""
+    try:
+        vs = VectorStoreManager()
+        results = vs.get_documents_by_filter(
+            course_id=course_id,
+            where_filter={"material_id": str(material_id)},
+            limit=50,
+        )
+        if results:
+            chunks = [doc for doc, _ in results]
+            text = "\n\n".join(chunks)
+            return {"success": True, "text": text, "chunks": len(chunks)}
+        return {"success": False, "text": "", "chunks": 0, "message": "No indexed content found"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/{material_id}")

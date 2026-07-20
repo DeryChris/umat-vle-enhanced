@@ -256,106 +256,112 @@ function render_pptx(string $path, string $cachedir): array|false {
 // ═══════════════════════════════════════════════════
 
 function render_via_libreoffice(string $path, string $cachedir): array|false {
-    // Check if soffice is available
-    $lo = '';
+    $lo = find_soffice();
+    if (!$lo) return false;
+
+    // Strategy A: Convert PPTX directly to PNGs (no PDF intermediate)
+    $escPath = escapeshellarg($path);
+    $escOut  = escapeshellarg($cachedir);
+    $base = pathinfo($path, PATHINFO_FILENAME);
+
+    if (!glob($cachedir . '/' . $base . '_*.png')) {
+        $cmd = "\"$lo\" --headless --norestore --convert-to png --outdir $escOut $escPath 2>&1";
+        shell_exec($cmd);
+    }
+
+    $pngs = glob($cachedir . '/' . $base . '_*.png');
+    if (count($pngs) > 0) {
+        // Rename to slide_N.png (LibreOffice names them <filename>_N.png)
+        $slides = [];
+        $idx = 1;
+        foreach ($pngs as $png) {
+            $dest = $cachedir . '/slide_' . $idx . '.png';
+            if ($png !== $dest) {
+                @unlink($dest);
+                rename($png, $dest);
+            }
+            $slides[] = ['slide' => $idx];
+            $idx++;
+        }
+        return $slides;
+    }
+
+    // Strategy B: PPTX → PDF → PNG via ImageMagick
+    $pdffile = $cachedir . '/presentation.pdf';
+    if (!file_exists($pdffile)) {
+        $cmd = "\"$lo\" --headless --norestore --convert-to pdf --outdir $escOut $escPath 2>&1";
+        shell_exec($cmd);
+        $pdfs = glob($cachedir . '/*.pdf');
+        if (!empty($pdfs)) rename($pdfs[0], $pdffile);
+    }
+
+    if (file_exists($pdffile)) {
+        $existing = glob($cachedir . '/slide_*.png');
+        if (count($existing) > 0) {
+            $slides = []; $i = 1;
+            while (file_exists($cachedir . '/slide_' . $i . '.png')) { $slides[] = ['slide' => $i]; $i++; }
+            return $slides;
+        }
+
+        $magick = find_magick();
+        if ($magick) {
+            $escPdf = escapeshellarg($pdffile);
+            $escOut2 = escapeshellarg($cachedir . '/slide_%d.png');
+            $cmd = "\"$magick\" -density 200 $escPdf -quality 92 -background white -alpha remove $escOut2 2>&1";
+            shell_exec($cmd);
+            $pngs = glob($cachedir . '/slide_*.png');
+            if (count($pngs) > 0) {
+                $slides = []; $i = 1;
+                while (file_exists($cachedir . '/slide_' . $i . '.png')) { $slides[] = ['slide' => $i]; $i++; }
+                return $slides;
+            }
+        }
+    }
+
+    return false;
+}
+
+function find_soffice(): string {
     if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-        $commonPaths = [
+        $paths = [
             getenv('PROGRAMFILES') . '\\LibreOffice\\program\\soffice.exe',
             getenv('PROGRAMFILES(X86)') . '\\LibreOffice\\program\\soffice.exe',
             getenv('LOCALAPPDATA') . '\\LibreOffice\\program\\soffice.exe',
             'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
             'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
         ];
-        foreach ($commonPaths as $p) {
-            if (file_exists($p)) { $lo = $p; break; }
-        }
-        if (!$lo) $lo = trim(shell_exec('where soffice 2>NUL'));
+        foreach ($paths as $p) { if (file_exists($p)) return $p; }
+        $t = trim(shell_exec('where soffice 2>NUL'));
+        if ($t) return $t;
     } else {
-        $lo = trim(shell_exec('which soffice 2>/dev/null'));
-        if (!$lo) {
-            $commonPaths = [
-                '/usr/bin/libreoffice',
-                '/usr/local/bin/libreoffice',
-                '/snap/bin/libreoffice',
-            ];
-            foreach ($commonPaths as $p) {
-                if (file_exists($p)) { $lo = $p; break; }
-            }
+        $t = trim(shell_exec('which soffice 2>/dev/null'));
+        if ($t) return $t;
+        foreach (['/usr/bin/libreoffice','/usr/local/bin/libreoffice','/snap/bin/libreoffice'] as $p) {
+            if (file_exists($p)) return $p;
         }
     }
-    if (!$lo) return false;
+    return '';
+}
 
-    $pdfpath = $cachedir . '/output.pdf';
-    $pdffile = $cachedir . '/presentation.pdf';
-
-    // Step 1: Convert PPTX → PDF
-    if (!file_exists($pdffile)) {
-        $escPath = escapeshellarg($path);
-        $escOut  = escapeshellarg($cachedir);
-        $cmd = "\"$lo\" --headless --norestore --convert-to pdf --outdir $escOut $escPath 2>&1";
-        shell_exec($cmd);
-
-        // Find the generated PDF
-        $pdfs = glob($cachedir . '/*.pdf');
-        if (empty($pdfs)) return false;
-        rename($pdfs[0], $pdffile);
-    }
-
-    // Step 2: Convert PDF → PNGs
-    $existing = glob($cachedir . '/slide_*.png');
-    if (count($existing) > 0) {
-        // Count slides
-        $slides = [];
-        $i = 1;
-        while (file_exists($cachedir . '/slide_' . $i . '.png')) {
-            $slides[] = ['slide' => $i];
-            $i++;
+function find_magick(): string {
+    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        $t = trim(shell_exec('where magick 2>NUL'));
+        if ($t) return $t;
+        $paths = [
+            getenv('PROGRAMFILES') . '\\ImageMagick*\\magick.exe',
+            getenv('PROGRAMFILES(X86)') . '\\ImageMagick*\\magick.exe',
+            'C:\\Program Files\\ImageMagick*\\magick.exe',
+            'C:\\Program Files (x86)\\ImageMagick*\\magick.exe',
+        ];
+        foreach ($paths as $pat) {
+            $m = glob($pat);
+            if (!empty($m)) return $m[0];
         }
-        return $slides;
+    } else {
+        $t = trim(shell_exec('which convert 2>/dev/null'));
+        if ($t) return $t;
     }
-
-    // Try ImageMagick
-    $convert = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? 'where magick 2>NUL' : 'which convert 2>/dev/null';
-    $convBin = trim(shell_exec($convert));
-    if ($convBin) {
-        $escPdf = escapeshellarg($pdffile);
-        $escOut = escapeshellarg($cachedir . '/slide_%d.png');
-        $cmd = "\"$convBin\" -density 150 $escPdf -quality 95 -background white -alpha remove $escOut 2>&1";
-        shell_exec($cmd);
-        $pngs = glob($cachedir . '/slide_*.png');
-        if (count($pngs) > 0) {
-            $slides = [];
-            $i = 1;
-            while (file_exists($cachedir . '/slide_' . $i . '.png')) {
-                $slides[] = ['slide' => $i];
-                $i++;
-            }
-            return $slides;
-        }
-    }
-
-    // Try Ghostscript
-    $gs = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? 'where gswin64c 2>NUL' : 'which gs 2>/dev/null';
-    $gsBin = trim(shell_exec($gs));
-    if ($gsBin) {
-        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') $gsBin = 'gswin64c';
-        $escPdf = escapeshellarg($pdffile);
-        $escOut = escapeshellarg($cachedir . '/slide_%d.png');
-        $cmd = "\"$gsBin\" -dNOPAUSE -dBATCH -sDEVICE=pngalpha -r150 -sOutputFile=$escOut $escPdf 2>&1";
-        shell_exec($cmd);
-        $pngs = glob($cachedir . '/slide_*.png');
-        if (count($pngs) > 0) {
-            $slides = [];
-            $i = 1;
-            while (file_exists($cachedir . '/slide_' . $i . '.png')) {
-                $slides[] = ['slide' => $i];
-                $i++;
-            }
-            return $slides;
-        }
-    }
-
-    return false;
+    return '';
 }
 
 // ═══════════════════════════════════════════════════
@@ -473,7 +479,7 @@ function render_via_html(string $path, string $cachedir): array|false {
                 if ($tag === 'sp') {
                     $spPr = $shape->getElementsByTagNameNS($pNs, 'spPr')->item(0);
                 } elseif ($tag === 'pic') {
-                    $spPr = $shape->getElementsByTagNameNS($aNs, 'spPr')->item(0);
+                    $spPr = $shape->getElementsByTagNameNS($pNs, 'spPr')->item(0);
                 }
                 if (!$spPr) continue;
 
@@ -491,7 +497,7 @@ function render_via_html(string $path, string $cachedir): array|false {
                 if ($w < 1 || $h < 1) continue;
 
                 if ($tag === 'pic') {
-                    $blipFill = $shape->getElementsByTagNameNS($aNs, 'blipFill')->item(0);
+                    $blipFill = $shape->getElementsByTagNameNS($pNs, 'blipFill')->item(0);
                     if ($blipFill) {
                         $blip = $blipFill->getElementsByTagNameNS($aNs, 'blip')->item(0);
                         if ($blip) {
@@ -516,7 +522,7 @@ function render_via_html(string $path, string $cachedir): array|false {
                         }
                     }
                 } elseif ($tag === 'sp') {
-                    $txBody = $shape->getElementsByTagNameNS($aNs, 'txBody')->item(0);
+                    $txBody = $shape->getElementsByTagNameNS($pNs, 'txBody')->item(0);
                     if (!$txBody) continue;
 
                     $lines = [];

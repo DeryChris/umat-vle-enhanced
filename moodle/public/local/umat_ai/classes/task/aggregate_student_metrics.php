@@ -46,7 +46,7 @@ class aggregate_student_metrics extends \core\task\scheduled_task {
 
                 // Avg quiz grade last 7 days
                 $avgquiz = $DB->get_field_sql(
-                    "SELECT AVG(grade) FROM {quiz_grades} qg
+                    "SELECT AVG(qg.grade) FROM {quiz_grades} qg
                       JOIN {quiz} q ON q.id = qg.quiz
                      WHERE qg.userid = :uid AND q.course = :cid AND qg.timemodified > :since",
                     ['uid' => $uid, 'cid' => $cid, 'since' => $weekago]
@@ -65,7 +65,7 @@ class aggregate_student_metrics extends \core\task\scheduled_task {
                     SELECT MAX(last) FROM (
                         SELECT MAX(timecreated) AS last FROM {umat_ai_chat_logs} WHERE userid = :uid1 AND courseid = :cid1
                         UNION ALL
-                        SELECT MAX(timemodified) FROM {quiz_grades} qg2 JOIN {quiz} q2 ON q2.id = qg2.quiz WHERE qg2.userid = :uid2 AND q2.course = :cid2
+                        SELECT MAX(qg2.timemodified) FROM {quiz_grades} qg2 JOIN {quiz} q2 ON q2.id = qg2.quiz WHERE qg2.userid = :uid2 AND q2.course = :cid2
                         UNION ALL
                         SELECT MAX(timecreated) FROM {logstore_standard_log} WHERE userid = :uid3 AND courseid = :cid3
                     ) AS t",

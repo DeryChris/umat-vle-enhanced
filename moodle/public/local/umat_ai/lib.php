@@ -225,6 +225,23 @@ function local_umat_ai_request_id(): string {
 function local_umat_ai_pluginfile($course, $cm, \context $context, $filearea, $args, $forcedownload, array $options = []) {
     global $DB;
 
+    if ($filearea === 'materials') {
+        $filename = array_pop($args);
+        $filepath = $args ? '/' . implode('/', $args) . '/' : '/';
+
+        $coursecontext = \context_course::instance($context->instanceid);
+        require_capability('local/umat_ai:chatwithai', $coursecontext);
+
+        $fs = get_file_storage();
+        $file = $fs->get_file($context->id, 'local_umat_ai', 'materials', 0, $filepath, $filename);
+        if (!$file) {
+            return false;
+        }
+
+        send_stored_file($file, null, 0, true);
+        return;
+    }
+
     if ($filearea !== 'recordings') {
         return false;
     }

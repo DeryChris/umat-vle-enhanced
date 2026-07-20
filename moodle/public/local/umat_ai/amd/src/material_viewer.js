@@ -158,11 +158,13 @@ define([], function () {
             case 'audio': viewAudio(body, opts); break;
             case 'pdf':   viewPdf(body, opts); break;
             case 'docx':  viewDocx(body, opts); break;
+            case 'doc':   viewUnsupported(body, opts); break;
             case 'xlsx':  viewXlsx(body, opts); break;
             case 'pptx':  viewPptx(body, opts); break;
+            case 'ppt':   viewUnsupported(body, opts); break;
             case 'code':  viewCode(body, opts); break;
             default:
-                body.innerHTML = '<div class="umat-vw-empty"><span class="material-symbols-outlined">description</span><p>Preview not available for this file type.</p></div>';
+                body.innerHTML = '<div class="umat-vw-empty"><span class="material-symbols-outlined">description</span><p>Preview not available for this file type. <a href="' + esc(opts.downloadUrl || '#') + '" download style="color:var(--u-pri);text-decoration:underline;">Download</a> the file to view it.</p></div>';
         }
     }
 
@@ -1164,6 +1166,69 @@ define([], function () {
         }).catch(function () {
             showError(container, 'Failed to load highlighting library.', 'Check your internet connection.');
         });
+    }
+
+    // ═══════════════════════════════════════════
+    //  OLD FORMAT TEXT VIEWER (fetches extracted text from AI service)
+    // ═══════════════════════════════════════════
+
+    function viewUnsupported(container, opts) {
+        var mid = opts.materialId;
+        var cid = opts.courseId;
+        var name = opts.name || 'file';
+
+        if (!mid || !cid) {
+            showFallback(container, name, opts.downloadUrl);
+            return;
+        }
+
+        showLoading(container, 'Loading content\u2026');
+
+        var a = document.createElement('a');
+        a.href = opts.downloadUrl || opts.url || '';
+        var parts = a.pathname.split('/');
+        var idx = parts.indexOf('local');
+        var root = idx > 0 ? parts.slice(0, idx).join('/') : '';
+        var apiUrl = a.origin + root + '/local/umat_ai/material_text.php?material_id=' + mid + '&course_id=' + cid;
+
+        fetch(apiUrl)
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function (data) {
+                if (!data.success || !data.text) {
+                    showFallback(container, name, opts.downloadUrl);
+                    return;
+                }
+                var text = data.text;
+                var lines = text.split('\n').filter(function (l) { return l.trim(); });
+                container.innerHTML =
+                    '<div class="umat-vw-docx-body" style="padding:16px;font-size:14px;line-height:1.7;">' +
+                        lines.map(function (l) {
+                            return '<p style="margin:0 0 8px 0;">' + esc(l) + '</p>';
+                        }).join('') +
+                    '</div>';
+                document.getElementById('umat-vw-meta').textContent = data.chunks + ' chunks' +
+                    (opts.size ? ' \u00b7 ' + formatBytes(opts.size) : '');
+            })
+            .catch(function (err) {
+                showFallback(container, name, opts.downloadUrl);
+            });
+    }
+
+    function showFallback(container, name, downloadUrl) {
+        var ext = name.lastIndexOf('.') > 0 ? name.substring(name.lastIndexOf('.') + 1).toUpperCase() : '';
+        var label = ext || 'file';
+        container.innerHTML =
+            '<div class="umat-vw-empty">' +
+                '<span class="material-symbols-outlined">description</span>' +
+                '<p>Preview not available for this ' + esc(label) + ' format.</p>' +
+                '<p style="font-size:13px;color:var(--u-txt-sec);margin-top:4px;">' + esc(name) + '</p>' +
+                '<a href="' + esc(downloadUrl || '#') + '" download class="umat-vw-retry-btn" style="display:inline-flex;align-items:center;gap:6px;margin-top:12px;text-decoration:none;">' +
+                    '<span class="material-symbols-outlined" style="font-size:18px;">download</span> Download to view' +
+                '</a>' +
+            '</div>';
     }
 
     var api = { open: openViewer, close: closeViewer };

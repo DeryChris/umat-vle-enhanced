@@ -141,6 +141,7 @@ class course_data extends \external_api {
 
     public static function get_course_materials($courseid) {
         global $USER, $DB;
+        try {
         $params = self::validate_parameters(
             self::get_course_materials_parameters(), ['courseid' => $courseid]);
         $cid = (int)$params['courseid'];
@@ -248,7 +249,38 @@ class course_data extends \external_api {
             }
         }
 
+        // Cross-reference indexing status from umat_ai_materials table.
+        if ($DB->get_manager()->table_exists('umat_ai_materials') && !empty($mats)) {
+            $fileIds = array_column($mats, 'id');
+            $placeholders = implode(',', array_fill(0, count($fileIds), '?'));
+            $indexRows = $DB->get_records_sql(
+                "SELECT fileid, id AS material_id, is_indexed FROM {umat_ai_materials}
+                 WHERE fileid IN ($placeholders)", $fileIds);
+            foreach ($mats as &$mat) {
+                $idx = $indexRows[$mat['id']] ?? null;
+                if ($idx) {
+                    $mat['status']       = $idx->is_indexed ? 'indexed' : 'pending';
+                    $mat['material_id']  = (int)$idx->material_id;
+                } else {
+                    $mat['status']       = 'not_indexed';
+                    $mat['material_id']  = 0;
+                }
+            }
+            unset($mat);
+        } else {
+            foreach ($mats as &$mat) {
+                $mat['status']      = 'not_indexed';
+                $mat['material_id'] = 0;
+            }
+            unset($mat);
+        }
+
         return ['materials' => $mats];
+            } catch (\Throwable $e) {
+                error_log('local_umat_ai get_course_materials error: ' . $e->getMessage()
+                    . ' in ' . $e->getFile() . ':' . $e->getLine());
+                throw $e;
+            }
     }
 
     public static function get_course_materials_returns() {
@@ -262,8 +294,121 @@ class course_data extends \external_api {
                 'timemodified' => new \external_value(PARAM_INT),
                 'time_ago'     => new \external_value(PARAM_TEXT),
                 'page_count'   => new \external_value(PARAM_INT),
+                'status'       => new \external_value(PARAM_ALPHA, 'Indexing status', VALUE_DEFAULT, 'not_indexed'),
+                'material_id'  => new \external_value(PARAM_INT, 'umat_ai_materials record id', VALUE_DEFAULT, 0),
             ])
         )]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // reindex_material                                                    //
+    // ------------------------------------------------------------------ //
+    public static function reindex_material_parameters() {
+        return new \external_function_parameters([
+            'courseid'    => new \external_value(PARAM_INT, 'Course ID'),
+            'material_id' => new \external_value(PARAM_INT, 'umat_ai_materials record id'),
+        ]);
+    }
+
+    public static function reindex_material($courseid, $material_id) {
+        global $DB;
+        try {
+            $params = self::validate_parameters(
+                self::reindex_material_parameters(),
+                ['courseid' => $courseid, 'material_id' => $material_id]);
+            $cid = (int)$params['courseid'];
+            $mid = (int)$params['material_id'];
+
+            $ctx = \context_course::instance($cid);
+            self::validate_context($ctx);
+            require_capability('local/umat_ai:approveoutput', $ctx);
+
+            $matRecord = $DB->get_record('umat_ai_materials', ['id' => $mid, 'courseid' => $cid]);
+            if (!$matRecord) {
+                return ['success' => false, 'message' => 'Material record not found.'];
+            }
+
+            $fileId = (int)$matRecord->fileid;
+            if ($fileId <= 0) {
+                return ['success' => false, 'message' => 'No file associated with this material.'];
+            }
+
+            $fs = get_file_storage();
+            $context = \context_course::instance($cid);
+            $files = $fs->get_area_files($context->id, 'local_umat_ai', 'materials', false, '', false);
+            $target = null;
+            foreach ($files as $f) {
+                if ((int)$f->get_id() === $fileId) {
+                    $target = $f;
+                    break;
+                }
+            }
+            if (!$target) {
+                $allCtxs = [$context->id];
+                $modinfo = get_fast_modinfo($cid);
+                foreach ($modinfo->get_cms() as $cm) {
+                    $allCtxs[] = \context_module::instance($cm->id)->id;
+                }
+                foreach ($allCtxs as $ctxId) {
+                    foreach (['mod_resource' => 'content', 'mod_folder' => 'content', 'course' => 'legacy'] as [$comp, $area]) {
+                        $areaFiles = $fs->get_area_files($ctxId, $comp, $area, false, '', false);
+                        foreach ($areaFiles as $f) {
+                            if ((int)$f->get_id() === $fileId) {
+                                $target = $f;
+                                break 3;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!$target) {
+                return ['success' => false, 'message' => 'Original file not found in Moodle file storage.'];
+            }
+
+            $cfg = \local_umat_ai_get_service_config();
+            $tempdir  = \make_temp_directory('umat_ai_reindex');
+            $filepath = $tempdir . '/' . $target->get_filename();
+            $target->copy_content_to($filepath);
+
+            $client = new \curl(['ignoresecurity' => \local_umat_ai_is_localhost($cfg['url'])]);
+            $client->setHeader([
+                'Authorization: Bearer ' . $cfg['token'],
+                'X-Request-Id: ' . \local_umat_ai_request_id(),
+            ]);
+            $client->setopt(['CURLOPT_TIMEOUT' => 120]);
+
+            $response = $client->post($cfg['url'] . '/api/v1/materials/index', [
+                'course_id'   => (string)$cid,
+                'material_id' => (string)$fileId,
+                'filename'    => $target->get_filename(),
+                'file'        => new \CURLFile($filepath, $target->get_mimetype(), $target->get_filename()),
+            ]);
+
+            if (file_exists($filepath)) unlink($filepath);
+
+            $result = @json_decode($response, true);
+            if (!empty($result['success'])) {
+                $matRecord->is_indexed  = 1;
+                $matRecord->timeindexed = time();
+                $DB->update_record('umat_ai_materials', $matRecord);
+                return ['success' => true, 'message' => $target->get_filename() . ' is ready for question generation.'];
+            }
+
+            $detail = $result['detail'] ?? $result['message'] ?? 'Unknown error';
+            return ['success' => false, 'message' => $target->get_filename() . ' could not be indexed: ' . $detail];
+
+        } catch (\Throwable $e) {
+            error_log('local_umat_ai reindex_material error: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'Reindex failed. Please try again or contact the administrator.'];
+        }
+    }
+
+    public static function reindex_material_returns() {
+        return new \external_single_structure([
+            'success' => new \external_value(PARAM_BOOL),
+            'message' => new \external_value(PARAM_TEXT),
+        ]);
     }
 
     // ------------------------------------------------------------------ //

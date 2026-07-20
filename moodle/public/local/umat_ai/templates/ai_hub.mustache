@@ -144,10 +144,12 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;}
 .hub-scroll-bottom .material-symbols-outlined{font-size:18px;}
 
 @keyframes hub-bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
-.hub-typing{display:flex;gap:4px;padding:4px 0;}
+.hub-typing{display:inline-flex;gap:4px;padding:4px 0;align-items:center;}
 .hub-typing span{width:6px;height:6px;border-radius:50%;background:var(--p);animation:hub-bounce 1.2s infinite;}
 .hub-typing span:nth-child(2){animation-delay:.2s;}
 .hub-typing span:nth-child(3){animation-delay:.4s;}
+.hub-typing-label{font-size:13px;color:#888;font-style:italic;margin-left:8px;white-space:nowrap;}
+@media(prefers-reduced-motion:reduce){.hub-typing span{animation:none!important;opacity:.7;}.hub-typing span:nth-child(2){opacity:.5;}.hub-typing span:nth-child(3){opacity:.3;}}
 
 /* Sessions section */
 .hub-sessions-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
@@ -370,7 +372,10 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;}
   function showTyping() {
     var d = document.createElement('div');
     d.id = 'hub-typing-el';
-    d.innerHTML = '<div class="hub-msg ai"><div class="hub-msg-label">AI TUTOR</div><div class="hub-bubble"><div class="hub-typing"><span></span><span></span><span></span></div></div></div>';
+    d.setAttribute('role', 'status');
+    d.setAttribute('aria-live', 'polite');
+    d.setAttribute('aria-label', 'AI is preparing a response');
+    d.innerHTML = '<div class="hub-msg ai"><div class="hub-msg-label">AI TUTOR</div><div class="hub-bubble"><div class="hub-typing" aria-hidden="true"><span></span><span></span><span></span></div><span class="hub-typing-label">AI is responding&hellip;</span></div></div>';
     msgs.appendChild(d);
     msgs.scrollTop = msgs.scrollHeight;
   }
@@ -383,22 +388,44 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;}
     var inp=document.getElementById('hub-chat-input');if(inp){inp.value='';inp.style.height='auto';}
     showTyping();
 
+    // Disable send button during request
+    var sendBtn = document.getElementById('hub-chat-send');
+    var chatInp = document.getElementById('hub-chat-input');
+    if (sendBtn) { sendBtn.disabled = true; sendBtn.setAttribute('aria-busy', 'true'); }
+    if (chatInp) chatInp.disabled = true;
+
     var cid = parseInt((sel && sel.value) || firstCourseId) || 0;
-    if (!cid) { hideTyping(); appendMsg('Please select a course first.', false); return; }
+    if (!cid) {
+      hideTyping();
+      appendMsg('Please select a course first.', false);
+      if (sendBtn) { sendBtn.disabled = false; sendBtn.removeAttribute('aria-busy'); }
+      if (chatInp) chatInp.disabled = false;
+      return;
+    }
 
     require(['core/ajax'], function(Ajax) {
       Ajax.call([{ methodname:'local_umat_ai_ask_question', args:{courseid:cid, question:q, session_key:''} }])[0]
-        .done(function(r){ hideTyping(); appendMsg(r.success?r.answer:'Sorry, an error occurred. Please try again.', false); })
-        .fail(function(){ hideTyping(); appendMsg('Connection error. Please check your network.', false); });
+        .done(function(r){
+          hideTyping();
+          appendMsg(r.success ? r.answer : 'Sorry, an error occurred. Please try again.', false);
+          if (sendBtn) { sendBtn.disabled = false; sendBtn.removeAttribute('aria-busy'); }
+          if (chatInp) { chatInp.disabled = false; chatInp.focus(); }
+        })
+        .fail(function(){
+          hideTyping();
+          appendMsg('Connection error. Please check your network.', false);
+          if (sendBtn) { sendBtn.disabled = false; sendBtn.removeAttribute('aria-busy'); }
+          if (chatInp) { chatInp.disabled = false; chatInp.focus(); }
+        });
     });
   }
 
   var sendBtn = document.getElementById('hub-chat-send');
   var chatInput = document.getElementById('hub-chat-input');
-  if (sendBtn) sendBtn.addEventListener('click', function(){ sendMsg(chatInput.value); });
+  if (sendBtn) sendBtn.addEventListener('click', function(){ if(this.disabled)return; sendMsg(chatInput.value); });
   if (chatInput) {
     chatInput.addEventListener('keydown', function(e){
-      if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg(this.value);}
+      if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(sendBtn&&!sendBtn.disabled)sendMsg(this.value);}
     });
     /* auto-resize */
     chatInput.addEventListener('input', function(){

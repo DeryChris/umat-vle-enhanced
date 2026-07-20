@@ -20,7 +20,6 @@ var coursesLoaded  = false;
 var notesLoaded    = false;
 var sessionsLoaded = false;
 var reportLoaded = false;
-var progLoaded = false;
 var ov = document.getElementById('umat-student-ov');
 
 /* Time formatting helper for chat timestamps */
@@ -95,7 +94,7 @@ function setCpFeatureActive(name){
 }
 function renderCpFeature(name){
   var meta={
-    home:['home','Home','Course snapshot'],lectures:['play_circle','Lectures','Recent recordings'],courses:['menu_book','Courses','Your enrolled courses'],library:['local_library','Library','Course materials'],sessions:['chat_bubble','Sessions','Recent AI chats'],'report-issue':['flag','Report Issue','Submit a complaint'],'my-progress':['trending_up','My Progress','Personal learning insights']
+    home:['home','Home','Course snapshot'],lectures:['play_circle','Lectures','Recent recordings'],courses:['menu_book','Courses','Your enrolled courses'],library:['local_library','Library','Course materials'],sessions:['chat_bubble','Sessions','Recent AI chats'],'report-issue':['flag','Report Issue','Submit a complaint']
   }[name]||['widgets','Feature','Quick view'];
   showCpPane('cp-feature');setCpFeatureActive(name);
   document.getElementById('cp-feature-icon').textContent=meta[0];document.getElementById('cp-feature-title').textContent=meta[1];document.getElementById('cp-feature-sub').textContent=meta[2];
@@ -106,7 +105,6 @@ function renderCpFeature(name){
   if(name==='lectures')return renderCpLectures(body);
   if(name==='library')return renderCpLibrary(body);
   if(name==='report-issue')return renderCpReportIssue(body);
-  if(name==='my-progress')return renderCpProgress(body);
 }
 function renderCpReportIssue(body){
   if(!courseId){var c=(userData&&userData.courses)||[];if(!c.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses available.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course to report an issue:</div><div style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+c.slice(0,12).map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';body.querySelectorAll('.umat-chip').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;renderCpFeature('report-issue');});});return;}
@@ -213,27 +211,7 @@ function renderCpLectures(body){
 }
 function renderCpLibrary(body){
   if(!courseId){var c=(userData&&userData.courses)||[];if(!c.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses found.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course to view materials:</div><div style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+c.slice(0,12).map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';body.querySelectorAll('.umat-chip').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;renderCpFeature('library');});});return;}
-  require(['core/ajax'],function(Ajax){Ajax.call([{methodname:'local_umat_ai_get_course_materials',args:{courseid:courseId}}])[0].done(function(r){var mats=r.materials||[];if(!mats.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">folder_open</span><p>No materials indexed yet.</p></div>';return;}body.innerHTML=mats.slice(0,12).map(function(m){return '<button class="umat-cp-list-card as-btn" data-mid="'+m.id+'" type="button"><strong>'+_umatEsc(m.filename||m.name||'Material')+'</strong><p>'+_umatEsc(m.mimetype||m.type||'Course material')+'</p></button>';}).join('');}).fail(function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load materials.</p></div>';});});
-}
-function renderCpProgress(body){
-  require(['core/ajax'],function(Ajax){
-    Ajax.call([{methodname:'local_umat_ai_get_my_progress',args:{courseid:courseId||0,days:60}}])[0]
-      .done(function(d){
-        if(!d||!d.total_questions&&!d.struggle_topics.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">info</span><p>Start chatting with the AI tutor to see your progress!</p></div>';return;}
-        var avgStr=d.struggle_score||0;
-        var strLevel=avgStr>=60?'high':(avgStr>=30?'medium':'low');
-        var strColor=strLevel==='high'?'#dc2626':(strLevel==='medium'?'#d97706':'#16a34a');
-        body.innerHTML=
-          '<div class="umat-cp-mini-grid">'+
-            '<div class="umat-cp-mini-card"><span class="material-symbols-outlined">quiz</span><strong>'+(d.total_questions||0)+'</strong><small>Questions</small></div>'+
-            '<div class="umat-cp-mini-card"><span class="material-symbols-outlined">bar_chart</span><strong>'+(d.week_questions||0)+'</strong><small>This Week</small></div>'+
-            '<div class="umat-cp-mini-card"><span class="material-symbols-outlined">chat</span><strong>'+(d.total_sessions||0)+'</strong><small>Sessions</small></div>'+
-            '<div class="umat-cp-mini-card" style="color:'+strColor+';"><span class="material-symbols-outlined">psychology</span><strong>'+avgStr+'</strong><small>Struggle</small></div>'+
-          '</div>'+
-          (d.ai_recommendation?'<div class="umat-cp-list-card" style="margin-top:8px;background:linear-gradient(135deg, rgba(99,102,241,.06), rgba(168,85,247,.06));border:1px solid rgba(99,102,241,.12);"><span class="material-symbols-outlined" style="color:var(--u-p);vertical-align:middle;margin-right:4px;">auto_awesome</span><span style="font-size:11px;">'+_umatEsc(d.ai_recommendation)+'</span></div>':'');
-      })
-      .fail(function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load progress.</p></div>';});
-  });
+  require(['core/ajax'],function(Ajax){Ajax.call([{methodname:'local_umat_ai_get_course_materials',args:{courseid:courseId}}])[0].done(function(r){var mats=r.materials||[];if(!mats.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">folder_open</span><p>No materials indexed yet.</p></div>';return;}body.innerHTML=mats.slice(0,12).map(function(m){return '<button class="umat-cp-list-card as-btn" data-mid="'+m.id+'" type="button"><strong>'+_umatEsc(m.filename||m.name||'Material')+'</strong><p>'+_umatEsc(m.mimetype||m.type||'Course material')+'</p></button>';}).join('');}).fail(function(err){console.error('[umat] get_course_materials failed:',err&&err.message||err||'unknown');body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load materials.</p></div>';});});
 }
 
 /* ---- workspace tab switching ---- */
@@ -246,7 +224,6 @@ function switchToTab(name){
   if(name==='my-notes'   && !notesLoaded){   initNotesTab();  notesLoaded=true;    }
   if(name==='sessions'   && !sessionsLoaded){ loadSessions();  sessionsLoaded=true; }
   if(name==='report-issue'){ if(!reportLoaded){ initReportIssueTab(); reportLoaded=true; }else loadMyIssues(); markResponsesRead(); pollUnreadCount(); }
-  if(name==='my-progress' && !progLoaded){ initProgressTab(); progLoaded=true; }
 }
 /* Select course: set context and switch to AI Tutor */
 function selectCourse(cid,cname){
@@ -365,6 +342,10 @@ function sendQuestion(q, msgsId){
   var contextQ=selectedMats.length>0?'[Referencing: '+selectedMats.map(function(m){return m.name;}).join(', ')+'] '+q:q;
   var matIds=selectedMats.map(function(m){return m.id;});
 
+  // Determine which send button/input pair to manage
+  var sendBtnId = (msgsId === 'cp-msgs') ? 'cp-send' : 'ws-send';
+  var sendInputId = (msgsId === 'cp-msgs') ? 'cp-input' : 'ws-input';
+
   _umatStreamChat({
     url: streamUrl,
     sesskey: moodleSesskey,
@@ -373,6 +354,8 @@ function sendQuestion(q, msgsId){
     session_key: sessionKey,
     material_ids: matIds,
     msgsId: msgsId,
+    sendBtnId: sendBtnId,
+    sendInputId: sendInputId,
     statusText: _detectTaskHint(q),
     onMeta: function(meta){ syncRemaining(meta.remaining); updateRate(); markConn(true); },
     onQuizData: function(payload){
@@ -390,7 +373,26 @@ function sendQuestion(q, msgsId){
       _umatHideTyping(tid);
       if(err.error==='rate_limit'){ qTimes.pop(); updateRate(); }
       else { markConn(false); }
+      // Show error message with inline retry button
+      var retryId = 'retry_' + Date.now();
       _umatAppendAi(msgsId, err.message||'Sorry, an error occurred. Please try again.', []);
+      // Add retry button after error message
+      var msgsCont = document.getElementById(msgsId);
+      if (msgsCont) {
+        var lastBubble = msgsCont.querySelector('.umat-bubble-ai:last-of-type');
+        if (lastBubble) {
+          var retryBtn = document.createElement('button');
+          retryBtn.className = 'umat-retry-btn';
+          retryBtn.type = 'button';
+          retryBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;">refresh</span>Retry';
+          retryBtn.setAttribute('aria-label', 'Retry sending message');
+          retryBtn.addEventListener('click', function() {
+            retryBtn.parentNode.removeChild(retryBtn);
+            sendQuestion(q, msgsId);
+          });
+          lastBubble.parentNode.appendChild(retryBtn);
+        }
+      }
     }
   });
 }
@@ -880,8 +882,8 @@ _umatWireQuizBtns('cp');
 
 /* workspace AI tutor */
 var wsInput=document.getElementById('ws-input'),wsSend=document.getElementById('ws-send');
-if(wsSend)wsSend.addEventListener('click',function(){sendQuestion(wsInput.value,'ws-msgs');wsInput.value='';});
-if(wsInput)wsInput.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();wsSend.click();}});
+if(wsSend)wsSend.addEventListener('click',function(){if(this.disabled)return;sendQuestion(wsInput.value,'ws-msgs');wsInput.value='';});
+if(wsInput)wsInput.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(wsSend&&!wsSend.disabled)wsSend.click();}});
 /* suggestion chips */
 ov.addEventListener('click',function(e){
   var chip=e.target.closest('[data-q]');
@@ -890,8 +892,8 @@ ov.addEventListener('click',function(e){
 
 /* compact panel send */
 var cpInput=document.getElementById('cp-input'),cpSend=document.getElementById('cp-send');
-if(cpSend)cpSend.addEventListener('click',function(){sendQuestion(cpInput.value,'cp-msgs');cpInput.value='';});
-if(cpInput)cpInput.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();cpSend.click();}});
+if(cpSend)cpSend.addEventListener('click',function(){if(this.disabled)return;sendQuestion(cpInput.value,'cp-msgs');cpInput.value='';});
+if(cpInput)cpInput.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(cpSend&&!cpSend.disabled)cpSend.click();}});
 /* compact panel scroll-to-bottom */
 (function(){
   var cpMsgs=document.getElementById('cp-msgs');
@@ -1008,8 +1010,8 @@ var wsDrawerCtrl = _umatInitAttachDrawer({
 
 /* lecture player send */
 var plInput=document.getElementById('ws-player-input'),plSend=document.getElementById('ws-player-send');
-if(plSend)plSend.addEventListener('click',function(){sendQuestion(plInput.value,'ws-player-msgs');plInput.value='';});
-if(plInput)plInput.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();plSend.click();}});
+if(plSend)plSend.addEventListener('click',function(){if(this.disabled)return;sendQuestion(plInput.value,'ws-player-msgs');plInput.value='';});
+if(plInput)plInput.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(plSend&&!plSend.disabled)plSend.click();}});
 
 /* ---- LECTURES: load & display ---- */
 function loadLectures(){
@@ -1039,8 +1041,8 @@ function loadLibrary(){
   grid.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading materials' + '?' + '</p></div>';
   require(['core/ajax'],function(Ajax){
     Ajax.call([{methodname:'local_umat_ai_get_course_materials',args:{courseid:courseId}}])[0]
-      .done(function(r){renderLibrary(r.materials||[]);if(typeof updateMaterialAnalysis==='function')updateMaterialAnalysis(courseId);if(typeof updateVideoGenerationStatus==='function')updateVideoGenerationStatus(courseId);})
-      .fail(function(){grid.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load materials.</p></div>';});
+      .done(function(r){renderLibrary(r.materials||[], courseId);if(typeof updateMaterialAnalysis==='function')updateMaterialAnalysis(courseId);if(typeof updateVideoGenerationStatus==='function')updateVideoGenerationStatus(courseId);})
+      .fail(function(err){console.error('[umat] loadLibrary failed:',err&&err.message||err||'unknown');grid.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load materials.</p></div>';});
   });
 }
 document.getElementById('ws-lib-refresh').addEventListener('click',function(){libraryLoaded=false;loadLibrary();libraryLoaded=true;});
@@ -1713,108 +1715,6 @@ sendQuestion=function(q,msgsId){
   }
   return _origSendQ(q,msgsId);
 };
-
-/* ' + '"?' + '"? My Progress ' + '"?' + '"? */
-function initProgressTab(){
-  var body=document.getElementById('prog-body');
-  if(!body)return;
-  var loading=document.getElementById('prog-loading');
-  var content=document.getElementById('prog-content');
-  loading.style.display='';
-  if(content)content.style.display='none';
-  require(['core/ajax'],function(Ajax){
-    Ajax.call([{methodname:'local_umat_ai_get_my_progress',args:{courseid:courseId||0,days:60}}])[0]
-      .done(function(d){
-        loading.style.display='none';
-        if(content)content.style.display='block';
-        renderProgress(d);
-      })
-      .fail(function(e){
-        loading.innerHTML='<span class="material-symbols-outlined">error</span><p>Failed to load progress data.</p>';
-        console.warn('Progress load error:',e);
-      });
-  });
-}
-
-function renderProgress(d){
-  if(!d)return;
-  /* KPI cards */
-  var kpis=document.getElementById('prog-kpis');
-  if(kpis){
-    var questions=d.total_questions||0;
-    var weekQ=d.week_questions||0;
-    var sessions=d.total_sessions||0;
-    var issues=d.total_issues||0;
-    var avgStr=d.struggle_score||0;
-    var strLevel=avgStr>=60?'high':(avgStr>=30?'medium':'low');
-    var strIcon=strLevel==='high'?'error':'warning';
-    var strColor=strLevel==='high'?'#dc2626':(strLevel==='medium'?'#d97706':'#16a34a');
-    kpis.innerHTML=
-      '<div class="prog-kpi"><div class="prog-kpi-icon pk-q"><span class="material-symbols-outlined">quiz</span></div><div class="prog-kpi-body"><div class="prog-kpi-val">'+questions+'</div><div class="prog-kpi-lbl">Questions</div></div></div>'+
-      '<div class="prog-kpi"><div class="prog-kpi-icon pk-w"><span class="material-symbols-outlined">bar_chart</span></div><div class="prog-kpi-body"><div class="prog-kpi-val">'+weekQ+'</div><div class="prog-kpi-lbl">This Week</div></div></div>'+
-      '<div class="prog-kpi"><div class="prog-kpi-icon pk-s"><span class="material-symbols-outlined">chat</span></div><div class="prog-kpi-body"><div class="prog-kpi-val">'+sessions+'</div><div class="prog-kpi-lbl">Sessions</div></div></div>'+
-      '<div class="prog-kpi"><div class="prog-kpi-icon pk-i"><span class="material-symbols-outlined">flag</span></div><div class="prog-kpi-body"><div class="prog-kpi-val">'+issues+'</div><div class="prog-kpi-lbl">Issues</div></div></div>'+
-      '<div class="prog-kpi"><div class="prog-kpi-icon" style="background:'+strColor+'20;color:'+strColor+';"><span class="material-symbols-outlined">'+strIcon+'</span></div><div class="prog-kpi-body"><div class="prog-kpi-val" style="color:'+strColor+';">'+avgStr+'</div><div class="prog-kpi-lbl">Struggle Level</div></div></div>';
-  }
-
-  /* AI recommendation */
-  var aiEl=document.getElementById('prog-ai-recs');
-  if(aiEl){
-    if(d.ai_recommendation){
-      aiEl.style.display='block';
-      aiEl.innerHTML='<div class="prog-ai-rec"><span class="material-symbols-outlined" style="color:var(--u-p);vertical-align:middle;margin-right:6px;">auto_awesome</span><span>'+_umatEsc(d.ai_recommendation)+'</span></div>';
-    }else{
-      aiEl.style.display='none';
-    }
-  }
-
-  /* Weekly chart */
-  var chartEl=document.getElementById('prog-week-chart');
-  if(chartEl){
-    var days=typeof d.day_labels==='string'?JSON.parse(d.day_labels):(d.day_labels||[]);
-    var counts=typeof d.daily_questions==='string'?JSON.parse(d.daily_questions):(d.daily_questions||[]);
-    if(days.length&&counts.length){
-      var maxC=Math.max.apply(null,counts)||1;
-      chartEl.innerHTML=days.map(function(day,i){
-        var h=Math.round((counts[i]||0)/maxC*60);
-        return '<div class="prog-chart-bar-wrap"><div class="prog-chart-bar" style="height:'+Math.max(4,h)+'px;" title="'+counts[i]+' questions"></div><div class="prog-chart-label">'+day+'</div><div class="prog-chart-val">'+(counts[i]||0)+'</div></div>';
-      }).join('');
-    }else{
-      chartEl.innerHTML='<div class="umat-empty" style="padding:20px;"><span class="material-symbols-outlined">bar_chart</span><p>No activity data yet.</p></div>';
-    }
-  }
-
-  /* Struggle topics */
-  var stEl=document.getElementById('prog-struggle-list');
-  if(stEl){
-    var topics=d.struggle_topics||[];
-    if(topics.length){
-      stEl.innerHTML=topics.slice(0,10).map(function(t){
-        var reasonLabel={quiz_failure:'Quiz Failure',repeated_views:'Repeated Viewing',assignment_failure:'Assignment Issue',issue_reported:'Issue Reported'}[t.struggle_reason]||t.struggle_reason;
-        var sev=t.struggle_score>=60?'high':(t.struggle_score>=30?'medium':'low');
-        var sevColor=sev==='high'?'#dc2626':(sev==='medium'?'#d97706':'#16a34a');
-        return '<div class="prog-struggle-item"><div class="prog-struggle-dot" style="background:'+sevColor+';"></div><div class="prog-struggle-info"><span class="prog-struggle-topic">'+_umatEsc(t.topic_label||'General')+'</span><span class="prog-struggle-course">'+_umatEsc(t.course_short||'')+'</span></div><div class="prog-struggle-reason">'+reasonLabel+'</div><div class="prog-struggle-score" style="color:'+sevColor+';">'+t.struggle_score+'</div></div>';
-      }).join('');
-    }else{
-      stEl.innerHTML='<div class="umat-empty" style="padding:20px;"><span class="material-symbols-outlined">check_circle</span><p>No struggle signals detected. Keep up the good work!</p></div>';
-    }
-  }
-
-  /* Issues summary */
-  var issEl=document.getElementById('prog-issues');
-  if(issEl){
-    var is=d.issue_statuses||{};
-    var total=d.total_issues||0;
-    if(total>0){
-      var open=is.open||0,inReview=is.in_review||0,resolved=is.resolved||0,closed=is.closed||0;
-      issEl.innerHTML=
-        '<div class="prog-issue-stats"><div class="prog-issue-stat"><span class="prog-issue-num" style="color:#dc2626;">'+open+'</span><span class="prog-issue-lbl">Open</span></div><div class="prog-issue-stat"><span class="prog-issue-num" style="color:#d97706;">'+inReview+'</span><span class="prog-issue-lbl">In Review</span></div><div class="prog-issue-stat"><span class="prog-issue-num" style="color:#16a34a;">'+resolved+'</span><span class="prog-issue-lbl">Resolved</span></div><div class="prog-issue-stat"><span class="prog-issue-num" style="color:var(--u-ol);">'+closed+'</span><span class="prog-issue-lbl">Closed</span></div></div>'+
-        (open>0?'<p style="font-size:12px;color:var(--u-ol);margin-top:8px;"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">info</span> You have '+open+' open issue'+(open>1?'s':'')+'. <a href="#" onclick="switchToTab(\'report-issue\');return false;" style="color:var(--u-p);">View your reports</a></p>':'');
-    }else{
-      issEl.innerHTML='<div class="umat-empty" style="padding:20px;"><span class="material-symbols-outlined">check_circle</span><p>No issues reported yet.</p></div>';
-    }
-  }
-}
 
 /* ' + '"?' + '"? Notification polling: unread lecturer responses ' + '"?' + '"? */
 function markResponsesRead(){

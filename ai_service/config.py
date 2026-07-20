@@ -19,15 +19,20 @@ class Settings(BaseSettings):
     # Each provider needs its own API key; only the selected one is required.
     llm_provider: str = "gemini"
 
+    # LLM provider for lecturers: "openai" or "gemini".
+    # When set, lecturer queries use this provider instead of llm_provider.
+    llm_provider_lecturer: str = "openai"
+
     # Google Gemini (LLM + embeddings)
     google_api_key: str = ""
     llm_model: str = "gemini-2.5-flash"
     embedding_model: str = "gemini-embedding-001"
 
-    # OpenAI (used when llm_provider=openai)
+    # OpenAI / OpenRouter (used when llm_provider=openai)
     openai_api_key: str = ""
     openai_llm_model: str = "gpt-4o-mini"
     openai_embedding_model: str = "text-embedding-3-small"
+    openai_base_url: str = ""  # Set to https://openrouter.ai/api/v1 for OpenRouter
 
     # OpenRouter (used when llm_provider=openrouter)
     # OpenRouter uses OpenAI-compatible API format — reuses ChatOpenAI with custom base_url.
@@ -72,6 +77,10 @@ class Settings(BaseSettings):
     lti_key_id: str = "umat-ai-key-1"
 
     @property
+    def effective_lecturer_provider(self) -> str:
+        return self.llm_provider_lecturer or self.llm_provider
+
+    @property
     def database_url(self) -> str:
         return (
             f"postgresql+psycopg2://{self.ai_db_user}:"
@@ -113,6 +122,17 @@ def _validate_provider(s: Settings) -> None:
     if s.llm_provider == "openrouter" and not s.openrouter_api_key:
         _fail_startup(["\nLLM_PROVIDER is 'openrouter' but OPENAI_API_KEY is not set.",
                        "Get your OpenRouter API key at https://openrouter.ai/keys."])
+
+    # Validate lecturer provider (defaults to openai, falls back to llm_provider).
+    lecturer_provider = s.llm_provider_lecturer or s.llm_provider
+    if lecturer_provider not in ("gemini", "openai"):
+        _fail_startup([f"\nLLM_PROVIDER_LECTURER must be 'gemini' or 'openai', got: {lecturer_provider!r}"])
+    if lecturer_provider == "gemini" and not s.google_api_key:
+        _fail_startup(["\nLLM_PROVIDER_LECTURER is 'gemini' but GOOGLE_API_KEY is not set.",
+                       "Get a key at https://aistudio.google.com/apikey"])
+    if lecturer_provider == "openai" and not s.openai_api_key:
+        _fail_startup(["\nLLM_PROVIDER_LECTURER is 'openai' but OPENAI_API_KEY is not set.",
+                       "Get a key at https://platform.openai.com/api-keys"])
 
 
 @lru_cache()

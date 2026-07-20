@@ -48,20 +48,23 @@ class generate_quiz_adhoc extends \core\task\adhoc_task {
                 'ai_instructions' => $config['ai_instructions'] ?? '',
             ];
 
-            $client = new \curl();
-            $client->setHeader([
-                'Content-Type: application/json',
-                'Authorization: Bearer ' . $cfg->ai_service_token,
-            ]);
-
-            $payloadJson = json_encode($payload);
+            $url = rtrim($cfg->ai_service_url, '/') . '/api/v1/quizgen/generate';
             mtrace("[umat_ai] Calling AI service for job $jobid...");
-            $response = $client->post(
-                rtrim($cfg->ai_service_url, '/') . '/api/v1/quizgen/generate',
-                $payloadJson
-            );
-
-            $httpCode = $client->get_info()['http_code'] ?? 0;
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => json_encode($payload),
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $cfg->ai_service_token,
+                ],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 120,
+                CURLOPT_CONNECTTIMEOUT => 10,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
             mtrace("[umat_ai] AI service responded HTTP $httpCode");
 
             $result = json_decode($response, true);

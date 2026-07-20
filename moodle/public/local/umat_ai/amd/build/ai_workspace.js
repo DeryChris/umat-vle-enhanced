@@ -147,6 +147,9 @@ define(['core/ajax', 'core/notification', 'local_umat_ai/umatshared'], function(
         var msgs = document.getElementById('workspace-chat-messages');
         if (!msgs) return;
 
+        var typing = document.getElementById('workspace-typing');
+        if (typing) msgs.removeChild(typing);
+
         var sourcesHtml = '';
         if (sources && sources.length > 0) {
             sourcesHtml = '<div class="umat-ws-sources">' +
@@ -162,6 +165,9 @@ define(['core/ajax', 'core/notification', 'local_umat_ai/umatshared'], function(
               '<div class="umat-ws-bubble-ai"><p>' + escHtml(text) + '</p></div>' +
             '</div>' + sourcesHtml;
         msgs.appendChild(div);
+
+        // Re-append typing indicator at the bottom.
+        if (typing) msgs.appendChild(typing);
         msgs.scrollTop = msgs.scrollHeight;
     }
 
@@ -176,11 +182,15 @@ define(['core/ajax', 'core/notification', 'local_umat_ai/umatshared'], function(
     }
 
     function showTyping() {
-        Shared._umatShowTyping('workspace-chat-messages', 'workspace-typing');
+        var el = document.getElementById('workspace-typing');
+        if (el) el.style.display = '';
+        var msgs = document.getElementById('workspace-chat-messages');
+        if (msgs) msgs.scrollTop = msgs.scrollHeight;
     }
 
     function hideTyping() {
-        Shared._umatHideTyping('workspace-typing');
+        var el = document.getElementById('workspace-typing');
+        if (el) el.style.display = 'none';
     }
 
     function sendQuestion(q) {

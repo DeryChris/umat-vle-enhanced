@@ -47,6 +47,11 @@ $functions = [
         'description' => 'Get course files for library', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
+    'local_umat_ai_reindex_material' => [
+        'classname'   => '\local_umat_ai\external\course_data', 'methodname' => 'reindex_material',
+        'description' => 'Retry indexing a failed material', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:approveoutput',
+    ],
     'local_umat_ai_get_course_recordings' => [
         'classname'   => '\local_umat_ai\external\course_data', 'methodname' => 'get_course_recordings',
         'description' => 'Get BBB recordings with AI metadata', 'type' => 'read', 'ajax' => true,
@@ -153,12 +158,6 @@ $functions = [
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
 
-    /* ---- Student Progress ---- */
-    'local_umat_ai_get_my_progress' => [
-        'classname'   => '\local_umat_ai\external\student_progress', 'methodname' => 'get_my_progress',
-        'description' => 'Student views their personal progress/struggle dashboard', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
-    ],
 
     /* ---- Quiz Generator ---- */
     'local_umat_ai_generate_quiz_draft' => [
@@ -179,6 +178,21 @@ $functions = [
     'local_umat_ai_get_quiz_job_history' => [
         'classname'   => '\local_umat_ai\external\quizgen', 'methodname' => 'get_quiz_job_history',
         'description' => 'List all quiz generation jobs for a course (history tracking)', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_export_quiz_word' => [
+        'classname'   => '\local_umat_ai\external\quizgen', 'methodname' => 'export_quiz_word',
+        'description' => 'Generate a .docx assessment document from questions', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_save_quizgen_questions' => [
+        'classname'   => '\local_umat_ai\external\quizgen', 'methodname' => 'save_quizgen_questions',
+        'description' => 'Save edited questions back to a quizgen job and rebuild XML', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_regenerate_quizgen_question' => [
+        'classname'   => '\local_umat_ai\external\quizgen', 'methodname' => 'regenerate_quizgen_question',
+        'description' => 'Regenerate a single question via AI', 'type' => 'write', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
 
@@ -287,6 +301,33 @@ $functions = [
         'classname'   => '\local_umat_ai\external\admin_panel', 'methodname' => 'system_health',
         'description' => 'Get AI service and system health', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
+
+    /* ---- Lecture Transcription ---- */
+    'local_umat_ai_upload_recording' => [
+        'classname'   => '\local_umat_ai\external\transcription', 'methodname' => 'upload_recording',
+        'description' => 'Initiate a transcription upload session', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_get_transcription' => [
+        'classname'   => '\local_umat_ai\external\transcription', 'methodname' => 'get_transcription',
+        'description' => 'Get transcription status and content', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_get_study_tools' => [
+        'classname'   => '\local_umat_ai\external\transcription', 'methodname' => 'get_study_tools',
+        'description' => 'Get AI-generated study tools from a transcript', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_list_transcriptions' => [
+        'classname'   => '\local_umat_ai\external\transcription', 'methodname' => 'list_transcriptions',
+        'description' => 'List transcription jobs for a course', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_direct_upload' => [
+        'classname'   => '\local_umat_ai\external\transcription', 'methodname' => 'direct_upload',
+        'description' => 'Handle direct file upload for transcription', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
 ];
 

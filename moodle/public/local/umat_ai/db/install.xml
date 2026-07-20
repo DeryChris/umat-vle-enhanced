@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="local/umat_ai/db" VERSION="2026070700" COMMENT="UMaT AI plugin v2.0.0 schema">
+<XMLDB PATH="local/umat_ai/db" VERSION="2026071600" COMMENT="UMaT AI plugin v2.1.0 schema">
   <TABLES>
 
-    <TABLE NAME="umat_ai_sessions" COMMENT="Tracks BBB recordings being processed by the AI service">
+    <TABLE NAME="umat_ai_sessions" COMMENT="Tracks BBB recordings and uploaded lectures being processed by the AI service">
       <FIELDS>
         <FIELD NAME="id"             TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="sessionid"      TYPE="char" LENGTH="100" NOTNULL="true"/>
         <FIELD NAME="courseid"       TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="userid"         TYPE="int"  LENGTH="10"  NOTNULL="false" DEFAULT="0"/>
         <FIELD NAME="cmid"           TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="source_type"    TYPE="char" LENGTH="20"  NOTNULL="true" DEFAULT="bbb"/>
         <FIELD NAME="recording_url"  TYPE="text" NOTNULL="false"/>
         <FIELD NAME="recording_path" TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="upload_filename" TYPE="char" LENGTH="255" NOTNULL="false"/>
         <FIELD NAME="transcript_json" TYPE="text" NOTNULL="false"/>
         <FIELD NAME="status"         TYPE="char" LENGTH="30"  NOTNULL="true" DEFAULT="pending"/>
         <FIELD NAME="timecreated"    TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>

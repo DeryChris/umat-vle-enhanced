@@ -16,10 +16,14 @@ class process_recordings extends \core\task\scheduled_task {
         $client->setHeader(['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['token'], 'X-Request-Id: ' . local_umat_ai_request_id()]);
         $client->setopt(['CURLOPT_TIMEOUT' => 25]);
         $pending = $DB->get_records_select('umat_ai_sessions',
-            "status IN ('pending','processing','queued','downloading','transcribing','processing_ai')",
+            "status IN ('pending','processing','queued','downloading','transcribing','processing_ai','uploading')",
             [], 'timecreated ASC', '*', 0, 20);
         foreach ($pending as $sess) {
-            $raw    = $client->get($cfg['url'] . '/api/v1/recording/status/' . urlencode($sess->sessionid));
+            $isUpload = ($sess->source_type ?? '') === 'upload';
+            $statusUrl = $isUpload
+                ? $cfg['url'] . '/api/v1/transcription/' . urlencode($sess->sessionid)
+                : $cfg['url'] . '/api/v1/recording/status/' . urlencode($sess->sessionid);
+            $raw    = $client->get($statusUrl);
             $result = json_decode($raw, true);
             if (empty($result['status'])) { mtrace("  [umat_ai] No status for {$sess->sessionid}"); continue; }
             $aiStatus = $result['status'];
@@ -46,6 +50,9 @@ class process_recordings extends \core\task\scheduled_task {
                 $DB->set_field('umat_ai_sessions','status','processing',['id'=>$sess->id]);
                 $DB->set_field('umat_ai_sessions','timemodified',time(),['id'=>$sess->id]);
                 mtrace("  [umat_ai] {$sess->sessionid} → {$aiStatus}");
+            } elseif ($aiStatus === 'uploading') {
+                $DB->set_field('umat_ai_sessions','timemodified',time(),['id'=>$sess->id]);
+                mtrace("  [umat_ai] {$sess->sessionid} still uploading");
             } elseif ($aiStatus === 'failed') {
                 $DB->set_field('umat_ai_sessions','status','failed',['id'=>$sess->id]);
                 $DB->set_field('umat_ai_sessions','timemodified',time(),['id'=>$sess->id]);

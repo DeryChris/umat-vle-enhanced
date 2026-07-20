@@ -6,6 +6,17 @@
  * @package local_umat_ai
  */
 
+// CORS preflight — must come before require_login().
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    header('Access-Control-Allow-Origin: ' . ($_SERVER['HTTP_ORIGIN'] ?? '*'));
+    header('Access-Control-Allow-Methods: POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+    header('Access-Control-Allow-Credentials: true');
+    header('Access-Control-Max-Age: 86400');
+    http_response_code(204);
+    exit;
+}
+
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/local/umat_ai/lib.php');
 
@@ -64,10 +75,20 @@ if ($is_lecturer) {
 
     $question_to_send = $analyticsCtx . ' Lecturer query: ' . $question;
 } else {
-    require_capability('local/umat_ai:chatwithai', $context);
+    if (!has_capability('local/umat_ai:chatwithai', $context)) {
+        header('Content-Type: text/event-stream');
+        header('Cache-Control: no-cache');
+        echo "event: error\n";
+        echo 'data: ' . json_encode([
+            'message' => 'You are not enrolled in this course.',
+            'error' => 'no_capability',
+        ]) . "\n\n";
+        exit;
+    }
 
     $rateLimit = (int) get_config('local_umat_ai', 'rate_limit') ?: 10;
     $remaining = local_umat_ai_questions_remaining($USER->id, $rateLimit);
+    error_log('chat_stream.php: student path, remaining=' . $remaining);
     if ($remaining <= 0) {
         header('Content-Type: text/event-stream');
         header('Cache-Control: no-cache');
@@ -129,6 +150,9 @@ while (ob_get_level() > 0) {
     ob_end_flush();
 }
 
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
+header('Access-Control-Allow-Origin: ' . $origin);
+header('Access-Control-Allow-Credentials: true');
 header('Content-Type: text/event-stream');
 header('Cache-Control: no-cache');
 header('Connection: keep-alive');

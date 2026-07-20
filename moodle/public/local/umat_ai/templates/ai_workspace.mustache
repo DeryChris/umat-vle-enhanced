@@ -365,7 +365,7 @@
 }
 
 /* Typing indicator */
-.umat-ws-typing { display: flex; gap: 4px; padding: 8px 0; }
+.umat-ws-typing { display: inline-flex; gap: 4px; padding: 8px 0; align-items: center; }
 .umat-ws-typing span, .umat-typing span {
     width: 7px; height: 7px; border-radius: 50%;
     background: var(--ws-p);
@@ -373,6 +373,7 @@
 }
 .umat-ws-typing span:nth-child(2),.umat-typing span:nth-child(2) { animation-delay: .2s; }
 .umat-ws-typing span:nth-child(3),.umat-typing span:nth-child(3) { animation-delay: .4s; }
+@media(prefers-reduced-motion:reduce){.umat-ws-typing span,.umat-typing span{animation:none!important;opacity:.7;}.umat-ws-typing span:nth-child(2),.umat-typing span:nth-child(2){opacity:.5;}.umat-ws-typing span:nth-child(3),.umat-typing span:nth-child(3){opacity:.3;}}
 
 /* Input */
 .umat-ws-input-area {
@@ -621,14 +622,6 @@
           <div class="umat-msg-ai-wrap">
             <div class="umat-msg-lbl">AI ASSISTANT</div>
             <div class="umat-bubble-ai"><div class="umat-ai-content"><p>{{#str}}workspace_greeting, local_umat_ai{{/str}}</p></div></div>
-          </div>
-        </div>
-        <!-- Typing indicator (hidden) -->
-        <div id="workspace-typing" style="display:none;" class="umat-msg-ai">
-          <div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>
-          <div class="umat-msg-ai-wrap">
-            <div class="umat-msg-lbl">AI ASSISTANT</div>
-            <div class="umat-bubble-ai"><div class="umat-typing"><span></span><span></span><span></span></div></div>
           </div>
         </div>
       </div>

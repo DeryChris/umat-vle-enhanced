@@ -61,14 +61,12 @@ def ingest_material(
 
 def _warm_llamaindex_index(course_id: int) -> None:
     """Touch the LlamaIndex vector store so the index is ready for hybrid retrieval."""
-    from core.vector_store import get_chroma_client
     from llama_index.core import VectorStoreIndex
     from llama_index.vector_stores.chroma import ChromaVectorStore
     from core.vector_store import get_embedding_function
 
-    client = get_chroma_client()
-    coll_name = VectorStoreManager().get_collection_name(course_id)
-    chroma_collection = client.get_collection(name=coll_name)
+    vs = VectorStoreManager()
+    chroma_collection = vs._resolve_collection(course_id)
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
 
     embed_fn = get_embedding_function()

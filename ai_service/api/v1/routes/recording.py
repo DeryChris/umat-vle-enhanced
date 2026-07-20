@@ -125,7 +125,7 @@ def process_recording_background(
                 raise Exception(f"Transcription failed: {str(e)}")
 
         try:
-            # Step 4: Index transcript in ChromaDB
+            # Step 4: Index transcript in ChromaDB (non-fatal)
             logger.info(f"[{job_id}] Indexing transcript")
             texts, metadatas, ids = doc_loader.process_transcript(
                 transcript, request.session_id, request.course_id
@@ -133,19 +133,17 @@ def process_recording_background(
             if texts:
                 vector_store.add_documents(request.course_id, texts, metadatas, ids)
         except Exception as e:
-            step_failed = "chromadb_indexing"
-            raise Exception(f"ChromaDB indexing failed: {str(e)}")
+            logger.warning(f"[{job_id}] ChromaDB indexing failed (non-fatal): {e}")
 
         try:
-            # Step 5: Generate AI outputs (Gemini)
+            # Step 5: Generate AI outputs (optional — may fail if LLM quota exhausted)
             logger.info(f"[{job_id}] Generating summary, notes, quiz")
             job.summary = llm.generate_summary(transcript)
             job.notes   = llm.generate_notes(transcript)
             job.quiz    = llm.generate_quiz(transcript)
         except Exception as e:
-            if "gemini" in str(e).lower() or "api" in str(e).lower():
-                step_failed = "llm_generation"
-                raise Exception(f"Gemini API error: {str(e)}")
+            logger.warning(f"[{job_id}] LLM generation failed (non-fatal): {e}")
+            # Don't fail the whole job — transcript is still valuable
 
         job.status       = "completed"
         job.completed_at = datetime.utcnow()

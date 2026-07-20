@@ -137,6 +137,96 @@ class DocumentLoader:
 
         return "\n\n".join(parts)
 
+    def load_old_doc(self, file_path: str) -> str:
+        """Extract text from old .doc (Word 97-2003) via LibreOffice or basic OleFile."""
+        import subprocess, tempfile, logging
+        logger = logging.getLogger(__name__)
+        try:
+            result = subprocess.run(
+                ['soffice', '--headless', '--convert-to', 'txt:Text', '--outdir', tempfile.gettempdir(), file_path],
+                capture_output=True, text=True, timeout=60
+            )
+            if result.returncode == 0:
+                out = Path(tempfile.gettempdir()) / (Path(file_path).stem + '.txt')
+                if out.exists():
+                    text = out.read_text(encoding='utf-8', errors='ignore')
+                    out.unlink(missing_ok=True)
+                    if text.strip():
+                        return text
+        except Exception:
+            pass
+        logger.warning(f"LibreOffice not available for {file_path}; trying OleFile fallback")
+        try:
+            import olefile
+            ole = olefile.OleFileIO(file_path)
+            text = ''
+            for stream_name in ole.listdir():
+                name = '/'.join(stream_name)
+                try:
+                    data = ole.openstream(name).read()
+                    decoded = data.decode('utf-16', errors='ignore')
+                    text += decoded + '\n'
+                except Exception:
+                    try:
+                        decoded = data.decode('utf-8', errors='ignore')
+                        text += decoded + '\n'
+                    except Exception:
+                        pass
+            ole.close()
+            clean = '\n'.join(line for line in text.split('\n') if line.strip())
+            if clean.strip():
+                return clean
+        except ImportError:
+            logger.warning("olefile not installed. Install with: pip install olefile")
+        except Exception:
+            pass
+        return f"[Could not extract text from {Path(file_path).name}. Convert to .docx format for better results.]"
+
+    def load_old_ppt(self, file_path: str) -> str:
+        """Extract text from old .ppt (PowerPoint 97-2003) via LibreOffice or basic OleFile."""
+        import subprocess, tempfile, logging
+        logger = logging.getLogger(__name__)
+        try:
+            result = subprocess.run(
+                ['soffice', '--headless', '--convert-to', 'txt:Text', '--outdir', tempfile.gettempdir(), file_path],
+                capture_output=True, text=True, timeout=60
+            )
+            if result.returncode == 0:
+                out = Path(tempfile.gettempdir()) / (Path(file_path).stem + '.txt')
+                if out.exists():
+                    text = out.read_text(encoding='utf-8', errors='ignore')
+                    out.unlink(missing_ok=True)
+                    if text.strip():
+                        return text
+        except Exception:
+            pass
+        logger.warning(f"LibreOffice not available for {file_path}; trying OleFile fallback")
+        try:
+            import olefile
+            ole = olefile.OleFileIO(file_path)
+            text = ''
+            for stream_name in ole.listdir():
+                name = '/'.join(stream_name)
+                try:
+                    data = ole.openstream(name).read()
+                    decoded = data.decode('utf-16', errors='ignore')
+                    text += decoded + '\n'
+                except Exception:
+                    try:
+                        decoded = data.decode('utf-8', errors='ignore')
+                        text += decoded + '\n'
+                    except Exception:
+                        pass
+            ole.close()
+            clean = '\n'.join(line for line in text.split('\n') if line.strip())
+            if clean.strip():
+                return clean
+        except ImportError:
+            logger.warning("olefile not installed. Install with: pip install olefile")
+        except Exception:
+            pass
+        return f"[Could not extract text from {Path(file_path).name}. Convert to .pptx format for better results.]"
+
     def load_xlsx(self, file_path: str) -> str:
         load_workbook = _import_openpyxl()
         wb = load_workbook(file_path, read_only=True, data_only=True)
@@ -198,8 +288,12 @@ class DocumentLoader:
             return self.load_pdf(file_path)
         elif ext == ".docx":
             return self.load_docx(file_path)
+        elif ext == ".doc":
+            return self.load_old_doc(file_path)
         elif ext == ".pptx":
             return self.load_pptx(file_path)
+        elif ext == ".ppt":
+            return self.load_old_ppt(file_path)
         elif ext == ".xlsx":
             return self.load_xlsx(file_path)
         elif ext in {".txt", ".text", ".md", ".markdown", ".csv"}:

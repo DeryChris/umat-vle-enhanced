@@ -27,7 +27,7 @@ class before_footer {
             }
             $wwwroot = rtrim($CFG->wwwroot, '/');
             $sskey   = sesskey();
-            $streamUrl = $wwwroot . '/local/umat_ai/chat_stream.php';
+            $streamUrl = '/local/umat_ai/chat_stream.php';
             $sdts = filemtime(__DIR__ . '/../../styles/umat-struggle-dashboard.css');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-overlay.css?v=' . filemtime(__DIR__ . '/../../styles/umat-overlay.css') . '">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-responsive.css?v=' . filemtime(__DIR__ . '/../../styles/umat-responsive.css') . '">');

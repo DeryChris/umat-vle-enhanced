@@ -3,9 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from middleware.auth import verify_token
 from core.llm_processor import LLMProcessor
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/quiz", tags=["quiz"])
+settings = get_settings()
+_lecturer_llm = LLMProcessor(provider=settings.effective_lecturer_provider)
 
 class GradeTheoryRequest(BaseModel):
     question: str
@@ -23,8 +26,7 @@ async def grade_theory(
     _ = Depends(verify_token),
 ):
     try:
-        llm = LLMProcessor()
-        result = await llm.grade_theory_answer(
+        result = await _lecturer_llm.grade_theory_answer(
             question=request.question,
             answer_hint=request.answer_hint,
             student_answer=request.student_answer,

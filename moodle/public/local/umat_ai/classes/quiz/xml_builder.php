@@ -17,30 +17,18 @@ class xml_builder {
     /**
      * Build a Moodle XML string from an array of AI-generated question objects.
      *
-     * Expected question schema:
-     *   {
-     *     type: "multichoice"|"truefalse"|"shortanswer",
-     *     question_text: string,
-     *     options: string[],            // multichoice (4) or truefalse (2)
-     *     correct_answer_index: int,    // 0-based for multichoice/truefalse
-     *     correct_text: string|null,    // shortanswer only
-     *     feedback_correct: string,
-     *     feedback_incorrect: string,
-     *     source_reference: string,
-     *   }
-     *
-     * @param array  $questions     Array of question objects from the AI.
-     * @param string $category_name Moodle question category name.
+     * @param array  $questions          Array of question objects from the AI.
+     * @param string $category_name      Moodle question category name.
+     * @param float  $defaultMarks       Default marks per question if not specified per-question.
      * @return string Well-formed Moodle XML string.
      */
-    public static function build_moodle_xml(array $questions, string $category_name): string {
+    public static function build_moodle_xml(array $questions, string $category_name, float $defaultMarks = 1.0): string {
         $dom = new \DOMDocument('1.0', 'UTF-8');
         $dom->formatOutput = true;
 
         $quiz = $dom->createElement('quiz');
         $dom->appendChild($quiz);
 
-        // ── Category element ──
         $cat = $dom->createElement('question');
         $cat->setAttribute('type', 'category');
         $catCat = $dom->createElement('category');
@@ -49,13 +37,11 @@ class xml_builder {
         $cat->appendChild($catCat);
         $quiz->appendChild($cat);
 
-        // ── Questions ──
         foreach ($questions as $q) {
             $q = (array)$q;
             $node = $dom->createElement('question');
             $node->setAttribute('type', $q['type'] ?? 'multichoice');
 
-            // Name (truncated question text)
             $name = $dom->createElement('name');
             $nameText = $dom->createElement('text', htmlspecialchars(
                 self::truncate($q['question_text'] ?? '', 50), ENT_XML1, 'UTF-8'
@@ -63,7 +49,6 @@ class xml_builder {
             $name->appendChild($nameText);
             $node->appendChild($name);
 
-            // Question text
             $qt = $dom->createElement('questiontext');
             $qt->setAttribute('format', 'html');
             $qtText = $dom->createElement('text', htmlspecialchars(
@@ -72,7 +57,6 @@ class xml_builder {
             $qt->appendChild($qtText);
             $node->appendChild($qt);
 
-            // General feedback
             $gf = $dom->createElement('generalfeedback');
             $gf->setAttribute('format', 'html');
             $gfText = $dom->createElement('text', htmlspecialchars(
@@ -82,15 +66,16 @@ class xml_builder {
             $gf->appendChild($gfText);
             $node->appendChild($gf);
 
-            // Penalty (default 0.1 for all)
+            $marks = isset($q['marks']) ? (float)$q['marks'] : $defaultMarks;
+            $defaultGrade = $dom->createElement('defaultgrade', (string)$marks);
+            $node->appendChild($defaultGrade);
+
             $penalty = $dom->createElement('penalty', '0.1000000');
             $node->appendChild($penalty);
 
-            // Hidden (always visible)
             $hidden = $dom->createElement('hidden', '0');
             $node->appendChild($hidden);
 
-            // Idnumber (optional — leave empty)
             $idnumber = $dom->createElement('idnumber', '');
             $node->appendChild($idnumber);
 
@@ -102,9 +87,6 @@ class xml_builder {
         return $dom->saveXML();
     }
 
-    /**
-     * Append type-specific XML elements to a question node.
-     */
     private static function build_type_specific(\DOMDocument $dom, \DOMElement $node, array $q): void {
         $type = $q['type'] ?? 'multichoice';
 
@@ -139,7 +121,6 @@ class xml_builder {
 
             $correctIdx = (int)($q['correct_answer_index'] ?? 0);
 
-            // True answer
             $trueAns = $dom->createElement('answer');
             $trueAns->setAttribute('format', 'html');
             $trueAns->setAttribute('fraction', $correctIdx === 0 ? '100' : '0');
@@ -155,7 +136,6 @@ class xml_builder {
             $trueAns->appendChild($trueFb);
             $node->appendChild($trueAns);
 
-            // False answer
             $falseAns = $dom->createElement('answer');
             $falseAns->setAttribute('format', 'html');
             $falseAns->setAttribute('fraction', $correctIdx === 1 ? '100' : '0');

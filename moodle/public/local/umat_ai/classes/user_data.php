@@ -75,8 +75,15 @@ class user_data {
             }
         }
 
+        $isLecturer = $DB->record_exists_sql(
+            "SELECT 1 FROM {role_assignments} ra JOIN {role} r ON r.id=ra.roleid
+              WHERE ra.userid=:uid AND r.shortname IN ('editingteacher','teacher','manager')",
+            ['uid' => $userId]
+        );
+
         return json_encode([
             'courses'        => $courseList,
+            'is_lecturer'    => (bool)$isLecturer,
             'week_sessions'  => $weekSessions,
             'week_questions' => $weekQuestions,
             'sessions'       => $sessions,

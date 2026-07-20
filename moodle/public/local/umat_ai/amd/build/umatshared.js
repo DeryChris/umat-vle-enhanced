@@ -5,6 +5,7 @@ define([], function() {
     'use strict';
 
     var _msgIdCounter = 0;
+    var _activeStream = null;  // AbortController of the currently running stream
 
     // ─── HTML Escaping ─────────────────────────────── //
     function _umatEsc(s) {
@@ -265,6 +266,9 @@ define([], function() {
         if (!c) return;
         var d = document.createElement('div');
         d.id = tid;
+        d.setAttribute('role', 'status');
+        d.setAttribute('aria-live', 'polite');
+        d.setAttribute('aria-label', 'AI is thinking');
         d.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-typing"><span></span><span></span><span></span></div></div></div></div>';
         c.appendChild(d);
         c.scrollTop = c.scrollHeight;
@@ -339,7 +343,7 @@ define([], function() {
     }
 
     // ─── Stream AI tutor response via SSE proxy ────── //
-        function _umatStreamChat(opts) {
+    function _umatStreamChat(opts) {
         var accumulated = '';
         var streamRow = null;
         var contentEl = null;
@@ -349,24 +353,52 @@ define([], function() {
         var label = opts.label || 'AI ASSISTANT';
         var controller = new AbortController();
         var doneReceived = false;
-        var retries = 0;
         var maxRetries = 3;
-        var statusText = opts.statusText || null;
+        var statusText = opts.label || null;
         var statusPending = !!statusText && !opts._noStatus;
         var statusEl = null;
         var quizDataHandled = false;
+        var firstTokenReceived = false;
+        opts._retries = opts._retries || 0;
+
+        // --- Send-button management ---
+        var sendBtnId = opts.sendBtnId || null;
+        var sendInputId = opts.sendInputId || null;
+        function _disableSend() {
+            if (sendBtnId) {
+                var btn = document.getElementById(sendBtnId);
+                if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
+            }
+        }
+        function _enableSend() {
+            if (sendBtnId) {
+                var btn = document.getElementById(sendBtnId);
+                if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); }
+            }
+        }
+        _disableSend();
+
+        // --- Cancel any previous active stream ---
+        if (_activeStream && _activeStream !== controller) {
+            try { _activeStream.abort(); } catch(e) {}
+        }
+        _activeStream = controller;
 
         function doRetry() {
-            if (doneReceived || retries >= maxRetries) return;
-            retries++;
+            if (doneReceived) return;
+            opts._retries++;
+            if (opts._retries > maxRetries) {
+                _finishAll();
+                return;
+            }
             if (streamRow && contentEl) {
                 var el = contentEl;
                 var existing = el.querySelector('.umat-retry-msg');
                 if (!existing) {
-                    el.insertAdjacentHTML('beforeend', '<div class="umat-retry-msg" style="padding:8px 0;opacity:.6;font-size:12px;">Reconnecting… (' + retries + '/' + maxRetries + ')</div>');
+                    el.insertAdjacentHTML('beforeend', '<div class="umat-retry-msg" style="padding:8px 0;opacity:.6;font-size:12px;">Reconnecting… (' + opts._retries + '/' + maxRetries + ')</div>');
                 }
             }
-            setTimeout(function() { _umatStreamChat(opts); }, retries * 2000);
+            setTimeout(function() { _umatStreamChat(opts); }, opts._retries * 2000);
         }
 
         function hideTypingOnce() {
@@ -392,7 +424,7 @@ define([], function() {
             var innerHtml;
             if (statusPending) {
                 innerHtml = '<div class="umat-ai-stream-content" style="display:none"></div>'
-                    + '<div class="umat-status-text"><span class="umat-status-spinner"></span>' + _umatEsc(statusText) + '</div>';
+                    + '<div class="umat-status-text" role="status" aria-live="polite"><span class="umat-status-spinner"></span>' + _umatEsc(statusText) + '</div>';
             } else {
                 innerHtml = '<div class="umat-ai-stream-content"></div>';
             }
@@ -427,6 +459,11 @@ define([], function() {
                 formatTimer = null;
                 renderContent();
             }, 45);
+        }
+
+        function _finishAll() {
+            _enableSend();
+            if (_activeStream === controller) _activeStream = null;
         }
 
         function finishStream(payload) {
@@ -470,6 +507,15 @@ define([], function() {
                 } else if (event === 'token') {
                     ensureBubble();
                     accumulated += payload.text || '';
+                    // On first token, transition from status text to content
+                    if (!firstTokenReceived) {
+                        firstTokenReceived = true;
+                        if (statusPending && statusEl) {
+                            statusEl.style.display = 'none';
+                            if (contentEl) contentEl.style.display = '';
+                            statusPending = false;
+                        }
+                    }
                     if (!statusPending) {
                         scheduleRender();
                     }
@@ -487,19 +533,23 @@ define([], function() {
                 } else if (event === 'done') {
                     doneReceived = true;
                     finishStream(payload);
+                    _finishAll();
                     if (opts.onDone) opts.onDone(payload, accumulated);
                 } else if (event === 'error') {
                     hideTypingOnce();
+                    _finishAll();
                     if (opts.onError) opts.onError(payload);
                 }
             });
         }).catch(function(err) {
             if (err && err.name === 'AbortError') {
                 finishStream({ answer: accumulated });
+                _finishAll();
                 if (opts.onDone) opts.onDone({ stopped: true }, accumulated);
                 return;
             }
             hideTypingOnce();
+            _finishAll();
             if (opts.onError) opts.onError({ message: err.message || 'Connection error.' });
             doRetry();
         });
@@ -1084,7 +1134,7 @@ define([], function() {
     }
 
     // ─── Shared material tile renderer ─────────────── //
-    function _renderYtMaterials(mats, g, pfx) {
+    function _renderYtMaterials(mats, g, pfx, courseId) {
         if (!mats || !mats.length) {
             g.innerHTML = '<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">folder_open</span><p>No materials found for this course.</p></div>';
             return;
@@ -1103,7 +1153,7 @@ define([], function() {
             else if (m.page_count && m.page_count > 0) badge = '<span class="yt-badge">' + m.page_count + ' pp</span>';
             else badge = '<span class="yt-badge">' + ext + '</span>';
             var sz = (Math.round((m.filesize || 0) / 1024)) + 'KB';
-            return '<div class="yt-tile" data-url="' + _umatEsc(m.url || '') + '" data-name="' + _umatEsc(m.filename || '') + '" data-mime="' + _umatEsc(mime) + '" data-fileid="' + (m.id || 0) + '">' +
+            return                 '<div class="yt-tile" data-url="' + _umatEsc(m.url || '') + '" data-name="' + _umatEsc(m.filename || '') + '" data-mime="' + _umatEsc(mime) + '" data-fileid="' + (m.id || 0) + '" data-courseid="' + (courseId || '') + '">' +
                 '<div class="yt-thumb ' + bg + '">' +
                 '<span class="yt-thumb-icon material-symbols-outlined">' + ic + '</span>' +
                 '<div class="yt-play-ov"><span class="material-symbols-outlined">' + playIcon + '</span></div>' +
@@ -1140,11 +1190,13 @@ define([], function() {
                         mime.indexOf('image') !== -1 ? 'image' :
                         mime.indexOf('audio') !== -1 ? 'audio' :
                         mime.indexOf('wordprocessingml.document') !== -1 ? 'docx' :
+                        mime.indexOf('msword') !== -1 ? 'doc' :
                         mime.indexOf('spreadsheetml.sheet') !== -1 ? 'xlsx' :
                         mime.indexOf('presentationml.presentation') !== -1 ? 'pptx' :
+                        mime.indexOf('ms-powerpoint') !== -1 ? 'ppt' :
                         (mime.indexOf('text/') === 0 || mime.indexOf('application/json') === 0 || mime.indexOf('application/xml') === 0 || mime.indexOf('application/x-httpd-php') !== -1) ? 'code' :
                         'other';
-                    window.umatMaterialViewer.open(type, { url: url, name: name, downloadUrl: url, mime: mime });
+                    window.umatMaterialViewer.open(type, { url: url, name: name, downloadUrl: url, mime: mime, materialId: parseInt(tile.dataset.fileid) || 0, courseId: parseInt(tile.dataset.courseid) || 0 });
                 } else {
                     window.open(url, '_blank');
                 }
@@ -1262,17 +1314,17 @@ define([], function() {
     }
 
     // ─── Library tiles ─────────────────────────────── //
-    function renderLibrary(mats) {
+    function renderLibrary(mats, courseId) {
         var grid = document.getElementById('stu-lib-grid') || document.getElementById('ws-lib-grid');
         if (!grid) return;
         if (mats && !Array.isArray(mats)) mats = mats.materials || [];
-        _renderYtMaterials(mats || [], grid, 'stu');
+        _renderYtMaterials(mats || [], grid, 'stu', courseId);
     }
 
     // ─── Lecturer library tiles ────────────────────── //
-    function renderLibTiles(materials, g) {
+    function renderLibTiles(materials, g, courseId) {
         if (!g) { g = document.getElementById('lec-lib-grid'); }
-        _renderYtMaterials(materials, g, 'lec');
+        _renderYtMaterials(materials, g, 'lec', courseId);
     }
 
     // ─── ESC key handler (nested-first) ────────────── //
@@ -1549,6 +1601,13 @@ define([], function() {
         _umatHandleReply: _umatHandleReply,
         _getReplyContext: function() { return _replyContext; },
         _clearReplyContext: function() { _replyContext = null; },
+        _cancelActiveStream: function() {
+            if (_activeStream) {
+                try { _activeStream.abort(); } catch(e) {}
+                _activeStream = null;
+            }
+        },
+        _isStreamActive: function() { return !!_activeStream; },
 
         // Voice
         _umatInitVoice: _umatInitVoice,

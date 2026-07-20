@@ -5,6 +5,7 @@ define([], function() {
     'use strict';
 
     var _msgIdCounter = 0;
+    var _activeStream = null;  // AbortController of the currently running stream
 
     // ─── HTML Escaping ─────────────────────────────── //
     function _umatEsc(s) {
@@ -263,21 +264,24 @@ define([], function() {
     function _umatShowTyping(cid, tid) {
         var c = document.getElementById(cid);
         if (!c) return;
+        // Prevent duplicate typing bubbles for the same request
+        if (document.getElementById(tid)) return;
         var d = document.createElement('div');
         d.id = tid;
-        d.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-typing"><span></span><span></span><span></span></div></div></div></div>';
+        d.className = 'umat-typing-wrap';
+        d.setAttribute('role', 'status');
+        d.setAttribute('aria-live', 'polite');
+        d.setAttribute('aria-label', 'AI is preparing a response');
+        d.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai umat-typing-bubble"><div class="umat-typing" aria-hidden="true"><span></span><span></span><span></span></div><span class="umat-typing-label">AI is responding&hellip;</span></div></div></div>';
         c.appendChild(d);
         c.scrollTop = c.scrollHeight;
     }
 
     // ─── Hide typing indicator ─────────────────────── //
     function _umatHideTyping(tid) {
+        if (!tid) return;
         var e = document.getElementById(tid);
         if (e && e.parentNode) e.parentNode.removeChild(e);
-        document.querySelectorAll('.umat-typing').forEach(function(el){
-            var r = el.closest('[id^="typ_"]');
-            if (r && r.parentNode) r.parentNode.removeChild(r);
-        });
     }
 
     // ─── Append source chips to a streaming bubble ─── //
@@ -339,7 +343,9 @@ define([], function() {
     }
 
     // ─── Stream AI tutor response via SSE proxy ────── //
-        function _umatStreamChat(opts) {
+    var _chatState = 'idle';  // idle | submitting | waiting | streaming | completed | failed
+
+    function _umatStreamChat(opts) {
         var accumulated = '';
         var streamRow = null;
         var contentEl = null;
@@ -349,25 +355,40 @@ define([], function() {
         var label = opts.label || 'AI ASSISTANT';
         var controller = new AbortController();
         var doneReceived = false;
-        var retries = 0;
         var maxRetries = 3;
-        var statusText = opts.statusText || null;
+        var statusText = opts.label || null;
         var statusPending = !!statusText && !opts._noStatus;
         var statusEl = null;
         var quizDataHandled = false;
+        var firstTokenReceived = false;
+        opts._retries = opts._retries || 0;
 
-        function doRetry() {
-            if (doneReceived || retries >= maxRetries) return;
-            retries++;
-            if (streamRow && contentEl) {
-                var el = contentEl;
-                var existing = el.querySelector('.umat-retry-msg');
-                if (!existing) {
-                    el.insertAdjacentHTML('beforeend', '<div class="umat-retry-msg" style="padding:8px 0;opacity:.6;font-size:12px;">Reconnecting… (' + retries + '/' + maxRetries + ')</div>');
-                }
-            }
-            setTimeout(function() { _umatStreamChat(opts); }, retries * 2000);
+        // --- State management ---
+        _chatState = 'submitting';
+        if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
+
+        // --- Prevent duplicate submissions ---
+        if (_activeStream && _activeStream !== controller) {
+            try { _activeStream.abort(); } catch(e) {}
         }
+        _activeStream = controller;
+
+        // --- Send-button management ---
+        var sendBtnId = opts.sendBtnId || null;
+        var sendInputId = opts.sendInputId || null;
+        function _disableSend() {
+            if (sendBtnId) {
+                var btn = document.getElementById(sendBtnId);
+                if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
+            }
+        }
+        function _enableSend() {
+            if (sendBtnId) {
+                var btn = document.getElementById(sendBtnId);
+                if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); }
+            }
+        }
+        _disableSend();
 
         function hideTypingOnce() {
             if (typingHidden) return;
@@ -381,6 +402,8 @@ define([], function() {
                 return;
             }
             hideTypingOnce();
+            _chatState = 'streaming';
+            if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
             var c = document.getElementById(opts.msgsId);
             if (!c) {
                 return;
@@ -392,7 +415,7 @@ define([], function() {
             var innerHtml;
             if (statusPending) {
                 innerHtml = '<div class="umat-ai-stream-content" style="display:none"></div>'
-                    + '<div class="umat-status-text"><span class="umat-status-spinner"></span>' + _umatEsc(statusText) + '</div>';
+                    + '<div class="umat-status-text" role="status" aria-live="polite"><span class="umat-status-spinner"></span>' + _umatEsc(statusText) + '</div>';
             } else {
                 innerHtml = '<div class="umat-ai-stream-content"></div>';
             }
@@ -429,6 +452,15 @@ define([], function() {
             }, 45);
         }
 
+        function _finishAll() {
+            _enableSend();
+            if (_activeStream === controller) _activeStream = null;
+            if (_chatState !== 'failed') {
+                _chatState = 'completed';
+                if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
+            }
+        }
+
         function finishStream(payload) {
             if (payload && payload.answer) {
                 accumulated = payload.answer;
@@ -450,6 +482,55 @@ define([], function() {
             _umatAppendSources(bubbleEl, (payload && payload.sources) || []);
         }
 
+        function showFailureUI(message) {
+            hideTypingOnce();
+            _chatState = 'failed';
+            if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
+            // Ensure we have a bubble to show the error in
+            ensureBubble();
+            if (streamRow) {
+                streamRow.classList.remove('umat-msg-streaming');
+            }
+            if (bubbleEl) {
+                bubbleEl.classList.remove('is-streaming');
+            }
+            if (contentEl) {
+                contentEl.innerHTML = '<p class="umat-ai-error-text">The AI could not respond. Please try again.</p>';
+                contentEl.style.display = '';
+            }
+            if (statusEl) {
+                statusEl.style.display = 'none';
+            }
+            // Add retry button
+            if (bubbleEl) {
+                var existingRetry = bubbleEl.querySelector('.umat-retry-btn');
+                if (!existingRetry) {
+                    var retryBtn = document.createElement('button');
+                    retryBtn.className = 'umat-retry-btn';
+                    retryBtn.type = 'button';
+                    retryBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;">refresh</span>Retry';
+                    retryBtn.setAttribute('aria-label', 'Retry sending message');
+                    retryBtn.addEventListener('click', function() {
+                        // Remove the failed bubble and retry
+                        if (streamRow && streamRow.parentNode) {
+                            streamRow.parentNode.removeChild(streamRow);
+                        }
+                        streamRow = null;
+                        contentEl = null;
+                        bubbleEl = null;
+                        typingHidden = false;
+                        firstTokenReceived = false;
+                        opts._retries = 0;
+                        _chatState = 'idle';
+                        _umatStreamChat(opts);
+                    });
+                    bubbleEl.parentNode.appendChild(retryBtn);
+                }
+            }
+            _enableSend();
+            if (_activeStream === controller) _activeStream = null;
+        }
+
         var body = new FormData();
         body.append('sesskey', opts.sesskey);
         body.append('courseid', String(opts.courseid));
@@ -465,11 +546,22 @@ define([], function() {
         }).then(function(response) {
             return _umatConsumeSseStream(response, function(event, payload) {
                 if (event === 'meta') {
+                    _chatState = 'waiting';
+                    if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
                     hideTypingOnce();
                     if (opts.onMeta) opts.onMeta(payload);
                 } else if (event === 'token') {
                     ensureBubble();
                     accumulated += payload.text || '';
+                    // On first token, transition from status text to content
+                    if (!firstTokenReceived) {
+                        firstTokenReceived = true;
+                        if (statusPending && statusEl) {
+                            statusEl.style.display = 'none';
+                            if (contentEl) contentEl.style.display = '';
+                            statusPending = false;
+                        }
+                    }
                     if (!statusPending) {
                         scheduleRender();
                     }
@@ -487,21 +579,31 @@ define([], function() {
                 } else if (event === 'done') {
                     doneReceived = true;
                     finishStream(payload);
+                    _finishAll();
                     if (opts.onDone) opts.onDone(payload, accumulated);
                 } else if (event === 'error') {
-                    hideTypingOnce();
+                    showFailureUI(payload.message || 'An error occurred.');
                     if (opts.onError) opts.onError(payload);
                 }
             });
         }).catch(function(err) {
             if (err && err.name === 'AbortError') {
                 finishStream({ answer: accumulated });
+                _finishAll();
                 if (opts.onDone) opts.onDone({ stopped: true }, accumulated);
                 return;
             }
-            hideTypingOnce();
+            // Check if we should retry
+            if (opts._retries < maxRetries) {
+                opts._retries++;
+                hideTypingOnce();
+                _chatState = 'waiting';
+                if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
+                setTimeout(function() { _umatStreamChat(opts); }, opts._retries * 2000);
+                return;
+            }
+            showFailureUI(err.message || 'Connection error.');
             if (opts.onError) opts.onError({ message: err.message || 'Connection error.' });
-            doRetry();
         });
 
         promise.abort = function() { controller.abort(); };
@@ -1084,7 +1186,7 @@ define([], function() {
     }
 
     // ─── Shared material tile renderer ─────────────── //
-    function _renderYtMaterials(mats, g, pfx) {
+    function _renderYtMaterials(mats, g, pfx, courseId) {
         if (!mats || !mats.length) {
             g.innerHTML = '<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">folder_open</span><p>No materials found for this course.</p></div>';
             return;
@@ -1103,7 +1205,7 @@ define([], function() {
             else if (m.page_count && m.page_count > 0) badge = '<span class="yt-badge">' + m.page_count + ' pp</span>';
             else badge = '<span class="yt-badge">' + ext + '</span>';
             var sz = (Math.round((m.filesize || 0) / 1024)) + 'KB';
-            return '<div class="yt-tile" data-url="' + _umatEsc(m.url || '') + '" data-name="' + _umatEsc(m.filename || '') + '" data-mime="' + _umatEsc(mime) + '" data-fileid="' + (m.id || 0) + '">' +
+            return                 '<div class="yt-tile" data-url="' + _umatEsc(m.url || '') + '" data-name="' + _umatEsc(m.filename || '') + '" data-mime="' + _umatEsc(mime) + '" data-fileid="' + (m.id || 0) + '" data-courseid="' + (courseId || '') + '">' +
                 '<div class="yt-thumb ' + bg + '">' +
                 '<span class="yt-thumb-icon material-symbols-outlined">' + ic + '</span>' +
                 '<div class="yt-play-ov"><span class="material-symbols-outlined">' + playIcon + '</span></div>' +
@@ -1140,11 +1242,13 @@ define([], function() {
                         mime.indexOf('image') !== -1 ? 'image' :
                         mime.indexOf('audio') !== -1 ? 'audio' :
                         mime.indexOf('wordprocessingml.document') !== -1 ? 'docx' :
+                        mime.indexOf('msword') !== -1 ? 'doc' :
                         mime.indexOf('spreadsheetml.sheet') !== -1 ? 'xlsx' :
                         mime.indexOf('presentationml.presentation') !== -1 ? 'pptx' :
+                        mime.indexOf('ms-powerpoint') !== -1 ? 'ppt' :
                         (mime.indexOf('text/') === 0 || mime.indexOf('application/json') === 0 || mime.indexOf('application/xml') === 0 || mime.indexOf('application/x-httpd-php') !== -1) ? 'code' :
                         'other';
-                    window.umatMaterialViewer.open(type, { url: url, name: name, downloadUrl: url, mime: mime });
+                    window.umatMaterialViewer.open(type, { url: url, name: name, downloadUrl: url, mime: mime, materialId: parseInt(tile.dataset.fileid) || 0, courseId: parseInt(tile.dataset.courseid) || 0 });
                 } else {
                     window.open(url, '_blank');
                 }
@@ -1262,17 +1366,17 @@ define([], function() {
     }
 
     // ─── Library tiles ─────────────────────────────── //
-    function renderLibrary(mats) {
+    function renderLibrary(mats, courseId) {
         var grid = document.getElementById('stu-lib-grid') || document.getElementById('ws-lib-grid');
         if (!grid) return;
         if (mats && !Array.isArray(mats)) mats = mats.materials || [];
-        _renderYtMaterials(mats || [], grid, 'stu');
+        _renderYtMaterials(mats || [], grid, 'stu', courseId);
     }
 
     // ─── Lecturer library tiles ────────────────────── //
-    function renderLibTiles(materials, g) {
+    function renderLibTiles(materials, g, courseId) {
         if (!g) { g = document.getElementById('lec-lib-grid'); }
-        _renderYtMaterials(materials, g, 'lec');
+        _renderYtMaterials(materials, g, 'lec', courseId);
     }
 
     // ─── ESC key handler (nested-first) ────────────── //
@@ -1549,6 +1653,14 @@ define([], function() {
         _umatHandleReply: _umatHandleReply,
         _getReplyContext: function() { return _replyContext; },
         _clearReplyContext: function() { _replyContext = null; },
+        _cancelActiveStream: function() {
+            if (_activeStream) {
+                try { _activeStream.abort(); } catch(e) {}
+                _activeStream = null;
+            }
+        },
+        _isStreamActive: function() { return !!_activeStream; },
+        getChatState: function() { return _chatState; },
 
         // Voice
         _umatInitVoice: _umatInitVoice,
