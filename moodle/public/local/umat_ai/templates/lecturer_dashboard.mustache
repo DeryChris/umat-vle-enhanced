@@ -245,29 +245,7 @@
 .fill-track { background: #60a5fa; }
 .fill-risk  { background: var(--ter); }
 
-/* ---- AI insight card ---- */
-.umat-insight-big {
-  border: 1px solid var(--olv);
-  border-radius: var(--r12);
-  padding: 16px;
-  margin-bottom: 12px;
-  background: var(--sflo);
-}
-.umat-insight-big.warn { border-left: 4px solid var(--ter); }
-.umat-insight-big.alert { border-left: 4px solid #f59e0b; }
-.umat-insight-big.info  { border-left: 4px solid var(--p); }
-.umat-insight-big h4 {
-  margin: 0 0 6px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--ons);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.umat-insight-big h4 .material-symbols-outlined { font-size: 18px; }
-.umat-insight-big p { margin: 0 0 10px; font-size: 13px; color: var(--onsv); line-height: 1.5; }
-.umat-insight-big .umat-insight-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+/* ---- Action chip button (questions table) ---- */
 .umat-insight-chip-btn {
   padding: 5px 13px;
   border-radius: 999px;
@@ -518,66 +496,10 @@
 
     </div><!-- /left col -->
 
-    <!-- ---- Right: AI insights + heatmap ---- -->
+    <!-- ---- Right: heatmap ---- -->
     <div style="display:flex;flex-direction:column;gap:20px;">
 
-      <!-- AI Learning Insight Bubble -->
-      <div class="umat-card">
-        <div class="umat-card-header">
-          <h3 class="umat-card-title">
-            <span class="material-symbols-outlined">auto_awesome</span>
-            AI Insights
-          </h3>
-        </div>
-        <div class="umat-card-body" style="display:flex;flex-direction:column;gap:12px;">
-
-          {{#struggle_count}}
-          <div class="umat-insight-big warn">
-            <h4>
-              <span class="material-symbols-outlined" style="color:var(--ter);">warning</span>
-              Learning Gap: {{struggle_index}}
-            </h4>
-            <p>{{struggle_count}} student questions referenced this material — the most in the period. Consider scheduling a targeted review or adding supplementary content for it.</p>
-            <div class="umat-insight-actions">
-              <a href="{{approve_url}}" class="umat-insight-chip-btn">
-                <span class="material-symbols-outlined">edit_note</span>Update Material
-              </a>
-            </div>
-          </div>
-          {{/struggle_count}}
-
-          {{#at_risk}}
-          <div class="umat-insight-big alert">
-            <h4>
-              <span class="material-symbols-outlined" style="color:#f59e0b;">notifications_active</span>
-              Participation Alert
-            </h4>
-            <p>{{at_risk}} enrolled student(s) have not interacted with the AI assistant in the last 30 days. These students may need outreach.</p>
-            <div class="umat-insight-actions">
-              <span class="umat-insight-chip-btn" title="Use Moodle messaging to notify students">
-                <span class="material-symbols-outlined">send</span>Notify Students
-              </span>
-            </div>
-          </div>
-          {{/at_risk}}
-
-          <div class="umat-insight-big info">
-            <h4>
-              <span class="material-symbols-outlined" style="color:var(--p);">lightbulb</span>
-              Strategic Recommendation
-            </h4>
-            <p>Based on AI interaction data, the highest engagement occurs mid-week. Consider scheduling live review sessions on Tuesday–Wednesday for maximum attendance.</p>
-            <div class="umat-insight-actions">
-              <span class="umat-insight-chip-btn">
-                <span class="material-symbols-outlined">event</span>Schedule Review
-              </span>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Lecture Rewatch Heatmap (illustrative 7-week grid) -->
+      <!-- AI Activity Heatmap (illustrative 7-day grid) -->
       <div class="umat-card">
         <div class="umat-card-header">
           <h3 class="umat-card-title">

@@ -192,12 +192,17 @@
         <FIELD NAME="id"          TYPE="int"  LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="userid"      TYPE="int"  LENGTH="10" NOTNULL="true"/>
         <FIELD NAME="courseid"    TYPE="int"  LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="session_key" TYPE="char" LENGTH="64" NOTNULL="false"/>
         <FIELD NAME="query"       TYPE="text" NOTNULL="true"/>
         <FIELD NAME="response"    TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="sources"     TYPE="text" NOTNULL="false"/>
         <FIELD NAME="timecreated" TYPE="int"  LENGTH="10" NOTNULL="true" DEFAULT="0"/>
       </FIELDS>
       <KEYS><KEY NAME="primary" TYPE="primary" FIELDS="id"/></KEYS>
-      <INDEXES><INDEX NAME="userid_courseid" UNIQUE="false" FIELDS="userid,courseid"/></INDEXES>
+      <INDEXES>
+        <INDEX NAME="userid_courseid" UNIQUE="false" FIELDS="userid,courseid"/>
+        <INDEX NAME="session_key"     UNIQUE="false" FIELDS="session_key"/>
+      </INDEXES>
     </TABLE>
 
     <TABLE NAME="umat_ai_student_context" COMMENT="Per-student struggle areas detected by event observers">

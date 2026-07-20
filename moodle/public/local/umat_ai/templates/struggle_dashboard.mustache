@@ -1,157 +1,141 @@
 {{!
     Template: local/umat_ai/templates/struggle_dashboard.mustache
-    Student Struggle Areas Dashboard — full spec layout.
-    Context: courseid, coursefullname
+    Lecturer Insights Dashboard — 5-zone actionable insights layout.
+    Context: stream_url, sesskey
     Rendered via JS AMD module struggle_dashboard.init(courseid)
 }}
-<div class="sd-dashboard" data-stream-url="{{stream_url}}" data-sesskey="{{sesskey}}">
+<div class="umat-insights-pane sd-dashboard" data-stream-url="{{stream_url}}" data-sesskey="{{sesskey}}">
 
-  <!-- Claude-style NLQ bar -->
-  <div class="sd-nlq-wrap">
-    <div class="sd-nlq-bar">
-      <span class="material-symbols-outlined sd-nlq-icon">auto_awesome</span>
-      <input type="text" id="sd-nlq-input" class="sd-nlq-input"
-        placeholder="Ask AI: Show me students struggling with thermodynamics…" maxlength="500" />
-      <button class="sd-nlq-btn" id="sd-nlq-btn" type="button" aria-label="Ask AI">
-        <span class="material-symbols-outlined">arrow_upward</span>
+  <!-- ZONE 1: Priority Briefing -->
+  <section class="ins-zone" id="ins-priority-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">notification_important</span>
+      What Needs Your Attention
+    </h3>
+    <div id="ins-priority-actions" class="ins-priority-list"></div>
+  </section>
+
+  <!-- ZONE 2: Struggle Map -->
+  <section class="ins-zone" id="ins-struggle-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">map</span>
+      Where Students Are Struggling
+    </h3>
+    <div id="ins-struggle-areas" class="ins-struggle-list"></div>
+    <div id="ins-section-breakdown" class="ins-section-bars"></div>
+    <div id="ins-material-struggle" class="ins-material-list"></div>
+  </section>
+
+  <!-- ZONE 3: Student Dossiers -->
+  <section class="ins-zone" id="ins-students-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">groups</span>
+      Your Students
+    </h3>
+    <div class="ins-nlq-bar">
+      <input type="text" id="ins-nlq-input" class="ins-nlq-input"
+        placeholder="Ask about student performance..." />
+      <button class="ins-nlq-btn" onclick="window.struggleDashboard.submitNLQ()">
+        <span class="material-symbols-outlined">search</span>
+      </button>
+      <div class="ins-nlq-spinner" id="ins-nlq-spinner" style="display:none;"></div>
+    </div>
+    <div id="ins-nlq-response" class="ins-nlq-response umat-ai-stream-panel" style="display:none;"></div>
+    <div class="ins-filter-row" id="ins-filters">
+      <button class="ins-chip ins-chip-active" data-filter="all" onclick="window.struggleDashboard.setFilter('all', this)">All</button>
+      <button class="ins-chip" data-filter="disengaged" onclick="window.struggleDashboard.setFilter('disengaged', this)">
+        <span class="material-symbols-outlined">person_off</span> Disengaged
+      </button>
+      <button class="ins-chip" data-filter="struggling" onclick="window.struggleDashboard.setFilter('struggling', this)">
+        <span class="material-symbols-outlined">psychology</span> Struggling
+      </button>
+      <button class="ins-chip" data-filter="failing" onclick="window.struggleDashboard.setFilter('failing', this)">
+        <span class="material-symbols-outlined">trending_down</span> Failing
+      </button>
+      <button class="ins-chip" data-filter="issues" onclick="window.struggleDashboard.setFilter('issues', this)">
+        <span class="material-symbols-outlined">report</span> Issues
       </button>
     </div>
-    <div id="sd-nlq-response" class="sd-nlq-response umat-ai-stream-panel" style="display:none;"></div>
-  </div>
-
-  <!-- ================================================================ -->
-  <!-- TOP KPI RIBBON — 4 columns                                       -->
-  <!-- ================================================================ -->
-  <div class="sd-kpi-ribbon">
-    <div class="sd-kpi-card" id="sd-kpi-engagement">
-      <div class="sd-kpi-header">Class Engagement Score</div>
-      <div class="sd-kpi-body">
-        <span class="sd-kpi-big" id="sd-eng-pct">0%</span>
-        <canvas id="sd-eng-sparkline" width="120" height="40"></canvas>
-      </div>
-      <div class="sd-kpi-delta positive" id="sd-eng-delta">+ 0% vs. Last Week</div>
+    <div id="ins-student-list" class="ins-student-cards">
+      <div class="ins-empty">No student data loaded yet.</div>
     </div>
+  </section>
 
-    <div class="sd-kpi-card" id="sd-kpi-atrisk">
-      <div class="sd-kpi-header">
-        <span class="material-symbols-outlined sd-warn-icon">priority_high</span>
-        Total At-Risk Students
-      </div>
-      <div class="sd-kpi-body">
-        <span class="sd-kpi-big sd-risk-num" id="sd-atrisk-count">0</span>
-      </div>
-      <div class="sd-avatar-stack" id="sd-atrisk-avatars"></div>
-    </div>
+  <!-- ZONE 4: Question Radar -->
+  <section class="ins-zone" id="ins-questions-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">question_answer</span>
+      What Students Are Asking
+    </h3>
+    <div id="ins-common-questions" class="ins-question-list"></div>
+  </section>
 
-    <div class="sd-kpi-card" id="sd-kpi-topic">
-      <div class="sd-kpi-header">Top Difficulty Topic</div>
-      <div class="sd-kpi-body">
-        <div class="sd-gauge-wrap">
-          <canvas id="sd-topic-gauge" width="80" height="60"></canvas>
-          <span class="sd-gauge-label" id="sd-topic-name">—</span>
-        </div>
-      </div>
-      <div class="sd-kpi-insight" id="sd-topic-insight"></div>
-    </div>
+  <!-- ZONE 5: Course Vitals -->
+  <section class="ins-zone" id="ins-vitals-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">monitor_heart</span>
+      Course Pulse
+    </h3>
+    <div id="ins-course-pulse" class="ins-pulse-grid"></div>
+  </section>
 
-    <div class="sd-kpi-card" id="sd-kpi-material">
-      <div class="sd-kpi-header">
-        <span class="material-symbols-outlined sd-warn-icon">warning</span>
-        Material with Highest Friction
+  <!-- Student Detail Panel -->
+  <div class="ins-detail-panel" id="ins-detail-panel" style="display:none;">
+    <div class="ins-detail-header">
+      <div>
+        <strong id="ins-detail-name">-</strong>
+        <span class="ins-pill" id="ins-detail-risk-badge">-</span>
       </div>
-      <div class="sd-kpi-body">
-        <div class="sd-mat-name" id="sd-mat-name">—</div>
-        <canvas id="sd-mat-weekday-chart" width="140" height="40"></canvas>
-      </div>
+      <button class="ins-chip-sm" onclick="window.struggleDashboard.closeDetail()">
+        <span class="material-symbols-outlined">close</span>
+      </button>
     </div>
-  </div>
-
-  <!-- ================================================================ -->
-  <!-- MIDDLE SECTION — 2 columns: Scatter Plot + Topic Mastery         -->
-  <!-- ================================================================ -->
-  <div class="sd-mid-row">
-    <div class="sd-card sd-card-half">
-      <div class="sd-card-header">Struggle Friction Analysis</div>
-      <div class="sd-chart-container">
-        <canvas id="sd-scatter-plot"></canvas>
-      </div>
+    <div class="ins-detail-body" id="ins-detail-body">
+      <div class="ins-empty">Loading profile...</div>
     </div>
-    <div class="sd-card sd-card-half">
-      <div class="sd-card-header">Topic Mastery &amp; Support</div>
-      <div class="sd-topic-mastery-list" id="sd-topic-mastery-list">
-        <div class="sd-empty">No topic data yet.</div>
-      </div>
+    <div class="ins-detail-actions">
+      <button class="ins-action-btn" onclick="window.struggleDashboard.openActionDrawer('encouragement')">
+        <span class="material-symbols-outlined">favorite</span> Encourage
+      </button>
+      <button class="ins-action-btn" onclick="window.struggleDashboard.openActionDrawer('meeting')">
+        <span class="material-symbols-outlined">event</span> 1:1
+      </button>
+      <button class="ins-action-btn" onclick="window.struggleDashboard.openActionDrawer('remedial_quiz')">
+        <span class="material-symbols-outlined">quiz</span> Quiz
+      </button>
     </div>
   </div>
 
-  <!-- ================================================================ -->
-  <!-- BOTTOM SECTION — 2 columns: Student Triage + Material Health     -->
-  <!-- ================================================================ -->
-  <div class="sd-bot-row">
-    <div class="sd-card sd-card-half">
-      <div class="sd-card-header">Actionable At-Risk Student Triage</div>
-      <div class="sd-table-wrap">
-        <table class="sd-data-table" id="sd-student-table">
-          <thead>
-            <tr>
-              <th><input type="checkbox" id="sd-select-all"></th>
-              <th class="sd-sortable" data-col="name">Name <span class="sd-sort-icon"></span></th>
-              <th class="sd-sortable" data-col="risk">Risk Status <span class="sd-sort-icon"></span></th>
-              <th class="sd-sortable" data-col="struggle">Primary Struggle <span class="sd-sort-icon"></span></th>
-              <th class="sd-sortable" data-col="last">Last Activity <span class="sd-sort-icon"></span></th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="sd-student-tbody">
-            <tr><td colspan="6" class="sd-empty">No at-risk students.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <div class="sd-card sd-card-half">
-      <div class="sd-card-header">Material &amp; Content Health</div>
-      <div class="sd-chart-container">
-        <canvas id="sd-material-health-chart"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <!-- ================================================================ -->
-  <!-- FOOTER — Questions Feed + Topics + AI Health Report               -->
-  <!-- ================================================================ -->
-  <div class="sd-footer-row">
-    <div class="sd-card sd-card-third">
-      <div class="sd-card-header">Common Student Questions</div>
-      <div class="sd-questions-feed" id="sd-questions-feed">
-        <div class="sd-empty">No questions yet.</div>
-      </div>
-    </div>
-    <div class="sd-card sd-card-third">
-      <div class="sd-card-header">Topics by Frequency</div>
-      <div class="sd-topics-feed" id="sd-topics-feed">
-        <div class="sd-empty">No topics yet.</div>
-      </div>
-    </div>
-    <div class="sd-card sd-card-full">
-      <div class="sd-card-header">
-        AI Course Health Report
-        <button class="sd-btn-outline" id="sd-ai-strategy-btn">
-          <span class="material-symbols-outlined">auto_awesome</span>
-          Ask AI for tailored student outreach strategies
+  <!-- Action Drawer -->
+  <div class="ins-action-drawer" id="ins-action-drawer" style="display:none;">
+    <div class="ins-drawer-backdrop" onclick="window.struggleDashboard.closeActionDrawer()"></div>
+    <div class="ins-drawer-content">
+      <div class="ins-drawer-header">
+        <h3 id="ins-drawer-title">Send Intervention</h3>
+        <button class="ins-chip-sm" onclick="window.struggleDashboard.closeActionDrawer()">
+          <span class="material-symbols-outlined">close</span>
         </button>
       </div>
-      <div class="sd-health-report" id="sd-health-report">
-        <div class="sd-empty">Loading health report…</div>
+      <div class="ins-drawer-body">
+        <p id="ins-drawer-recipient" style="font-size:13px;color:var(--u-ol);margin:0 0 12px;"></p>
+        <textarea id="ins-drawer-message" class="ins-drawer-textarea"
+          placeholder="Draft your message..." rows="4"></textarea>
+        <div id="ins-drawer-status" style="font-size:12px;margin-top:8px;display:none;"></div>
       </div>
-      <div class="sd-recommendations" id="sd-recommendations"></div>
+      <div class="ins-drawer-footer">
+        <button class="ins-btn ins-btn-secondary" onclick="window.struggleDashboard.closeActionDrawer()">Cancel</button>
+        <button class="ins-btn ins-btn-primary" id="ins-drawer-send-btn" onclick="window.struggleDashboard.sendIntervention()">
+          <span class="material-symbols-outlined">send</span> Send
+        </button>
+      </div>
     </div>
   </div>
 
-  <!-- Shimmer skeleton for loading state -->
-  <div class="sd-skeleton" id="sd-skeleton">
-    <div class="sd-shim-row"><div class="sd-shim-block" style="width:23%;height:120px;"></div><div class="sd-shim-block" style="width:23%;height:120px;"></div><div class="sd-shim-block" style="width:23%;height:120px;"></div><div class="sd-shim-block" style="width:23%;height:120px;"></div></div>
-    <div class="sd-shim-row"><div class="sd-shim-block" style="width:49%;height:300px;"></div><div class="sd-shim-block" style="width:49%;height:300px;"></div></div>
-    <div class="sd-shim-row"><div class="sd-shim-block" style="width:49%;height:260px;"></div><div class="sd-shim-block" style="width:49%;height:260px;"></div></div>
-    <div class="sd-shim-row"><div class="sd-shim-block" style="width:32%;height:200px;"></div><div class="sd-shim-block" style="width:32%;height:200px;"></div><div class="sd-shim-block" style="width:32%;height:200px;"></div></div>
+  <!-- Skeleton -->
+  <div class="ins-skeleton" id="ins-skeleton" style="display:none;">
+    <div class="ins-shimmer-block" style="width:100%;height:80px;"></div>
+    <div class="ins-shimmer-block" style="width:100%;height:120px;"></div>
+    <div class="ins-shimmer-block" style="width:100%;height:200px;"></div>
+    <div class="ins-shimmer-block" style="width:100%;height:150px;"></div>
   </div>
 </div>

@@ -1,634 +1,569 @@
-define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'local_umat_ai/umatshared'], function(Ajax, Str, Chart, Notification, Shared) {
+/**
+ * Lecturer Insights Dashboard — 5-zone actionable insights (via struggle_dashboard).
+ *
+ * Zone 1: Priority Briefing (what needs attention)
+ * Zone 2: Struggle Map (where students are confused)
+ * Zone 3: Student Dossiers (who needs help and why)
+ * Zone 4: Question Radar (what students are asking)
+ * Zone 5: Course Vitals (how course is performing)
+ */
+define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str, Shared) {
     'use strict';
 
     var cid = 0;
-    var chartInstances = {};
-    var studentData = [];
-    var selectedStudentIds = {};
+    var currentDetailUid = 0;
+    var currentDrawerAction = '';
+    var allStudentNarratives = [];
+    var filterMode = 'all';
     var activeStream = null;
 
     function streamConfig() {
-        if (window._umatChatStream) {
-            return window._umatChatStream;
-        }
-        var root = document.querySelector('.sd-dashboard');
-        if (root && root.dataset.streamUrl) {
-            return { url: root.dataset.streamUrl, sesskey: root.dataset.sesskey || '' };
-        }
+        if (window._umatChatStream) return window._umatChatStream;
         return { url: '', sesskey: '' };
     }
 
-    function streamQuestion(question, targetId, onStart, onDone) {
-        var cfg = streamConfig();
-        if (!cfg.url || !cid) {
-            Notification.addNotification({ message: 'Open a course before asking AI.', type: 'warning' });
-            return null;
-        }
-        if (activeStream && activeStream.abort) {
-            activeStream.abort();
-        }
-        if (typeof onStart === 'function') {
-            onStart();
-        }
-        activeStream = Shared._umatStreamInline({
-            url: cfg.url,
-            sesskey: cfg.sesskey,
-            courseid: cid,
-            question: question,
-            session_key: 'sd_nlq_' + cid,
-            targetId: targetId,
-            onDone: function() {
-                activeStream = null;
-                if (typeof onDone === 'function') {
-                    onDone();
-                }
-            },
-            onError: function(err) {
-                activeStream = null;
-                var el = document.getElementById(targetId);
-                if (el) {
-                    el.classList.remove('is-streaming');
-                    el.innerHTML = '<p class="sd-stream-error">' + escapeHtml(err.message || 'AI unavailable.') + '</p>';
-                }
-                if (typeof onDone === 'function') {
-                    onDone();
-                }
-            }
-        });
-        return activeStream;
-    }
-
+    // ── Initialisation ──
     function init(courseId) {
         cid = parseInt(courseId) || 0;
-        if (!cid) {
-            showSkeleton(false);
-            var dashboard = document.querySelector('.sd-dashboard');
-            if (dashboard) {
-                dashboard.innerHTML = '<div class="umat-empty" style="padding:60px 20px;text-align:center;">' +
-                    '<span class="material-symbols-outlined" style="font-size:48px;color:var(--u-olv);">menu_book</span>' +
-                    '<p style="color:var(--u-ol);font-size:15px;margin-top:12px;">Select a course using the button above to view the struggle dashboard.</p>' +
-                    '</div>';
-            }
-            return;
-        }
-        bindNlqBar();
-        showSkeleton(true);
+        console.log('[StruggleDashboard] init called, cid=' + cid);
+        if (!cid) return;
         loadData();
     }
 
-    function showSkeleton(show) {
-        var sk = document.getElementById('sd-skeleton');
-        if (sk) sk.style.display = show ? 'flex' : 'none';
-    }
-
+    // ── Data loading ──
     function loadData() {
+        showSkeleton(true);
         Ajax.call([{
-            methodname: 'local_umat_ai_get_struggle_dashboard_data',
-            args: {courseid: cid, days: 60}
-        }])[0].done(function(data) {
-            try {
-                renderKpiRibbon(data.kpis);
-                renderScatterPlot(data.scatter_plot_data);
-                renderTopicMastery(data.topic_mastery);
-                renderStudentTable(data.at_risk_students);
-                renderMaterialHealth(data.material_health);
-                renderQuestionsFeed(data.common_questions);
-                renderTopicsFeed(data.scatter_plot_data);
-                renderHealthReport(data.course_health);
-            } catch (e) {
-                console.error('Struggle dashboard render error:', e);
-            }
+            methodname: 'local_umat_ai_get_struggle_insights',
+            args: { courseid: cid, days: 60 }
+        }])[0].done(function(insights) {
+            console.log('[StruggleDashboard] API SUCCESS — keys:', Object.keys(insights), insights);
+            renderAll(insights);
             showSkeleton(false);
         }).fail(function() {
+            console.error('[StruggleDashboard] API FAILED for cid=' + cid, Array.prototype.slice.call(arguments));
             showSkeleton(false);
-            Notification.addNotification({
-                message: 'Failed to load struggle dashboard data.',
-                type: 'error'
-            });
+            renderEmpty();
         });
     }
 
-    /* ── KPI Ribbon ── */
-    function renderKpiRibbon(kpis) {
-        if (!kpis) return;
-
-        var pctEl = document.getElementById('sd-eng-pct');
-        if (pctEl) pctEl.textContent = kpis.engagement_score + '%';
-
-        // Engagement sparkline
-        var sparkCanvas = document.getElementById('sd-eng-sparkline');
-        if (sparkCanvas && sparkCanvas.getContext && kpis.engagement_trend && kpis.engagement_trend.length) {
-            destroyChart('sparkline');
-            chartInstances.sparkline = new Chart(sparkCanvas.getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: kpis.engagement_trend.map(function(v, i) {
-                        var d = new Date();
-                        d.setDate(d.getDate() - (kpis.engagement_trend.length - 1 - i));
-                        return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
-                    }),
-                    datasets: [{
-                        data: kpis.engagement_trend,
-                        borderColor: '#006b2f',
-                        backgroundColor: 'rgba(0,107,47,0.08)',
-                        borderWidth: 2,
-                        fill: true,
-                        pointRadius: 0,
-                        tension: 0.4,
-                    }]
-                },
-                options: {
-                    responsive: false,
-                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                    scales: { x: { display: false }, y: { display: false, min: 0, max: 100 } },
-                    animation: false,
-                }
-            });
-            // Delta
-            var trend = kpis.engagement_trend;
-            var delta = trend.length > 1 ? (trend[trend.length - 1] - trend[0]) : 0;
-            var deltaEl = document.getElementById('sd-eng-delta');
-            if (deltaEl) {
-                deltaEl.textContent = (delta >= 0 ? '+ ' : '- ') + Math.abs(Math.round(delta)) + '% vs. Last Week';
-                deltaEl.className = 'sd-kpi-delta ' + (delta >= 0 ? 'positive' : 'negative');
-            }
-        }
-
-        // At-risk count
-        var riskEl = document.getElementById('sd-atrisk-count');
-        if (riskEl) riskEl.textContent = kpis.at_risk_count || 0;
-
-        // Avatars
-        var avatarStack = document.getElementById('sd-atrisk-avatars');
-        if (avatarStack && kpis.at_risk_avatars) {
-            avatarStack.innerHTML = kpis.at_risk_avatars.map(function(a) {
-                return a.avatar || '<div class="sd-avatar-sm" title="' + escapeHtml(a.name) + '">' + escapeHtml(a.name.charAt(0)) + '</div>';
-            }).join('');
-        }
-
-        // Topic gauge
-        if (kpis.top_topic) {
-            var topicName = document.getElementById('sd-topic-name');
-            if (topicName) topicName.textContent = kpis.top_topic.name;
-
-            var topicInsight = document.getElementById('sd-topic-insight');
-            if (topicInsight) topicInsight.textContent = kpis.top_topic.ai_insight || '';
-
-            var gaugeCanvas = document.getElementById('sd-topic-gauge');
-            if (gaugeCanvas && gaugeCanvas.getContext) {
-                destroyChart('gauge');
-                var val = Math.min(100, Math.max(0, kpis.top_topic.gauge_value || 0));
-                chartInstances.gauge = new Chart(gaugeCanvas.getContext('2d'), {
-                    type: 'doughnut',
-                    data: {
-                        datasets: [{
-                            data: [val, 100 - val],
-                            backgroundColor: val >= 70 ? '#a5304d' : val >= 40 ? '#f59e0b' : '#006b2f',
-                            borderWidth: 0,
-                            circumference: 180,
-                            rotation: 270,
-                        }]
-                    },
-                    options: {
-                        responsive: false,
-                        cutout: '75%',
-                        plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                        animation: false,
-                    }
-                });
-            }
-        }
-
-        // Top material
-        if (kpis.top_material) {
-            var matName = document.getElementById('sd-mat-name');
-            if (matName) matName.textContent = kpis.top_material.name;
-
-            var weekdayCanvas = document.getElementById('sd-mat-weekday-chart');
-            if (weekdayCanvas && weekdayCanvas.getContext && kpis.top_material.weekday_volume) {
-                destroyChart('weekday');
-                chartInstances.weekday = new Chart(weekdayCanvas.getContext('2d'), {
-                    type: 'bar',
-                    data: {
-                        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-                        datasets: [{
-                            data: kpis.top_material.weekday_volume,
-                            backgroundColor: '#a5304d',
-                            borderRadius: 2,
-                            borderWidth: 0,
-                            barThickness: 6,
-                        }]
-                    },
-                    options: {
-                        responsive: false,
-                        plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                        scales: {
-                            x: { display: false },
-                            y: { display: false, beginAtZero: true }
-                        },
-                        animation: false,
-                    }
-                });
-            }
-        }
+    function showSkeleton(show) {
+        var sk = document.getElementById('ins-skeleton');
+        var pane = document.querySelector('.umat-insights-pane');
+        if (sk) sk.style.display = show ? 'flex' : 'none';
+        if (pane) pane.style.opacity = show ? '0.3' : '1';
     }
 
-    /* ── Scatter Plot ── */
-    function renderScatterPlot(data) {
-        var canvas = document.getElementById('sd-scatter-plot');
-        if (!canvas || !canvas.getContext) return;
-        if (!data || !data.length) {
-            canvas.parentElement.innerHTML = '<div class="sd-empty">No scatter data yet. Questions will appear once students start asking.</div>';
+    function renderEmpty() {
+        var el = document.getElementById('ins-priority-actions');
+        if (el) el.innerHTML = '<div class="ins-empty">No data available yet. The hourly cron will populate insights soon.</div>';
+    }
+
+    // ── Master renderer ──
+    function renderAll(data) {
+        if (!data) { renderEmpty(); return; }
+        renderPriorityActions(data.priority_actions || []);
+        renderStruggleAreas(data.struggle_areas || []);
+        renderSectionStruggle(data.section_struggle || []);
+        renderMaterialStruggle(data.material_struggle || []);
+        renderStudentDossiers(data.student_narratives || []);
+        renderQuestionRadar(data.common_questions || []);
+        renderCoursePulse(data.course_pulse || {});
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // ZONE 1: Priority Briefing
+    // ════════════════════════════════════════════════════════════════
+    function renderPriorityActions(actions) {
+        var el = document.getElementById('ins-priority-actions');
+        if (!el) return;
+        if (!actions || !actions.length) {
+            el.innerHTML = '<div class="ins-priority-card urgency-low">' +
+                '<span class="material-symbols-outlined ins-priority-icon">check_circle</span>' +
+                '<div><div class="ins-priority-text">Everything looks good!</div>' +
+                '<div class="ins-priority-details">No urgent issues detected. Check the sections below for detailed insights.</div></div></div>';
             return;
         }
-
-        destroyChart('scatter');
-
-        var colors = {critical: '#a5304d', moderate: '#f59e0b', minor: '#006b2f', healthy: '#4ade80'};
-        var bubbles = data.map(function(d) {
-            return {
-                x: d.volume,
-                y: d.friction,
-                r: d.impact_size > 0 ? d.impact_size / 2 : 8,
-                label: d.topic,
-                backgroundColor: colors[d.severity] || '#999',
-                borderColor: 'rgba(255,255,255,0.6)',
-                borderWidth: 1,
-            };
-        });
-
-        var parent = canvas.parentElement;
-        var width = parent.clientWidth || 400;
-        var height = parent.clientHeight || 280;
-
-        canvas.style.width = width + 'px';
-        canvas.style.height = height + 'px';
-
-        chartInstances.scatter = new Chart(canvas.getContext('2d'), {
-            type: 'bubble',
-            data: { datasets: [{ data: bubbles, label: 'Topics' }] },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function(ctx) {
-                                var d = ctx.raw;
-                                return d.label + ': Vol ' + d.x + ', Friction ' + d.y;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        title: { display: true, text: 'Question Volume', color: '#666', font: {size: 11} },
-                        min: 0, max: data.length ? Math.ceil(Math.max.apply(null, data.map(function(d) { return d.volume; })) / 10) * 10 * 1.2 : 70,
-                        grid: { display: false }
-                    },
-                    y: {
-                        title: { display: true, text: 'Friction Score', color: '#666', font: {size: 11} },
-                        min: 0, max: data.length ? Math.ceil(Math.max.apply(null, data.map(function(d) { return d.friction; })) / 10) * 10 * 1.2 : 60,
-                        grid: { display: false }
-                    }
-                },
-                animation: false,
+        el.innerHTML = actions.map(function(a) {
+            var itemsHtml = '';
+            if (a.items && a.items.length) {
+                itemsHtml = '<ul class="ins-priority-items">' +
+                    a.items.map(function(item) {
+                        var detail = item.name || '';
+                        if (item.students) detail += ' — ' + item.students + ' students';
+                        if (item.pct) detail += ' (' + item.pct + '%)';
+                        if (item.trend) detail += ', ' + item.trend;
+                        if (item.days) detail += ' — ' + item.days + ' days ago';
+                        return '<li>' + escapeHtml(detail) + '</li>';
+                    }).join('') + '</ul>';
             }
-        });
-    }
-
-    /* ── Topic Mastery List ── */
-    function renderTopicMastery(data) {
-        var list = document.getElementById('sd-topic-mastery-list');
-        if (!list) return;
-        if (!data || !data.length) {
-            list.innerHTML = '<div class="sd-empty">No topic data yet.</div>';
-            return;
-        }
-
-        list.innerHTML = data.map(function(t, idx) {
-            var pct = t.total_students > 0 ? Math.round(t.students_mastered / t.total_students * 100) : 0;
-            var ringColor = t.difficulty === 'critical' ? '#a5304d' : t.difficulty === 'moderate' ? '#f59e0b' : '#006b2f';
-            var ringHtml = '<svg class="sd-progress-ring" viewBox="0 0 36 36">' +
-                '<circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" stroke-width="2.8"/>' +
-                '<circle cx="18" cy="18" r="15.9" fill="none" stroke="' + ringColor + '" stroke-width="2.8" ' +
-                'stroke-dasharray="100" stroke-dashoffset="' + (100 - pct) + '" transform="rotate(-90,18,18)" stroke-linecap="round"/>' +
-                '<text x="18" y="18" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" fill="' + ringColor + '">' + pct + '%</text></svg>';
-
-            var questionsHtml = '';
-            if (t.expand_questions && t.expand_questions.length) {
-                questionsHtml = '<div class="sd-expand-questions" id="sd-eq-' + idx + '">' +
-                    t.expand_questions.map(function(q) { return '<div>• ' + escapeHtml(q) + '</div>'; }).join('') + '</div>';
+            var actionBtn = '';
+            if (a.action_label) {
+                actionBtn = '<button class="ins-priority-btn" onclick="window.struggleDashboard.handlePriorityAction(\'' + escapeHtml(a.type) + '\')">' +
+                    escapeHtml(a.action_label) + '</button>';
             }
-
-            return '<div class="sd-mastery-row">' +
-                ringHtml +
-                '<div class="sd-mastery-name">' + escapeHtml(t.topic) + '</div>' +
-                '<span class="sd-diff-badge ' + t.difficulty + '">' + t.difficulty + '</span>' +
-                '<button class="sd-expand-btn" onclick="window.struggleDashboard.toggleQuestions(' + idx + ')">Expand</button>' +
-                questionsHtml +
-                '</div>';
-        }).join('');
-    }
-
-    function toggleQuestions(idx) {
-        var el = document.getElementById('sd-eq-' + idx);
-        if (el) el.classList.toggle('open');
-    }
-
-    /* ── Student Triage Table ── */
-    function renderStudentTable(students) {
-        var tbody = document.getElementById('sd-student-tbody');
-        if (!tbody) return;
-        studentData = students || [];
-        selectedStudentIds = {};
-
-        renderTableRows();
-        wireTableSorting();
-        wireSelectAll();
-    }
-
-    function renderTableRows() {
-        var tbody = document.getElementById('sd-student-tbody');
-        if (!tbody) return;
-        if (!studentData.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="sd-empty">No at-risk students.</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = studentData.map(function(s) {
-            return '<tr>' +
-                '<td><input type="checkbox" class="sd-student-cb" data-uid="' + s.id + '" ' + (selectedStudentIds[s.id] ? 'checked' : '') + '></td>' +
-                '<td>' + (s.avatar || '') + '<span class="sd-student-name">' + escapeHtml(s.name) + '</span></td>' +
-                '<td><span class="sd-risk-badge ' + s.risk + '">' + s.risk + '</span></td>' +
-                '<td><span class="sd-struggle-trunc" title="' + escapeHtml(s.struggle_area) + '">' + escapeHtml(s.struggle_area) + '</span></td>' +
-                '<td>' + escapeHtml(s.last_active) + '</td>' +
-                '<td><div class="sd-action-icons">' +
-                '<button class="sd-action-icon mail" title="Send message" onclick="window.struggleDashboard.actionStudent(' + s.id + ',\'mail\')"><span class="material-symbols-outlined">mail</span></button>' +
-                '<button class="sd-action-icon video" title="Start BBB meeting" onclick="window.struggleDashboard.actionStudent(' + s.id + ',\'video\')"><span class="material-symbols-outlined">videocam</span></button>' +
-                '<button class="sd-action-icon trash" title="Flag intervention" onclick="window.struggleDashboard.actionStudent(' + s.id + ',\'trash\')"><span class="material-symbols-outlined">flag</span></button>' +
-                '</div></td>' +
-                '</tr>';
-        }).join('');
-
-        // Wire checkboxes
-        document.querySelectorAll('.sd-student-cb').forEach(function(cb) {
-            cb.addEventListener('change', function() {
-                var uid = parseInt(this.dataset.uid);
-                if (this.checked) selectedStudentIds[uid] = true;
-                else delete selectedStudentIds[uid];
-            });
-        });
-    }
-
-    function wireTableSorting() {
-        var headers = document.querySelectorAll('.sd-sortable');
-        headers.forEach(function(h) {
-            h.addEventListener('click', function() {
-                var col = this.dataset.col;
-                var isAsc = this.classList.contains('sd-sort-asc');
-                headers.forEach(function(x) { x.classList.remove('sd-sort-asc', 'sd-sort-desc'); });
-                this.classList.add(isAsc ? 'sd-sort-desc' : 'sd-sort-asc');
-
-                studentData.sort(function(a, b) {
-                    var va = (a[col] || '').toString().toLowerCase();
-                    var vb = (b[col] || '').toString().toLowerCase();
-                    if (col === 'risk') {
-                        va = a.risk === 'Critical' ? 2 : 1;
-                        vb = b.risk === 'Critical' ? 2 : 1;
-                    }
-                    if (va < vb) return isAsc ? 1 : -1;
-                    if (va > vb) return isAsc ? -1 : 1;
-                    return 0;
-                });
-                renderTableRows();
-            });
-        });
-    }
-
-    function wireSelectAll() {
-        var selAll = document.getElementById('sd-select-all');
-        if (!selAll) return;
-        selAll.addEventListener('change', function() {
-            var checked = this.checked;
-            studentData.forEach(function(s) {
-                if (checked) selectedStudentIds[s.id] = true;
-                else delete selectedStudentIds[s.id];
-            });
-            document.querySelectorAll('.sd-student-cb').forEach(function(cb) {
-                cb.checked = checked;
-            });
-        });
-    }
-
-    /* ── Material Health Chart ── */
-    function renderMaterialHealth(data) {
-        var canvas = document.getElementById('sd-material-health-chart');
-        if (!canvas || !canvas.getContext) return;
-        destroyChart('matHealth');
-        if (!data || !data.length) {
-            canvas.parentElement.innerHTML = '<div class="sd-empty">No material health data yet.</div>';
-            return;
-        }
-
-        var labels = data.map(function(m) { return m.name.length > 25 ? m.name.substring(0, 22) + '...' : m.name; });
-
-        chartInstances.matHealth = new Chart(canvas.getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    { label: '% Complete', data: data.map(function(m) { return m.pct_complete; }), backgroundColor: '#006b2f', borderRadius: 2, barThickness: 10 },
-                    { label: '% Questions', data: data.map(function(m) { return m.pct_questions; }), backgroundColor: '#f59e0b', borderRadius: 2, barThickness: 10 },
-                    { label: '% Correct', data: data.map(function(m) { return m.pct_correct; }), backgroundColor: '#a5304d', borderRadius: 2, barThickness: 10 },
-                ]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'top', labels: { boxWidth: 12, font: {size: 10}, padding: 8 } },
-                },
-                scales: {
-                    x: { min: 0, max: 80, grid: { display: false }, title: { display: true, text: 'Percentage', font: {size: 10} } },
-                    y: { grid: { display: false }, ticks: { font: {size: 9} } }
-                },
-                animation: false,
-            }
-        });
-    }
-
-    /* ── Questions Feed ── */
-    function renderQuestionsFeed(data) {
-        var feed = document.getElementById('sd-questions-feed');
-        if (!feed) return;
-        if (!data || !data.length) {
-            feed.innerHTML = '<div class="sd-empty">No questions yet.</div>';
-            return;
-        }
-        feed.innerHTML = data.slice(0, 15).map(function(q) {
-            return '<div class="sd-feed-item">' +
-                '<div class="sd-feed-text">' + escapeHtml(q.text) + '</div>' +
-                '<div class="sd-feed-meta">' +
-                '<span class="sd-feed-count">' + q.count + 'x</span>' +
-                (q.source_material ? ' · ' + escapeHtml(q.source_material) : '') +
+            return '<div class="ins-priority-card urgency-' + escapeHtml(a.urgency) + '">' +
+                '<span class="material-symbols-outlined ins-priority-icon">' + escapeHtml(a.icon) + '</span>' +
+                '<div class="ins-priority-body">' +
+                '<div class="ins-priority-text">' + escapeHtml(a.text) + '</div>' +
+                itemsHtml +
+                '<div class="ins-priority-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' +
+                escapeHtml(a.suggestion) + '</div>' +
+                actionBtn +
                 '</div></div>';
         }).join('');
     }
 
-    /* ── Topics Feed ── */
-    function renderTopicsFeed(scatterData) {
-        var feed = document.getElementById('sd-topics-feed');
-        if (!feed) return;
-        if (!scatterData || !scatterData.length) {
-            feed.innerHTML = '<div class="sd-empty">No topics yet.</div>';
+    // ════════════════════════════════════════════════════════════════
+    // ZONE 2: Struggle Map
+    // ════════════════════════════════════════════════════════════════
+    function renderStruggleAreas(areas) {
+        var el = document.getElementById('ins-struggle-areas');
+        if (!el) return;
+        if (!areas || !areas.length) {
+            el.innerHTML = '<div class="ins-empty">No struggle data yet. Student questions will populate this section.</div>';
             return;
         }
+        el.innerHTML = areas.map(function(a) {
+            var severityLabel = a.severity === 'critical' ? 'Critical' :
+                (a.severity === 'attention' ? 'Needs Attention' : 'Watch');
+            var severityIcon = a.severity === 'critical' ? 'error' :
+                (a.severity === 'attention' ? 'warning' : 'info');
 
-        var sorted = scatterData.slice().sort(function(a, b) { return b.volume - a.volume; });
-        feed.innerHTML = sorted.slice(0, 15).map(function(t) {
-            var color = t.severity === 'critical' ? '#a5304d' : t.severity === 'moderate' ? '#f59e0b' : '#006b2f';
-            return '<div class="sd-feed-item">' +
-                '<div class="sd-feed-text" style="border-left:3px solid ' + color + ';padding-left:8px;">' + escapeHtml(t.topic) + '</div>' +
-                '<div class="sd-feed-meta">' + t.volume + ' questions · Friction: ' + Math.round(t.friction) + '</div></div>';
+            // Trend indicator
+            var trendHtml = '';
+            if (a.trend === 'up') {
+                trendHtml = '<span class="ins-trend ins-trend-up"><span class="material-symbols-outlined">trending_up</span> +' + a.trend_pct + '%</span>';
+            } else if (a.trend === 'down') {
+                trendHtml = '<span class="ins-trend ins-trend-down"><span class="material-symbols-outlined">trending_down</span> ' + a.trend_pct + '%</span>';
+            } else {
+                trendHtml = '<span class="ins-trend ins-trend-stable"><span class="material-symbols-outlined">trending_flat</span> Stable</span>';
+            }
+
+            // Sample questions
+            var sqHtml = '';
+            if (a.sample_questions && a.sample_questions.length) {
+                sqHtml = '<div class="ins-struggle-questions">' +
+                    a.sample_questions.slice(0, 2).map(function(q) {
+                        return '<div class="ins-struggle-sample-q">"' + escapeHtml(q) + '"</div>';
+                    }).join('') + '</div>';
+            }
+
+            // Materials
+            var matHtml = '';
+            if (a.materials && a.materials.length) {
+                matHtml = '<div class="ins-struggle-materials">' +
+                    a.materials.map(function(m) {
+                        return '<span class="ins-material-tag">' + escapeHtml(m.name) + '</span>';
+                    }).join('') + '</div>';
+            }
+
+            return '<div class="ins-struggle-card severity-' + escapeHtml(a.severity) + '">' +
+                '<div class="ins-struggle-header">' +
+                '<div class="ins-struggle-topic">' +
+                '<span class="material-symbols-outlined ins-severity-icon">' + severityIcon + '</span>' +
+                '<strong>' + escapeHtml(a.topic) + '</strong>' +
+                '<span class="ins-severity-label">' + severityLabel + '</span>' +
+                '</div>' +
+                trendHtml +
+                '</div>' +
+                '<div class="ins-struggle-narrative">' + escapeHtml(a.description) + '</div>' +
+                '<div class="ins-struggle-evidence">' +
+                '<span class="ins-evidence"><span class="material-symbols-outlined">quiz</span> ' + a.question_count + ' questions</span>' +
+                '<span class="ins-evidence"><span class="material-symbols-outlined">people</span> ' + a.student_count + ' of ' + a.total_students + ' students (' + a.student_pct + '%)</span>' +
+                '</div>' +
+                sqHtml +
+                '<div class="ins-struggle-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' +
+                escapeHtml(a.suggestion) + '</div>' +
+                matHtml +
+                '</div>';
         }).join('');
     }
 
-    /* ── Health Report ── */
-    function renderHealthReport(report) {
-        var reportEl = document.getElementById('sd-health-report');
-        var recEl = document.getElementById('sd-recommendations');
-        if (!report || !report.summary) {
-            if (reportEl) reportEl.innerHTML = '<div class="sd-empty">AI course health report will appear once enough student data is available.</div>';
-            if (recEl) recEl.innerHTML = '';
-            return;
-        }
-        if (reportEl) {
-            reportEl.innerHTML = escapeHtml(report.summary);
-        }
-        if (recEl && report && report.recommendations) {
-            recEl.innerHTML = report.recommendations.map(function(r) {
-                return '<span class="sd-rec-chip">' + escapeHtml(r) + '</span>';
+    function renderSectionStruggle(sections) {
+        var el = document.getElementById('ins-section-breakdown');
+        if (!el) return;
+        if (!sections || !sections.length) return;
+        el.innerHTML = '<h4 class="ins-sub-title">Course Sections</h4>' +
+            sections.map(function(s) {
+                var color = s.severity === 'critical' ? '#dc2626' :
+                    (s.severity === 'attention' ? '#f59e0b' : '#16a34a');
+                return '<div class="ins-section-bar">' +
+                    '<div class="ins-section-bar-header">' +
+                    '<span class="ins-section-name">' + escapeHtml(s.section_name) + '</span>' +
+                    '<span class="ins-section-pct" style="color:' + color + '">' + s.struggle_pct + '% struggling (' + s.student_count + ' students)</span>' +
+                    '</div>' +
+                    '<div class="ins-section-track"><div class="ins-section-fill" style="width:' + s.struggle_pct + '%;background:' + color + '"></div></div>' +
+                    '<div class="ins-section-hint">' + escapeHtml(s.hint) + '</div>' +
+                    '</div>';
             }).join('');
-        }
-
-        var btn = document.getElementById('sd-ai-strategy-btn');
-        if (btn && !btn.dataset.bound) {
-            btn.dataset.bound = '1';
-            btn.addEventListener('click', function() {
-                if (this.disabled) {
-                    return;
-                }
-                this.disabled = true;
-                this.innerHTML = '<span class="material-symbols-outlined umat-spin">progress_activity</span> Generating…';
-                streamQuestion(
-                    'Suggest tailored student outreach strategies for struggling students in this course. Include specific actions, messaging tone, and priority order.',
-                    'sd-health-report',
-                    null,
-                    function() {
-                        btn.disabled = false;
-                        btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span> Ask AI for tailored student outreach strategies';
-                    }
-                );
-            });
-        }
-
-        bindNlqBar();
     }
 
-    function bindNlqBar() {
-        var input = document.getElementById('sd-nlq-input');
-        var btn = document.getElementById('sd-nlq-btn');
-        if (!input || !btn || btn.dataset.bound) {
+    function renderMaterialStruggle(materials) {
+        var el = document.getElementById('ins-material-struggle');
+        if (!el) return;
+        if (!materials || !materials.length) return;
+        el.innerHTML = '<h4 class="ins-sub-title">Materials Needing Attention</h4>' +
+            materials.map(function(m, i) {
+                return '<div class="ins-material-item">' +
+                    '<span class="ins-material-rank">#' + (i + 1) + '</span>' +
+                    '<div class="ins-material-info">' +
+                    '<div class="ins-material-name">' + escapeHtml(m.material_name) + ' <span class="ins-material-count">' + m.question_count + ' questions</span></div>' +
+                    '<div class="ins-material-suggestion">' + escapeHtml(m.suggestion) + '</div>' +
+                    '</div></div>';
+            }).join('');
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // ZONE 3: Student Dossiers
+    // ════════════════════════════════════════════════════════════════
+    function renderStudentDossiers(students) {
+        allStudentNarratives = students || [];
+        applyFilterAndRender();
+    }
+
+    function applyFilterAndRender() {
+        var el = document.getElementById('ins-student-list');
+        if (!el) return;
+        var filtered = applyFilter(allStudentNarratives);
+        if (!filtered.length) {
+            el.innerHTML = '<div class="ins-empty">No students match the current filter.</div>';
             return;
         }
-        btn.dataset.bound = '1';
+        el.innerHTML = filtered.map(function(s) {
+            var riskClass = s.risk_level || 'low';
+            var riskLabel = riskClass === 'high' ? 'High Risk' :
+                (riskClass === 'medium' ? 'Medium Risk' : 'Low Risk');
 
-        function runNlq() {
-            var q = (input.value || '').trim();
-            if (!q) {
-                return;
+            // Topic chips
+            var topicChips = '';
+            if (s.struggle_topics && s.struggle_topics.length) {
+                topicChips = '<div class="ins-student-topics">' +
+                    s.struggle_topics.slice(0, 3).map(function(t) {
+                        return '<span class="ins-topic-chip">' + escapeHtml(t) + '</span>';
+                    }).join('') + '</div>';
             }
-            btn.disabled = true;
-            input.disabled = true;
-            var response = document.getElementById('sd-nlq-response');
-            if (response) {
-                response.style.display = 'block';
+
+            // Stats line
+            var stats = [];
+            if (s.question_count > 0) stats.push(s.question_count + ' questions');
+            if (s.ai_queries > 0) stats.push(s.ai_queries + ' AI queries');
+            if (s.quiz_failures > 0) stats.push(s.quiz_failures + ' quiz fails');
+            var statsHtml = stats.length ? '<div class="ins-student-stats">' + stats.join(' · ') + '</div>' : '';
+
+            // Suggestion
+            var sugHtml = s.suggestion ? '<div class="ins-student-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' + escapeHtml(s.suggestion) + '</div>' : '';
+
+            return '<div class="ins-student-card" data-uid="' + s.userid + '" onclick="window.struggleDashboard.loadStudentDetail(' + s.userid + ')">' +
+                '<div class="ins-student-header">' +
+                '<div class="ins-student-name-row">' +
+                '<img class="ins-student-avatar" src="' + escapeHtml(s.profileimageurl || '') + '" alt="" onerror="this.style.display=\'none\'">' +
+                '<strong class="ins-student-name">' + escapeHtml(s.fullname) + '</strong>' +
+                '</div>' +
+                '<span class="ins-pill ins-pill-' + riskClass + '">' + riskLabel + '</span>' +
+                '</div>' +
+                '<div class="ins-student-summary">' + escapeHtml(s.summary) + '</div>' +
+                topicChips +
+                statsHtml +
+                '<div class="ins-student-meta">Last active: ' + escapeHtml(s.last_active) + '</div>' +
+                sugHtml +
+                '</div>';
+        }).join('');
+    }
+
+    function applyFilter(students) {
+        if (filterMode === 'all') return students;
+        return students.filter(function(s) {
+            if (filterMode === 'disengaged') {
+                return (s.days_since_last_login || 0) >= 3;
             }
-            streamQuestion(q, 'sd-nlq-response', null, function() {
-                btn.disabled = false;
-                input.disabled = false;
-            });
+            if (filterMode === 'struggling') {
+                return s.risk_score >= 40 && s.question_count >= 5;
+            }
+            if (filterMode === 'failing') {
+                return (s.quiz_failures || 0) > 0 || s.risk_score >= 60;
+            }
+            if (filterMode === 'issues') {
+                return (s.issue_reports || 0) > 0;
+            }
+            return true;
+        });
+    }
+
+    function setFilter(mode, btnEl) {
+        filterMode = mode;
+        var chips = document.querySelectorAll('.ins-chip[data-filter]');
+        for (var i = 0; i < chips.length; i++) chips[i].classList.remove('ins-chip-active');
+        if (btnEl) btnEl.classList.add('ins-chip-active');
+        applyFilterAndRender();
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // ZONE 4: Question Radar
+    // ════════════════════════════════════════════════════════════════
+    function renderQuestionRadar(questions) {
+        var el = document.getElementById('ins-common-questions');
+        if (!el) return;
+        if (!questions || !questions.length) {
+            el.innerHTML = '<div class="ins-empty">No common questions yet.</div>';
+            return;
+        }
+        el.innerHTML = questions.slice(0, 8).map(function(q) {
+            return '<div class="ins-question-card">' +
+                '<div class="ins-question-text">"' + escapeHtml(q.text) + '"</div>' +
+                '<div class="ins-question-meta">' + q.student_count + ' student' + (q.student_count !== 1 ? 's' : '') +
+                ' · ' + q.ask_count + ' time' + (q.ask_count !== 1 ? 's' : '') +
+                ' · Topic: <strong>' + escapeHtml(q.topic) + '</strong></div>' +
+                '<div class="ins-question-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' +
+                escapeHtml(q.suggestion) + '</div>' +
+                '</div>';
+        }).join('');
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // ZONE 5: Course Vitals
+    // ════════════════════════════════════════════════════════════════
+    function renderCoursePulse(pulse) {
+        var el = document.getElementById('ins-course-pulse');
+        if (!el) return;
+        if (!pulse || !pulse.total_students) {
+            el.innerHTML = '<div class="ins-empty">No pulse data available.</div>';
+            return;
         }
 
-        btn.addEventListener('click', runNlq);
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                runNlq();
+        function trendIcon(trend, pct) {
+            if (trend === 'up') return '<span class="ins-pulse-trend up">↑' + (pct || '') + '%</span>';
+            if (trend === 'down') return '<span class="ins-pulse-trend down">↓' + Math.abs(pct || 0) + '%</span>';
+            return '<span class="ins-pulse-trend stable">—</span>';
+        }
+
+        var html = '<div class="ins-pulse-card">' +
+            '<div class="ins-pulse-val">' + (pulse.avg_quiz || 0) + '%</div>' +
+            '<div class="ins-pulse-label">Avg Quiz</div>' +
+            trendIcon(pulse.quiz_trend, pulse.quiz_trend_pct) +
+            '</div>';
+
+        html += '<div class="ins-pulse-card">' +
+            '<div class="ins-pulse-val">' + (pulse.at_risk_count || 0) + '</div>' +
+            '<div class="ins-pulse-label">At Risk</div>' +
+            '<div class="ins-pulse-sub">of ' + pulse.total_students + ' students</div>' +
+            '</div>';
+
+        html += '<div class="ins-pulse-card">' +
+            '<div class="ins-pulse-val ins-pulse-topic">' + escapeHtml(pulse.top_struggle_topic || '—') + '</div>' +
+            '<div class="ins-pulse-label">Top Struggle</div>' +
+            '<div class="ins-pulse-sub">' + escapeHtml(pulse.top_struggle_trend || '') + '</div>' +
+            '</div>';
+
+        html += '<div class="ins-pulse-card">' +
+            '<div class="ins-pulse-val">' + (pulse.active_this_week || 0) + '</div>' +
+            '<div class="ins-pulse-label">Active This Week</div>' +
+            '<div class="ins-pulse-sub">of ' + pulse.total_students + ' students</div>' +
+            '</div>';
+
+        el.innerHTML = html;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // Student Detail Panel
+    // ════════════════════════════════════════════════════════════════
+    function loadStudentDetail(uid) {
+        currentDetailUid = uid;
+        var panel = document.getElementById('ins-detail-panel');
+        var body = document.getElementById('ins-detail-body');
+        var nameEl = document.getElementById('ins-detail-name');
+        var riskBadge = document.getElementById('ins-detail-risk-badge');
+        if (!panel || !body) return;
+
+        panel.style.display = 'block';
+        body.innerHTML = '<div class="ins-empty">Loading profile…</div>';
+
+        // Find student from cache
+        var s = null;
+        for (var i = 0; i < allStudentNarratives.length; i++) {
+            if (allStudentNarratives[i].userid === uid) { s = allStudentNarratives[i]; break; }
+        }
+        if (s) {
+            nameEl.textContent = s.fullname;
+            riskBadge.textContent = s.risk_level === 'high' ? 'High Risk' : (s.risk_level === 'medium' ? 'Medium Risk' : 'Low Risk');
+            riskBadge.className = 'ins-pill ins-pill-' + s.risk_level;
+        }
+
+        Ajax.call([{
+            methodname: 'local_umat_ai_get_student_profile',
+            args: { courseid: cid, userid: uid }
+        }])[0].done(function(data) {
+            if (!data) return;
+            body.innerHTML =
+                '<div class="ins-detail-narrative">' + escapeHtml(s ? s.summary : '') + '</div>' +
+                '<div class="ins-detail-grid">' +
+                '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.risk_score || 0) + '</div><div class="ins-detail-stat-lbl">Risk Score</div></div>' +
+                '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.total_logins || 0) + '</div><div class="ins-detail-stat-lbl">Logins</div></div>' +
+                '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.avg_quiz || 0).toFixed(1) + '%</div><div class="ins-detail-stat-lbl">Avg Quiz</div></div>' +
+                '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.ai_queries || 0) + '</div><div class="ins-detail-stat-lbl">AI Queries</div></div>' +
+                '</div>';
+            if (s && s.suggestion) {
+                body.innerHTML += '<div class="ins-detail-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' + escapeHtml(s.suggestion) + '</div>';
+            }
+            if (data.interventions && data.interventions.length) {
+                body.innerHTML += '<div class="ins-detail-section-title">Recent Interventions</div>';
+                body.innerHTML += data.interventions.slice(0, 5).map(function(inv) {
+                    return '<div class="ins-detail-intervention">' +
+                        '<span>' + escapeHtml(inv.action || '') + '</span>' +
+                        '<span class="ins-detail-intervention-meta">' + (inv.status || '') + ' · ' + new Date((inv.timecreated || 0) * 1000).toLocaleDateString() + '</span>' +
+                        '</div>';
+                }).join('');
+            }
+        }).fail(function() {
+            body.innerHTML = '<div class="ins-empty">Failed to load profile.</div>';
+        });
+    }
+
+    function closeDetail() {
+        var panel = document.getElementById('ins-detail-panel');
+        if (panel) panel.style.display = 'none';
+        currentDetailUid = 0;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // Priority Action Handler
+    // ════════════════════════════════════════════════════════════════
+    function handlePriorityAction(type) {
+        if (type === 'disengagement') {
+            setFilter('disengaged', document.querySelector('[data-filter="disengaged"]'));
+        } else if (type === 'recap_needed') {
+            setFilter('struggling', document.querySelector('[data-filter="struggling"]'));
+        } else if (type === 'issues') {
+            setFilter('issues', document.querySelector('[data-filter="issues"]'));
+        }
+        // Scroll to student section
+        var zone = document.getElementById('ins-students-zone');
+        if (zone) zone.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // Action Drawer
+    // ════════════════════════════════════════════════════════════════
+    function openActionDrawer(action) {
+        currentDrawerAction = action;
+        var drawer = document.getElementById('ins-action-drawer');
+        var title = document.getElementById('ins-drawer-title');
+        var recipient = document.getElementById('ins-drawer-recipient');
+        var message = document.getElementById('ins-drawer-message');
+        if (!drawer) return;
+
+        var actionNames = { encouragement: 'Send Encouragement', meeting: 'Schedule 1:1', remedial_quiz: 'Assign Remedial Quiz' };
+        if (title) title.textContent = actionNames[action] || 'Send Intervention';
+
+        var student = null;
+        for (var i = 0; i < allStudentNarratives.length; i++) {
+            if (allStudentNarratives[i].userid === currentDetailUid) { student = allStudentNarratives[i]; break; }
+        }
+        if (student) {
+            if (recipient) recipient.textContent = 'To: ' + student.fullname + ' (' + student.risk_level + ')';
+        }
+
+        var templates = {
+            encouragement: 'Hi {{name}}, I noticed you might be struggling with the course material. Remember that I\'m here to help — don\'t hesitate to reach out or use the AI assistant for extra support. Keep going!',
+            meeting: 'Hi {{name}}, would you like to schedule a 1:1 meeting this week? I\'d love to discuss how we can help you get back on track. Please let me know what times work for you.',
+            remedial_quiz: 'Hi {{name}}, I\'ve prepared some additional practice questions to help reinforce the key concepts. Check your course page for the remedial quiz. Let me know if you have questions!'
+        };
+        var name = student ? student.fullname.split(' ')[0] : 'Student';
+        if (message) message.value = (templates[action] || '').replace('{{name}}', name);
+
+        drawer.style.display = 'flex';
+        var status = document.getElementById('ins-drawer-status');
+        if (status) status.style.display = 'none';
+    }
+
+    function closeActionDrawer() {
+        var drawer = document.getElementById('ins-action-drawer');
+        if (drawer) drawer.style.display = 'none';
+        currentDrawerAction = '';
+    }
+
+    function sendIntervention() {
+        var btn = document.getElementById('ins-drawer-send-btn');
+        var status = document.getElementById('ins-drawer-status');
+        var message = document.getElementById('ins-drawer-message');
+        if (!btn || !status || !message) return;
+        if (!currentDetailUid || !currentDrawerAction) return;
+
+        btn.disabled = true;
+        status.style.display = 'block';
+        status.textContent = 'Sending…';
+        status.style.color = 'var(--u-ol)';
+
+        Ajax.call([{
+            methodname: 'local_umat_ai_execute_intervention',
+            args: {
+                courseid: cid,
+                userid: currentDetailUid,
+                action: currentDrawerAction,
+                message: message.value
+            }
+        }])[0].done(function(resp) {
+            if (resp.status === 'sent') {
+                status.textContent = '✓ Message sent successfully!';
+                status.style.color = 'var(--u-p)';
+                setTimeout(closeActionDrawer, 2000);
+            } else if (resp.status === 'cooldown') {
+                status.textContent = '⏳ Already sent within 24h. Please wait.';
+                status.style.color = '#f59e0b';
+            } else {
+                status.textContent = '✗ Failed: ' + (resp.message || 'Unknown error');
+                status.style.color = 'var(--u-ter)';
+            }
+            btn.disabled = false;
+        }).fail(function() {
+            status.textContent = '✗ Connection error. Please try again.';
+            status.style.color = 'var(--u-ter)';
+            btn.disabled = false;
+        });
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // NLQ Search
+    // ════════════════════════════════════════════════════════════════
+    function submitNLQ() {
+        var input = document.getElementById('ins-nlq-input');
+        var response = document.getElementById('ins-nlq-response');
+        var spinner = document.getElementById('ins-nlq-spinner');
+        if (!input || !response) return;
+        var q = input.value.trim();
+        if (!q || !cid) return;
+
+        if (activeStream && activeStream.abort) activeStream.abort();
+
+        response.style.display = 'block';
+        if (spinner) spinner.style.display = 'inline-block';
+        input.disabled = true;
+
+        var cfg = streamConfig();
+        activeStream = Shared._umatStreamInline({
+            url: cfg.url,
+            sesskey: cfg.sesskey,
+            courseid: cid,
+            question: q,
+            session_key: 'ins_nlq_' + cid,
+            targetId: 'ins-nlq-response',
+            onDone: function() {
+                activeStream = null;
+                if (spinner) spinner.style.display = 'none';
+                input.disabled = false;
+            },
+            onError: function(err) {
+                activeStream = null;
+                if (spinner) spinner.style.display = 'none';
+                input.disabled = false;
+                response.innerHTML = '<span style="color:var(--u-ter);">' + escapeHtml(err.message || 'Failed to query AI service.') + '</span>';
             }
         });
     }
 
-    function submitNLQ() {
-        var input = document.getElementById('sd-nlq-input') || document.getElementById('ins-nlq-input');
-        if (!input) {
-            return;
-        }
-        var q = (input.value || '').trim();
-        if (!q) {
-            return;
-        }
-        var targetId = document.getElementById('sd-nlq-response') ? 'sd-nlq-response' : 'ins-nlq-response';
-        var response = document.getElementById(targetId);
-        if (response) {
-            response.style.display = 'block';
-        }
-        streamQuestion(q, targetId);
-    }
-
-    /* ── Student Actions ── */
-    function actionStudent(uid, action) {
-        var student = studentData.find(function(s) { return s.id === uid; });
-        if (!student) return;
-
-        if (action === 'mail') {
-            // Open Moodle messaging
-            var url = '/message/index.php?user1to=' + uid + '&id=' + cid;
-            window.open(url, '_blank');
-        } else if (action === 'video') {
-            // Launch BBB meeting — try BBB module
-            var bbbUrl = '/mod/bigbluebuttonbn/index.php?id=' + cid;
-            // Show iframe overlay
-            var overlay = document.createElement('div');
-            overlay.className = 'sd-bbb-overlay open';
-            overlay.innerHTML = '<iframe class="sd-bbb-frame" src="' + bbbUrl + '" allow="microphone; camera" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>';
-            overlay.addEventListener('click', function(e) {
-                if (e.target === overlay) overlay.remove();
-            });
-            document.body.appendChild(overlay);
-        } else if (action === 'trash') {
-            // Flag intervention
-            Ajax.call([{
-                methodname: 'local_umat_ai_execute_intervention',
-                args: {courseid: cid, userid: uid, action: 'flagged', message: 'Flagged for review from Struggle Dashboard'}
-            }])[0].done(function() {
-                Notification.addNotification({message: 'Student flagged for review.', type: 'success'});
-            }).fail(function() {
-                Notification.addNotification({message: 'Failed to flag student.', type: 'error'});
-            });
-        }
-    }
-
-    function destroyChart(key) {
-        if (chartInstances[key]) {
-            chartInstances[key].destroy();
-            delete chartInstances[key];
-        }
-    }
-
+    // ════════════════════════════════════════════════════════════════
+    // Utilities
+    // ════════════════════════════════════════════════════════════════
     function escapeHtml(s) {
         if (!s) return '';
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -636,9 +571,15 @@ define(['core/ajax', 'core/str', 'local_umat_ai/chart', 'core/notification', 'lo
 
     return {
         init: init,
-        toggleQuestions: toggleQuestions,
-        actionStudent: actionStudent,
         loadData: loadData,
-        submitNLQ: submitNLQ,
+        setFilter: setFilter,
+        loadStudentDetail: loadStudentDetail,
+        closeDetail: closeDetail,
+        handlePriorityAction: handlePriorityAction,
+        openActionDrawer: openActionDrawer,
+        closeActionDrawer: closeActionDrawer,
+        sendIntervention: sendIntervention,
+        submitNLQ: submitNLQ
     };
 });
+

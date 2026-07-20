@@ -9,7 +9,6 @@ var UID = data.userId;
 var streamUrl = data.streamUrl;
 var moodleSesskey = data.moodleSesskey;
 var sessKey = 'hub_'+Math.random().toString(36).substr(2,18);
-var _msgIdCounter = 0;
 /* Rolling 60s rate-limit window — mirrors the server check, refills as entries expire */
 var RATE_MAX = 10;
 var qTimes   = [];
@@ -392,15 +391,15 @@ function sendQ(q){
   var msgs=document.getElementById('hub-msgs');
   appendMsg(q,true,msgs);var hi=document.getElementById('hub-input');if(hi){hi.value='';hi.style.height='auto';}
   var tid='h_'+Date.now();
-  _umatShowTyping('hub-msgs', tid);
+  var t=document.createElement('div');t.id=tid;t.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-typing"><span></span><span></span><span></span></div></div></div></div>';
+  msgs.appendChild(t);msgs.scrollTop=msgs.scrollHeight;
   _umatStreamChat({
     url:streamUrl,sesskey:moodleSesskey,courseid:cid,question:ctx,session_key:sessKey,
     material_ids:selMat.map(function(m){return m.id;}),msgsId:'hub-msgs',
-    typingId:tid,
     onMeta:function(meta){syncRemaining(meta.remaining);updateRate();},
-    onDone:function(meta){_umatHideTyping(tid);syncRemaining(meta.remaining);updateRate();},
+    onDone:function(meta){var e=document.getElementById(tid);if(e)e.parentNode.removeChild(e);syncRemaining(meta.remaining);updateRate();},
     onError:function(err){
-      _umatHideTyping(tid);
+      var e=document.getElementById(tid);if(e)e.parentNode.removeChild(e);
       if(err.error==='rate_limit'){qTimes.pop();updateRate();}
       appendMsg(err.message||'Connection error.',false,msgs,[]);
     }

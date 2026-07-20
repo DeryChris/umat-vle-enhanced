@@ -67,6 +67,21 @@ $functions = [
         'description' => 'Delete a single chat session by session_key', 'type' => 'write', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
+    'local_umat_ai_get_lecturer_sessions' => [
+        'classname'   => '\local_umat_ai\external\course_data', 'methodname' => 'get_lecturer_sessions',
+        'description' => 'Get lecturer AI chat sessions', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_get_lecturer_session_detail' => [
+        'classname'   => '\local_umat_ai\external\course_data', 'methodname' => 'get_lecturer_session_detail',
+        'description' => 'Get messages in a lecturer AI session', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_delete_lecturer_session' => [
+        'classname'   => '\local_umat_ai\external\course_data', 'methodname' => 'delete_lecturer_session',
+        'description' => 'Delete a lecturer AI session', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
     'local_umat_ai_get_pending_outputs' => [
         'classname'   => '\local_umat_ai\external\course_data', 'methodname' => 'get_pending_outputs',
         'description' => 'Get unapproved AI outputs for lecturer review', 'type' => 'read', 'ajax' => true,

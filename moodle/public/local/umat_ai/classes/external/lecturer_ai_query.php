@@ -17,17 +17,18 @@ class lecturer_ai_query extends \external_api {
 
     public static function ask_parameters() {
         return new \external_function_parameters([
-            'courseid' => new \external_value(PARAM_INT,  'Course ID'),
-            'query'    => new \external_value(PARAM_TEXT, 'Lecturer query text'),
+            'courseid'    => new \external_value(PARAM_INT,  'Course ID'),
+            'query'       => new \external_value(PARAM_TEXT, 'Lecturer query text'),
+            'session_key' => new \external_value(PARAM_ALPHANUMEXT, 'Session key for grouping', VALUE_DEFAULT, ''),
         ]);
     }
 
-    public static function ask($courseid, $query) {
+    public static function ask($courseid, $query, $session_key = '') {
         global $DB, $USER;
 
         $params = self::validate_parameters(
             self::ask_parameters(),
-            ['courseid' => $courseid, 'query' => $query]
+            ['courseid' => $courseid, 'query' => $query, 'session_key' => $session_key]
         );
 
         $context = \context_course::instance($params['courseid']);
@@ -78,13 +79,16 @@ class lecturer_ai_query extends \external_api {
         $result      = json_decode($rawResponse, true);
 
         $answer = $result['answer'] ?? get_string('ai_unavailable', 'local_umat_ai');
+        $sources = $result['sources'] ?? [];
 
         // Log lecturer interaction.
         $DB->insert_record('umat_ai_lecturer_notes', (object)[
             'userid'      => $USER->id,
             'courseid'    => $params['courseid'],
+            'session_key' => $params['session_key'],
             'query'       => $params['query'],
             'response'    => $answer,
+            'sources'     => json_encode($sources),
             'timecreated' => time(),
         ]);
 

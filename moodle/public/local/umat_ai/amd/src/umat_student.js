@@ -41,7 +41,7 @@ var expBtn  = document.getElementById('stu-expand-btn');
 
 function updateBodyLock(){document.body.classList.toggle('umat-body-lock',!(!document.querySelector('.umat-ov.open,.umat-cp-ov.open')));}
 
-if(fab)fab.addEventListener('click', function(){ if(window.innerWidth<640){ cpOv.classList.remove('open'); ov.classList.add('open'); switchPane('home'); initHome(); } else { cpOv.classList.add('open'); } updateRate(); checkConn(); initCpNotes(); updateBodyLock(); }); else console.warn('UMaT: #umat-stu-fab not found');
+if(fab)fab.addEventListener('click', function(){ if(window.innerWidth<640){ cpOv.classList.remove('open'); ov.classList.add('open'); switchToTab('home'); populateHomeTab(); } else { cpOv.classList.add('open'); } updateRate(); checkConn(); initCpNotes(); updateBodyLock(); }); else console.warn('UMaT: #umat-stu-fab not found');
 if(cpClose)cpClose.addEventListener('click', function(){ cpOv.classList.remove('open'); updateBodyLock(); });
 if(cpOv)cpOv.addEventListener('click', function(e){ if(e.target===cpOv){ cpOv.classList.remove('open'); updateBodyLock(); } });
 if(expBtn)expBtn.addEventListener('click', function(){ cpOv.classList.remove('open'); openOverlay(); });

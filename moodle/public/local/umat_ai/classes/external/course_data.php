@@ -597,6 +597,209 @@ class course_data extends \external_api {
     }
 
     // ------------------------------------------------------------------ //
+    // get_lecturer_sessions                                                 //
+    // ------------------------------------------------------------------ //
+    public static function get_lecturer_sessions_parameters() {
+        return new \external_function_parameters([
+            'courseid' => new \external_value(PARAM_INT, 'Course ID (0 = all)', VALUE_DEFAULT, 0),
+            'limit'    => new \external_value(PARAM_INT, 'Max sessions', VALUE_DEFAULT, 20),
+        ]);
+    }
+
+    public static function get_lecturer_sessions($courseid = 0, $limit = 20) {
+        global $DB, $USER;
+        $params = self::validate_parameters(self::get_lecturer_sessions_parameters(),
+            ['courseid' => $courseid, 'limit' => $limit]);
+        $cid = (int)$params['courseid'];
+        $limit = min((int)$params['limit'], 50);
+
+        // Sessions WITH session_key (grouped).
+        $where = "userid=:uid AND session_key IS NOT NULL AND session_key!=''";
+        $wargs = ['uid' => $USER->id];
+        if ($cid > 0) { $where .= ' AND courseid=:cid'; $wargs['cid'] = $cid; }
+
+        $rawSessions = $DB->get_records_sql(
+            "SELECT session_key, MAX(courseid) AS courseid, MAX(timecreated) AS lastactive,
+                    COUNT(*) AS msg_count, MIN(query) AS first_q
+               FROM {umat_ai_lecturer_notes}
+              WHERE $where
+           GROUP BY session_key ORDER BY lastactive DESC",
+            $wargs, 0, $limit);
+
+        // Legacy rows WITHOUT session_key (each treated as its own session).
+        $legacyWhere = "userid=:uid AND (session_key IS NULL OR session_key='')";
+        $legacyWargs = ['uid' => $USER->id];
+        if ($cid > 0) { $legacyWhere .= ' AND courseid=:cid'; $legacyWargs['cid'] = $cid; }
+
+        $legacyRows = $DB->get_records_sql(
+            "SELECT id, courseid, timecreated AS lastactive, 1 AS msg_count, query AS first_q
+               FROM {umat_ai_lecturer_notes}
+              WHERE $legacyWhere
+           ORDER BY timecreated DESC",
+            $legacyWargs, 0, $limit);
+
+        // Resolve course names.
+        $courses = enrol_get_users_courses($USER->id, true, 'id,fullname,shortname');
+        $cMap = [];
+        foreach ($courses as $c) $cMap[$c->id] = $c;
+
+        $sessions = [];
+        foreach ($rawSessions as $s) {
+            $cName = $cShort = '';
+            if (isset($cMap[$s->courseid])) {
+                $cName = format_string($cMap[$s->courseid]->fullname);
+                $cShort = $cMap[$s->courseid]->shortname;
+            }
+            $sessions[] = [
+                'session_key'  => $s->session_key,
+                'courseid'     => (int)$s->courseid,
+                'course_name'  => $cName,
+                'course_short' => $cShort,
+                'time_label'   => self::time_ago($s->lastactive),
+                'msg_count'    => (int)$s->msg_count,
+                'preview'      => mb_strlen($s->first_q) > 110
+                    ? mb_substr($s->first_q, 0, 107) . '...' : $s->first_q,
+            ];
+        }
+        foreach ($legacyRows as $s) {
+            $cName = $cShort = '';
+            if (isset($cMap[$s->courseid])) {
+                $cName = format_string($cMap[$s->courseid]->fullname);
+                $cShort = $cMap[$s->courseid]->shortname;
+            }
+            $sessions[] = [
+                'session_key'  => 'lec_legacy_' . $s->id,
+                'courseid'     => (int)$s->courseid,
+                'course_name'  => $cName,
+                'course_short' => $cShort,
+                'time_label'   => self::time_ago($s->lastactive),
+                'msg_count'    => (int)$s->msg_count,
+                'preview'      => mb_strlen($s->first_q) > 110
+                    ? mb_substr($s->first_q, 0, 107) . '...' : $s->first_q,
+            ];
+        }
+
+        return ['sessions' => $sessions];
+    }
+
+    public static function get_lecturer_sessions_returns() {
+        return new \external_single_structure(['sessions' => new \external_multiple_structure(
+            new \external_single_structure([
+                'session_key'  => new \external_value(PARAM_TEXT),
+                'courseid'     => new \external_value(PARAM_INT),
+                'course_name'  => new \external_value(PARAM_TEXT),
+                'course_short' => new \external_value(PARAM_TEXT),
+                'time_label'   => new \external_value(PARAM_TEXT),
+                'msg_count'    => new \external_value(PARAM_INT),
+                'preview'      => new \external_value(PARAM_TEXT),
+            ])
+        )]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // get_lecturer_session_detail                                           //
+    // ------------------------------------------------------------------ //
+    public static function get_lecturer_session_detail_parameters() {
+        return new \external_function_parameters([
+            'session_key' => new \external_value(PARAM_ALPHANUMEXT, 'Session key'),
+        ]);
+    }
+
+    public static function get_lecturer_session_detail($session_key = '') {
+        global $DB, $USER;
+        $params = self::validate_parameters(self::get_lecturer_session_detail_parameters(),
+            ['session_key' => $session_key]);
+        $sk = trim($params['session_key']);
+
+        // Handle legacy sessions (prefix 'lec_legacy_').
+        if (strpos($sk, 'lec_legacy_') === 0) {
+            $id = (int) str_replace('lec_legacy_', '', $sk);
+            $record = $DB->get_record('umat_ai_lecturer_notes', ['id' => $id, 'userid' => $USER->id]);
+            if (!$record) return ['messages' => []];
+            return ['messages' => [[
+                'id'          => (int)$record->id,
+                'question'    => $record->query,
+                'answer'      => $record->response ?? '',
+                'sources'     => json_decode($record->sources ?? '[]', true) ?? [],
+                'timecreated' => (int)$record->timecreated,
+            ]]];
+        }
+
+        $records = $DB->get_records('umat_ai_lecturer_notes',
+            ['userid' => $USER->id, 'session_key' => $sk],
+            'timecreated ASC', '*', 0, 50);
+
+        return ['messages' => array_values(array_map(function($r) {
+            return [
+                'id'          => (int)$r->id,
+                'question'    => $r->query,
+                'answer'      => $r->response ?? '',
+                'sources'     => json_decode($r->sources ?? '[]', true) ?? [],
+                'timecreated' => (int)$r->timecreated,
+            ];
+        }, (array)$records))];
+    }
+
+    public static function get_lecturer_session_detail_returns() {
+        return new \external_single_structure(['messages' => new \external_multiple_structure(
+            new \external_single_structure([
+                'id'          => new \external_value(PARAM_INT),
+                'question'    => new \external_value(PARAM_TEXT),
+                'answer'      => new \external_value(PARAM_RAW),
+                'sources'     => new \external_multiple_structure(new \external_value(PARAM_TEXT)),
+                'timecreated' => new \external_value(PARAM_INT),
+            ])
+        )]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // delete_lecturer_session                                               //
+    // ------------------------------------------------------------------ //
+    public static function delete_lecturer_session_parameters() {
+        return new \external_function_parameters([
+            'session_key' => new \external_value(PARAM_ALPHANUMEXT, 'Session key to delete'),
+        ]);
+    }
+
+    public static function delete_lecturer_session($session_key = '') {
+        global $DB, $USER;
+        $params = self::validate_parameters(self::delete_lecturer_session_parameters(),
+            ['session_key' => $session_key]);
+        $sk = trim($params['session_key']);
+
+        if (empty($sk)) {
+            throw new \moodle_exception('invalidparameter', 'local_umat_ai', '', 'session_key cannot be empty');
+        }
+
+        // Handle legacy sessions.
+        if (strpos($sk, 'lec_legacy_') === 0) {
+            $id = (int) str_replace('lec_legacy_', '', $sk);
+            $exists = $DB->record_exists('umat_ai_lecturer_notes', ['id' => $id, 'userid' => $USER->id]);
+            if (!$exists) return ['success' => true, 'deleted' => 0];
+            $DB->delete_records('umat_ai_lecturer_notes', ['id' => $id, 'userid' => $USER->id]);
+            return ['success' => true, 'deleted' => 1];
+        }
+
+        $exists = $DB->record_exists('umat_ai_lecturer_notes', [
+            'session_key' => $sk, 'userid' => $USER->id,
+        ]);
+        if (!$exists) return ['success' => true, 'deleted' => 0];
+
+        $deleted = $DB->delete_records('umat_ai_lecturer_notes', [
+            'session_key' => $sk, 'userid' => $USER->id,
+        ]);
+
+        return ['success' => true, 'deleted' => (int)$deleted];
+    }
+
+    public static function delete_lecturer_session_returns() {
+        return new \external_single_structure([
+            'success' => new \external_value(PARAM_BOOL),
+            'deleted' => new \external_value(PARAM_INT),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
     // get_pending_outputs                                                    //
     // ------------------------------------------------------------------ //
     public static function get_pending_outputs_parameters() {

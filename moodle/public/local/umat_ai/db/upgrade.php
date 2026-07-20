@@ -605,5 +605,17 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026071600, 'local', 'umat_ai');
     }
 
+    if ($oldversion < 2026072000) {
+        // Add session_key and sources to umat_ai_lecturer_notes for lecturer AI session tracking.
+        $table = new xmldb_table('umat_ai_lecturer_notes');
+        $f1 = new xmldb_field('session_key', XMLDB_TYPE_CHAR, '64', null, null, null, null, 'courseid');
+        $f2 = new xmldb_field('sources', XMLDB_TYPE_TEXT, null, null, null, null, null, 'response');
+        if (!$dbman->field_exists($table, $f1)) $dbman->add_field($table, $f1);
+        if (!$dbman->field_exists($table, $f2)) $dbman->add_field($table, $f2);
+        $idx = new xmldb_index('session_key', XMLDB_INDEX_NOTUNIQUE, ['session_key']);
+        if (!$dbman->index_exists($table, $idx)) $dbman->add_index($table, $idx);
+        upgrade_plugin_savepoint(true, 2026072000, 'local', 'umat_ai');
+    }
+
     return true;
 }

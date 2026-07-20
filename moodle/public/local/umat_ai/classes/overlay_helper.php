@@ -815,6 +815,21 @@ HTML;
           <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">history</span> AI Chat Sessions</h2>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="lec-sess-hdr-actions"></div>
         </div>
+        <!-- Toggle: My AI Sessions / Student Sessions -->
+        <div class="umat-sess-toggle" id="lec-sess-toggle" style="display:flex;gap:6px;padding:12px 16px 0;">
+          <button class="umat-sess-toggle-btn active" data-sess-tab="lecturer" type="button"
+            style="flex:1;padding:8px 12px;border-radius:var(--u-r8);border:1px solid var(--u-olv);
+            background:var(--u-p);color:#fff;font-size:12px;font-weight:700;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;gap:6px;">
+            <span class="material-symbols-outlined" style="font-size:14px;">person</span>My AI Sessions
+          </button>
+          <button class="umat-sess-toggle-btn" data-sess-tab="student" type="button"
+            style="flex:1;padding:8px 12px;border-radius:var(--u-r8);border:1px solid var(--u-olv);
+            background:var(--u-bg);color:var(--u-ons);font-size:12px;font-weight:700;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;gap:6px;">
+            <span class="material-symbols-outlined" style="font-size:14px;">group</span>Student Sessions
+          </button>
+        </div>
         <!-- Course picker overlay -->
         <div class="umat-cs-overlay" id="lec-sess-cs-ov">
           <div class="umat-cs-modal">
@@ -1171,7 +1186,7 @@ function renderLcpFeature(name){
   document.getElementById('lcp-feature-icon').textContent=meta[0];document.getElementById('lcp-feature-title').textContent=meta[1];document.getElementById('lcp-feature-sub').textContent=meta[2];
   var body=document.getElementById('lcp-feature-body');body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading '+meta[1].toLowerCase()+'…</p></div>';
   if(name==='lec-courses')return renderLcpCourses(body);
-  if(name==='lec-analytics'||name==='lec-struggle'||name==='lec-insights'){if(window.struggleDashboard)window.struggleDashboard.init(CID||insCid);return;}
+  if(name==='lec-analytics'||name==='lec-struggle'||name==='lec-insights'){if(window.struggleDashboard)window.struggleDashboard.init(resolveInsightsCid());return;}
   if(name==='lec-library')return renderLcpLibrary(body);
   if(name==='lec-sessions')return renderLcpSessions(body);
   if(name==='lec-issues')return renderLcpIssues(body);
@@ -1179,7 +1194,55 @@ function renderLcpFeature(name){
 function renderLcpCourses(body){var courses=(UD&&UD.courses)||[];if(!courses.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses found.</p></div>';return;}body.innerHTML=courses.map(function(c){return '<button class="umat-cp-list-card as-btn" data-cid="'+c.id+'" data-name="'+esc(c.fullname||'')+'" type="button"><strong>'+esc(c.shortname||c.fullname)+'</strong><p>'+esc(c.fullname||'')+'</p></button>';}).join('');body.querySelectorAll('[data-cid]').forEach(function(b){b.addEventListener('click',function(){CID=parseInt(b.dataset.cid)||CID;CN=b.dataset.name||CN;renderLcpFeature('lec-analytics');});});}
 function renderLcpAnalytics(body,name){if(!CID){var courses=(UD&&UD.courses)||[];if(!courses.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">school</span><p>No courses available.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course or view composite:</div><div id="lcp-cs-bar" style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+courses.slice(0,16).map(function(c){return '<button class="umat-chip" data-cid="'+c.id+'" type="button">'+esc(c.shortname||c.fullname)+'</button>';}).join('')+'</div><div id="lcp-ov-body" style="padding:0 14px 14px;"><div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading overview\u2026</p></div></div>';body.querySelectorAll('#lcp-cs-bar .umat-chip').forEach(function(b){b.addEventListener('click',function(){CID=parseInt(this.dataset.cid)||CID;renderLcpFeature(name);});});var ovBody=document.getElementById('lcp-ov-body'),agg=name==='lec-struggle'?{total_questions:0,total_students:0,total_issues:0,open_issues:0,per_course:[],all_topics:[],all_students:[],topic_map:{}}:{active_students:0,enrolled_students:0,total_interactions:0,per_course:[],all_questions:[],high_total:0,risk_total:0,track_total:0},done=0;courses.forEach(function(c){ajax(name==='lec-struggle'?'local_umat_ai_get_struggle_insights':'local_umat_ai_get_analytics',{courseid:c.id,days:name==='lec-struggle'?60:30},function(d){if(name==='lec-struggle'){var s=d.summary||{};agg.total_questions+=s.total_questions||0;agg.total_students+=s.total_students||0;agg.total_issues+=s.total_issues||0;agg.open_issues+=s.open_issues||0;var sc='N/A';if(d.topic_matrix&&d.topic_matrix.length){var scs=d.topic_matrix.map(function(t){return t.struggle_score||0;});sc=Math.round(scs.reduce(function(a,b){return a+b;})/scs.length);d.topic_matrix.forEach(function(t){var k=t.topic;if(agg.topic_map[k]){agg.topic_map[k].question_count+=t.question_count;agg.topic_map[k].student_count+=t.student_count;agg.topic_map[k].struggle_score=(agg.topic_map[k].struggle_score+t.struggle_score)/2;}else{agg.topic_map[k]=JSON.parse(JSON.stringify(t));}});}(d.at_risk_students||[]).forEach(function(s){s.course_name=c.shortname;agg.all_students.push(s);});agg.per_course.push({id:c.id,name:c.shortname,questions:s.total_questions||0,students:s.total_students||0,struggle:sc});}else{agg.active_students+=d.active_students;agg.enrolled_students+=d.enrolled_students;agg.total_interactions+=d.total_interactions;agg.high_total+=d.high_performers||0;agg.risk_total+=Math.max(0,d.enrolled_students-d.active_students);agg.track_total+=Math.max(0,d.active_students-(d.high_performers||0));(d.top_questions||[]).forEach(function(q){agg.all_questions.push(q);});agg.per_course.push({id:c.id,name:c.shortname,active:d.active_students,enrolled:d.enrolled_students,interactions:d.total_interactions,struggle:d.struggle_index});}done++;if(done===courses.length){if(name==='lec-struggle'){var tm=Object.keys(agg.topic_map);var hi=0,md=0,lo=0;tm.forEach(function(k){var sc=agg.topic_map[k].struggle_score||0;if(sc>=60)hi++;else if(sc>=30)md++;else lo++;});ovBody.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">quiz</span><strong>'+agg.total_questions+'</strong><small>total questions</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">people</span><strong>'+agg.total_students+'</strong><small>students</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">flag</span><strong>'+agg.total_issues+'</strong><small>issues ('+agg.open_issues+' open)</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">donut_small</span><strong>'+tm.length+'</strong><small>topics (H:'+hi+' M:'+md+' L:'+lo+')</small></div></div>'+((agg.all_students||[]).slice(0,5).map(function(s){return '<div class="umat-cp-list-card"><strong>'+esc(s.fullname||'Student')+'</strong><p>'+esc(s.course_name||'')+'\u00a0\u00b7\u00a0'+esc(s.topic||'')+'</p></div>';}).join('')||'<div class="umat-empty"><span class="material-symbols-outlined">check_circle</span><p>No at-risk students.</p></div>');}else{ovBody.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">group</span><strong>'+agg.active_students+'/'+agg.enrolled_students+'</strong><small>active students</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">forum</span><strong>'+agg.total_interactions+'</strong><small>total interactions</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">trending_up</span><strong>'+agg.high_total+'</strong><small>high performers</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">warning</span><strong>'+agg.risk_total+'</strong><small>at risk</small></div></div>'+((agg.all_questions||[]).sort(function(a,b){return b.ask_count-a.ask_count;}).slice(0,5).map(function(q){return '<div class="umat-cp-list-card"><strong>'+esc(q.text)+'</strong><p>'+q.ask_count+' students asked</p></div>';}).join('')||'<div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>No questions yet.</p></div>');}}},function(){done++;if(done===courses.length)ovBody.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load some courses.</p></div>';});});return;}ajax('local_umat_ai_get_analytics',{courseid:CID,days:30},function(d){if(name==='lec-struggle'){body.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">psychology</span><strong>'+esc(d.struggle_index||'N/A')+'</strong><small>struggle index</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">forum</span><strong>'+((d.top_questions||[]).length)+'</strong><small>top questions</small></div></div>'+((d.top_questions||[]).slice(0,6).map(function(q){return '<div class="umat-cp-list-card"><strong>'+esc(q.text)+'</strong><p>'+q.ask_count+' students asked</p></div>';}).join('')||'<div class="umat-empty"><span class="material-symbols-outlined">check_circle</span><p>No struggle questions yet.</p></div>');return;}body.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">group</span><strong>'+d.active_students+'/'+d.enrolled_students+'</strong><small>active students</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">forum</span><strong>'+d.total_interactions+'</strong><small>AI interactions</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">psychology</span><strong>'+esc(d.struggle_index||'N/A')+'</strong><small>struggle index</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">timer</span><strong>'+esc(d.avg_questions_per_session||'0')+'</strong><small>avg Q/session</small></div></div>';},function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load analytics.</p></div>';});}
 function renderLcpLibrary(body){var courses=(UD&&UD.courses)||[];body.innerHTML=(courses.length?'<p class="umat-cp-help">Choose a course to view materials in this panel.</p>'+courses.slice(0,10).map(function(c){return '<button class="umat-cp-list-card as-btn" data-cid="'+c.id+'" type="button"><strong>'+esc(c.shortname||c.fullname)+'</strong><p>'+esc(c.fullname||'')+'</p></button>';}).join(''):'<div class="umat-empty"><span class="material-symbols-outlined">local_library</span><p>No courses available.</p></div>');body.querySelectorAll('[data-cid]').forEach(function(b){b.addEventListener('click',function(){var cid=parseInt(b.dataset.cid);body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading materials\u2026</p></div>';ajax('local_umat_ai_get_course_materials',{courseid:cid},function(r){var mats=r.materials||[];body.innerHTML=mats.length?mats.slice(0,12).map(function(m){return '<div class="umat-cp-list-card"><strong>'+esc(m.filename||m.name||'Material')+'</strong><p>'+esc(m.mimetype||m.type||'Course material')+'</p></div>';}).join(''):'<div class="umat-empty"><span class="material-symbols-outlined">folder_open</span><p>No materials for this course.</p></div>';},function(){console.error('[umat] renderLcpLibrary failed');body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load materials.</p></div>';});});});}
-function renderLcpSessions(body){var courses=(UD&&UD.courses)||[];body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>Select a course from Courses, then ask AI about session history in this panel.</p></div>'+(courses.length?courses.slice(0,6).map(function(c){return '<button class="umat-cp-list-card as-btn" data-cid="'+c.id+'" type="button"><strong>'+esc(c.shortname||c.fullname)+'</strong><p>Use this course context</p></button>';}).join(''):'');body.querySelectorAll('[data-cid]').forEach(function(b){b.addEventListener('click',function(){CID=parseInt(b.dataset.cid)||CID;showLcpPane('lcp-ai');});});}
+function renderLcpSessions(body){
+  body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading sessions...</p></div>';
+  ajax('local_umat_ai_get_lecturer_sessions',{courseid:CID||0,limit:5},function(r){
+    var sessions=r.sessions||[];
+    if(!sessions.length){
+      body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No AI sessions yet. Ask the assistant a question!</p></div>';
+      return;
+    }
+    body.innerHTML='<div style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--u-ol);">Recent Sessions</div>'
+      + sessions.map(function(s){
+        return '<div class="umat-cp-list-card" data-sk="'+esc(s.session_key)+'" data-cid="'+s.courseid+'" style="cursor:pointer;display:flex;align-items:center;gap:8px;">'
+          + '<div style="flex:1;min-width:0;"><strong>'+esc(s.course_name||'AI Session')+'</strong>'
+          + '<p style="margin:2px 0 0;font-size:11px;color:var(--u-onsv);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(s.preview)+'</p>'
+          + '<small style="font-size:10px;color:var(--u-ol);">'+esc(s.time_label)+' &middot; '+s.msg_count+' messages</small></div>'
+          + '<button class="umat-cp-del-session" type="button" title="Delete session" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--u-ter);flex-shrink:0;">'
+          + '<span class="material-symbols-outlined" style="font-size:18px;">delete</span></button></div>';
+      }).join('');
+
+    /* Wire delete buttons */
+    body.querySelectorAll('.umat-cp-del-session').forEach(function(btn){
+      btn.addEventListener('click',function(e){
+        e.stopPropagation();
+        var card=e.target.closest('.umat-cp-list-card');
+        if(!card)return;
+        if(!confirm('Delete this conversation? This cannot be undone.'))return;
+        btn.disabled=true;
+        btn.innerHTML='<span class="material-symbols-outlined" style="font-size:18px;">hourglass_empty</span>';
+        ajax('local_umat_ai_delete_lecturer_session',{session_key:card.dataset.sk},function(){
+          card.remove();
+          if(!body.querySelector('.umat-cp-list-card')){
+            body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No AI sessions yet.</p></div>';
+          }
+        },function(){
+          btn.disabled=false;
+          btn.innerHTML='<span class="material-symbols-outlined" style="font-size:18px;">delete</span>';
+        });
+      });
+    });
+
+    /* Wire card click → open full dashboard sessions tab */
+    body.querySelectorAll('.umat-cp-list-card').forEach(function(card){
+      card.addEventListener('click',function(e){
+        if(e.target.closest('.umat-cp-del-session'))return;
+        openDash();
+        switchPane('lec-sessions');
+      });
+    });
+  });
+}
 function renderLcpIssues(body){if(!CID){var courses=(UD&&UD.courses)||[];if(!courses.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">school</span><p>No courses available.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course to view its issues:</div><div id="lcp-iss-cs-bar" style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+courses.slice(0,16).map(function(c){return '<button class="umat-chip" data-cid="'+c.id+'" type="button">'+esc(c.shortname||c.fullname)+'</button>';}).join('')+'</div>';body.querySelectorAll('#lcp-iss-cs-bar .umat-chip').forEach(function(b){b.addEventListener('click',function(){CID=parseInt(this.dataset.cid)||CID;renderLcpFeature('lec-issues');});});return;}body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading issues\u2026</p></div>';ajax('local_umat_ai_get_course_issues',{courseid:CID},function(r){var issues=r.issues||[];if(!issues.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No student issues.</p></div>';return;}body.innerHTML=issues.slice(0,10).map(function(iss){var sc={'open':'var(--u-ter)','in_review':'#d97706','resolved':'var(--u-sec)','closed':'var(--u-ol)'}[iss.status]||'var(--u-ol)';return '<div style="padding:8px 10px;border-bottom:1px solid var(--u-olv);font-size:12px;display:flex;justify-content:space-between;"><span><strong>'+esc(iss.fullname||'Student')+'</strong><br>'+esc(iss.description.replace(/^(.{60}[^\\s]*).*$/,'$1')+(iss.description.length>60?'...':''))+'</span><span style="font-size:10px;padding:2px 6px;border-radius:999px;background:'+sc+'20;color:'+sc+';white-space:nowrap;">'+iss.status.replace('_',' ')+'</span></div>';}).join('');},function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load issues.</p></div>';});}
 var lcpMsgs=document.getElementById('lcp-msgs');
 if(lcpMsgs)lcpMsgs.addEventListener('click',function(e){
@@ -1225,11 +1288,11 @@ function switchPane(name){
   document.querySelectorAll('#lec-ov .umat-tab-pane').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('#lec-sb [data-lp], #lec-glass-tabs [data-lp]').forEach(function(b){b.classList.toggle('active',b.dataset.lp===name);});
   var pane=document.getElementById(name);if(pane)pane.classList.add('active');
-  /* Hide AI FAB on insights tab, show elsewhere */
+  /* AI FAB always visible — AI Assistant accessible from all tabs including insights */
   var aiFab=document.getElementById('lec-ai-fab');
-  if(aiFab)aiFab.style.display=name==='lec-insights'?'none':'';
+  if(aiFab)aiFab.style.display='';
   if(!lecLoaded[name]){lecLoaded[name]=true;loadPaneData(name);}
-  else if(name==='lec-insights'){if(window.struggleDashboard)window.struggleDashboard.init(CID||insCid);else loadInsights(CID||insCid);}
+  else if(name==='lec-insights'){if(window.struggleDashboard)window.struggleDashboard.init(resolveInsightsCid());else loadInsights(resolveInsightsCid());}
 }
 document.querySelectorAll('#lec-sb [data-lp], #lec-glass-tabs [data-lp]').forEach(function(b){
   b.addEventListener('click',function(){switchPane(b.dataset.lp);});
@@ -1274,7 +1337,7 @@ function loadPaneData(name){
   if(name==='lec-library'){populateLibCourseSel();loadLibrary();}
   if(name==='lec-sessions'){populateSessCourseSel();loadSessions();}
   if(name==='lec-issues')loadLecturerIssues();
-  if(name==='lec-insights'){populateInsightsCourseSel();if(window.struggleDashboard){window.struggleDashboard.init(CID||insCid);}else{loadInsights(CID||insCid);}}
+  if(name==='lec-insights'){populateInsightsCourseSel();if(window.struggleDashboard){window.struggleDashboard.init(resolveInsightsCid());}else{loadInsights(resolveInsightsCid());}}
   if(name==='lec-quizgen')loadQuizGenUI();
   if(name==='lec-home')initHome();
 }
@@ -1719,30 +1782,147 @@ function openAnalyticsPicker(){
   var ov=document.getElementById('lec-an-cs-ov');
   if(ov)ov.classList.add('open');
 }
+/* Sessions tab — dual-mode: lecturer's own AI sessions OR student sessions */
+var lecSessMode='lecturer';
 function loadSessions(cid){
   var list=document.getElementById('lec-sess-list');
+  var mode=lecSessMode;
   var courseId=cid||lecSessCourseId||0;
-  if(!courseId){
-    list.innerHTML='<div class="umat-lib-picker"><span class="material-symbols-outlined">school</span><p>Select a course to view its chat sessions.</p><button type="button" id="lec-sess-pick-btn"><span class="material-symbols-outlined">menu_book</span>Select Course</button></div>';
+
+  /* Wire toggle buttons */
+  var toggles=document.querySelectorAll('#lec-sess-toggle .umat-sess-toggle-btn');
+  toggles.forEach(function(b){b.removeEventListener('click',lecSessToggle);b.addEventListener('click',lecSessToggle);});
+
+  if(mode==='student'&&!courseId){
+    list.innerHTML='<div class="umat-lib-picker"><span class="material-symbols-outlined">school</span><p>Select a course to view its student chat sessions.</p><button type="button" id="lec-sess-pick-btn"><span class="material-symbols-outlined">menu_book</span>Select Course</button></div>';
+    wireSessPicker();
     return;
   }
   var hdr=document.getElementById('lec-sess-hdr-actions');
-  if(hdr){
+  if(hdr&&mode==='student'){
     var course=(UD.courses||[]).find(function(c){return c.id===courseId;});
     hdr.innerHTML=course?'<button class="umat-lib-sel-label" id="lec-sess-sel-label" type="button"><span class="material-symbols-outlined">menu_book</span>'+esc(course.shortname)+'</button>':'';
     var lbl=document.getElementById('lec-sess-sel-label');
     if(lbl)lbl.addEventListener('click',openLecSessPicker);
+  } else if(hdr){
+    hdr.innerHTML='';
   }
+
   list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading sessions…</p></div>';
-  ajax('local_umat_ai_get_ai_sessions',{courseid:courseId,limit:20},function(r){
-    if(!r.sessions||!r.sessions.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No AI chat sessions yet.</p></div>';return;}
-    list.innerHTML=r.sessions.map(function(s){
-      return '<div class="umat-session-tile">'+
-        '<div class="umat-session-tile-hdr"><span class="umat-session-badge">'+esc(s.course_short||'GEN')+'</span><span class="umat-session-time">'+esc(s.time_label)+'</span></div>'+
-        '<h4>'+esc(s.course_name)+' AI Session</h4><p>'+esc(s.preview)+'</p>'+
-        '<div class="umat-session-tile-foot"><div class="umat-session-meta"><span class="material-symbols-outlined">chat</span>'+s.msg_count+' messages</div></div></div>';
-    }).join('');
-  },function(){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load sessions.</p></div>';});
+
+  if(mode==='lecturer'){
+    ajax('local_umat_ai_get_lecturer_sessions',{courseid:courseId,limit:20},function(r){
+      var sessions=r.sessions||[];
+      if(!sessions.length){
+        list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No AI sessions yet. Ask the assistant a question!</p></div>';
+        return;
+      }
+      list.innerHTML=sessions.map(function(s){
+        return '<div class="umat-session-tile" data-sk="'+esc(s.session_key)+'" data-cid="'+s.courseid+'">'+
+          '<div class="umat-session-tile-hdr"><span class="umat-session-badge">'+esc(s.course_short||'AI')+'</span><span class="umat-session-time">'+esc(s.time_label)+'</span></div>'+
+          '<h4>'+esc(s.course_name||'AI Session')+'</h4><p>'+esc(s.preview)+'</p>'+
+          '<div class="umat-session-tile-foot"><div class="umat-session-meta"><span class="material-symbols-outlined">chat</span>'+s.msg_count+' messages</div>'+
+          '<button class="umat-del-session-btn" type="button" title="Delete session"><span class="material-symbols-outlined">delete</span></button></div></div>';
+      }).join('');
+
+      /* Wire delete buttons */
+      list.querySelectorAll('.umat-del-session-btn').forEach(function(btn){
+        btn.addEventListener('click',function(e){
+          e.stopPropagation();
+          if(!confirm('Delete this conversation? This cannot be undone.'))return;
+          var tile=btn.closest('.umat-session-tile');
+          if(!tile)return;
+          btn.disabled=true;
+          btn.innerHTML='<span class="material-symbols-outlined">hourglass_empty</span>';
+          ajax('local_umat_ai_delete_lecturer_session',{session_key:tile.dataset.sk},function(){
+            tile.remove();
+            if(!list.querySelector('.umat-session-tile')){
+              list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No AI sessions yet. Ask the assistant a question!</p></div>';
+            }
+          },function(){
+            btn.disabled=false;
+            btn.innerHTML='<span class="material-symbols-outlined">delete</span>';
+          });
+        });
+      });
+
+      /* Wire tile click → expand detail */
+      list.querySelectorAll('.umat-session-tile').forEach(function(tile){
+        tile.addEventListener('click',function(e){
+          if(e.target.closest('.umat-del-session-btn'))return;
+          expandLecSession(tile);
+        });
+      });
+    },function(){
+      list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load sessions.</p></div>';
+    });
+  } else {
+    /* Student sessions mode */
+    ajax('local_umat_ai_get_ai_sessions',{courseid:courseId,limit:20},function(r){
+      var sessions=r.sessions||[];
+      if(!sessions.length){
+        list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No student chat sessions yet for this course.</p></div>';
+        return;
+      }
+      list.innerHTML=sessions.map(function(s){
+        return '<div class="umat-session-tile" data-sk="'+esc(s.session_key)+'" data-cid="'+s.courseid+'">'+
+          '<div class="umat-session-tile-hdr"><span class="umat-session-badge">'+esc(s.course_short||'GEN')+'</span><span class="umat-session-time">'+esc(s.time_label)+'</span></div>'+
+          '<h4>'+esc(s.course_name)+' AI Session</h4><p>'+esc(s.preview)+'</p>'+
+          '<div class="umat-session-tile-foot"><div class="umat-session-meta"><span class="material-symbols-outlined">chat</span>'+s.msg_count+' messages</div></div></div>';
+      }).join('');
+    },function(){
+      list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load sessions.</p></div>';
+    });
+  }
+}
+function lecSessToggle(e){
+  var btn=e.currentTarget;
+  document.querySelectorAll('#lec-sess-toggle .umat-sess-toggle-btn').forEach(function(b){
+    b.style.background='var(--u-bg)';b.style.color='var(--u-ons)';
+  });
+  btn.style.background='var(--u-p)';btn.style.color='#fff';
+  lecSessMode=btn.dataset.sessTab;
+  loadSessions();
+}
+function expandLecSession(tile){
+  var sk=tile.dataset.sk;
+  var existing=tile.nextElementSibling;
+  if(existing&&existing.classList.contains('umat-session-detail')){
+    existing.remove();
+    return;
+  }
+  /* Remove any other open details */
+  document.querySelectorAll('.umat-session-detail').forEach(function(d){d.remove();});
+  var det=document.createElement('div');
+  det.className='umat-session-detail';
+  det.style='padding:12px 16px;background:var(--u-sflo);border-radius:var(--u-r8);margin:0 0 10px;border:1px solid var(--u-olv);';
+  det.innerHTML='<div style="display:flex;align-items:center;gap:6px;padding:6px 0;font-size:12px;color:var(--u-ol);"><span class="material-symbols-outlined" style="font-size:14px;">hourglass_empty</span> Loading messages…</div>';
+  tile.parentNode.insertBefore(det,tile.nextElementSibling);
+  ajax('local_umat_ai_get_lecturer_session_detail',{session_key:sk},function(r){
+    var msgs=r.messages||[];
+    if(!msgs.length){
+      det.innerHTML='<div style="padding:10px;text-align:center;color:var(--u-ol);font-size:12px;">No messages found.</div>';
+      return;
+    }
+    det.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--u-olv);">'
+      +'<span style="font-size:11px;font-weight:700;color:var(--u-ol);">'+(msgs.length===1?'1 message':msgs.length+' messages')+'</span>'
+      +'<button class="umat-collapse-detail-btn" type="button" style="background:none;border:none;cursor:pointer;color:var(--u-p);font-size:11px;font-weight:600;">Collapse</button></div>'
+      + msgs.map(function(m){
+        return '<div style="margin-bottom:10px;">'
+          +'<div class="umat-msg umat-msg-user" style="margin-bottom:4px;"><div class="umat-msg-bubble" style="display:inline-block;background:var(--u-p)20;padding:8px 12px;border-radius:12px 12px 4px 12px;font-size:12px;">'+esc(m.question)+'</div></div>'
+          +'<div class="umat-msg umat-msg-ai"><div class="umat-msg-bubble umat-msg-bubble-ai" style="display:inline-block;background:var(--u-sfll);padding:8px 12px;border-radius:12px 12px 12px 4px;font-size:12px;">'
+          +(m.answer?'<div class="umat-msg-text">'+esc(m.answer)+'</div>':'<em style="color:var(--u-ol);">No answer recorded.</em>')
+          +(m.sources&&m.sources.length?'<div class="umat-msg-src" style="font-size:10px;color:var(--u-ol);margin-top:4px;">Sources: '+m.sources.map(function(x){return esc(typeof x==='string'?x:x.name||'');}).join(', ')+'</div>':'')
+          +'</div></div></div>';
+      }).join('');
+    det.querySelector('.umat-collapse-detail-btn').addEventListener('click',function(){det.remove();});
+  },function(){
+    det.innerHTML='<div style="padding:10px;text-align:center;color:var(--u-ter);font-size:12px;">Failed to load messages.</div>';
+  });
+}
+function wireSessPicker(){
+  var btn=document.getElementById('lec-sess-pick-btn');
+  if(btn)btn.addEventListener('click',function(){document.getElementById('lec-sess-cs-ov').classList.add('open');});
 }
 
 /* ─── Student Issues (Lecturer) ───────────────────── */
@@ -1883,6 +2063,21 @@ document.getElementById('qgen-cs-ov')?.addEventListener('click',function(e){if(e
 
 /* ── Insights Dashboard ── */
 var insCid = 0;
+
+/* Resolve the active insights course: CID > insCid > first course from UD */
+function resolveInsightsCid(){
+  if(CID) return CID;
+  if(insCid) return insCid;
+  if(typeof UD!=='undefined'&&UD&&UD.courses&&UD.courses.length){
+    var first=UD.courses[0];
+    insCid=first.id;
+    console.log('[StruggleDashboard] auto-selected course: '+first.fullname+' (id='+first.id+')');
+    var lbl=document.getElementById('ins-cs-label');
+    if(lbl) lbl.textContent=first.fullname||first.shortname||'Course';
+    return first.id;
+  }
+  return 0;
+}
 
 function populateInsightsCourseSel(){
   var list=document.getElementById('ins-cs-list');
@@ -2232,76 +2427,8 @@ function submitNLQ(){
   }
 }
 
-/* Compact panel lecturer AI send (streaming) */
-function sendLecQ(q){
-  q=(q||'').trim();if(!q)return;
-  if(!CID){_umatAppendAi('lcp-msgs','Please open a course page first to ask about its analytics.',[]);return;}
-  _umatAppendUser('lcp-msgs',q);
-  var inp=document.getElementById('lcp-input');if(inp)inp.value='';
-  var tid='lt_'+Date.now();_umatShowTyping('lcp-msgs',tid);
-  
-  _umatStreamChat({
-    url: streamUrl,
-    sesskey: moodleSesskey,
-    courseid: CID,
-    question: q,
-    session_key: 'lec_cp_' + CID,
-    material_ids: [],
-    msgsId: 'lcp-msgs',
-    typingId: tid,
-    label: 'AI ASSISTANT',
-    onDone: function(meta){ _umatHideTyping(tid); },
-    onError: function(err){
-      _umatHideTyping(tid);
-      _umatAppendAi('lcp-msgs', err.message||'Sorry, an error occurred. Please try again.', []);
-    }
-  });
-}
-var lcpIn=document.getElementById('lcp-input');var lcpSend=document.getElementById('lcp-send');
-if(lcpSend)lcpSend.addEventListener('click',function(){sendLecQ(lcpIn.value);});
-if(lcpIn)lcpIn.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();lcpSend.click();}});
-
-/* Compact panel suggestion chips click */
-var cp=document.getElementById('lec-cp');
-if(cp){
-  cp.addEventListener('click',function(e){
-    var chip=e.target.closest('[data-lp]');
-    if(chip){sendLecQ(chip.dataset.lp);}
-  });
-}
-
-/* Mini AI panel (always accessible, outside overlay - streaming) */
-var aiFab=document.getElementById('lec-ai-fab');var aiMini=document.getElementById('lec-ai-mini');
-if(aiFab&&aiMini)aiFab.addEventListener('click',function(){aiMini.style.display=aiMini.style.display==='flex'?'none':'flex';});
-var aiclose=document.getElementById('lec-ai-mini-close');
-if(aiclose&&aiMini)aiclose.addEventListener('click',function(){aiMini.style.display='none';});
-if(aiMini&&aiFab)document.addEventListener('click',function(e){if(aiMini.style.display==='flex'&&!aiMini.contains(e.target)&&!aiFab.contains(e.target))aiMini.style.display='none';});
-
-var miniIn=document.getElementById('lec-mini-input');var miniSend=document.getElementById('lec-mini-send');
-if(miniSend)miniSend.addEventListener('click',function(){
-  var q=(miniIn.value||'').trim();if(!q)return;
-  _umatAppendUser('lec-mini-msgs',q);
-  miniIn.value='';
-  var tid='lt_mini_'+Date.now();_umatShowTyping('lec-mini-msgs',tid);
-  
-  _umatStreamChat({
-    url: streamUrl,
-    sesskey: moodleSesskey,
-    courseid: CID,
-    question: q,
-    session_key: 'lec_mini_' + CID,
-    material_ids: [],
-    msgsId: 'lec-mini-msgs',
-    typingId: tid,
-    label: 'AI ASSISTANT',
-    onDone: function(meta){ _umatHideTyping(tid); },
-    onError: function(err){
-      _umatHideTyping(tid);
-      _umatAppendAi('lec-mini-msgs', err.message||'Sorry, an error occurred. Please try again.', []);
-    }
-  });
-});
-if(miniIn)miniIn.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(miniSend)miniSend.click();}});
+/* Compact panel + Mini panel chat handlers delegated to AMD umat_lecturer.js module.
+   Do NOT add duplicate sendLecQ / event listeners here — the AMD module owns them. */
 if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('lec-mini-msgs');
 
 /* Init home on overlay open */
@@ -2315,7 +2442,7 @@ populateInsightsCourseSel_legacy();
 if(expand)expand.addEventListener('click',function(){setTimeout(function(){
   var anCid=CID||lecAnalyticsCourseId;
   if(!lecLoaded['lec-analytics']){lecLoaded['lec-analytics']=true;loadAnalytics(anCid);}
-  var stCid=CID||insCid;
+  var stCid=resolveInsightsCid();
   loadInsights(stCid);
 },100);});
 /* ESC: close nested-first, root-last */
@@ -3059,48 +3186,8 @@ function openHubPdf(url,name){
   });
 }
 
-/* Chat */
-function qRemaining(){var now=Date.now();qTimes=qTimes.filter(function(t){return now-t<60000;});return Math.max(0,RATE_MAX-qTimes.length);}
-function syncRemaining(rem){if(typeof rem!=='number'||rem<0)return;var now=Date.now();while(qRemaining()>rem)qTimes.push(now);}
-function updateRate(){var left=qRemaining();var e=document.getElementById('hub-rate');if(e){e.textContent=left+' Q/min';e.style.color=left<=2?'var(--u-ter)':'';}}
-setInterval(updateRate,5000); /* refill display as window entries expire */
-function appendMsg(text,isUser,container,sources){
-  var d=document.createElement('div');
-  if(isUser)d.innerHTML='<div class="umat-msg-user"><div class="umat-bubble-user"><p>'+esc(text)+'</p></div></div>';
-  else{var srcs='';if(sources&&sources.length)srcs='<div class="umat-src-chips">'+sources.map(function(s){return '<span class="umat-src-chip">'+esc(s)+'</span>';}).join('')+'</div>';
-    d.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">'+(typeof _umatFormatAI==='function'?_umatFormatAI(text):esc(text))+'</div>'+srcs+'</div></div></div>';}
-  container.appendChild(d);container.scrollTop=container.scrollHeight;
-}
-function sendQ(q){
-  q=(q||'').trim();if(!q)return;
-  if(qRemaining()<=0){appendMsg('Rate limit reached. Please wait a moment before asking again.',false,document.getElementById('hub-msgs'),[]);return;}
-  qTimes.push(Date.now());updateRate();
-  var ctx=selMat.length>0?'[Referencing: '+selMat.map(function(m){return m.name;}).join(', ')+'] '+q:q;
-  var cid=parseInt(document.getElementById('hub-course-sel').value)||activeCID||1;
-  var msgs=document.getElementById('hub-msgs');
-  appendMsg(q,true,msgs);var hi=document.getElementById('hub-input');if(hi){hi.value='';hi.style.height='auto';}
-  var tid='h_'+Date.now();
-  var t=document.createElement('div');t.id=tid;t.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-typing"><span></span><span></span><span></span></div></div></div></div>';
-  msgs.appendChild(t);msgs.scrollTop=msgs.scrollHeight;
-  _umatStreamChat({
-    url:streamUrl,sesskey:moodleSesskey,courseid:cid,question:ctx,session_key:sessKey,
-    material_ids:selMat.map(function(m){return m.id;}),msgsId:'hub-msgs',
-    onMeta:function(meta){syncRemaining(meta.remaining);updateRate();},
-    onDone:function(meta){var e=document.getElementById(tid);if(e)e.parentNode.removeChild(e);syncRemaining(meta.remaining);updateRate();},
-    onError:function(err){
-      var e=document.getElementById(tid);if(e)e.parentNode.removeChild(e);
-      if(err.error==='rate_limit'){qTimes.pop();updateRate();}
-      appendMsg(err.message||'Connection error.',false,msgs,[]);
-    }
-  });
-}
-var hubIn=document.getElementById('hub-input');var hubSend=document.getElementById('hub-send');
-hubSend.addEventListener('click',function(){sendQ(hubIn.value);});
-hubIn.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();hubSend.click();}});
-hubIn.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,200)+'px';});
-document.getElementById('hub-msgs').addEventListener('click',function(e){var chip=e.target.closest('.umat-chip[data-q]');if(chip){hubIn.value=chip.dataset.q;hubSend.click();}});
-/* scroll-to-bottom */
-(function(){var ms=document.getElementById('hub-msgs'),sb=document.getElementById('hub-scroll-bottom');if(!ms||!sb)return;var t=null;ms.addEventListener('scroll',function(){if(t)clearTimeout(t);t=setTimeout(function(){sb.classList.toggle('visible',ms.scrollHeight-ms.scrollTop-ms.clientHeight<100?false:true);},80);});sb.addEventListener('click',function(){ms.scrollTo({top:ms.scrollHeight,behavior:'smooth'});});var mo=new MutationObserver(function(){sb.classList.toggle('visible',ms.scrollHeight-ms.scrollTop-ms.clientHeight<100?false:true);});mo.observe(ms,{childList:true,subtree:false});})();
+/* Chat + attachment drawer delegated to AMD umat_hub.js module.
+   Do NOT add duplicate sendQ / event listeners here — the AMD module owns them. */
 
 /* Attachment drawer (enhanced) — wait for AMD module to load */
 !function w(){if(typeof _umatInitAttachDrawer==='function'){window.hubDrawerCtrl=_umatInitAttachDrawer({

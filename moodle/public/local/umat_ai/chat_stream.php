@@ -219,8 +219,10 @@ curl_setopt_array($ch, [
                         $DB->insert_record('umat_ai_lecturer_notes', (object)[
                             'userid'      => $USER->id,
                             'courseid'    => $courseid,
+                            'session_key' => $sessionkey,
                             'query'       => $question,
                             'response'    => $fullanswer,
+                            'sources'     => json_encode($sources),
                             'timecreated' => time(),
                         ]);
                     } else {
