@@ -485,6 +485,18 @@ define([], function() {
                 streamRow.classList.remove('umat-msg-streaming');
             }
             _umatAppendSources(bubbleEl, (payload && payload.sources) || []);
+            if (streamRow) {
+                var wrap = streamRow.querySelector('.umat-msg-ai-wrap');
+                if (wrap && !wrap.querySelector('.umat-reply-btn')) {
+                    var rp = document.createElement('button');
+                    rp.className = 'umat-reply-btn';
+                    rp.type = 'button';
+                    rp.title = 'Reply';
+                    rp.innerHTML = '<span class="material-symbols-outlined">reply</span>';
+                    rp.addEventListener('click', _umatHandleReply);
+                    wrap.appendChild(rp);
+                }
+            }
         }
 
         var body = new FormData();

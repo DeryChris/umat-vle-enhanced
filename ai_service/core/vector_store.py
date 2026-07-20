@@ -4,11 +4,15 @@
 # If you upgrade ChromaDB, verify the import path for Settings.
 # ============================================================
 
+import logging
 import chromadb
 from chromadb.config import Settings as ChromaSettings
+from chromadb.errors import InvalidDimensionException
 from config import get_settings
 from typing import List, Tuple
 import requests
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -28,11 +32,48 @@ def get_chroma_client():
 
 def embed_texts(texts: List[str]) -> List[List[float]]:
     """Direct API call for embeddings — provider chosen by LLM_PROVIDER.
-    OpenRouter does not support embeddings, so openrouter falls back to
-    text-embedding-3-small via OpenAI's embedding API (requires OPENAI_API_KEY)."""
-    if settings.llm_provider in ("openai", "openrouter"):
+    OpenRouter routes through its own API (openrouter.ai/api/v1/embeddings)
+    using the OPENROUTER_API_KEY."""
+    if settings.llm_provider == "openrouter":
+        return _embed_texts_openrouter(texts)
+    if settings.llm_provider == "openai":
         return _embed_texts_openai(texts)
     return _embed_texts_gemini(texts)
+
+
+def _embed_texts_openrouter(texts: List[str]) -> List[List[float]]:
+    """Embed texts via OpenRouter's OpenAI-compatible embeddings API."""
+    embeddings = []
+    for i in range(0, len(texts), 100):
+        batch = [t[:8000] for t in texts[i:i + 100]]
+        try:
+            response = requests.post(
+                "https://openrouter.ai/api/v1/embeddings",
+                headers={
+                    "Authorization": f"Bearer {settings.openrouter_api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": settings.openrouter_site_url,
+                    "X-Title": settings.openrouter_site_name,
+                },
+                json={
+                    "model": "openai/text-embedding-3-small",
+                    "input": batch,
+                    "dimensions": 1536,
+                },
+                timeout=30,
+            )
+            logger.info(f"Embedding batch {i // 100}: status={response.status_code}")
+            if response.status_code == 200:
+                data = response.json().get("data", [])
+                embeddings.extend(item["embedding"] for item in data)
+            else:
+                logger.error(f"Embedding failed: {response.status_code} - {response.text[:200]}")
+                embeddings.extend([[0.0] * 1536] * len(batch))
+        except Exception as e:
+            logger.error(f"Embedding error for batch {i // 100}: {str(e)}")
+            embeddings.extend([[0.0] * 1536] * len(batch))
+
+    return embeddings
 
 
 def _embed_texts_openai(texts: List[str]) -> List[List[float]]:
@@ -122,6 +163,8 @@ class VectorStoreManager:
         # dimensions, so each provider keeps its own collection per course.
         if settings.llm_provider == "openai":
             return f"course_{course_id}_local"
+        if settings.llm_provider == "openrouter":
+            return f"course_{course_id}_openrouter"
         return f"course_{course_id}"
 
     def _resolve_collection(self, course_id: int):
@@ -142,6 +185,24 @@ class VectorStoreManager:
                 continue
         return client.get_collection(name=name)
 
+    def _add_batches(
+        self,
+        collection: object,
+        texts:      List[str],
+        embeddings: List[List[float]],
+        metadatas:  List[dict],
+        ids:        List[str],
+        batch_size: int = 100,
+    ) -> None:
+        """Internal: add documents/embeddings to a collection in batches."""
+        for i in range(0, len(texts), batch_size):
+            collection.add(
+                documents=texts[i:i + batch_size],
+                embeddings=embeddings[i:i + batch_size],
+                metadatas=metadatas[i:i + batch_size],
+                ids=ids[i:i + batch_size],
+            )
+
     def add_documents(
         self,
         course_id:  int,
@@ -149,7 +210,13 @@ class VectorStoreManager:
         metadatas:  List[dict],
         ids:        List[str],
     ) -> int:
-        """Embed and store text chunks in the course's ChromaDB collection."""
+        """Embed and store text chunks in the course's ChromaDB collection.
+
+        Auto-heals dimension mismatches: if the underlying embedder now outputs
+        a different vector size (e.g. after switching to a different provider or
+        embedding model), the old collection is automatically recreated with the
+        correct dimensionality.
+        """
         client    = get_chroma_client()
         embedder  = get_embedding_function()
         coll_name = self.get_collection_name(course_id)
@@ -161,15 +228,19 @@ class VectorStoreManager:
 
         embeddings = embedder.embed_documents(texts)
 
-        # Add in batches of 100
-        batch_size = 100
-        for i in range(0, len(texts), batch_size):
-            collection.add(
-                documents=texts[i:i + batch_size],
-                embeddings=embeddings[i:i + batch_size],
-                metadatas=metadatas[i:i + batch_size],
-                ids=ids[i:i + batch_size],
+        try:
+            self._add_batches(collection, texts, embeddings, metadatas, ids)
+        except InvalidDimensionException:
+            logger.warning(
+                "Dimension mismatch in collection '%s' — "
+                "recreating with new embedding dimension", coll_name,
             )
+            client.delete_collection(coll_name)
+            collection = client.create_collection(
+                name=coll_name,
+                metadata={"course_id": course_id},
+            )
+            self._add_batches(collection, texts, embeddings, metadatas, ids)
 
         return len(texts)
 
@@ -184,6 +255,12 @@ class VectorStoreManager:
 
         If material_ids is provided and non-empty, restrict search to only chunks
         belonging to those materials (using the material_id metadata field).
+
+        Returns an empty list if:
+        - No documents have been indexed for this course yet, OR
+        - The collection's embedding dimension differs from the current embedder
+          (e.g. after switching providers).  The dimension will be healed on the
+          next call to add_documents().
         """
         embedder = get_embedding_function()
 
@@ -205,9 +282,14 @@ class VectorStoreManager:
                 where=where_filter,
                 include=["documents", "metadatas", "distances"],
             )
+        except InvalidDimensionException:
+            logger.info(
+                "Dimension mismatch for collection '%s' — "
+                "returning empty results (will heal on next add)", coll_name,
+            )
+            return []
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"Dense search failed (likely dimension mismatch): {e}")
+            logger.warning(f"Dense search failed: {e}")
             return []
 
         documents = results["documents"][0] if results["documents"] else []

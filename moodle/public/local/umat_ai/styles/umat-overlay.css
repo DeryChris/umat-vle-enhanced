@@ -675,7 +675,7 @@
 .umat-course-tile-arrow .material-symbols-outlined{font-size:20px;color:var(--u-olv);}
 .umat-course-tile:hover .umat-course-tile-arrow .material-symbols-outlined{color:var(--u-p);}
 /* ==== SESSION TILES ==== */
-.umat-sessions-list{display:flex;flex-direction:column;gap:10px;padding:20px;overflow-y:auto;flex:1;}
+.umat-sessions-list{display:flex;flex-direction:column;gap:6px;padding:16px;overflow-y:auto;flex:1;}
 .umat-sessions-list::-webkit-scrollbar{width:5px;}
 .umat-sessions-list::-webkit-scrollbar-thumb{background:var(--u-olv);border-radius:3px;}
 .umat-session-tile{background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);
@@ -698,6 +698,11 @@
   border-radius:var(--u-r6);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .2s;}
 .umat-resume-btn:active{transform:scale(.95);}
 .umat-resume-btn:hover{background:var(--u-pb);}
+.umat-session-actions{display:flex;align-items:center;gap:6px;}
+.umat-del-session-btn{background:none;border:none;cursor:pointer;padding:6px;border-radius:var(--u-r6);color:var(--u-ter);transition:all .2s;display:flex;align-items:center;justify-content:center;}
+.umat-del-session-btn:hover{background:rgba(220,38,38,.12);color:#dc2626;}
+.umat-del-session-btn:active{transform:scale(.88);}
+.umat-del-session-btn .material-symbols-outlined{font-size:18px;}
 /* ==== ANALYTICS WIDGETS ==== */
 .umat-an-scroll{flex:1;overflow-y:auto;padding:20px;background:var(--u-sf);}
 .umat-an-scroll::-webkit-scrollbar{width:5px;}

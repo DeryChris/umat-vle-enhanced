@@ -162,10 +162,27 @@ function renderSessionTiles(sessions,container){
       '<div class="umat-session-tile-hdr"><span class="umat-session-badge">'+esc(s.course_short||'GEN')+'</span><span class="umat-session-time">'+esc(s.time_label)+'</span></div>'+
       '<h4>'+esc(s.course_name||'General')+'</h4><p>'+esc(s.preview)+'</p>'+
       '<div class="umat-session-tile-foot"><div class="umat-session-meta"><span class="material-symbols-outlined">chat</span>'+s.msg_count+' messages</div>'+
-      '<button class="umat-resume-btn" type="button">Resume →</button></div></div>';
+      '<div class="umat-session-actions"><button class="umat-resume-btn" type="button">Resume →</button>'+
+      '<button class="umat-del-session-btn" type="button" title="Delete session"><span class="material-symbols-outlined">delete</span></button></div></div></div>';
   }).join('');
   container.querySelectorAll('.umat-session-tile').forEach(function(t){
     t.addEventListener('click',function(){resumeSession(t.dataset.sk,parseInt(t.dataset.cid)||0,t.dataset.cn||'');});
+    var del=t.querySelector('.umat-del-session-btn');
+    if(del)del.addEventListener('click',function(e){
+      e.stopPropagation();
+      if(!confirm('Delete this conversation? This cannot be undone.'))return;
+      var btn=e.currentTarget;
+      btn.disabled=true;btn.innerHTML='<span class="material-symbols-outlined">hourglass_empty</span>';
+      ajax('local_umat_ai_delete_session',{session_key:t.dataset.sk},function(){
+        t.remove();
+        if(!container.querySelector('.umat-session-tile')){
+          container.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No past sessions yet.</p></div>';
+        }
+      },function(){
+        btn.disabled=false;btn.innerHTML='<span class="material-symbols-outlined">delete</span>';
+        alert('Could not delete session. Please try again.');
+      });
+    });
   });
 }
 function resumeSession(sk,cid,cname){
@@ -353,19 +370,26 @@ function updateRate(){var left=qRemaining();var e=document.getElementById('hub-r
 var _hubRateTimer=setInterval(updateRate,5000);
 function appendMsg(text,isUser,container,sources){
   var d=document.createElement('div');
-  if(isUser)d.innerHTML='<div class="umat-msg-user"><div class="umat-bubble-user"><p>'+esc(text)+'</p></div></div>';
+  var mid='msg_'+(++_msgIdCounter);
+  d.setAttribute('data-msg-id',mid);
+  d.setAttribute('data-msg-role',isUser?'user':'ai');
+  if(isUser)d.innerHTML='<div class="umat-msg-user"><div class="umat-bubble-user"><p>'+esc(text)+'</p></div><button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div>';
   else{var srcs='';if(sources&&sources.length)srcs='<div class="umat-src-chips">'+sources.map(function(s){return '<span class="umat-src-chip">'+esc(s)+'</span>';}).join('')+'</div>';
-    d.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">'+_umatFormatAI(text)+'</div>'+srcs+'</div></div></div>';}
+    d.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">'+_umatFormatAI(text)+'</div>'+srcs+'</div><button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div></div>';}
+  var rb=d.querySelector('.umat-reply-btn');
+  if(rb)rb.addEventListener('click',_umatHandleReply);
   container.appendChild(d);container.scrollTop=container.scrollHeight;
 }
 function sendQ(q){
   q=(q||'').trim();if(!q)return;
   if(qRemaining()<=0){appendMsg('Rate limit reached. Please wait a moment before asking again.',false,document.getElementById('hub-msgs'),[]);return;}
   qTimes.push(Date.now());updateRate();
+  var replyTxt=(typeof _getReplyContext==='function')?_getReplyContext():null;
+  if(replyTxt){q='[Replying to: "'+replyTxt+'"] '+q;_clearReplyContext();var rp=document.getElementById('umat-reply-preview');if(rp)rp.remove();}
   var ctx=selMat.length>0?'[Referencing: '+selMat.map(function(m){return m.name;}).join(', ')+'] '+q:q;
   var cid=parseInt(document.getElementById('hub-course-sel').value)||activeCID||defaultCID;
   var msgs=document.getElementById('hub-msgs');
-  appendMsg(q,true,msgs);document.getElementById('hub-input').value='';
+  appendMsg(q,true,msgs);var hi=document.getElementById('hub-input');if(hi){hi.value='';hi.style.height='auto';}
   var tid='h_'+Date.now();
   var t=document.createElement('div');t.id=tid;t.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-typing"><span></span><span></span><span></span></div></div></div></div>';
   msgs.appendChild(t);msgs.scrollTop=msgs.scrollHeight;
@@ -384,7 +408,10 @@ function sendQ(q){
 var hubIn=document.getElementById('hub-input');var hubSend=document.getElementById('hub-send');
 hubSend.addEventListener('click',function(){sendQ(hubIn.value);});
 hubIn.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();hubSend.click();}});
+hubIn.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,200)+'px';});
 document.getElementById('hub-msgs').addEventListener('click',function(e){var chip=e.target.closest('.umat-chip[data-q]');if(chip){hubIn.value=chip.dataset.q;hubSend.click();}});
+/* scroll-to-bottom */
+(function(){var ms=document.getElementById('hub-msgs'),sb=document.getElementById('hub-scroll-bottom');if(!ms||!sb)return;var t=null;ms.addEventListener('scroll',function(){if(t)clearTimeout(t);t=setTimeout(function(){sb.classList.toggle('visible',ms.scrollHeight-ms.scrollTop-ms.clientHeight<100?false:true);},80);});sb.addEventListener('click',function(){ms.scrollTo({top:ms.scrollHeight,behavior:'smooth'});});var mo=new MutationObserver(function(){sb.classList.toggle('visible',ms.scrollHeight-ms.scrollTop-ms.clientHeight<100?false:true);});mo.observe(ms,{childList:true,subtree:false});})();
 
 /* Attachment drawer (enhanced) */
 var hubDrawerCtrl = _umatInitAttachDrawer({

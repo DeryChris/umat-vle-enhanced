@@ -2449,8 +2449,8 @@ HTML;
           </select>
         </div>
         <div style="display:flex;flex:1;overflow:hidden;">
-          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
-            <div class="umat-msgs" id="hub-msgs">
+          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;">
+            <div class="umat-msgs" id="hub-msgs" style="padding-bottom:80px;">
               <div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>
                 <div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div>
                   <div class="umat-bubble-ai"><p>Hello! I'm your cross-course AI tutor. Ask me anything about your engineering studies or campus inquiries. Select a course above to get course-specific answers! 🎓</p></div>
@@ -2462,13 +2462,16 @@ HTML;
                 </div>
               </div>
             </div>
-            <div class="umat-chatbar">
-              <button class="umat-chatbar-btn" id="hub-attach-btn" type="button"><span class="material-symbols-outlined">add</span></button>
-              <textarea id="hub-input" class="umat-chatbar-input" placeholder="Ask anything about your courses…" rows="1" maxlength="900"></textarea>
-              <button class="umat-chatbar-btn" id="hub-mic-btn" type="button" title="Voice input"><span class="material-symbols-outlined">mic</span></button>
-              <button class="umat-chatbar-send" id="hub-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
+            <div class="umat-chat-overlay">
+              <button class="umat-scroll-bottom" id="hub-scroll-bottom" type="button"><span class="material-symbols-outlined">expand_more</span></button>
+              <div class="umat-chatbar">
+                <button class="umat-chatbar-btn" id="hub-attach-btn" type="button"><span class="material-symbols-outlined">add</span></button>
+                <textarea id="hub-input" class="umat-chatbar-input" placeholder="Ask anything about your courses…" rows="1" maxlength="900"></textarea>
+                <button class="umat-chatbar-btn" id="hub-mic-btn" type="button" title="Voice input"><span class="material-symbols-outlined">mic</span></button>
+                <button class="umat-chatbar-send" id="hub-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
+              </div>
+              <div class="umat-mat-bar" id="hub-mat-bar"></div>
             </div>
-            <div class="umat-mat-bar" id="hub-mat-bar"></div>
           </div>
         </div>
         <div class="umat-attach-drawer umat-drawer-enhanced" id="hub-attach-drawer">
@@ -3075,7 +3078,7 @@ function sendQ(q){
   var ctx=selMat.length>0?'[Referencing: '+selMat.map(function(m){return m.name;}).join(', ')+'] '+q:q;
   var cid=parseInt(document.getElementById('hub-course-sel').value)||activeCID||1;
   var msgs=document.getElementById('hub-msgs');
-  appendMsg(q,true,msgs);document.getElementById('hub-input').value='';
+  appendMsg(q,true,msgs);var hi=document.getElementById('hub-input');if(hi){hi.value='';hi.style.height='auto';}
   var tid='h_'+Date.now();
   var t=document.createElement('div');t.id=tid;t.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-typing"><span></span><span></span><span></span></div></div></div></div>';
   msgs.appendChild(t);msgs.scrollTop=msgs.scrollHeight;
@@ -3094,7 +3097,10 @@ function sendQ(q){
 var hubIn=document.getElementById('hub-input');var hubSend=document.getElementById('hub-send');
 hubSend.addEventListener('click',function(){sendQ(hubIn.value);});
 hubIn.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();hubSend.click();}});
+hubIn.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,200)+'px';});
 document.getElementById('hub-msgs').addEventListener('click',function(e){var chip=e.target.closest('.umat-chip[data-q]');if(chip){hubIn.value=chip.dataset.q;hubSend.click();}});
+/* scroll-to-bottom */
+(function(){var ms=document.getElementById('hub-msgs'),sb=document.getElementById('hub-scroll-bottom');if(!ms||!sb)return;var t=null;ms.addEventListener('scroll',function(){if(t)clearTimeout(t);t=setTimeout(function(){sb.classList.toggle('visible',ms.scrollHeight-ms.scrollTop-ms.clientHeight<100?false:true);},80);});sb.addEventListener('click',function(){ms.scrollTo({top:ms.scrollHeight,behavior:'smooth'});});var mo=new MutationObserver(function(){sb.classList.toggle('visible',ms.scrollHeight-ms.scrollTop-ms.clientHeight<100?false:true);});mo.observe(ms,{childList:true,subtree:false});})();
 
 /* Attachment drawer (enhanced) — wait for AMD module to load */
 !function w(){if(typeof _umatInitAttachDrawer==='function'){window.hubDrawerCtrl=_umatInitAttachDrawer({

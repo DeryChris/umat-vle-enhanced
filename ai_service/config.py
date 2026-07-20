@@ -36,8 +36,7 @@ class Settings(BaseSettings):
 
     # OpenRouter (used when llm_provider=openrouter)
     # OpenRouter uses OpenAI-compatible API format — reuses ChatOpenAI with custom base_url.
-    # Embeddings fall back to text-embedding-3-small via OpenAI since OpenRouter
-    # does not support embedding endpoints.
+    # Embeddings are routed through OpenRouter's own API at /api/v1/embeddings.
     openrouter_api_key: str = ""
     openrouter_model: str = "meta-llama/llama-4-maverick"
     openrouter_site_url: str = "https://umat.edu.gh"
@@ -120,7 +119,7 @@ def _validate_provider(s: Settings) -> None:
         _fail_startup(["\nLLM_PROVIDER is 'openai' but OPENAI_API_KEY is not set.",
                        "Get a key at https://platform.openai.com/api-keys, or set LLM_PROVIDER=gemini or openrouter."])
     if s.llm_provider == "openrouter" and not s.openrouter_api_key:
-        _fail_startup(["\nLLM_PROVIDER is 'openrouter' but OPENAI_API_KEY is not set.",
+        _fail_startup(["\nLLM_PROVIDER is 'openrouter' but OPENROUTER_API_KEY is not set.",
                        "Get your OpenRouter API key at https://openrouter.ai/keys."])
 
     # Validate lecturer provider (defaults to openai, falls back to llm_provider).
