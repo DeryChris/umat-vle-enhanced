@@ -24,35 +24,36 @@ class compute_topic_friction extends \core\task\scheduled_task {
     public function execute() {
         global $DB;
 
-        $since = time() - DAYSECS;
         $courses = $DB->get_fieldset_sql(
-            "SELECT DISTINCT courseid FROM {umat_ai_chat_logs} WHERE timecreated > :since",
-            ['since' => $since]
+            "SELECT DISTINCT courseid FROM {umat_ai_chat_logs}
+              WHERE role = 'student'"
         );
 
         if (empty($courses)) {
             return;
         }
 
-        // Fallback keyword dictionary for courses with no section names.
+        // Fallback keyword dictionary for questions that don't reference
+        // any course material.
         $fallbackKeywords = [
             'referenc'      => 'Referencing & Citations',
-            'citation'      => 'Referencing & Citations',
             'bibliograph'   => 'Referencing & Citations',
             'hypothesis'    => 'Hypothesis & Methodology',
-            'methodology'   => 'Hypothesis & Methodology',
+            'methodology'   => 'Methodology',
             'experiment'    => 'Experiment Design',
             'data analys'   => 'Data Analysis',
-            'statistic'     => 'Data Analysis',
-            'regression'    => 'Data Analysis',
-            'theory'        => 'Theoretical Concepts',
+            'statistic'     => 'Statistics',
+            'regression'    => 'Regression Analysis',
+            'correlation'   => 'Correlation',
             'definition'    => 'Definitions',
             'formula'       => 'Formulas & Equations',
-            'equation'      => 'Formulas & Equations',
+            'equation'      => 'Equations',
             'calculate'     => 'Calculations',
             'algorithm'     => 'Algorithms',
+            'theory'        => 'Theoretical Concepts',
+            'concept'       => 'Key Concepts',
             'code'          => 'Coding',
-            'program'       => 'Coding',
+            'program'       => 'Programming',
             'database'      => 'Databases',
             'sql'           => 'SQL',
             'network'       => 'Networking',
@@ -62,27 +63,31 @@ class compute_topic_friction extends \core\task\scheduled_task {
         $MAX_VOLUME = 50;
 
         foreach ($courses as $cid) {
+            // Get course fullname for context.
+            $courseFullname = $DB->get_field('course', 'fullname', ['id' => $cid]);
+            $courseShortname = $DB->get_field('course', 'shortname', ['id' => $cid]);
+
             $logs = $DB->get_records_sql(
                 "SELECT id, userid, question, sources, timecreated
                    FROM {umat_ai_chat_logs}
-                  WHERE courseid = :cid AND timecreated > :since AND role = 'student'
+                  WHERE courseid = :cid AND role = 'student'
                ORDER BY timecreated DESC",
-                ['cid' => $cid, 'since' => $since]
+                ['cid' => $cid]
             );
 
             if (empty($logs)) {
                 continue;
             }
 
-            // Build dynamic topic keywords from course section names.
-            $topickeywords = self::build_topic_keywords($cid, $DB);
-
-            // If the course has no custom sections, fall back to the generic dictionary.
-            if (empty($topickeywords)) {
-                $topickeywords = $fallbackKeywords;
-            }
-
             $topicdata = [];
+
+            // Pre-load unique material filenames for this course (for matching).
+            $materialNames = $DB->get_fieldset_sql(
+                "SELECT DISTINCT filename FROM {umat_ai_materials}
+                  WHERE courseid = :cid AND filename IS NOT NULL AND filename != ''
+               ORDER BY filename",
+                ['cid' => $cid]
+            );
 
             foreach ($logs as $log) {
                 $qtext   = strtolower($log->question);
@@ -92,21 +97,21 @@ class compute_topic_friction extends \core\task\scheduled_task {
 
                 $assigned = false;
 
-                // Strategy 1: Match against course section name keywords.
-                foreach ($topickeywords as $keyword => $topic) {
-                    if (strpos($qtext, $keyword) !== false) {
-                        self::add_to_topic($topicdata, $topic, $qid, $uid);
+                // --- Strategy 1: Extract material references from question text ---
+                // Many questions include "[Referencing: EC 1.pdf]" at the start.
+                if (preg_match('/\[referencing:\s*([^\]]+\.\w+)\]/i', $qtext, $m)) {
+                    $refName = self::clean_material_label(trim($m[1]));
+                    if ($refName) {
+                        self::add_to_topic($topicdata, $refName, $qid, $uid);
                         $assigned = true;
-                        break; // Use first (most specific) match.
                     }
                 }
 
-                // Strategy 2: Match using material filenames from chat sources.
+                // --- Strategy 2: Use material filenames from chat sources ---
                 if (!$assigned && !empty($sources) && is_array($sources)) {
                     foreach ($sources as $src) {
                         $name = is_string($src) ? $src : ($src['filename'] ?? $src['name'] ?? '');
                         if ($name) {
-                            // Use a cleaned-up version of the filename as the topic.
                             $topicLabel = self::clean_material_label($name);
                             if ($topicLabel) {
                                 self::add_to_topic($topicdata, $topicLabel, $qid, $uid);
@@ -117,22 +122,52 @@ class compute_topic_friction extends \core\task\scheduled_task {
                     }
                 }
 
-                // Strategy 3: Try matching against material filenames stored in the DB.
-                if (!$assigned) {
-                    $materialTopic = self::match_material_topic($qtext, $cid, $DB);
+                // --- Strategy 3: Match question text against material filenames ---
+                // Looks for significant words from filenames appearing in the question.
+                if (!$assigned && !empty($materialNames)) {
+                    $materialTopic = self::match_material_topic($qtext, $materialNames);
                     if ($materialTopic) {
                         self::add_to_topic($topicdata, $materialTopic, $qid, $uid);
                         $assigned = true;
                     }
                 }
 
+                // --- Strategy 4: Course section keyword matching ---
                 if (!$assigned) {
-                    self::add_to_topic($topicdata, 'General', $qid, $uid);
+                    $sectionTopic = self::match_section_topic($qtext, $cid, $DB);
+                    if ($sectionTopic) {
+                        self::add_to_topic($topicdata, $sectionTopic, $qid, $uid);
+                        $assigned = true;
+                    }
+                }
+
+                // --- Strategy 5: Generic keyword matching ---
+                if (!$assigned) {
+                    foreach ($fallbackKeywords as $keyword => $topic) {
+                        if (strpos($qtext, $keyword) !== false) {
+                            self::add_to_topic($topicdata, $topic, $qid, $uid);
+                            $assigned = true;
+                            break;
+                        }
+                    }
+                }
+
+                // --- Last resort: use course prefix + "Course Material" ---
+                if (!$assigned) {
+                    // Try to derive a meaningful category from the course name.
+                    $courseTopic = self::derive_course_topic($courseFullname, $courseShortname, $qtext);
+                    if ($courseTopic) {
+                        self::add_to_topic($topicdata, $courseTopic, $qid, $uid);
+                    } else {
+                        self::add_to_topic($topicdata, 'General', $qid, $uid);
+                    }
                 }
             }
 
             $topicRows = [];
             foreach ($topicdata as $topic => $data) {
+                // Expand short course prefix to full name for readability.
+                $displayTopic = self::expand_topic_label($topic, $courseFullname, $courseShortname);
                 $questionVolume = count($data['questions']);
                 $studentCount   = count($data['users']);
                 $uids           = array_keys($data['users']);
@@ -161,7 +196,7 @@ class compute_topic_friction extends \core\task\scheduled_task {
 
                 $topicRows[] = [
                     'courseid'        => $cid,
-                    'topic_label'     => $topic,
+                    'topic_label'     => $displayTopic,
                     'question_volume' => $questionVolume,
                     'friction_score'  => $frictionScore,
                     'student_count'   => $studentCount,
@@ -178,73 +213,8 @@ class compute_topic_friction extends \core\task\scheduled_task {
     }
 
     // ------------------------------------------------------------------
-    //  Helper: dynamic topic keyword builder from course structure.
+    //  Helpers: topic classification
     // ------------------------------------------------------------------
-
-    /**
-     * Build keyword => topic_label mapping from the course's section names.
-     *
-     * Each section name is tokenised into meaningful words (>= 4 chars, not
-     * stop words).  The section name itself becomes the topic label.
-     *
-     * @param int   $courseid
-     * @param \moodle_database $DB
-     * @return array  keyword => topic_label
-     */
-    private static function build_topic_keywords(int $courseid, \moodle_database $DB): array {
-        $sections = $DB->get_records_sql(
-            "SELECT id, name, summary
-               FROM {course_sections}
-              WHERE course = :cid
-           ORDER BY section ASC",
-            ['cid' => $courseid]
-        );
-
-        if (empty($sections)) {
-            return [];
-        }
-
-        $stopWords = [
-            'the','and','for','are','but','not','you','all','can','had',
-            'her','was','one','our','out','has','his','how','its','may',
-            'new','now','old','see','way','who','why','did','get','let',
-            'say','she','too','use','this','that','with','have','from',
-            'they','been','said','each','make','like','long','look',
-            'many','most','over','such','take','than','them','then',
-            'what','when','your','will','would','there','their','about',
-            'which','were','being','into','more','also','some','could',
-            'other','than','very','just','week','part','intro','week',
-            'lecture','chapter','topic','section','module','unit',
-        ];
-
-        $keywords = [];
-
-        foreach ($sections as $sec) {
-            // Use section name as the topic label; fall back to summary.
-            $label = trim($sec->name);
-            if (empty($label) || $label === 'General') {
-                continue;
-            }
-
-            // Tokenise the label into keywords.
-            $words = preg_split('/[^a-zA-Z0-9]+/', strtolower($label), -1, PREG_SPLIT_NO_EMPTY);
-            foreach ($words as $word) {
-                if (strlen($word) >= 4 && !in_array($word, $stopWords, true)) {
-                    $keywords[$word] = $label;
-                }
-            }
-
-            // Also add bigrams for multi-word section names (e.g. "e commerce").
-            for ($i = 0; $i < count($words) - 1; $i++) {
-                $bigram = $words[$i] . ' ' . $words[$i + 1];
-                if (strlen($bigram) >= 8) {
-                    $keywords[$bigram] = $label;
-                }
-            }
-        }
-
-        return $keywords;
-    }
 
     /**
      * Add a question/user pair to a topic bucket.
@@ -260,63 +230,197 @@ class compute_topic_friction extends \core\task\scheduled_task {
     /**
      * Clean a material filename into a readable topic label.
      *
-     * "EC 1.pdf" -> "EC 1"
-     * "Lecture-Notes-Chapter3.pdf" -> "Lecture Notes Chapter3"
-     * "1. E-Commerce Types.pdf" -> "E-Commerce Types"
+     * "EC 1.pdf"          -> "EC 1"
+     * "Lecture Notes Ch3" -> "Lecture Notes Ch3"
+     * "1. E-Commerce.pdf" -> "E-Commerce"
      */
     private static function clean_material_label(string $filename): string {
         // Remove extension.
         $name = preg_replace('/\.[^.]+$/', '', $filename);
-        // Remove leading numbering like "1.", "02 -", etc.
-        $name = preg_replace('/^\d+[\.\-\s]+/', '', $name);
+        // Remove leading numbering like "1.", "02 -".
+        $name = preg_replace('/^\s*\d+[\.\-\s)]+\s*/', '', $name);
         // Replace underscores and hyphens with spaces.
         $name = str_replace(['_', '-'], ' ', $name);
         // Collapse whitespace.
         $name = trim(preg_replace('/\s+/', ' ', $name));
-        // Title-case for display.
-        return ucwords($name);
+        if (empty($name)) {
+            return '';
+        }
+        // Normalise case: upper-case first letter of each word, rest lower.
+        $words = explode(' ', $name);
+        $result = [];
+        foreach ($words as $w) {
+            if (strlen($w) <= 2) {
+                // Keep short words (like "EC", "B2B", "C2C") as-is.
+                $result[] = strtoupper($w);
+            } else {
+                $result[] = ucfirst(strtolower($w));
+            }
+        }
+        return implode(' ', $result);
     }
 
     /**
-     * Try to match a question against stored material filenames.
+     * Match question text against a pre-loaded list of material filenames.
      *
-     * Looks up the umat_ai_materials table for this course and checks if
-     * any material filename words appear in the question text.
+     * Returns the best-matching material label if at least 2 significant
+     * words from the filename appear in the question text.
+     *
+     * @param string $qtext         Lowercased question text.
+     * @param array  $materialNames List of filenames from umat_ai_materials.
+     * @return string|null
      */
-    private static function match_material_topic(string $qtext, int $courseid, \moodle_database $DB): ?string {
-        $materials = $DB->get_records_sql(
-            "SELECT DISTINCT filename
-               FROM {umat_ai_materials}
-              WHERE courseid = :cid AND filename IS NOT NULL AND filename != ''",
-            ['cid' => $courseid],
-            0, 50
-        );
+    private static function match_material_topic(string $qtext, array $materialNames): ?string {
+        $best     = null;
+        $bestHits = 0;
+        $stopWords = ['the','and','for','are','not','this','that','with','from',
+                       'lecture','chapter','topic','section','module','unit'];
 
-        if (empty($materials)) {
-            return null;
-        }
-
-        $stopWords = ['the','and','for','are','not','this','that','with','from',' lecture',' chapter'];
-
-        foreach ($materials as $mat) {
-            $name = preg_replace('/\.[^.]+$/', '', $mat->filename);
-            $name = preg_replace('/^\d+[\.\-\s]+/', '', $name);
+        foreach ($materialNames as $filename) {
+            $name  = preg_replace('/\.[^.]+$/', '', $filename);
+            $name  = preg_replace('/^\d+[\.\-\s]+/', '', $name);
             $words = preg_split('/[^a-zA-Z0-9]+/', strtolower($name), -1, PREG_SPLIT_NO_EMPTY);
 
-            $matches = 0;
+            $hits = 0;
             foreach ($words as $word) {
-                if (strlen($word) >= 4 && !in_array($word, $stopWords, true)
+                if (strlen($word) >= 4
+                    && !in_array($word, $stopWords, true)
                     && strpos($qtext, $word) !== false) {
-                    $matches++;
+                    $hits++;
                 }
             }
 
-            // If at least 2 significant words from the filename appear in the question.
-            if ($matches >= 2) {
-                return self::clean_material_label($mat->filename);
+            if ($hits >= 2 && $hits > $bestHits) {
+                $best     = self::clean_material_label($filename);
+                $bestHits = $hits;
             }
         }
 
+        return $best;
+    }
+
+    /**
+     * Match question text against course section names.
+     *
+     * Returns the section name if 2+ significant section words appear
+     * in the question text.
+     */
+    private static function match_section_topic(string $qtext, int $courseid, \moodle_database $DB): ?string {
+        $sections = $DB->get_records_sql(
+            "SELECT name FROM {course_sections}
+              WHERE course = :cid
+                AND name IS NOT NULL
+                AND name != '' AND name != 'General'
+           ORDER BY section ASC",
+            ['cid' => $courseid]
+        );
+        if (empty($sections)) {
+            return null;
+        }
+
+        $stopWords = ['the','and','for','are','not','this','that','with',
+                       'from','lecture','chapter','topic','section','module',
+                       'unit','week','part','intro','one','two','three',
+                       'four','five','six','seven','eight','nine','ten'];
+
+        foreach ($sections as $sec) {
+            $words = preg_split('/[^a-zA-Z0-9]+/', strtolower($sec->name), -1, PREG_SPLIT_NO_EMPTY);
+            $hits  = 0;
+            foreach ($words as $word) {
+                if (strlen($word) >= 4
+                    && !in_array($word, $stopWords, true)
+                    && strpos($qtext, $word) !== false) {
+                    $hits++;
+                }
+            }
+            if ($hits >= 2) {
+                return ucwords(trim($sec->name));
+            }
+        }
         return null;
+    }
+
+    /**
+     * Derive a topic from the course name for questions that don't
+     * reference any specific material.
+     *
+     * Uses the course's shortname prefix (e.g. "EC" from "EC 101")
+     * to create a category like "EC Course Material".
+     */
+    private static function derive_course_topic(?string $fullname, ?string $shortname, string $qtext): ?string {
+        // Try to extract a meaningful prefix from the shortname.
+        if (!empty($shortname)) {
+            $parts = preg_split('/[^a-zA-Z]+/', $shortname, -1, PREG_SPLIT_NO_EMPTY);
+            foreach ($parts as $p) {
+                if (strlen($p) >= 2 && ctype_upper($p)) {
+                    // Check if the question mentions course-related terms.
+                    if (strpos($qtext, 'course') !== false
+                        || strpos($qtext, 'material') !== false
+                        || strpos($qtext, 'lecture') !== false
+                        || strpos($qtext, 'week') !== false
+                        || strpos($qtext, 'lesson') !== false) {
+                        return $p . ' Course Material';
+                    }
+                }
+            }
+        }
+
+        // Check for common question types.
+        if (strpos($qtext, 'practice') !== false
+            || strpos($qtext, 'quiz') !== false
+            || strpos($qtext, 'question') !== false) {
+            return 'Practice Questions';
+        }
+
+        if (strpos($qtext, 'summar') !== false) {
+            return 'Summaries';
+        }
+
+        if (strpos($qtext, 'explain') !== false
+            || strpos($qtext, 'what is') !== false
+            || strpos($qtext, 'key concept') !== false) {
+            return 'Key Concepts';
+        }
+
+        return null;
+    }
+
+    /**
+     * Expand a raw topic label with course name context for readability.
+     *
+     * "EC 1" + shortname="E-Commerce" → "E-Commerce 1"
+     * "EC" + fullname="Electronic Commerce" → "E-Commerce"
+     *
+     * Builds an acronym from the shortname words (E + Commerce → "EC")
+     * and replaces matches with the actual course name.
+     */
+    private static function expand_topic_label(string $topic, ?string $fullname, ?string $shortname): string {
+        if (empty($shortname)) {
+            return $topic;
+        }
+
+        // Build acronym from shortname: "E-Commerce" → "EC".
+        $nameParts = preg_split('/[^a-zA-Z0-9]+/', $shortname, -1, PREG_SPLIT_NO_EMPTY);
+        if (count($nameParts) < 2) {
+            return $topic;
+        }
+        $acronym = '';
+        foreach ($nameParts as $p) {
+            $acronym .= strtoupper($p[0]);
+        }
+
+        // Get a clean display base from shortname or fullname.
+        $displayBase = $shortname;
+        if (!empty($fullname) && preg_match('/\(([^)]+)\)/', $fullname, $fn)) {
+            $displayBase = trim($fn[1]);
+        }
+
+        // Check if topic starts with the acronym (e.g., "EC").
+        if (preg_match('/^' . preg_quote($acronym, '/') . '\s*(\d.*)?$/i', $topic, $m)) {
+            $suffix = isset($m[1]) ? ' ' . $m[1] : '';
+            return $displayBase . $suffix;
+        }
+
+        return $topic;
     }
 }
