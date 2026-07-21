@@ -136,15 +136,28 @@ class index_course_materials extends \core\task\scheduled_task {
                             $existing->timeindexed = time();
                             $DB->update_record('umat_ai_materials', $existing);
                         } else {
-                            $DB->insert_record('umat_ai_materials', (object)[
-                                'courseid'    => $courseid,
-                                'cmid'        => $contextMap[$ctx->id] ?? 0,
-                                'fileid'      => $file->get_id(),
-                                'filename'    => $file->get_filename(),
-                                'is_indexed'  => 1,
-                                'timeindexed' => time(),
-                                'timecreated' => time(),
+                            // Dedup by (courseid, filename) — avoid duplicate rows for same file
+                            $nameMatch = $DB->get_record('umat_ai_materials', [
+                                'courseid' => $courseid,
+                                'filename' => $file->get_filename(),
                             ]);
+                            if ($nameMatch) {
+                                $nameMatch->fileid      = $file->get_id();
+                                $nameMatch->is_indexed  = 1;
+                                $nameMatch->cmid        = $contextMap[$ctx->id] ?? $nameMatch->cmid;
+                                $nameMatch->timeindexed = time();
+                                $DB->update_record('umat_ai_materials', $nameMatch);
+                            } else {
+                                $DB->insert_record('umat_ai_materials', (object)[
+                                    'courseid'    => $courseid,
+                                    'cmid'        => $contextMap[$ctx->id] ?? 0,
+                                    'fileid'      => $file->get_id(),
+                                    'filename'    => $file->get_filename(),
+                                    'is_indexed'  => 1,
+                                    'timeindexed' => time(),
+                                    'timecreated' => time(),
+                                ]);
+                            }
                         }
 
                         mtrace("  [umat_ai]   Indexed: {$file->get_filename()} (course {$courseid})");

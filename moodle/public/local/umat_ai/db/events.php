@@ -19,6 +19,12 @@ $observers = [
         'internal'    => false,
     ],
     [
+        'eventname'   => '\core\event\course_module_deleted',
+        'callback'    => '\local_umat_ai\event\material_deleted::handle_resource_deleted',
+        'priority'    => 200,
+        'internal'    => false,
+    ],
+    [
         'eventname'   => '\mod_quiz\event\attempt_submitted',
         'callback'    => '\local_umat_ai\observer::quiz_submitted',
         'priority'    => 200,

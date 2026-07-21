@@ -21,7 +21,7 @@ class quizgen extends \external_api {
     public static function generate_quiz_draft_parameters() {
         return new \external_function_parameters([
             'courseid'              => new \external_value(PARAM_INT, 'Target course ID'),
-            'source_type'           => new \external_value(PARAM_ALPHA, '"text" or "material_id"'),
+            'source_type'           => new \external_value(PARAM_ALPHAEXT, '"text" or "material_id"'),
             'content'               => new \external_value(PARAM_RAW, 'Raw text content', VALUE_DEFAULT, null),
             'material_ids'          => new \external_value(PARAM_RAW, 'JSON array of material IDs', VALUE_DEFAULT, '[]'),
             'bloom_level'           => new \external_value(PARAM_RAW, 'Bloom level string or JSON distribution', VALUE_DEFAULT, 'understand'),

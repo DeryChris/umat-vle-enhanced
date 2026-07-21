@@ -155,7 +155,10 @@ class course_data extends \external_api {
         if ($cid > 0) {
             $ctx = \context_course::instance($cid);
             self::validate_context($ctx);
-            require_capability('local/umat_ai:chatwithai', $ctx);
+            // Allow lecturers (viewanalytics) OR students (chatwithai).
+            if (!has_capability('local/umat_ai:chatwithai', $ctx) && !has_capability('local/umat_ai:viewanalytics', $ctx)) {
+                require_capability('local/umat_ai:chatwithai', $ctx);
+            }
             $contextIds[] = (int)$ctx->id;
             $ctxToCm[(int)$ctx->id] = 0;
 
@@ -294,7 +297,7 @@ class course_data extends \external_api {
                 'timemodified' => new \external_value(PARAM_INT),
                 'time_ago'     => new \external_value(PARAM_TEXT),
                 'page_count'   => new \external_value(PARAM_INT),
-                'status'       => new \external_value(PARAM_ALPHA, 'Indexing status', VALUE_DEFAULT, 'not_indexed'),
+                'status'       => new \external_value(PARAM_ALPHAEXT, 'Indexing status', VALUE_DEFAULT, 'not_indexed'),
                 'material_id'  => new \external_value(PARAM_INT, 'umat_ai_materials record id', VALUE_DEFAULT, 0),
             ])
         )]);

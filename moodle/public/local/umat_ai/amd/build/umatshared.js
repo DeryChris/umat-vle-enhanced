@@ -32,12 +32,12 @@ define([], function() {
         /* HTML-escape remaining text */
         text = _umatEsc(text);
 
-        /* Inline formatting */
-        text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
-        text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
-        text = text.replace(/~~(.+?)~~/g, '<del>$1</del>');
-        text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+        /* Inline formatting (tolerates unclosed markers for smooth streaming) */
+        text = text.replace(/\*\*(.+?)(\*\*|$)/g, '<strong>$1</strong>');
+        text = text.replace(/__(.+?)(__|$)/g, '<strong>$1</strong>');
+        text = text.replace(/\*(.+?)(\*|$)/g, '<em>$1</em>');
+        text = text.replace(/~~(.+?)(~~|$)/g, '<del>$1</del>');
+        text = text.replace(/`([^`]+)(`|$)/g, '<code>$1</code>');
         text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
 
         /* Block-level: line-by-line */

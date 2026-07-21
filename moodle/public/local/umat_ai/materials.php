@@ -60,13 +60,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_FILES['material'])) {
             $stored = $fs->create_file_from_pathname($filerecord, $tempPath);
 
             // Record in umat_ai_materials with real Moodle file ID
-            $record = new stdClass();
-            $record->courseid    = $courseid;
-            $record->fileid      = $stored->get_id();
-            $record->filename    = $filename;
-            $record->is_indexed  = 0;
-            $record->timecreated = time();
-            $record->id = $DB->insert_record('umat_ai_materials', $record);
+            // Dedup by (courseid, filename) — update existing row instead of inserting duplicate
+            $existing = $DB->get_record('umat_ai_materials', [
+                'courseid' => $courseid,
+                'filename' => $filename,
+            ]);
+            if ($existing) {
+                $existing->fileid      = $stored->get_id();
+                $existing->is_indexed  = 0;
+                $existing->timecreated = time();
+                $DB->update_record('umat_ai_materials', $existing);
+                $record = $existing;
+            } else {
+                $record = new stdClass();
+                $record->courseid    = $courseid;
+                $record->fileid      = $stored->get_id();
+                $record->filename    = $filename;
+                $record->is_indexed  = 0;
+                $record->timecreated = time();
+                $record->id = $DB->insert_record('umat_ai_materials', $record);
+            }
 
             // Send to AI service for indexing (CURLFile — same pattern as index_course_materials.php)
             $config = local_umat_ai_get_service_config();

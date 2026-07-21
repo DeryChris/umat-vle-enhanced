@@ -88,15 +88,28 @@ class material_uploaded {
                             $existing->timeindexed = time();
                             $DB->update_record('umat_ai_materials', $existing);
                         } else {
-                            $DB->insert_record('umat_ai_materials', (object)[
-                                'courseid'    => $courseid,
-                                'cmid'        => $cmid,
-                                'fileid'      => $fileid,
-                                'filename'    => $filename,
-                                'is_indexed'  => 1,
-                                'timeindexed' => time(),
-                                'timecreated' => time(),
+                            // Dedup by (courseid, filename) — avoid duplicate rows for same file
+                            $nameMatch = $DB->get_record('umat_ai_materials', [
+                                'courseid' => $courseid,
+                                'filename' => $filename,
                             ]);
+                            if ($nameMatch) {
+                                $nameMatch->fileid      = $fileid;
+                                $nameMatch->is_indexed  = 1;
+                                $nameMatch->cmid        = $cmid;
+                                $nameMatch->timeindexed = time();
+                                $DB->update_record('umat_ai_materials', $nameMatch);
+                            } else {
+                                $DB->insert_record('umat_ai_materials', (object)[
+                                    'courseid'    => $courseid,
+                                    'cmid'        => $cmid,
+                                    'fileid'      => $fileid,
+                                    'filename'    => $filename,
+                                    'is_indexed'  => 1,
+                                    'timeindexed' => time(),
+                                    'timecreated' => time(),
+                                ]);
+                            }
                         }
                         $indexed++;
                     }

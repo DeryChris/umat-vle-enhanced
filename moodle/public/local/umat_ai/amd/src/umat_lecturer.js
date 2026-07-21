@@ -50,7 +50,7 @@ function renderLecCourses(courses,g){
       '</div>'+
       '<div class="yt-actions">'+
         '<button class="yt-btn" data-act="analytics" onclick="event.stopPropagation()"><span class="material-symbols-outlined">bar_chart</span>Analytics</button>'+
-        '<button class="yt-btn" data-act="library" onclick="event.stopPropagation()"><span class="material-symbols-outlined">local_library</span>Library</button>'+
+        '<button class="yt-btn" data-act="library" onclick="event.stopPropagation()"><span class="material-symbols-outlined">local_library</span>Resource Materials</button>'+
         (pending>0?'<button class="yt-btn" data-act="review" onclick="event.stopPropagation()" style="border-color:var(--u-ter);color:var(--u-ter);"><span class="material-symbols-outlined">fact_check</span>Review</button>':'')+
       '</div>'+
     '</div>';
@@ -96,7 +96,7 @@ var expand=document.getElementById('lec-expand');
 var panelDataLoaded=false;
 function updateBodyLock(){document.body.classList.toggle('umat-body-lock',!(!document.querySelector('.umat-ov.open,.umat-cp-ov.open')));}
 
-function openPanel(){if(window.innerWidth<640){cpOv.classList.remove('open');lecOv.classList.add('open');if(!anLoaded[CID||lecAnalyticsCourseId]){loadAnalytics(CID||lecAnalyticsCourseId);}}else{cpOv.classList.add('open');}fab.setAttribute('aria-expanded','true');if(!panelDataLoaded){loadPanelData();panelDataLoaded=true;}updateBodyLock();}
+function openPanel(){if(window.innerWidth<640){cpOv.classList.remove('open');lecOv.classList.add('open');if(!anLoaded[CID||lecAnalyticsCourseId]){loadAnalytics(CID||lecAnalyticsCourseId);}}else{cpOv.classList.add('open');}fab.setAttribute('aria-expanded','true');if(!panelDataLoaded){try{loadPanelData();panelDataLoaded=true;}catch(e){console.error('[umat] loadPanelData error:',e);}}updateBodyLock();}
 function closePanel(){cpOv.classList.remove('open');fab.setAttribute('aria-expanded','false');updateBodyLock();}
 function openDash(){closePanel();lecOv.classList.add('open');if(!anLoaded[CID||lecAnalyticsCourseId]){loadAnalytics(CID||lecAnalyticsCourseId);}updateBodyLock();}
 function closeDash(){lecOv.classList.remove('open');openPanel();}
@@ -130,7 +130,7 @@ function setLcpFeatureActive(name){
 }
 function renderLcpFeature(name){
   var meta={
-    'lec-analytics':['bar_chart','Analytics','Course performance'],'lec-struggle':['psychology','Struggle','Learning gaps'],'lec-courses':['menu_book','Courses','Your teaching courses'],'lec-library':['local_library','Library','Course materials'],'lec-sessions':['history','Sessions','AI interaction history'],'lec-review':['fact_check','Review','Pending AI outputs'],    'lec-issues':['flag','Issues','Student complaints'],
+    'lec-analytics':['bar_chart','Analytics','Course performance'],'lec-struggle':['psychology','Struggle','Learning gaps'],'lec-courses':['menu_book','Courses','Your teaching courses'],'lec-library':['local_library','Resource Materials','Course materials'],'lec-sessions':['history','Sessions','AI interaction history'],'lec-review':['fact_check','Review','Pending AI outputs'],    'lec-issues':['flag','Issues','Student complaints'],
     'lec-quiz-review':['rate_review','Quiz Review','Student quiz responses']
   }[name]||['widgets','Feature','Quick view'];
   showLcpPane('lcp-feature');setLcpFeatureActive(name);
@@ -333,7 +333,7 @@ function loadAnalytics(cid){
     if(detail)detail.style.display='';
     var anCourse=(UD.courses||[]).find(function(c){return c.id===cid;});
     if(csLabel)csLabel.textContent=anCourse?anCourse.fullname||anCourse.shortname:'Course '+cid;
-    document.getElementById('lec-an-course-label').textContent=cid===CID?CN:'Loading...';
+    var anLabel=document.getElementById('lec-an-course-label');if(anLabel)anLabel.textContent=cid===CID?CN:'Loading...';
     ajax('local_umat_ai_get_analytics',{courseid:cid,days:30},function(d){
       var s=function(id,v){var e=document.getElementById(id);if(e)e.textContent=v;};
       s('an-v-active',d.active_students+' / '+d.enrolled_students);
@@ -577,7 +577,7 @@ function loadLibrary(cid){
     if(lbl)lbl.addEventListener('click',openLecLibPicker);
   }
   g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading materials...</p></div>';
-  ajax('local_umat_ai_get_course_materials',{courseid:courseId},function(r){renderLibTiles(r.materials||[],g,courseId);if(typeof updateMaterialAnalysis==='function')updateMaterialAnalysis(courseId);if(typeof updateVideoGenerationStatus==='function')updateVideoGenerationStatus(courseId);},function(){console.error('[umat] lecturer loadLibrary failed');g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">error_outline</span><p>Could not load materials.</p></div>';});
+  ajax('local_umat_ai_get_course_materials',{courseid:courseId},function(r){renderLibTiles(r.materials||[],g,courseId);if(typeof updateMaterialAnalysis==='function')updateMaterialAnalysis(courseId);if(typeof updateVideoGenerationStatus==='function')updateVideoGenerationStatus(courseId);},function(e){console.error('[umat] lecturer loadLibrary failed:',e&&e.message||e);g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">error_outline</span><p>Could not load materials.</p></div>';});
 }
 function openLecLibPicker(){
   var ov=document.getElementById('lec-lib-cs-ov');

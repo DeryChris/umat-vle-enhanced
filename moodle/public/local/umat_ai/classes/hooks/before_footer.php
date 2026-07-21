@@ -9,7 +9,7 @@ class before_footer {
     private static function amd_script(string $module, string $func, array $args): string {
         $json = json_encode($args, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         $json = str_replace('</script>', '<\/script>', $json);
-        return '<script>M.util.js_pending("' . $module . '");!function w(){typeof require===\'function\'?require(["' . $module . '"],function(m){try{m.' . $func . '(' . $json . ');}catch(e){console.error("[umat]",e);}M.util.js_complete("' . $module . '");},function(){M.util.js_complete("' . $module . '");}):setTimeout(w,20);}();</script>';
+        return '<script>M.util.js_pending("' . $module . '");!function w(){typeof require===\'function\'?require(["' . $module . '"],function(m){try{m.' . $func . '(' . $json . ');}catch(e){console.error("[umat]",e);}M.util.js_complete("' . $module . '");},function(e){console.error("[umat] module load failed for ' . $module . ':",e);M.util.js_complete("' . $module . '");}):setTimeout(w,20);}();</script>';
     }
 
     public static function handle(before_footer_html_generation $hook): void {

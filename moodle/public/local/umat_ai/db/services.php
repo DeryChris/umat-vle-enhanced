@@ -45,7 +45,7 @@ $functions = [
     'local_umat_ai_get_course_materials' => [
         'classname'   => '\local_umat_ai\external\course_data', 'methodname' => 'get_course_materials',
         'description' => 'Get course files for library', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+        'loginrequired' => true, 'capabilities' => '',
     ],
     'local_umat_ai_reindex_material' => [
         'classname'   => '\local_umat_ai\external\course_data', 'methodname' => 'reindex_material',

@@ -22,7 +22,7 @@ class quiz_attempt extends \external_api {
             'graded_json'    => new \external_value(PARAM_RAW, 'JSON of grading results', VALUE_DEFAULT, ''),
             'score'          => new \external_value(PARAM_INT, 'Number of correct answers', VALUE_DEFAULT, null),
             'total'          => new \external_value(PARAM_INT, 'Total questions', VALUE_DEFAULT, null),
-            'status'         => new \external_value(PARAM_ALPHA, 'in_progress or completed', VALUE_DEFAULT, 'in_progress'),
+            'status'         => new \external_value(PARAM_ALPHAEXT, 'in_progress or completed', VALUE_DEFAULT, 'in_progress'),
         ]);
     }
 
@@ -193,7 +193,7 @@ class quiz_attempt extends \external_api {
                     'total'          => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                     'question_count' => new \external_value(PARAM_INT),
                     'graded_count'   => new \external_value(PARAM_INT),
-                    'status'         => new \external_value(PARAM_ALPHA),
+                    'status'         => new \external_value(PARAM_ALPHAEXT),
                     'timecreated'    => new \external_value(PARAM_INT),
                     'timemodified'   => new \external_value(PARAM_INT),
                 ])
@@ -324,7 +324,7 @@ class quiz_attempt extends \external_api {
                     'score'          => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                     'total'          => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                     'question_count' => new \external_value(PARAM_INT),
-                    'status'         => new \external_value(PARAM_ALPHA),
+                    'status'         => new \external_value(PARAM_ALPHAEXT),
                     'timecreated'    => new \external_value(PARAM_INT),
                     'timemodified'   => new \external_value(PARAM_INT),
                 ])
