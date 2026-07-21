@@ -202,7 +202,10 @@ define([], function() {
 
     function _umatHandleReply(e) {
         var btn = e.currentTarget;
-        var bubble = btn.closest('.umat-bubble-ai,.umat-bubble-user');
+        /* The reply button is a SIBLING of the bubble, not a child.
+           Search within the parent container (.umat-msg-ai-wrap or .umat-msg-user). */
+        var wrap = btn.closest('.umat-msg-ai-wrap,.umat-msg-user');
+        var bubble = wrap ? (wrap.querySelector('.umat-bubble-ai') || wrap.querySelector('.umat-bubble-user')) : null;
         if (!bubble) return;
         var txt = _umatGetReplyText(bubble);
         if (!txt) return;

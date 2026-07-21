@@ -377,7 +377,7 @@ function sendQuestion(q, msgsId){
 }
 
 /* ---- INTERACTIVE QUIZ ENGINE ---- */
-var qz={data:null,idx:0,answers:{},graded:{},active:false,attempt_id:null};
+var qz={data:null,idx:0,answers:{},graded:{},active:false,attempt_id:null,_pref:null,quizzes:{},currentId:null};
 setTimeout(function(){_umatLoadQuizState();},200);
 function _umatDetectQuiz(msgsId){
   var cont=document.getElementById(msgsId);if(!cont)return;
@@ -402,36 +402,47 @@ function _umatDetectQuiz(msgsId){
   last.querySelectorAll('p').forEach(function(p){
     if(p.textContent.trim()===''&&p.parentNode)p.parentNode.removeChild(p);
   });
-  if(qz.data)return;
+  // Check if this bubble's quiz was already processed (avoid duplicates)
+  var bubbleId=last.getAttribute('data-msg-id')||last.closest('.umat-msg-ai')?.getAttribute('data-msg-id')||'';
+  if(bubbleId&&qz._detectedBubbles&&qz._detectedBubbles[bubbleId])return;
   try{
     var data=JSON.parse(rawJson);
-    if(data&&data.quiz&&data.quiz.questions&&data.quiz.questions.length)_umatProcessQuiz(data, msgsId);
+    if(data&&data.quiz&&data.quiz.questions&&data.quiz.questions.length){
+      _umatProcessQuiz(data, msgsId);
+      if(!qz._detectedBubbles)qz._detectedBubbles={};
+      if(bubbleId)qz._detectedBubbles[bubbleId]=true;
+    }
   }catch(e){}
 }
 function _umatProcessQuiz(data, containerId){
-  qz.data=data.quiz;qz.idx=0;qz.answers=qz.answers||{};qz.graded=qz.graded||{};qz.active=true;
+  // Generate unique quiz ID and store quiz state
+  var quizId='qz_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
+  var qs={data:data.quiz,idx:0,answers:{},graded:{},attempt_id:null};
+  qz.quizzes[quizId]=qs;
   containerId=containerId||'ws-msgs';
   var c=document.getElementById(containerId);if(!c)return;
-  var total=qz.data.questions.length;
-  var gradedCnt=Object.keys(qz.graded).length;
-  var hasProg=gradedCnt>0;
-  var oldCard=c.querySelector('.umat-quiz-card');
-  if(oldCard)oldCard.parentNode.removeChild(oldCard);
-  var card=document.createElement('div');card.className='umat-quiz-card';
-  var progHtml='';
-  if(hasProg){
-    progHtml='<div class="umat-quiz-card-progress"><svg viewBox="0 0 36 36" width="32" height="32"><path d="M18 2a16 16 0 1 1 0 32 16 16 0 1 1 0-32" fill="none" stroke="var(--u-olv)" stroke-width="3"></path><path d="M18 2a16 16 0 1 1 0 32 16 16 0 1 1 0-32" fill="none" stroke="var(--u-p)" stroke-width="3" stroke-dasharray="100" stroke-dashoffset="'+(100-(gradedCnt/total*100))+'" stroke-linecap="round"></path><text x="18" y="20" text-anchor="middle" font-size="8" fill="var(--u-text)">'+gradedCnt+'/'+total+'</text></svg></div>';
-  } else {
-    progHtml='<div class="umat-quiz-card-progress"><svg viewBox="0 0 36 36" width="32" height="32"><circle cx="18" cy="18" r="16" fill="none" stroke="var(--u-olv)" stroke-width="3"/><circle cx="18" cy="18" r="16" fill="none" stroke="var(--u-p)" stroke-width="3" stroke-dasharray="100" stroke-dashoffset="100" stroke-linecap="round"/><text x="18" y="20" text-anchor="middle" font-size="8" fill="var(--u-ol)">0/'+total+'</text></svg></div>';
-  }
+  var total=qs.data.questions.length;
+  var card=document.createElement('div');card.className='umat-quiz-card';card.setAttribute('data-quiz-id',quizId);
+  var progHtml='<div class="umat-quiz-card-progress"><svg viewBox="0 0 36 36" width="32" height="32"><circle cx="18" cy="18" r="16" fill="none" stroke="var(--u-olv)" stroke-width="3"/><circle cx="18" cy="18" r="16" fill="none" stroke="var(--u-p)" stroke-width="3" stroke-dasharray="100" stroke-dashoffset="100" stroke-linecap="round"/><text x="18" y="20" text-anchor="middle" font-size="8" fill="var(--u-ol)">0/'+total+'</text></svg></div>';
   card.innerHTML=progHtml
-    +'<div class="umat-quiz-card-info"><strong>'+_umatEsc(data.quiz.title||'Practice Quiz')+'</strong>'
-    +'<span>'+total+' questions</span>'
-    +(hasProg?' \u00B7 <strong style="color:var(--u-p);">'+gradedCnt+'/'+total+' completed</strong>':'')
-    +'</span></div>'
-    +'<button class="umat-quiz-card-btn ws-start-quiz" type="button"><span class="material-symbols-outlined">'+(hasProg?'play_circle':'play_arrow')+'</span>'+(hasProg?'Continue Quiz':'Start Quiz')+'</button>';
+    +'<div class="umat-quiz-card-info"><strong>'+_umatEsc(qs.data.title||'Practice Quiz')+'</strong>'
+    +'<span>'+total+' questions</span></div>'
+    +'<button class="umat-quiz-card-btn ws-start-quiz" type="button"><span class="material-symbols-outlined">play_arrow</span>Start Quiz</button>';
   c.appendChild(card);
-  card.querySelector('.ws-start-quiz').addEventListener('click',function(){_umatOpenQuiz(containerId);});
+  card.querySelector('.ws-start-quiz').addEventListener('click',function(){_umatActivateQuiz(quizId,containerId);});
+  _umatSaveAllQuizState();
+}
+function _umatActivateQuiz(quizId,containerId){
+  var qs=qz.quizzes[quizId];if(!qs)return;
+  qz.data=qs.data;qz.idx=qs.idx;qz.answers=qs.answers;qz.graded=qs.graded;
+  qz.attempt_id=qs.attempt_id;qz.currentId=quizId;
+  _umatOpenQuiz(containerId);
+}
+function _umatSyncQuizState(){
+  if(qz.currentId&&qz.quizzes[qz.currentId]){
+    var qs=qz.quizzes[qz.currentId];
+    qs.idx=qz.idx;qs.answers=qz.answers;qs.graded=qz.graded;qs.attempt_id=qz.attempt_id;
+  }
 }
 function _umatGetQuizPrefix(containerId){
   return (containerId||'').indexOf('cp-')===0?'cp':'ws';
@@ -446,6 +457,8 @@ function _umatOpenQuiz(containerId){
   var title=_umatQ(pref,'quiz-title');if(title)title.textContent=qz.data.title||'Practice Quiz';
   var total=_umatQ(pref,'quiz-total');if(total)total.textContent=qz.data.questions.length;
   qz._pref=pref;
+  // Hide score pane if open
+  var scoreEl=_umatQ(pref,'quiz-score');if(scoreEl)scoreEl.style.display='none';
   // Find first unanswered question or show score if all done
   var found=false;
   for(var i=0;i<qz.data.questions.length;i++){
@@ -454,46 +467,102 @@ function _umatOpenQuiz(containerId){
   if(!found){_umatShowScore();return;}
   _umatRenderCircle();_umatRenderQuestion(qz.idx);
 }
-function _umatSaveQuizState(){
-  try{sessionStorage.setItem('qz_state',JSON.stringify({data:qz.data,answers:qz.answers,graded:qz.graded,idx:qz.idx,attempt_id:qz.attempt_id}));}catch(e){}
+function _umatSaveAllQuizState(){
+  _umatSyncQuizState();
+  try{sessionStorage.setItem('qz_all',JSON.stringify({quizzes:qz.quizzes,currentId:qz.currentId}));}catch(e){}
   if(qz._saveTimer)clearTimeout(qz._saveTimer);
   qz._saveTimer=setTimeout(function(){
-    if(!courseId||!qz.data||!qz.data.questions)return;
-    var allGraded=qz.data.questions.every(function(_,i){return qz.graded[i]!==undefined;});
-    var score=0,total=qz.data.questions.length;
-    Object.keys(qz.graded).forEach(function(k){if(qz.graded[k].correct)score++;});
-    require(['core/ajax'],function(Ajax){
-      Ajax.call([{methodname:'local_umat_ai_save_quiz_attempt',args:{
-        attempt_id:qz.attempt_id||0,courseid:courseId,session_key:sessionKey,
-        quiz_title:qz.data.title||'Practice Quiz',
-        questions_json:JSON.stringify(qz.data.questions),
-        answers_json:JSON.stringify(qz.answers),
-        graded_json:JSON.stringify(qz.graded),
-        score:allGraded?score:null,total:total,
-        status:allGraded?'completed':'in_progress'
-      }}])[0]
-      .done(function(r){
-        qz.attempt_id=r.attempt_id;
-        if(allGraded)try{sessionStorage.removeItem('qz_state');}catch(e){}
-      })
-      .fail(function(e){console.error('Quiz save failed:',e);});
+    if(!courseId)return;
+    // Save each in-progress quiz to server
+    Object.keys(qz.quizzes).forEach(function(qid){
+      var qs=qz.quizzes[qid];if(!qs||!qs.data||!qs.data.questions)return;
+      var allGraded=qs.data.questions.every(function(_,i){return qs.graded[i]!==undefined;});
+      var score=0,total=qs.data.questions.length;
+      Object.keys(qs.graded).forEach(function(k){if(qs.graded[k].correct)score++;});
+      if(allGraded&&!qs.attempt_id)return; // Already saved completed quiz
+      require(['core/ajax'],function(Ajax){
+        Ajax.call([{methodname:'local_umat_ai_save_quiz_attempt',args:{
+          attempt_id:qs.attempt_id||0,courseid:courseId,session_key:sessionKey,
+          quiz_title:qs.data.title||'Practice Quiz',
+          questions_json:JSON.stringify(qs.data.questions),
+          answers_json:JSON.stringify(qs.answers),
+          graded_json:JSON.stringify(qs.graded),
+          score:allGraded?score:null,total:total,
+          status:allGraded?'completed':'in_progress'
+        }}])[0]
+        .done(function(r){qs.attempt_id=r.attempt_id;if(allGraded)delete qz.quizzes[qid];})
+        .fail(function(e){console.error('Quiz save failed:',e);});
+      });
     });
   },800);
 }
 function _umatLoadQuizState(){
   try{
-    var raw=sessionStorage.getItem('qz_state');
+    // Try new multi-quiz format first
+    var raw=sessionStorage.getItem('qz_all');
+    if(raw){
+      var s=JSON.parse(raw);
+      if(s&&s.quizzes&&Object.keys(s.quizzes).length){
+        qz.quizzes=s.quizzes;qz.currentId=s.currentId||null;
+        // Restore active quiz state from currentId
+        if(qz.currentId&&qz.quizzes[qz.currentId]){
+          var qs=qz.quizzes[qz.currentId];
+          qz.data=qs.data;qz.answers=qs.answers||{};qz.graded=qs.graded||{};qz.idx=qs.idx||0;
+          qz.attempt_id=qs.attempt_id||null;qz.active=false;
+        }
+        // Render quiz cards for all quizzes
+        var containers=['cp-msgs','ws-msgs'];
+        for(var qid in qz.quizzes){
+          (function(quizId){
+            var qs=qz.quizzes[quizId];if(!qs||!qs.data)return;
+            var containerId=null;
+            for(var ci=0;ci<containers.length;ci++){
+              var c=document.getElementById(containers[ci]);if(c){containerId=containers[ci];break;}
+            }
+            if(!containerId)return;
+            var c=document.getElementById(containerId);
+            // Don't create duplicate cards
+            if(c.querySelector('[data-quiz-id="'+quizId+'"]'))return;
+            var total=qs.data.questions.length;
+            var gradedCnt=Object.keys(qs.graded).length;
+            var hasProg=gradedCnt>0;
+            var allDone=total>0&&gradedCnt===total;
+            var correct=0;
+            if(allDone)Object.keys(qs.graded).forEach(function(k){if(qs.graded[k].correct)correct++;});
+            var card=document.createElement('div');card.className='umat-quiz-card';card.setAttribute('data-quiz-id',quizId);
+            var pct=total?Math.round(gradedCnt/total*100):0;
+            var r=16,circ=2*Math.PI*r;
+            var progHtml='<div class="umat-quiz-card-progress"><svg viewBox="0 0 36 36" width="32" height="32"><path d="M18 2a16 16 0 1 1 0 32 16 16 0 1 1 0-32" fill="none" stroke="var(--u-olv)" stroke-width="3"></path><path d="M18 2a16 16 0 1 1 0 32 16 16 0 1 1 0-32" fill="none" stroke="var(--u-p)" stroke-width="3" stroke-dasharray="100" stroke-dashoffset="'+(100-pct)+'" stroke-linecap="round"></path><text x="18" y="20" text-anchor="middle" font-size="8" fill="var(--u-text)">'+(allDone?correct+'/'+total:gradedCnt+'/'+total)+'</text></svg></div>';
+            var infoText=total+' questions';
+            if(allDone)infoText+=' \u00B7 <strong style="color:var(--u-sec);">\u2713 Completed</strong> \u00B7 <strong style="color:var(--u-p);">'+correct+'/'+total+'</strong>';
+            else if(hasProg)infoText+=' \u00B7 <strong style="color:var(--u-p);">'+gradedCnt+'/'+total+' completed</strong>';
+            var btnLabel=allDone?'View Results':(hasProg?'Continue Quiz':'Start Quiz');
+            var btnIcon=allDone?'rate_review':(hasProg?'play_circle':'play_arrow');
+            card.innerHTML=progHtml
+              +'<div class="umat-quiz-card-info"><strong>'+_umatEsc(qs.data.title||'Practice Quiz')+'</strong>'
+              +'<span>'+infoText+'</span></div>'
+              +'<button class="umat-quiz-card-btn ws-start-quiz" type="button"><span class="material-symbols-outlined">'+btnIcon+'</span>'+btnLabel+'</button>';
+            c.appendChild(card);
+            card.querySelector('.ws-start-quiz').addEventListener('click',function(){_umatActivateQuiz(quizId,containerId);});
+          })(qid);
+        }
+        return;
+      }
+    }
+    // Fallback: legacy single-quiz format
+    raw=sessionStorage.getItem('qz_state');
     if(raw){
       var s=JSON.parse(raw);
       if(s&&s.data&&s.data.questions&&s.data.questions.length){
-        qz.data=s.data;qz.answers=s.answers||{};qz.graded=s.graded||{};qz.idx=s.idx||0;qz.active=false;qz.attempt_id=s.attempt_id||null;
+        var quizId='qz_legacy_'+Date.now();
+        qz.quizzes[quizId]={data:s.data,answers:s.answers||{},graded:s.graded||{},idx:s.idx||0,attempt_id:s.attempt_id||null};
+        qz.data=s.data;qz.answers=s.answers||{};qz.graded=s.graded||{};qz.idx=s.idx||0;
+        qz.active=false;qz.attempt_id=s.attempt_id||null;qz.currentId=quizId;
         var containers=['cp-msgs','ws-msgs'];
         for(var ci=0;ci<containers.length;ci++){
           var c=document.getElementById(containers[ci]);
           if(c){
-            var hasCard=c.querySelector('.umat-quiz-card');
-            if(!hasCard)_umatProcessQuiz({quiz:qz.data}, containers[ci]);
-            else _umatUpdateQuizCard();
+            _umatProcessQuiz({quiz:qz.data}, containers[ci]);
             break;
           }
         }
@@ -510,10 +579,13 @@ function _umatLoadQuizState(){
           var latest=attempts[0];
           var questions=JSON.parse(latest.questions_json||'[]');
           if(!questions.length)return;
-          qz.data={title:latest.quiz_title,questions:questions};
-          qz.answers=JSON.parse(latest.answers_json||'{}');
-          qz.graded=JSON.parse(latest.graded_json||'{}');
-          qz.idx=0;qz.active=false;qz.attempt_id=latest.attempt_id;
+          var quizData={title:latest.quiz_title,questions:questions};
+          var answers=JSON.parse(latest.answers_json||'{}');
+          var graded=JSON.parse(latest.graded_json||'{}');
+          var quizId='qz_srv_'+latest.attempt_id;
+          qz.quizzes[quizId]={data:quizData,answers:answers,graded:graded,idx:0,attempt_id:latest.attempt_id};
+          qz.data=quizData;qz.answers=answers;qz.graded=graded;
+          qz.idx=0;qz.active=false;qz.attempt_id=latest.attempt_id;qz.currentId=quizId;
           var msg='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">quiz</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">QUIZ RESUME</div><div class="umat-bubble-ai"><p>You have an incomplete quiz: <strong>'+_umatEsc(latest.quiz_title)+'</strong></p><div class="umat-chips-row"><button class="umat-chip" id="quiz-resume-yes" type="button">Yes, continue</button><button class="umat-chip" id="quiz-resume-no" type="button">No, start fresh</button></div></div></div></div>';
           var containers=['cp-msgs','ws-msgs'];
           for(var ci=0;ci<containers.length;ci++){
@@ -523,16 +595,16 @@ function _umatLoadQuizState(){
           setTimeout(function(){
             var yesBtn=document.getElementById('quiz-resume-yes');
             if(yesBtn)yesBtn.addEventListener('click',function(){
-              _umatProcessQuiz({quiz:qz.data}, 'ws-msgs');
-              _umatOpenQuiz('ws-msgs');
+              _umatActivateQuiz(quizId,'ws-msgs');
             });
             var noBtn=document.getElementById('quiz-resume-no');
             if(noBtn)noBtn.addEventListener('click',function(){
               require(['core/ajax'],function(Ajax){
                 Ajax.call([{methodname:'local_umat_ai_delete_quiz_attempt',args:{attempt_id:latest.attempt_id}}])[0].done(function(){});
               });
-              qz.data=null;qz.answers={};qz.graded={};qz.idx=0;qz.active=false;qz.attempt_id=null;
-              try{sessionStorage.removeItem('qz_state');}catch(e){}
+              delete qz.quizzes[quizId];
+              qz.data=null;qz.answers={};qz.graded={};qz.idx=0;qz.active=false;qz.attempt_id=null;qz.currentId=null;
+              try{sessionStorage.removeItem('qz_state');sessionStorage.removeItem('qz_all');}catch(e){}
             });
           },100);
         })
@@ -544,7 +616,8 @@ function _umatCloseQuiz(){
   var pref=qz._pref||'ws';
   var pane=_umatQ(pref,'quiz-pane');if(!pane)return;
   pane.style.display='none';qz.active=false;pane.classList.remove('umat-quiz-enter');
-  _umatSaveQuizState();
+  _umatSyncQuizState();
+  _umatSaveAllQuizState();
 }
 function _umatRenderCircle(){
   var pref=qz._pref||'ws';
@@ -635,7 +708,10 @@ function _umatRenderQuestion(idx){
   if(doc)doc.style.display='none';
 }
 function _umatUpdateQuizCard(){
-  var card=document.querySelector('.umat-quiz-card');if(!card)return;
+  var card=null;
+  if(qz.currentId)card=document.querySelector('.umat-quiz-card[data-quiz-id="'+qz.currentId+'"]');
+  if(!card)card=document.querySelector('.umat-quiz-card');
+  if(!card)return;
   var total=qz.data?qz.data.questions.length:0;
   var gradedCnt=Object.keys(qz.graded).length;
   var hasProg=gradedCnt>0;
@@ -680,7 +756,7 @@ function _umatGradeObjective(idx){
   if(q.type!=='objective'&&q.type!=='truefalse')return;
   var correct=qz.answers[idx]===q.correct;
   qz.graded[idx]={correct:correct,explanation:q.explanation||''};
-  _umatRenderQuestion(idx);_umatSaveQuizState();
+  _umatRenderQuestion(idx);_umatSaveAllQuizState();
   var allGraded=qz.data.questions.every(function(_,i){return qz.graded[i]!==undefined;});
   if(allGraded){setTimeout(_umatShowScore,600);}
 }
@@ -707,7 +783,7 @@ function _umatGradeText(idx){
     if(!explanation)explanation=correct?'Correct!':'Incorrect. Expected: '+_umatEsc(expected);
   }
   qz.graded[idx]={correct:correct,explanation:explanation,score:correct?100:0};
-  _umatRenderQuestion(idx);_umatSaveQuizState();
+  _umatRenderQuestion(idx);_umatSaveAllQuizState();
   var allGraded=qz.data.questions.every(function(_,i){return qz.graded[i]!==undefined;});
   if(allGraded){setTimeout(_umatShowScore,600);}
 }
@@ -726,8 +802,9 @@ function _umatShowScore(){
   var icon=_umatQ(pref,'quiz-score-icon');if(icon)icon.textContent=pct>=80?'emoji_events':(pct>=50?'sentiment_satisfied':'school');
   _umatRenderCircle();
   _umatUpdateQuizCard();
-  // Remove from sessionStorage so completed quiz doesn't restore on page load
-  try{sessionStorage.removeItem('qz_state');}catch(e){}
+  // Save completed quiz state
+  _umatSyncQuizState();
+  _umatSaveAllQuizState();
 }
 
 /* ---- Quiz History (renders in compact panel + workspace tab) ---- */
@@ -849,7 +926,7 @@ function _umatWireQuizBtns(pref){
     qz.answers={};qz.graded={};qz.idx=0;
     var score=_umatQ(pref,'quiz-score');if(score)score.style.display='none';
     _umatRenderQuestion(0);_umatUpdateQuizCard();
-    try{sessionStorage.removeItem('qz_state');}catch(e){}
+    _umatSyncQuizState();_umatSaveAllQuizState();
   });
   var review=_umatQ(pref,'quiz-review');if(review)review.addEventListener('click',function(){
     var score=_umatQ(pref,'quiz-score');if(score)score.style.display='none';
@@ -1718,7 +1795,7 @@ function pollUnreadCount(){
 }
 /* Save quiz state to server before page unload */
 window.addEventListener('beforeunload',function(){
-  if(qz.active&&courseId&&qz.data){_umatSaveQuizState();}
+  if(qz.active&&courseId&&qz.data){_umatSaveAllQuizState();}
 });
 
 /* ─── Message Nav Strip + Scroll-to-Bottom ─── */

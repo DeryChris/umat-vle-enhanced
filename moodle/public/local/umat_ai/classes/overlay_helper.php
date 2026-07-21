@@ -24,7 +24,7 @@ class overlay_helper {
 <div class="umat-sb">
     <div class="umat-sb-head">
         <div class="umat-sb-logo"><span class="material-symbols-outlined">school</span></div>
-        <div class="umat-sb-brand"><strong>UMaT Moodle</strong><span>AI Enhanced Learning</span></div>
+        <div class="umat-sb-brand"><strong>' . htmlspecialchars($platformName, ENT_QUOTES) . ' Moodle</strong><span>AI Enhanced Learning</span></div>
         <button class="umat-sb-close-btn" id="{$closeId}" type="button" title="Collapse sidebar">
             <span class="material-symbols-outlined">chevron_left</span>
         </button>
@@ -74,7 +74,7 @@ JS;
     }
 
 
-    public static function student_overlay(int $courseid, string $courseName, string $wwwroot, object $user, string $userData): string {
+    public static function student_overlay(int $courseid, string $courseName, string $wwwroot, object $user, string $userData, string $platformName = 'UMaT'): string {
         $safeName  = htmlspecialchars($courseName, ENT_QUOTES, 'UTF-8');
         $jsCid     = (int)$courseid;
         $jsName    = json_encode($courseName);
@@ -95,7 +95,7 @@ JS;
             ['id' => 'sessions',   'icon' => 'chat_bubble',   'label' => 'Sessions',   'active' => false],
             ['id' => 'report-issue', 'icon' => 'flag',       'label' => 'Report Issue','active' => false, 'badge' => 'responses'],
         ];
-        $sidebar = self::sidebar_html($tabs, 'New Session', 'stu-ws-close');
+        $sidebar = self::sidebar_html($tabs, 'New Session', 'stu-ws-close', $platformName);
         $sharedJs = self::shared_js('umat-student-ov', 'stu-ws-close');
 
         // Glassmorphism mobile tab bar (in-overlay)
@@ -116,7 +116,7 @@ JS;
 <!-- STUDENT FAB -->
 <button class="umat-fab umat-fab-pulse" id="umat-stu-fab" type="button" aria-label="Open AI Assistant">
   <span class="material-symbols-outlined">smart_toy</span>
-  <span class="umat-fab-tip">UMaT AI Assistant</span>
+  <span class="umat-fab-tip">' . htmlspecialchars($platformName, ENT_QUOTES) . ' AI Assistant</span>
 </button>
 
 <!-- COMPACT PANEL -->
@@ -143,11 +143,10 @@ JS;
     </div>
     <div class="umat-cp-feature-tabs" aria-label="Quick student tools" role="tablist">
       <button class="umat-cp-feature-tab active" data-cp-pane="cp-chat" type="button"><span class="material-symbols-outlined">smart_toy</span><span>Tutor</span></button>
-      <button class="umat-cp-feature-tab" data-cp-pane="cp-notes" type="button"><span class="material-symbols-outlined">note_add</span><span>Notes</span></button>
-      <button class="umat-cp-feature-tab" data-cp-pane="cp-resources" type="button"><span class="material-symbols-outlined">folder_open</span><span>Files</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="lectures" type="button"><span class="material-symbols-outlined">play_circle</span><span>Lectures</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="courses" type="button"><span class="material-symbols-outlined">menu_book</span><span>Courses</span></button>
-      <button class="umat-cp-feature-tab" data-cp-open="library" type="button"><span class="material-symbols-outlined">local_library</span><span>Resource Materials</span></button>
+      <button class="umat-cp-feature-tab" data-cp-open="library" type="button"><span class="material-symbols-outlined">local_library</span><span>Materials</span></button>
+      <button class="umat-cp-feature-tab" data-cp-pane="cp-notes" type="button"><span class="material-symbols-outlined">note_add</span><span>Notes</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="sessions" type="button"><span class="material-symbols-outlined">chat_bubble</span><span>Sessions</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="report-issue" type="button"><span class="material-symbols-outlined">flag</span><span>Report</span></button>
     </div>
@@ -489,7 +488,7 @@ JS;
 HTML;
     }
 
-    public static function lecturer_overlay(int $courseid, string $courseName, string $wwwroot, object $user, string $userData): string {
+    public static function lecturer_overlay(int $courseid, string $courseName, string $wwwroot, object $user, string $userData, string $platformName = 'UMaT'): string {
         $safe        = htmlspecialchars($courseName, ENT_QUOTES, 'UTF-8');
         $jsCid       = (int)$courseid;
         $jsName      = json_encode($courseName);
@@ -500,6 +499,7 @@ HTML;
         $uInit       = htmlspecialchars(strtoupper(mb_substr($user->firstname,0,1).mb_substr($user->lastname,0,1)), ENT_QUOTES);
         $logUrl      = $wwwroot . '/login/logout.php';
 
+        $safePlatform = htmlspecialchars($platformName, ENT_QUOTES);
         $sharedJs = self::shared_js('lec-ov', 'lec-ov-close');
         $streamUrl = json_encode('/local/umat_ai/chat_stream.php');
         $moodleSesskey = json_encode(sesskey());
@@ -561,7 +561,6 @@ HTML;
       <button class="umat-cp-feature-tab" data-lcp-open="lec-library" type="button"><span class="material-symbols-outlined">local_library</span><span>Resource Materials</span></button>
       <button class="umat-cp-feature-tab" data-lcp-open="lec-sessions" type="button"><span class="material-symbols-outlined">history</span><span>Sessions</span></button>
       <button class="umat-cp-feature-tab" data-lcp-open="lec-issues" type="button"><span class="material-symbols-outlined">flag</span><span>Issues</span></button>
-      <button class="umat-cp-feature-tab" data-lcp-open="lec-quiz-review" type="button"><span class="material-symbols-outlined">rate_review</span><span>Quiz Review</span></button>
     </div>
     <div class="umat-cp-pane active" id="lcp-insights" style="overflow-y:auto;">
       <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:9px;" id="lcp-kpi-grid">
@@ -664,7 +663,7 @@ HTML;
     <div class="umat-sb" id="lec-sb">
       <div class="umat-sb-head">
         <div class="umat-sb-logo"><span class="material-symbols-outlined">school</span></div>
-        <div class="umat-sb-brand"><strong>UMaT Moodle</strong><span>AI Enhanced Learning</span></div>
+        <div class="umat-sb-brand"><strong>{$safePlatform} Moodle</strong><span>AI Enhanced Learning</span></div>
         <button class="umat-sb-close-btn" id="lec-ov-close" type="button" title="Collapse sidebar">
           <span class="material-symbols-outlined">chevron_left</span>
         </button>
@@ -675,11 +674,11 @@ HTML;
       <nav class="umat-sb-nav">
         <button class="umat-sb-item active" data-lp="lec-home" type="button" title="Home"><span class="material-symbols-outlined">home</span><span class="umat-sb-item-lbl">Home</span></button>
         <button class="umat-sb-item" data-lp="lec-insights" type="button" title="Insights"><span class="material-symbols-outlined">psychology</span><span class="umat-sb-item-lbl">Insights</span></button>
+        <button class="umat-sb-item" data-lp="lec-quizgen" type="button" title="Quiz Generator"><span class="material-symbols-outlined">quiz</span><span class="umat-sb-item-lbl">Quiz Generator</span></button>
         <button class="umat-sb-item" data-lp="lec-courses" type="button" title="My Courses"><span class="material-symbols-outlined">menu_book</span><span class="umat-sb-item-lbl">My Courses</span></button>
         <button class="umat-sb-item" data-lp="lec-library" type="button" title="Resource Materials"><span class="material-symbols-outlined">local_library</span><span class="umat-sb-item-lbl">Resource Materials</span></button>
         <button class="umat-sb-item" data-lp="lec-sessions" type="button" title="Sessions"><span class="material-symbols-outlined">history</span><span class="umat-sb-item-lbl">Sessions</span></button>
         <button class="umat-sb-item" data-lp="lec-issues" type="button" title="Student Issues"><span class="material-symbols-outlined">flag</span><span class="umat-sb-item-lbl">Student Issues</span><span class="umat-sb-badge" id="sb-badge-new-issues" style="display:none;margin-left:auto;background:var(--u-ter);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;line-height:14px;min-width:16px;text-align:center;"></span></button>
-        <button class="umat-sb-item" data-lp="lec-quizgen" type="button" title="Quiz Generator"><span class="material-symbols-outlined">quiz</span><span class="umat-sb-item-lbl">Quiz Generator</span></button>
       </nav>
       <div class="umat-sb-divider"></div>
       <div class="umat-sb-foot">
@@ -2488,7 +2487,8 @@ _umatInitEsc([
 HTML;
     }
 
-    public static function hub_overlay(string $wwwroot, object $user, string $userData): string {
+    public static function hub_overlay(string $wwwroot, object $user, string $userData, string $platformName = 'UMaT'): string {
+        $safePlatform = htmlspecialchars($platformName, ENT_QUOTES);
         $uid     = (int)$user->id;
         $uName   = json_encode(fullname($user));
         $uInit   = htmlspecialchars(strtoupper(mb_substr($user->firstname,0,1).mb_substr($user->lastname,0,1)), ENT_QUOTES);
@@ -2527,7 +2527,7 @@ HTML;
     <div class="umat-sb" id="hub-sb">
       <div class="umat-sb-head">
         <div class="umat-sb-logo"><span class="material-symbols-outlined">school</span></div>
-        <div class="umat-sb-brand"><strong>UMaT Moodle</strong><span>AI Enhanced Learning</span></div>
+        <div class="umat-sb-brand"><strong>{$safePlatform} Moodle</strong><span>AI Enhanced Learning</span></div>
         <button class="umat-sb-close-btn" id="hub-ov-close" type="button" title="Collapse sidebar">
           <span class="material-symbols-outlined">chevron_left</span>
         </button>
@@ -3268,7 +3268,8 @@ _umatInitEsc([
 HTML;
     }
 
-    public static function admin_overlay(string $wwwroot, object $user): string {
+    public static function admin_overlay(string $wwwroot, object $user, string $platformName = 'UMaT'): string {
+        $safePlatform = htmlspecialchars($platformName, ENT_QUOTES);
         $uid     = (int)$user->id;
         $uName   = json_encode(fullname($user));
         $uInit   = htmlspecialchars(strtoupper(mb_substr($user->firstname,0,1).mb_substr($user->lastname,0,1)), ENT_QUOTES);
@@ -3296,7 +3297,7 @@ HTML;
     <div class="umat-sb" id="admin-sb">
       <div class="umat-sb-head">
         <div class="umat-sb-logo"><span class="material-symbols-outlined">admin_panel_settings</span></div>
-        <div class="umat-sb-brand"><strong>System Control</strong><span>UMaT AI Platform</span></div>
+        <div class="umat-sb-brand"><strong>System Control</strong><span>{$safePlatform} AI Platform</span></div>
         <button class="umat-sb-close-btn" id="admin-ov-close" type="button" title="Collapse sidebar">
           <span class="material-symbols-outlined">chevron_left</span>
         </button>
@@ -3795,6 +3796,20 @@ function _renderConfig(config,cId,mId){
   }).join('');
   document.getElementById(mId).innerHTML=cfgHtml;
 }
+/* Update platform display name across all visible overlays */
+function _applyPlatformName(name){
+  var escName=esc(name);
+  /* Update sidebar brand texts */
+  document.querySelectorAll('.umat-sb-brand strong').forEach(function(el){el.textContent=escName+' Moodle';});
+  /* Update admin sidebar subtitle */
+  document.querySelectorAll('.umat-sb-brand span').forEach(function(el){
+    if(el.textContent.indexOf('AI Platform')>-1)el.textContent=escName+' AI Platform';
+  });
+  /* Update FAB tooltips */
+  document.querySelectorAll('.umat-fab-tip').forEach(function(el){
+    el.textContent=escName+' AI Assistant';
+  });
+}
 function loadConfig(){
   ajax('local_umat_ai_admin_get_config',{},function(r){
     var config = typeof r.config_json === 'string' ? JSON.parse(r.config_json) : (r.config_json || {});
@@ -3815,6 +3830,8 @@ function _saveFeatures(containerId,msgId){
     if(r.status==='success'){
       msg.textContent='Settings saved successfully.';
       msg.style.color='var(--u-p)';
+      /* Live-update platform name if changed */
+      if(settings.platform_name)_applyPlatformName(settings.platform_name);
     }else{
       msg.textContent='Failed to save settings.';
       msg.style.color='var(--u-ter)';

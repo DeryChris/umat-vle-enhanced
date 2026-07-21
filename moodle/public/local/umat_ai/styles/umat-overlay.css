@@ -946,8 +946,8 @@
 .umat-quiz-back:hover{background:var(--u-p);color:#fff;transform:scale(1.08);}
 .umat-quiz-title{flex:1;font-size:15px;font-weight:700;color:var(--u-ons);}
 .umat-quiz-circle{padding:6px 12px 0 0;flex-shrink:0;display:flex;align-items:center;}
-.umat-quiz-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;align-items:center;}
-.umat-quiz-qcard{width:100%;max-width:min(480px,85%);background:rgba(255,255,255,.82);backdrop-filter:blur(22px) saturate(180%);border:1px solid rgba(255,255,255,.5);border-radius:22px;padding:24px;box-shadow:0 16px 48px rgba(0,53,128,.06),0 8px 20px rgba(0,107,47,.04);animation:uscale .3s var(--u-cb) forwards;}
+.umat-quiz-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;align-items:center;width:100%;box-sizing:border-box;}
+.umat-quiz-qcard{width:100%;max-width:480px;background:rgba(255,255,255,.82);backdrop-filter:blur(22px) saturate(180%);border:1px solid rgba(255,255,255,.5);border-radius:22px;padding:24px;box-shadow:0 16px 48px rgba(0,53,128,.06),0 8px 20px rgba(0,107,47,.04);animation:uscale .3s var(--u-cb) forwards;}
 .umat-quiz-qhead{font-size:17px;font-weight:650;color:var(--u-ons);line-height:1.5;margin-bottom:18px;}
 .umat-quiz-hint{display:flex;align-items:flex-start;gap:8px;padding:10px 14px;background:rgba(255,250,236,.6);border-radius:14px;margin-bottom:14px;font-size:13px;color:var(--u-onsv);border:1px solid rgba(228,201,135,.3);}
 .umat-quiz-hint .material-symbols-outlined{font-size:18px;color:#d4a847;flex-shrink:0;margin-top:1px;}
@@ -993,7 +993,7 @@
 .umat-quiz-nav-btn:disabled{opacity:.35;cursor:default;}
 .umat-quiz-nav-btn .material-symbols-outlined{font-size:18px;}
 .umat-quiz-nav-idx{font-size:12px;font-weight:600;color:var(--u-ol);}
-.umat-quiz-card{display:flex;align-items:center;gap:12px;padding:14px 18px;background:rgba(255,255,255,.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.5);border-radius:20px;margin-top:12px;box-shadow:0 12px 32px rgba(0,53,128,.05);animation:uscale .3s var(--u-cb) forwards;}
+.umat-quiz-card{display:flex;align-items:center;gap:12px;padding:14px 18px;max-width:min(480px,85%);background:rgba(255,255,255,.6);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.5);border-radius:20px;margin-top:12px;box-shadow:0 12px 32px rgba(0,53,128,.05);animation:uscale .3s var(--u-cb) forwards;}
 .umat-quiz-card-progress{flex-shrink:0;display:flex;align-items:center;}
 .umat-quiz-card-info{flex:1;}
 .umat-quiz-card-info strong{display:block;font-size:14px;color:var(--u-ons);}
