@@ -15,8 +15,25 @@ class before_footer {
     public static function handle(before_footer_html_generation $hook): void {
         global $PAGE, $COURSE, $USER, $CFG, $DB;
         try {
-            if (!isloggedin() || isguestuser()) return;
+            $wwwroot = rtrim($CFG->wwwroot, '/');
+            $pagelayout = $PAGE->pagelayout;
             $path = $PAGE->url->get_path();
+
+            /* ---- Login page: inject Login Issue Report toggle ---- */
+            $isLoginPage = $pagelayout === 'login' || strpos($path, '/login/') !== false;
+            if ($isLoginPage && !isloggedin()) {
+                $cssPath = $wwwroot . '/local/umat_ai/styles/umat-login-report.css';
+                $cssVer  = filemtime(__DIR__ . '/../../styles/umat-login-report.css');
+                $hook->add_html('<link rel="preconnect" href="https://fonts.gstatic.com">');
+                $hook->add_html('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">');
+                $hook->add_html('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">');
+                $hook->add_html('<link rel="stylesheet" href="' . $cssPath . '?v=' . $cssVer . '">');
+                $hook->add_html(\local_umat_ai\overlay_helper::login_report_overlay());
+                $hook->add_html(self::amd_script('local_umat_ai/umat_login_report','init',[]));
+                return;
+            }
+
+            if (!isloggedin() || isguestuser()) return;
             $isCourseArea = strpos($path, '/course/') !== false || strpos($path, '/mod/') !== false || strpos($path, '/section/') !== false;
             $courseid = 0;
             $ctx = $PAGE->context;
@@ -25,9 +42,9 @@ class before_footer {
             } elseif (!empty($COURSE->id) && $COURSE->id != SITEID) {
                 $courseid = (int)$COURSE->id;
             }
-            $wwwroot = rtrim($CFG->wwwroot, '/');
             $sskey   = sesskey();
             $streamUrl = '/local/umat_ai/chat_stream.php';
+            $platformName = get_config('local_umat_ai', 'platform_name') ?: 'UMaT';
             $sdts = filemtime(__DIR__ . '/../../styles/umat-struggle-dashboard.css');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-overlay.css?v=' . filemtime(__DIR__ . '/../../styles/umat-overlay.css') . '">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-responsive.css?v=' . filemtime(__DIR__ . '/../../styles/umat-responsive.css') . '">');
@@ -45,7 +62,7 @@ class before_footer {
             /* Admin check — site admins see only the admin FAB, bypass all other overlays */
             $isAdmin = has_capability('local/umat_ai:adminpanel', \context_system::instance());
             if ($isAdmin && get_config('local_umat_ai', 'enable_admin_fab')) {
-                $hook->add_html(\local_umat_ai\overlay_helper::admin_overlay($wwwroot, $USER));
+                $hook->add_html(\local_umat_ai\overlay_helper::admin_overlay($wwwroot, $USER, $platformName));
                 $hook->add_html(\local_umat_ai\overlay_helper::glassmorph_init_js());
                 return;
             }
@@ -56,22 +73,22 @@ class before_footer {
                 $isStudent  = !$isLecturer && is_enrolled($courseCtx, $USER, '', false);
                 if ($isLecturer && get_config('local_umat_ai', 'enable_lecturer_fab')) {
                     $userData = \local_umat_ai\user_data::preload_user_data($USER->id, $wwwroot);
-                    $hook->add_html(\local_umat_ai\overlay_helper::lecturer_overlay($courseid, $courseName, $wwwroot, $USER, $userData));
+                    $hook->add_html(\local_umat_ai\overlay_helper::lecturer_overlay($courseid, $courseName, $wwwroot, $USER, $userData, $platformName));
                     $hook->add_html(self::amd_script('local_umat_ai/umat_lecturer','init',['courseId'=>$courseid,'courseName'=>$courseName,'userData'=>$userData,'streamUrl'=>$streamUrl,'moodleSesskey'=>$sskey]));
                 } elseif ($isStudent && get_config('local_umat_ai','enable_student_fab')) {
                     $userData = \local_umat_ai\user_data::preload_user_data($USER->id, $wwwroot);
-                    $hook->add_html(\local_umat_ai\overlay_helper::student_overlay($courseid,$courseName,$wwwroot,$USER,$userData));
+                    $hook->add_html(\local_umat_ai\overlay_helper::student_overlay($courseid,$courseName,$wwwroot,$USER,$userData,$platformName));
                     $hook->add_html(self::amd_script('local_umat_ai/umat_student','init',['courseId'=>$courseid,'courseName'=>$courseName,'userData'=>$userData,'streamUrl'=>$streamUrl,'moodleSesskey'=>$sskey]));
                 }
             } elseif (!$isCourseArea) {
                 $isLecturerAnywhere = $DB->record_exists_sql("SELECT 1 FROM {role_assignments} ra JOIN {role} r ON r.id=ra.roleid WHERE ra.userid=:uid AND r.shortname IN ('editingteacher','teacher','manager')",['uid'=>$USER->id]);
                 if ($isLecturerAnywhere && get_config('local_umat_ai','enable_lecturer_fab')) {
                     $userData = \local_umat_ai\user_data::preload_user_data($USER->id,$wwwroot);
-                    $hook->add_html(\local_umat_ai\overlay_helper::lecturer_overlay(0, 'All Courses', $wwwroot, $USER, $userData));
+                    $hook->add_html(\local_umat_ai\overlay_helper::lecturer_overlay(0, 'All Courses', $wwwroot, $USER, $userData, $platformName));
                     $hook->add_html(self::amd_script('local_umat_ai/umat_lecturer','init',['courseId'=>0,'courseName'=>'All Courses','userData'=>$userData,'streamUrl'=>$streamUrl,'moodleSesskey'=>$sskey]));
                 } elseif (get_config('local_umat_ai','enable_hub_fab')) {
                     $userData = \local_umat_ai\user_data::preload_user_data($USER->id,$wwwroot);
-                    $hook->add_html(\local_umat_ai\overlay_helper::hub_overlay($wwwroot,$USER,$userData));
+                    $hook->add_html(\local_umat_ai\overlay_helper::hub_overlay($wwwroot,$USER,$userData,$platformName));
                     $hook->add_html(self::amd_script('local_umat_ai/umat_hub','init',['userData'=>$userData,'userId'=>(int)$USER->id,'streamUrl'=>$streamUrl,'moodleSesskey'=>$sskey]));
                 }
             }

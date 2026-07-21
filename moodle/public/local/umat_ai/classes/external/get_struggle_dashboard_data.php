@@ -342,7 +342,7 @@ class get_struggle_dashboard_data extends \external_api {
 
         $questions = [];
         foreach ($logs as $log) {
-            $text = trim($log->question);
+            $text = preg_replace('/^\[Referencing:\s*[^\]]+\]\s*/i', '', trim($log->question));
             if (!$text) continue;
             $key = md5($text);
             if (!isset($questions[$key])) {

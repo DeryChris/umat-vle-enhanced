@@ -1,85 +1,111 @@
 {{!
     Template: local/umat_ai/templates/struggle_dashboard.mustache
-    Lecturer Insights Dashboard — 5-zone actionable insights layout.
+    Lecturer Insights Dashboard — Card-based layout with charts.
     Context: stream_url, sesskey
     Rendered via JS AMD module struggle_dashboard.init(courseid)
 }}
 <div class="umat-insights-pane sd-dashboard" data-stream-url="{{stream_url}}" data-sesskey="{{sesskey}}">
 
-  <!-- ZONE 1: Priority Briefing -->
-  <section class="ins-zone" id="ins-priority-zone">
-    <h3 class="ins-zone-title">
-      <span class="material-symbols-outlined">notification_important</span>
-      What Needs Your Attention
-    </h3>
-    <div id="ins-priority-actions" class="ins-priority-list"></div>
+  <!-- ROW 1: Course Pulse Stat Tiles -->
+  <section class="ins-cards-row" id="ins-stat-tiles">
+    <div class="ins-stat-tile ins-stat-loading" data-metric="students">
+      <div class="ins-stat-icon"><span class="material-symbols-outlined">groups</span></div>
+      <div class="ins-stat-val" id="ins-stat-students">--</div>
+      <div class="ins-stat-label">Students</div>
+    </div>
+    <div class="ins-stat-tile ins-stat-loading" data-metric="at-risk">
+      <div class="ins-stat-icon ins-stat-icon-warn"><span class="material-symbols-outlined">warning</span></div>
+      <div class="ins-stat-val" id="ins-stat-at-risk">--</div>
+      <div class="ins-stat-label">At Risk</div>
+    </div>
+    <div class="ins-stat-tile ins-stat-loading" data-metric="quiz">
+      <div class="ins-stat-icon ins-stat-icon-ok"><span class="material-symbols-outlined">quiz</span></div>
+      <div class="ins-stat-val" id="ins-stat-quiz">--</div>
+      <div class="ins-stat-label">Avg Quiz</div>
+    </div>
+    <div class="ins-stat-tile ins-stat-loading" data-metric="active">
+      <div class="ins-stat-icon ins-stat-icon-blue"><span class="material-symbols-outlined">person</span></div>
+      <div class="ins-stat-val" id="ins-stat-active">--</div>
+      <div class="ins-stat-label">Active This Week</div>
+    </div>
   </section>
 
-  <!-- ZONE 2: Struggle Map -->
-  <section class="ins-zone" id="ins-struggle-zone">
-    <h3 class="ins-zone-title">
-      <span class="material-symbols-outlined">map</span>
-      Where Students Are Struggling
-    </h3>
-    <div id="ins-struggle-areas" class="ins-struggle-list"></div>
-    <div id="ins-section-breakdown" class="ins-section-bars"></div>
-    <div id="ins-material-struggle" class="ins-material-list"></div>
+  <!-- ROW 2: Risk Donut + Questions Trend -->
+  <section class="ins-cards-row ins-chart-row">
+    <div class="ins-chart-card">
+      <h4 class="ins-card-title"><span class="material-symbols-outlined">donut_large</span> Student Risk Distribution</h4>
+      <div class="ins-donut-wrap" id="ins-risk-donut">
+        <div class="ins-empty">No student data yet.</div>
+      </div>
+    </div>
+    <div class="ins-chart-card">
+      <h4 class="ins-card-title"><span class="material-symbols-outlined">show_chart</span> Question Activity</h4>
+      <div class="ins-sparkline-wrap" id="ins-question-sparkline">
+        <div class="ins-empty">No question data yet.</div>
+      </div>
+    </div>
   </section>
 
-  <!-- ZONE 3: Student Dossiers -->
-  <section class="ins-zone" id="ins-students-zone">
-    <h3 class="ins-zone-title">
-      <span class="material-symbols-outlined">groups</span>
-      Your Students
-    </h3>
+  <!-- ROW 3: Topic Struggle Heatmap -->
+  <section class="ins-full-card" id="ins-heatmap-card">
+    <h4 class="ins-card-title">
+      <span class="material-symbols-outlined">heatmap</span> Topic Struggle Heatmap
+    </h4>
+    <div id="ins-topic-heatmap" class="ins-heatmap-grid">
+      <div class="ins-empty">No struggle data yet.</div>
+    </div>
+  </section>
+
+  <!-- ROW 4: At-Risk Students + Common Questions -->
+  <section class="ins-cards-row">
+    <div class="ins-half-card">
+      <h4 class="ins-card-title">
+        <span class="material-symbols-outlined">person_off</span> Students Needing Attention
+        <span class="ins-badge" id="ins-at-risk-count">0</span>
+      </h4>
+      <div class="ins-filter-row" id="ins-filters">
+        <button class="ins-chip ins-chip-active" data-filter="all" onclick="window.struggleDashboard.setFilter('all', this)">All</button>
+        <button class="ins-chip" data-filter="disengaged" onclick="window.struggleDashboard.setFilter('disengaged', this)">
+          <span class="material-symbols-outlined">person_off</span> Disengaged
+        </button>
+        <button class="ins-chip" data-filter="struggling" onclick="window.struggleDashboard.setFilter('struggling', this)">
+          <span class="material-symbols-outlined">psychology</span> Struggling
+        </button>
+        <button class="ins-chip" data-filter="failing" onclick="window.struggleDashboard.setFilter('failing', this)">
+          <span class="material-symbols-outlined">trending_down</span> Failing
+        </button>
+      </div>
+      <div id="ins-student-list" class="ins-student-list-compact">
+        <div class="ins-empty">No student data loaded yet.</div>
+      </div>
+    </div>
+    <div class="ins-half-card">
+      <h4 class="ins-card-title">
+        <span class="material-symbols-outlined">question_answer</span> Common Questions
+      </h4>
+      <div id="ins-common-questions" class="ins-questions-list-compact">
+        <div class="ins-empty">No common questions yet.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROW 5: NLQ Search -->
+  <section class="ins-full-card">
+    <h4 class="ins-card-title">
+      <span class="material-symbols-outlined">smart_toy</span> Ask About Your Students
+    </h4>
     <div class="ins-nlq-bar">
       <input type="text" id="ins-nlq-input" class="ins-nlq-input"
-        placeholder="Ask about student performance..." />
+        placeholder="e.g. Who is struggling with payment systems?" />
       <button class="ins-nlq-btn" onclick="window.struggleDashboard.submitNLQ()">
         <span class="material-symbols-outlined">search</span>
       </button>
       <div class="ins-nlq-spinner" id="ins-nlq-spinner" style="display:none;"></div>
     </div>
     <div id="ins-nlq-response" class="ins-nlq-response umat-ai-stream-panel" style="display:none;"></div>
-    <div class="ins-filter-row" id="ins-filters">
-      <button class="ins-chip ins-chip-active" data-filter="all" onclick="window.struggleDashboard.setFilter('all', this)">All</button>
-      <button class="ins-chip" data-filter="disengaged" onclick="window.struggleDashboard.setFilter('disengaged', this)">
-        <span class="material-symbols-outlined">person_off</span> Disengaged
-      </button>
-      <button class="ins-chip" data-filter="struggling" onclick="window.struggleDashboard.setFilter('struggling', this)">
-        <span class="material-symbols-outlined">psychology</span> Struggling
-      </button>
-      <button class="ins-chip" data-filter="failing" onclick="window.struggleDashboard.setFilter('failing', this)">
-        <span class="material-symbols-outlined">trending_down</span> Failing
-      </button>
-      <button class="ins-chip" data-filter="issues" onclick="window.struggleDashboard.setFilter('issues', this)">
-        <span class="material-symbols-outlined">report</span> Issues
-      </button>
-    </div>
-    <div id="ins-student-list" class="ins-student-cards">
-      <div class="ins-empty">No student data loaded yet.</div>
-    </div>
   </section>
 
-  <!-- ZONE 4: Question Radar -->
-  <section class="ins-zone" id="ins-questions-zone">
-    <h3 class="ins-zone-title">
-      <span class="material-symbols-outlined">question_answer</span>
-      What Students Are Asking
-    </h3>
-    <div id="ins-common-questions" class="ins-question-list"></div>
-  </section>
-
-  <!-- ZONE 5: Course Vitals -->
-  <section class="ins-zone" id="ins-vitals-zone">
-    <h3 class="ins-zone-title">
-      <span class="material-symbols-outlined">monitor_heart</span>
-      Course Pulse
-    </h3>
-    <div id="ins-course-pulse" class="ins-pulse-grid"></div>
-  </section>
-
-  <!-- Student Detail Panel -->
+  <!-- Student Detail Panel (overlay) -->
   <div class="ins-detail-panel" id="ins-detail-panel" style="display:none;">
     <div class="ins-detail-header">
       <div>
@@ -133,9 +159,9 @@
 
   <!-- Skeleton -->
   <div class="ins-skeleton" id="ins-skeleton" style="display:none;">
-    <div class="ins-shimmer-block" style="width:100%;height:80px;"></div>
-    <div class="ins-shimmer-block" style="width:100%;height:120px;"></div>
+    <div class="ins-shimmer-block" style="width:100%;height:70px;"></div>
     <div class="ins-shimmer-block" style="width:100%;height:200px;"></div>
     <div class="ins-shimmer-block" style="width:100%;height:150px;"></div>
+    <div class="ins-shimmer-block" style="width:100%;height:200px;"></div>
   </div>
 </div>

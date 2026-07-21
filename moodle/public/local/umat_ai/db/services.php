@@ -318,6 +318,20 @@ $functions = [
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
     ],
 
+    /* ---- Login Issue Report (no auth required) ---- */
+    'local_umat_ai_login_lookup_courses' => [
+        'classname'   => '\local_umat_ai\external\login_issue', 'methodname' => 'lookup_courses',
+        'description' => 'Look up a student\'s courses by username/ID (login page, no auth)',
+        'type' => 'read', 'ajax' => true,
+        'loginrequired' => false, 'capabilities' => '',
+    ],
+    'local_umat_ai_login_submit_issue' => [
+        'classname'   => '\local_umat_ai\external\login_issue', 'methodname' => 'submit_issue',
+        'description' => 'Submit a login issue report (login page, no auth)',
+        'type' => 'write', 'ajax' => true,
+        'loginrequired' => false, 'capabilities' => '',
+    ],
+
     /* ---- Lecture Transcription ---- */
     'local_umat_ai_upload_recording' => [
         'classname'   => '\local_umat_ai\external\transcription', 'methodname' => 'upload_recording',

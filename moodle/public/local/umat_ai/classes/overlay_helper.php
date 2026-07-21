@@ -4,7 +4,7 @@ namespace local_umat_ai;
 
 class overlay_helper {
 
-    public static function sidebar_html(array $tabs, string $newBtnLabel, string $closeId): string {
+    public static function sidebar_html(array $tabs, string $newBtnLabel, string $closeId, string $platformName = 'UMaT'): string {
         global $CFG;
         $wwwroot = rtrim($CFG->wwwroot, '/');
         $logUrl  = $wwwroot . '/login/logout.php';
@@ -616,9 +616,37 @@ HTML;
           </div>
         </div>
       </div>
-      <div class="umat-chatbar">
-        <textarea id="lcp-input" class="umat-chatbar-input" placeholder="Ask about your course…" rows="1" maxlength="700"></textarea>
-        <button class="umat-chatbar-send" id="lcp-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
+      <div class="umat-attach-drawer umat-drawer-enhanced" id="lcp-attach-drawer">
+        <div class="umat-drawer-hdr">
+          <div class="umat-drawer-hdr-left">
+            <span class="material-symbols-outlined" style="font-size:17px;color:var(--u-p);">attach_file</span>
+            <h4>Select Materials</h4>
+            <span class="umat-drawer-count" id="lcp-drawer-count">0 selected</span>
+          </div>
+          <div class="umat-drawer-hdr-actions">
+            <button class="umat-drawer-clear-btn" id="lcp-drawer-clear" type="button">Clear</button>
+            <button class="umat-drawer-close-btn" id="lcp-drawer-close" type="button"><span class="material-symbols-outlined">close</span></button>
+          </div>
+        </div>
+        <div class="umat-drawer-search-wrap">
+          <span class="material-symbols-outlined umat-drawer-search-icon">search</span>
+          <input type="text" id="lcp-drawer-search" placeholder="Search materials…">
+        </div>
+        <div class="umat-drawer-cats" id="lcp-drawer-cats"></div>
+        <div class="umat-drawer-recent" id="lcp-drawer-recent"></div>
+        <div class="umat-drawer-list" id="lcp-drawer-list"><div class="umat-drawer-loading"><div class="umat-vw-spinner"></div><span>Loading materials&hellip;</span></div></div>
+        <div class="umat-drawer-foot">
+          <span class="umat-drawer-foot-info">Select materials for AI</span>
+          <button class="umat-drawer-confirm" id="lcp-drawer-confirm" type="button"><span class="material-symbols-outlined">check</span> Use Selected</button>
+        </div>
+      </div>
+      <div class="umat-chat-overlay">
+        <div class="umat-chatbar">
+          <button class="umat-chatbar-btn" id="lcp-attach-btn" type="button"><span class="material-symbols-outlined">add</span></button>
+          <textarea id="lcp-input" class="umat-chatbar-input" placeholder="Ask about your course…" rows="1" maxlength="700"></textarea>
+          <button class="umat-chatbar-send" id="lcp-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
+        </div>
+        <div class="umat-mat-bar" id="lcp-mat-bar"></div>
       </div>
     </div>
     <div class="umat-cp-pane" id="lcp-feature">
@@ -968,9 +996,10 @@ if(typeof loadAnalytics!=='function'){
           if(!d.top_questions||!d.top_questions.length){qList.innerHTML='<div style="text-align:center;padding:32px;color:var(--u-ol);font-size:13px;">No questions logged yet.</div>';return;}
           qList.innerHTML=d.top_questions.map(function(q,i){
             var acts=['Prepare Response','Generate AI Summary','Add to FAQ','Create Quiz','Schedule Review'];
+            var displayText=(q.text||'').replace(/^\[Referencing:\s*[^\]]+\]\s*/i,'');
             return '<div class="umat-q-row">'+
               '<div class="umat-q-votes"><div class="v-n">'+q.ask_count+'</div><div class="v-l">votes</div></div>'+
-              '<div class="umat-q-content"><div class="umat-q-text">&ldquo;'+esc(q.text)+'&rdquo;</div><div class="umat-q-related">Related to: <span>Course Materials</span></div></div>'+
+              '<div class="umat-q-content"><div class="umat-q-text">&ldquo;'+esc(displayText)+'&rdquo;</div><div class="umat-q-related">Related to: <span>Course Materials</span></div></div>'+
               '<div class="umat-q-action"><button class="umat-q-action-btn" type="button">'+esc(acts[i%acts.length])+'</button></div></div>';
           }).join('');
         }
@@ -1365,8 +1394,9 @@ function loadPanelData(){
     var ql=document.getElementById('lcp-q-list');
     if(ql&&d.top_questions&&d.top_questions.length){
       ql.innerHTML=d.top_questions.slice(0,5).map(function(q){
+        var displayText=(q.text||'').replace(/^\[Referencing:\s*[^\]]+\]\s*/i,'');
         return '<div style="padding:8px;background:var(--u-sf);border:1px solid var(--u-olv);border-radius:var(--u-r8);">'+
-          '<div style="font-size:12px;color:var(--u-ons);margin-bottom:3px;">'+esc(q.text)+'</div>'+
+          '<div style="font-size:12px;color:var(--u-ons);margin-bottom:3px;">'+esc(displayText)+'</div>'+
           '<div style="font-size:10px;color:var(--u-ol);"><b style="color:var(--u-p);">'+q.ask_count+'</b> students asked</div></div>';
       }).join('');
     }
@@ -1410,9 +1440,10 @@ function loadInsightsLegacy(cid){
         if(!d.top_questions||!d.top_questions.length){qList.innerHTML='<div style="text-align:center;padding:32px;color:var(--u-ol);font-size:13px;">No questions logged yet.</div>';return;}
         var acts=['Prepare Response','Generate AI Summary','Add to FAQ','Create Quiz','Schedule Review'];
         qList.innerHTML=d.top_questions.map(function(q,i){
+          var displayText=(q.text||'').replace(/^\[Referencing:\s*[^\]]+\]\s*/i,'');
           return '<div class="umat-q-row">'+
             '<div class="umat-q-votes"><div class="v-n">'+q.ask_count+'</div><div class="v-l">votes</div></div>'+
-            '<div class="umat-q-content"><div class="umat-q-text">&ldquo;'+esc(q.text)+'&rdquo;</div><div class="umat-q-related">Related to: <span>Course Materials</span></div></div>'+
+            '<div class="umat-q-content"><div class="umat-q-text">&ldquo;'+esc(displayText)+'&rdquo;</div><div class="umat-q-related">Related to: <span>Course Materials</span></div></div>'+
             '<div class="umat-q-action"><button class="umat-q-action-btn" type="button">'+esc(acts[i%acts.length])+'</button></div></div>';
         }).join('');
       }
@@ -3321,7 +3352,7 @@ HTML;
           </div>
           <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:16px;">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-              <div style="width:32px;height:32px;border-radius:var(--u-r8);background:rgba(245,158,11,.1);color:#d97706;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-outlined" style="font-size:18px;">storage</span></div>
+              <div style="width:32px;height:32px;border-radius:var(--u-r8);background:rgba(0,107,47,.1);color:var(--u-p);display:flex;align-items:center;justify-content:center;"><span class="material-symbols-outlined" style="font-size:18px;">storage</span></div>
               <div><div style="font-size:11px;color:var(--u-ol);">ChromaDB</div><div style="font-size:22px;font-weight:800;" id="aexp-hlth-chroma">—</div></div>
             </div>
             <span style="font-size:10px;" id="aexp-hlth-docs"></span>
@@ -3335,7 +3366,7 @@ HTML;
           </div>
           <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:16px;">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-              <div style="width:32px;height:32px;border-radius:var(--u-r8);background:rgba(99,102,241,.1);color:#6366f1;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-outlined" style="font-size:18px;">info</span></div>
+              <div style="width:32px;height:32px;border-radius:var(--u-r8);background:rgba(0,107,47,.1);color:var(--u-p);display:flex;align-items:center;justify-content:center;"><span class="material-symbols-outlined" style="font-size:18px;">info</span></div>
               <div><div style="font-size:11px;color:var(--u-ol);">Plugin Version</div><div style="font-size:22px;font-weight:800;" id="aexp-hlth-version">—</div></div>
             </div>
             <span style="font-size:10px;cursor:pointer;" id="aexp-hlth-refresh-label">Click to refresh</span>
@@ -3426,7 +3457,7 @@ HTML;
 <!-- ADMIN COMPACT PANEL -->
 <div class="umat-cp-ov" id="admin-cp-ov" role="dialog" aria-modal="true">
   <div class="umat-cp umat-cp-admin" id="admin-cp">
-    <div class="umat-cp-hdr" style="background:linear-gradient(135deg,#003580,#1e3a8a);">
+    <div class="umat-cp-hdr">
       <div class="umat-cp-hdr-row">
         <div class="umat-cp-av" style="background:rgba(255,255,255,0.2);">
           <span class="material-symbols-outlined" style="color:#fff;">tune</span>
@@ -3460,22 +3491,22 @@ HTML;
           <span style="font-size:9px;" id="acp-hlth-latency"></span>
         </div>
         <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:12px;">
-          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(245,158,11,.1);color:#d97706;display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">storage</span></div>
+          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(0,107,47,.1);color:var(--u-p);display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">storage</span></div>
           <div style="font-size:10px;color:var(--u-ol);">ChromaDB</div>
           <div style="font-size:18px;font-weight:800;" id="acp-hlth-chroma">—</div>
           <span style="font-size:9px;" id="acp-hlth-docs"></span>
         </div>
         <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:12px;">
-          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(165,48,77,.1);color:var(--u-ter);display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">memory</span></div>
+          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(0,107,47,.1);color:var(--u-p);display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">memory</span></div>
           <div style="font-size:10px;color:var(--u-ol);">Memory</div>
           <div style="font-size:18px;font-weight:800;" id="acp-hlth-memory">—</div>
           <span style="font-size:9px;" id="acp-hlth-cron"></span>
         </div>
         <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:12px;">
-          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(99,102,241,.1);color:#6366f1;display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">info</span></div>
+          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(99,102,241,.1);color:var(--u-p);display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">info</span></div>
           <div style="font-size:10px;color:var(--u-ol);">Plugin Version</div>
           <div style="font-size:18px;font-weight:800;" id="acp-hlth-version">—</div>
-          <span style="font-size:9px;" id="acp-hlth-refresh" style="cursor:pointer;">Click to refresh</span>
+          <span style="font-size:9px;cursor:pointer;" id="acp-hlth-refresh">Click to refresh</span>
         </div>
       </div>
     </div>
@@ -3611,78 +3642,131 @@ document.querySelectorAll('#admin-sb [data-aexp-tab]').forEach(function(b){
 });
 
 /* ─── Health Dashboard (populates both CP + expanded) ─── */
-function _fillHealth(d){
-  /* CP */
+var _healthTimer=null;
+function _setHealthBadge(el,state,text){
+  if(!el)return;
+  el.className='umat-hlth-badge '+state;
+  if(state==='loading'){el.innerHTML='<span class="spinner"></span> Checking\u2026';}
+  else{el.textContent=text;}
+}
+function _setHealthVal(id,val,sub){
+  var el=document.getElementById(id);
+  if(!el)return;
+  el.textContent=val;
+  el.className='umat-hlth-val';
+}
+function _setHealthSub(id,val,isLoading){
+  var el=document.getElementById(id);
+  if(!el)return;
+  if(isLoading){el.innerHTML='<span class="spinner"></span> Loading\u2026';el.className='umat-hlth-sub loading';}
+  else{el.innerHTML=val;el.className='umat-hlth-sub';}
+}
+function _fillHealth(d,errMsg){
+  var now=new Date();
+  var ts=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var online=d&&d.online;
+  var err=d&&d.error_detail?d.error_detail:(errMsg||'');
+  /* CP header status */
   var statusEl=document.getElementById('admin-health-status');
-  if(d.online){
-    if(statusEl){statusEl.innerHTML='● AI Service Online ('+d.latency_ms+'ms)';statusEl.style.color='#4ade80';}
-    document.getElementById('acp-hlth-service').textContent='Online';
-    document.getElementById('acp-hlth-service').style.color='var(--u-p)';
-    document.getElementById('acp-hlth-latency').textContent=d.latency_ms+'ms latency';
-    document.getElementById('acp-hlth-latency').style.cssText='background:#dcfce7;color:#065f46;padding:2px 6px;border-radius:999px;font-weight:700;';
-  }else{
-    if(statusEl){statusEl.innerHTML='● AI Service Offline';statusEl.style.color='#f87171';}
-    document.getElementById('acp-hlth-service').textContent='Offline';
-    document.getElementById('acp-hlth-service').style.color='var(--u-ter)';
-    document.getElementById('acp-hlth-latency').textContent='Unreachable';
-    document.getElementById('acp-hlth-latency').style.cssText='background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:999px;font-weight:700;';
+  if(statusEl){
+    statusEl.innerHTML=online
+      ? '\u25cf AI Online ('+d.latency_ms+'ms)'
+      : '\u25cf AI Offline'+(err?' - '+err:'');
+    statusEl.style.color=online?'#4ade80':'#f87171';
   }
-  document.getElementById('acp-hlth-chroma').textContent=d.chroma_collections||0;
-  document.getElementById('acp-hlth-docs').textContent=(d.chroma_documents||0)+' total documents';
-  document.getElementById('acp-hlth-memory').textContent=(d.python_memory_mb||0).toFixed(1)+' MB';
-  var cronLabel=d.cron_fresh?'<span style="color:var(--u-p);">Running</span>':'<span style="color:var(--u-ter);">Stale</span>';
-  document.getElementById('acp-hlth-cron').innerHTML='Cron: '+cronLabel;
-  document.getElementById('acp-hlth-version').textContent=d.plugin_version||'unknown';
-  /* Expanded */
+  /* Expanded header badge */
   var aexpStatus=document.getElementById('aexp-health-status');
-  if(d.online){
-    if(aexpStatus){aexpStatus.innerHTML='● Online ('+d.latency_ms+'ms)';aexpStatus.style.background='#dcfce7';aexpStatus.style.color='#065f46';}
-    document.getElementById('aexp-hlth-service').textContent='Online';
-    document.getElementById('aexp-hlth-latency').textContent=d.latency_ms+'ms latency';
-    document.getElementById('aexp-hlth-latency').style.cssText='background:#dcfce7;color:#065f46;padding:2px 6px;border-radius:999px;font-weight:700;';
-  }else{
-    if(aexpStatus){aexpStatus.innerHTML='● Offline';aexpStatus.style.background='#fee2e2';aexpStatus.style.color='#991b1b';}
-    document.getElementById('aexp-hlth-service').textContent='Offline';
-    document.getElementById('aexp-hlth-latency').textContent='Unreachable';
-    document.getElementById('aexp-hlth-latency').style.cssText='background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:999px;font-weight:700;';
-  }
-  document.getElementById('aexp-hlth-chroma').textContent=d.chroma_collections||0;
-  document.getElementById('aexp-hlth-docs').textContent=(d.chroma_documents||0)+' total documents';
-  document.getElementById('aexp-hlth-memory').textContent=(d.python_memory_mb||0).toFixed(1)+' MB';
-  document.getElementById('aexp-hlth-cron').innerHTML='Cron: '+cronLabel;
-  document.getElementById('aexp-hlth-version').textContent=d.plugin_version||'unknown';
+  if(aexpStatus)_setHealthBadge(aexpStatus,online?'online':'offline',online?'\u25cf Online ('+d.latency_ms+'ms)':'\u25cf Offline'+(err?' - '+err:''));
+  /* Populate both CP + expanded panels */
+  ['acp','aexp'].forEach(function(pfx){
+    _setHealthVal(pfx+'-hlth-service',online?'Online':'Offline');
+    var latEl=document.getElementById(pfx+'-hlth-latency');
+    if(latEl){
+      if(online){latEl.textContent=d.latency_ms+'ms latency';latEl.className='umat-hlth-badge online';}
+      else{latEl.textContent=err||'Unreachable';latEl.className='umat-hlth-badge offline';}
+    }
+    _setHealthVal(pfx+'-hlth-chroma',online?(d.chroma_collections||0):'-');
+    _setHealthSub(pfx+'-hlth-docs',online?(d.chroma_documents||0)+' total documents':(err?'Error: '+err:'Unavailable'),false);
+    _setHealthVal(pfx+'-hlth-memory',online?(d.python_memory_mb||0).toFixed(1)+' MB':'-');
+    var cronLabel=d&&d.cron_fresh?'<span style="color:var(--u-p);">Running</span>':'<span style="color:var(--u-ter);">Stale</span>';
+    var cronEl=document.getElementById(pfx+'-hlth-cron');
+    if(cronEl){cronEl.innerHTML='Cron: '+cronLabel;cronEl.className='umat-hlth-sub';}
+    _setHealthVal(pfx+'-hlth-version',d&&d.plugin_version?d.plugin_version:'-');
+    /* Last-checked footer */
+    var footEl=document.getElementById(pfx+'-hlth-footer');
+    if(!footEl){
+      footEl=document.createElement('div');
+      footEl.id=pfx+'-hlth-footer';
+      footEl.className='umat-hlth-footer';
+      var card=document.getElementById(pfx+'-hlth-version');
+      if(card){card.closest('div')&&card.closest('div').appendChild(footEl);}
+    }
+    if(footEl){
+      footEl.innerHTML='Last checked: '+ts
+        +' <button type="button" data-refresh="1">Refresh</button>';
+      footEl.querySelector('[data-refresh]').addEventListener('click',function(){
+        if(_healthTimer)clearTimeout(_healthTimer);
+        loadHealth();
+      });
+    }
+  });
+}
+function _healthLoading(){
+  var statusEl=document.getElementById('admin-health-status');
+  if(statusEl){statusEl.innerHTML='\u25cf Checking\u2026';statusEl.style.color='#9ca3af';}
+  var aexpStatus=document.getElementById('aexp-health-status');
+  if(aexpStatus)_setHealthBadge(aexpStatus,'loading');
+  ['acp','aexp'].forEach(function(pfx){
+    _setHealthVal(pfx+'-hlth-service','...');
+    var latEl=document.getElementById(pfx+'-hlth-latency');
+    if(latEl){latEl.textContent='';latEl.className='';}
+    _setHealthVal(pfx+'-hlth-chroma','...');
+    _setHealthSub(pfx+'-hlth-docs','',true);
+    _setHealthVal(pfx+'-hlth-memory','...');
+    _setHealthSub(pfx+'-hlth-cron','',true);
+    _setHealthVal(pfx+'-hlth-version','...');
+  });
 }
 function loadHealth(){
+  console.log('[admin-health] loadHealth() called');
+  if(_healthTimer)clearTimeout(_healthTimer);
+  _healthLoading();
   var x=new XMLHttpRequest();
   x.open('POST','/lib/ajax/service.php?sesskey='+encodeURIComponent(moodleSesskey));
   x.setRequestHeader('Content-Type','application/json');
   x.onload=function(){
-    if(x.status!==200){_healthError();return;}
+    console.log('[admin-health] AJAX response status:',x.status);
+    if(x.status!==200){_fillHealth(null,'HTTP '+x.status);return;}
     try{
       var r=JSON.parse(x.responseText);
-      if(r&&r[0]&&!r[0].error){_fillHealth(r[0].data);}
-      else{_healthError();}
-    }catch(e){_healthError();}
+      console.log('[admin-health] Parsed response:',r);
+      if(r&&r[0]&&!r[0].error){
+        console.log('[admin-health] Health data:',r[0].data);
+        _fillHealth(r[0].data,null);
+      }
+      else{
+        var errMsg=r&&r[0]&&r[0].message?r[0].message:(r&&r[0]&&r[0].error?'Service error':'Unknown error');
+        console.error('[admin-health] Error:',errMsg,r&&r[0]);
+        _fillHealth(null,errMsg);
+      }
+    }catch(e){_fillHealth(null,'Invalid response');console.error('[admin-health] Parse error:',e,x.responseText.substring(0,500));}
   };
-  x.onerror=_healthError;
+  x.onerror=function(){_fillHealth(null,'Network error');console.error('[admin-health] Network error');};
+  x.onabort=function(){console.log('[admin-health] Request aborted');};
+  x.ontimeout=function(){_fillHealth(null,'Timeout');console.error('[admin-health] Request timed out');};
   x.send(JSON.stringify([{index:0,methodname:'local_umat_ai_admin_system_health',args:{}}]));
+  /* Auto-refresh every 30s */
+  _healthTimer=setTimeout(loadHealth,30000);
 }
-function _healthError(){
-  var statusEl=document.getElementById('admin-health-status');
-  if(statusEl){statusEl.textContent='● AI Service Offline';statusEl.style.color='#f87171';}
-  var aexpStatus=document.getElementById('aexp-health-status');
-  if(aexpStatus){aexpStatus.innerHTML='● Offline';aexpStatus.style.background='#fee2e2';aexpStatus.style.color='#991b1b';}
-  ['acp','aexp'].forEach(function(pfx){
-    var s=document.getElementById(pfx+'-hlth-service');if(s){s.textContent='Offline';s.style.color='var(--u-ter)';}
-    var l=document.getElementById(pfx+'-hlth-latency');if(l){l.textContent='Unreachable';l.style.cssText='background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:999px;font-weight:700;';}
-    var c=document.getElementById(pfx+'-hlth-chroma');if(c)c.textContent='0';
-    var d=document.getElementById(pfx+'-hlth-docs');if(d)d.textContent='0 total documents';
-    var m=document.getElementById(pfx+'-hlth-memory');if(m)m.textContent='0.0 MB';
-    var r=document.getElementById(pfx+'-hlth-cron');if(r)r.innerHTML='Cron: <span style="color:var(--u-ter);">Stale</span>';
-    var v=document.getElementById(pfx+'-hlth-version');if(v)v.textContent='unknown';
-  });
-}
-document.getElementById('aexp-health-refresh').addEventListener('click',loadHealth);
+document.getElementById('aexp-health-refresh').addEventListener('click',function(){
+  if(_healthTimer)clearTimeout(_healthTimer);
+  loadHealth();
+});
+var acpRefresh=document.getElementById('acp-hlth-refresh');
+if(acpRefresh)acpRefresh.addEventListener('click',function(){
+  if(_healthTimer)clearTimeout(_healthTimer);
+  loadHealth();
+});
 
 /* ─── Features / Config (populates both CP + expanded) ─── */
 var _toggleDefs=[
@@ -3692,6 +3776,7 @@ var _toggleDefs=[
   {key:'enable_admin_fab',label:'Enable Admin FAB',type:'checkbox'},
 ];
 var _cfgDefs=[
+  {key:'platform_name',label:'Platform Name',type:'text'},
   {key:'ai_service_url',label:'AI Service URL',type:'text'},
   {key:'ai_service_token',label:'API Bearer Token',type:'password'},
   {key:'rate_limit',label:'Rate Limit (Q/min)',type:'number'},
@@ -3863,6 +3948,78 @@ _matEscCb([
 
 })();
 </script>
+HTML;
+    }
+
+    /**
+     * Login-page issue report toggle — appears as a link below the login form.
+     * Clicking it hides the login form and shows an inline report card.
+     */
+    public static function login_report_overlay(): string {
+        return <<<HTML
+<!-- LOGIN ISSUE REPORT TOGGLE -->
+<div id="lr-wrapper">
+  <p class="lr-toggle-link" id="lr-toggle-btn">
+    Having trouble logging in?
+    <a href="#" id="lr-show-form">Report an issue</a>
+  </p>
+</div>
+
+<script>
+/* Immediately inject toggle link after the login submit button */
+(function(){var w=document.getElementById('lr-wrapper');if(!w){console.log('[umat] lr-wrapper not found');return;}var f=document.querySelector('.loginform')||document.querySelector('#page-login-index form')||document.querySelector('form[action*="login"]');if(f){var sb=f.querySelector('.fitem.fsubmit')||f.querySelector('.login-submit')||f.querySelector('input[type="submit"],button[type="submit"]');var target=sb&&sb.parentNode?sb.parentNode:f;target.appendChild(w);console.log('[umat] lr-wrapper injected into form');}else{w.style.display='';console.log('[umat] lr-wrapper shown at bottom, no form found');}})();
+</script>
+
+<!-- REPORT FORM (hidden initially, replaces login form when toggled) -->
+<div class="umat-login-report-card" id="lr-report-card" style="display:none;">
+  <button class="umat-login-report-close" id="lr-report-back" type="button" aria-label="Back to login">&larr; Back to login</button>
+  <div class="umat-login-report-hdr">
+    <span class="material-symbols-outlined">feedback</span>
+    <h2>Report Login Issue</h2>
+    <p>Having trouble logging in? Let your lecturer know.</p>
+  </div>
+  <div class="umat-login-report-body" id="login-report-body">
+
+    <!-- Step 1: Identify -->
+    <div class="umat-login-report-step" id="lr-step-identify">
+      <label for="lr-username">Your Student ID or Username</label>
+      <input type="text" id="lr-username" class="umat-login-report-input" placeholder="e.g. 2023456 or jdoe" autocomplete="off" />
+      <div class="umat-login-report-hint">Enter your student ID, username, or email address.</div>
+      <button class="umat-login-report-btn" id="lr-lookup-btn" type="button">
+        <span class="material-symbols-outlined">search</span> Find My Courses
+      </button>
+      <div class="umat-login-report-msg" id="lr-msg"></div>
+    </div>
+
+    <!-- Step 2: Course + description (hidden until step 1 succeeds) -->
+    <div class="umat-login-report-step" id="lr-step-report" style="display:none;">
+      <label for="lr-course">Course</label>
+      <select id="lr-course" class="umat-login-report-input"></select>
+      <label for="lr-name" style="margin-top:12px;">Your Name <span style="font-weight:400;color:#8aa08e;">(optional)</span></label>
+      <input type="text" id="lr-name" class="umat-login-report-input" placeholder="e.g. John Doe" autocomplete="off" />
+      <label for="lr-desc" style="margin-top:12px;">Describe the Issue</label>
+      <textarea id="lr-desc" class="umat-login-report-input umat-login-report-ta" placeholder="What problem are you having? e.g. I can't log in with my student ID, it says invalid credentials..." rows="4"></textarea>
+      <button class="umat-login-report-btn umat-login-report-btn-primary" id="lr-submit-btn" type="button">
+        <span class="material-symbols-outlined">send</span> Submit Report
+      </button>
+      <div class="umat-login-report-msg" id="lr-submit-msg"></div>
+    </div>
+
+    <!-- Step 3: Success (hidden until submitted) -->
+    <div class="umat-login-report-step" id="lr-step-done" style="display:none;">
+      <div class="umat-login-report-success">
+        <span class="material-symbols-outlined" style="font-size:48px;color:#006b2f;">check_circle</span>
+        <h3>Report Submitted!</h3>
+        <p>Your lecturer will review your issue and get back to you.</p>
+        <button class="umat-login-report-btn" id="lr-close-btn" type="button">Close &amp; return to login</button>
+      </div>
+    </div>
+
+  </div>
+  <div class="umat-login-report-loader" id="lr-loader" style="display:none;">
+    <div class="umat-spinner"></div>
+  </div>
+</div>
 HTML;
     }
 

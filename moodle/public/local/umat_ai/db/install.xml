@@ -244,21 +244,35 @@
 
     <TABLE NAME="umat_ai_issue_reports" COMMENT="Student-submitted issues/complaints about course content">
       <FIELDS>
-        <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
-        <FIELD NAME="userid"      TYPE="int"  LENGTH="10"  NOTNULL="true"/>
-        <FIELD NAME="courseid"    TYPE="int"  LENGTH="10"  NOTNULL="true"/>
-        <FIELD NAME="category"    TYPE="char" LENGTH="30"  NOTNULL="true" DEFAULT="other"/>
-        <FIELD NAME="topic"       TYPE="char" LENGTH="255" NOTNULL="false"/>
-        <FIELD NAME="description" TYPE="text" NOTNULL="true"/>
-        <FIELD NAME="status"      TYPE="char" LENGTH="20"  NOTNULL="true" DEFAULT="open"/>
-        <FIELD NAME="lecturer_notes" TYPE="text" NOTNULL="false"/>
-        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
-        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="id"               TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid"           TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="courseid"         TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="category"         TYPE="char" LENGTH="30"  NOTNULL="true" DEFAULT="other"/>
+        <FIELD NAME="topic"            TYPE="char" LENGTH="255" NOTNULL="false"/>
+        <FIELD NAME="description"      TYPE="text" NOTNULL="true"/>
+        <FIELD NAME="status"           TYPE="char" LENGTH="20"  NOTNULL="true" DEFAULT="open"/>
+        <FIELD NAME="lecturer_notes"   TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="reporter_name"    TYPE="char" LENGTH="255" NOTNULL="false" COMMENT="Name provided by unauthenticated reporter"/>
+        <FIELD NAME="reporter_username" TYPE="char" LENGTH="100" NOTNULL="false" COMMENT="Username/idnumber provided by unauthenticated reporter"/>
+        <FIELD NAME="timecreated"      TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timemodified"     TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
       </FIELDS>
       <KEYS><KEY NAME="primary" TYPE="primary" FIELDS="id"/></KEYS>
       <INDEXES>
         <INDEX NAME="user_course" UNIQUE="false" FIELDS="userid,courseid"/>
         <INDEX NAME="course_status" UNIQUE="false" FIELDS="courseid,status"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_login_lookup_log" COMMENT="Rate-limiting log for login-page course lookups (5/min per IP)">
+      <FIELDS>
+        <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="ip_address"  TYPE="char" LENGTH="45"  NOTNULL="true"/>
+        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS><KEY NAME="primary" TYPE="primary" FIELDS="id"/></KEYS>
+      <INDEXES>
+        <INDEX NAME="ip_time" UNIQUE="false" FIELDS="ip_address,timecreated"/>
       </INDEXES>
     </TABLE>
 

@@ -25,6 +25,12 @@ $observers = [
         'internal'    => false,
     ],
     [
+        'eventname'   => '\core\event\course_module_updated',
+        'callback'    => '\local_umat_ai\event\material_updated::handle_resource_updated',
+        'priority'    => 200,
+        'internal'    => false,
+    ],
+    [
         'eventname'   => '\mod_quiz\event\attempt_submitted',
         'callback'    => '\local_umat_ai\observer::quiz_submitted',
         'priority'    => 200,

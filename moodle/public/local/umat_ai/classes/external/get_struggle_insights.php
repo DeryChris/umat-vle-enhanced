@@ -968,7 +968,7 @@ class get_struggle_insights extends \external_api {
             $questionItems = [];
             $knownTopics = array_values(array_map(function($t) { return $t['topic']; }, $topicMatrix));
             foreach ($logs as $l) {
-                $questionItems[] = ['id' => (int)$l->id, 'text' => $l->question];
+                $questionItems[] = ['id' => (int)$l->id, 'text' => preg_replace('/^\[Referencing:\s*[^\]]+\]\s*/i', '', $l->question)];
                 if (count($questionItems) >= 100) break; // batch limit
             }
 
@@ -1345,7 +1345,7 @@ class get_struggle_insights extends \external_api {
     // -- 12e. Common questions (question radar) --
     $questionCounts = []; // question text => ['count' => N, 'students' => [uid => true], 'topic' => '']
     foreach ($logs as $l) {
-        $qtext = trim($l->question);
+        $qtext = preg_replace('/^\[Referencing:\s*[^\]]+\]\s*/i', '', trim($l->question));
         if (strlen($qtext) < 5) continue;
         $qkey = strtolower($qtext);
         if (!isset($questionCounts[$qkey])) {
@@ -2052,9 +2052,10 @@ class get_struggle_insights extends \external_api {
         $topicLower = strtolower($topicName);
         $matching = [];
         foreach ($logs as $l) {
-            $qLower = strtolower($l->question);
+            $clean = preg_replace('/^\[Referencing:\s*[^\]]+\]\s*/i', '', $l->question);
+            $qLower = strtolower($clean);
             if (strpos($qLower, $topicLower) !== false || strpos($topicLower, $qLower) !== false) {
-                $matching[] = $l->question;
+                $matching[] = $clean;
             }
             if (count($matching) >= $limit) break;
         }

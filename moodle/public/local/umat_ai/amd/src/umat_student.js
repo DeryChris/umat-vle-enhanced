@@ -333,7 +333,7 @@ function sendQuestion(q, msgsId){
     var rp = document.getElementById('umat-reply-preview');
     if (rp) rp.remove();
   }
-  _umatAppendUser(msgsId,q);
+  _umatAppendUser(msgsId,q,selectedMats);
   // Reset quiz state so a new quiz from this message doesn't collide with a previous one.
   qz.answers={};qz.graded={};qz.idx=0;qz.active=false;qz.attempt_id=null;qz.data=null;
   var tid='typ_'+Date.now();_umatShowTyping(msgsId,tid);

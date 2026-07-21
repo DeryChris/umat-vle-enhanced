@@ -87,9 +87,10 @@ class get_analytics extends \external_api {
         );
 
         $topQuestions = array_values(array_map(function ($q) {
-            $text = mb_strlen($q->question) > 110
-                ? mb_substr($q->question, 0, 107) . '…'
-                : $q->question;
+            $cleanText = preg_replace('/^\[Referencing:\s*[^\]]+\]\s*/i', '', $q->question);
+            $text = mb_strlen($cleanText) > 110
+                ? mb_substr($cleanText, 0, 107) . '…'
+                : $cleanText;
             return ['text' => $text, 'ask_count' => (int) $q->ask_count];
         }, (array) $rawQuestions));
 

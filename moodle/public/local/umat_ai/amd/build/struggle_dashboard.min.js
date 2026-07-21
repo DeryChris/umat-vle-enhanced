@@ -1,11 +1,7 @@
 /**
- * Lecturer Insights Dashboard — 5-zone actionable insights (via struggle_dashboard).
+ * Lecturer Insights Dashboard — Card-based layout with charts.
  *
- * Zone 1: Priority Briefing (what needs attention)
- * Zone 2: Struggle Map (where students are confused)
- * Zone 3: Student Dossiers (who needs help and why)
- * Zone 4: Question Radar (what students are asking)
- * Zone 5: Course Vitals (how course is performing)
+ * Cards: Stat Tiles → Risk Donut + Sparkline → Topic Heatmap → Students + Questions → NLQ
  */
 define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str, Shared) {
     'use strict';
@@ -16,6 +12,17 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
     var allStudentNarratives = [];
     var filterMode = 'all';
     var activeStream = null;
+
+    var COLORS = {
+        high: '#dc2626',
+        medium: '#f59e0b',
+        low: '#22c55e',
+        critical: '#dc2626',
+        attention: '#f59e0b',
+        watch: '#22c55e',
+        blue: '#3b82f6',
+        muted: '#94a3b8'
+    };
 
     function streamConfig() {
         if (window._umatChatStream) return window._umatChatStream;
@@ -37,13 +44,13 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
             methodname: 'local_umat_ai_get_struggle_insights',
             args: { courseid: cid, days: 60 }
         }])[0].done(function(insights) {
-            console.log('[StruggleDashboard] API SUCCESS — keys:', Object.keys(insights), insights);
+            console.log('[StruggleDashboard] API SUCCESS', insights);
             renderAll(insights);
             showSkeleton(false);
         }).fail(function() {
-            console.error('[StruggleDashboard] API FAILED for cid=' + cid, Array.prototype.slice.call(arguments));
+            console.error('[StruggleDashboard] API FAILED', Array.prototype.slice.call(arguments));
             showSkeleton(false);
-            renderEmpty();
+            renderAll({});
         });
     }
 
@@ -54,171 +61,202 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         if (pane) pane.style.opacity = show ? '0.3' : '1';
     }
 
-    function renderEmpty() {
-        var el = document.getElementById('ins-priority-actions');
-        if (el) el.innerHTML = '<div class="ins-empty">No data available yet. The hourly cron will populate insights soon.</div>';
-    }
-
     // ── Master renderer ──
     function renderAll(data) {
-        if (!data) { renderEmpty(); return; }
-        renderPriorityActions(data.priority_actions || []);
-        renderStruggleAreas(data.struggle_areas || []);
-        renderSectionStruggle(data.section_struggle || []);
-        renderMaterialStruggle(data.material_struggle || []);
-        renderStudentDossiers(data.student_narratives || []);
-        renderQuestionRadar(data.common_questions || []);
-        renderCoursePulse(data.course_pulse || {});
+        if (!data) data = {};
+        renderStatTiles(data.course_pulse || {});
+        renderRiskDonut(data.student_narratives || []);
+        renderQuestionSparkline(data.course_pulse || {});
+        renderTopicHeatmap(data.struggle_areas || []);
+        renderAtRiskStudents(data.student_narratives || []);
+        renderCommonQuestions(data.common_questions || []);
     }
 
     // ════════════════════════════════════════════════════════════════
-    // ZONE 1: Priority Briefing
+    // STAT TILES
     // ════════════════════════════════════════════════════════════════
-    function renderPriorityActions(actions) {
-        var el = document.getElementById('ins-priority-actions');
+    function renderStatTiles(pulse) {
+        var totalStudents = pulse.total_students || 0;
+        var atRisk = pulse.at_risk_count || 0;
+        var avgQuiz = pulse.avg_quiz || 0;
+        var active = pulse.active_this_week || 0;
+
+        var trendBadge = function(trend, pct) {
+            if (trend === 'up') return '<span class="ins-trend-pill up">+' + (pct || 0) + '%</span>';
+            if (trend === 'down') return '<span class="ins-trend-pill down">' + (pct || 0) + '%</span>';
+            return '';
+        };
+
+        setTileValue('ins-stat-students', totalStudents,
+            totalStudents ? trendBadge(pulse.questions_trend, pulse.questions_trend_pct) : '');
+        setTileValue('ins-stat-at-risk', atRisk,
+            atRisk ? trendBadge(pulse.at_risk_trend, pulse.at_risk_trend_delta) : '');
+        setTileValue('ins-stat-quiz', avgQuiz + '%',
+            avgQuiz ? trendBadge(pulse.quiz_trend, pulse.quiz_trend_pct) : '');
+        setTileValue('ins-stat-active', active,
+            totalStudents ? '<span class="ins-trend-sub">of ' + totalStudents + '</span>' : '');
+    }
+
+    function setTileValue(id, value, extra) {
+        var el = document.getElementById(id);
         if (!el) return;
-        if (!actions || !actions.length) {
-            el.innerHTML = '<div class="ins-priority-card urgency-low">' +
-                '<span class="material-symbols-outlined ins-priority-icon">check_circle</span>' +
-                '<div><div class="ins-priority-text">Everything looks good!</div>' +
-                '<div class="ins-priority-details">No urgent issues detected. Check the sections below for detailed insights.</div></div></div>';
+        el.innerHTML = esc(value) + (extra ? '<span class="ins-trend-extra">' + extra + '</span>' : '');
+        var tile = el.closest('.ins-stat-tile');
+        if (tile) tile.classList.remove('ins-stat-loading');
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // RISK DONUT CHART (pure CSS conic-gradient)
+    // ════════════════════════════════════════════════════════════════
+    function renderRiskDonut(students) {
+        var el = document.getElementById('ins-risk-donut');
+        if (!el) return;
+        if (!students || !students.length) {
+            el.innerHTML = '<div class="ins-empty">No student data yet.</div>';
             return;
         }
-        el.innerHTML = actions.map(function(a) {
-            var itemsHtml = '';
-            if (a.items && a.items.length) {
-                itemsHtml = '<ul class="ins-priority-items">' +
-                    a.items.map(function(item) {
-                        var detail = item.name || '';
-                        if (item.students) detail += ' — ' + item.students + ' students';
-                        if (item.pct) detail += ' (' + item.pct + '%)';
-                        if (item.trend) detail += ', ' + item.trend;
-                        if (item.days) detail += ' — ' + item.days + ' days ago';
-                        return '<li>' + escapeHtml(detail) + '</li>';
-                    }).join('') + '</ul>';
-            }
-            var actionBtn = '';
-            if (a.action_label) {
-                actionBtn = '<button class="ins-priority-btn" onclick="window.struggleDashboard.handlePriorityAction(\'' + escapeHtml(a.type) + '\')">' +
-                    escapeHtml(a.action_label) + '</button>';
-            }
-            return '<div class="ins-priority-card urgency-' + escapeHtml(a.urgency) + '">' +
-                '<span class="material-symbols-outlined ins-priority-icon">' + escapeHtml(a.icon) + '</span>' +
-                '<div class="ins-priority-body">' +
-                '<div class="ins-priority-text">' + escapeHtml(a.text) + '</div>' +
-                itemsHtml +
-                '<div class="ins-priority-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' +
-                escapeHtml(a.suggestion) + '</div>' +
-                actionBtn +
-                '</div></div>';
+
+        var counts = { high: 0, medium: 0, low: 0 };
+        students.forEach(function(s) {
+            var level = s.risk_level || 'low';
+            counts[level] = (counts[level] || 0) + 1;
+        });
+
+        var total = students.length;
+        var segments = [
+            { label: 'High Risk', count: counts.high, color: COLORS.high },
+            { label: 'Medium Risk', count: counts.medium, color: COLORS.medium },
+            { label: 'Low Risk', count: counts.low, color: COLORS.low }
+        ].filter(function(s) { return s.count > 0; });
+
+        // Build conic-gradient
+        var gradParts = [];
+        var angle = 0;
+        segments.forEach(function(seg) {
+            var pct = (seg.count / total) * 360;
+            gradParts.push(seg.color + ' ' + angle + 'deg ' + (angle + pct) + 'deg');
+            angle += pct;
+        });
+        var gradient = 'conic-gradient(' + gradParts.join(', ') + ')';
+
+        // Legend
+        var legendHtml = segments.map(function(seg) {
+            var pctVal = Math.round((seg.count / total) * 100);
+            return '<div class="ins-donut-legend-item">' +
+                '<span class="ins-donut-swatch" style="background:' + seg.color + '"></span>' +
+                '<span class="ins-donut-label">' + seg.label + '</span>' +
+                '<span class="ins-donut-value">' + seg.count + ' (' + pctVal + '%)</span>' +
+                '</div>';
         }).join('');
+
+        el.innerHTML = '<div class="ins-donut-container">' +
+            '<div class="ins-donut-ring" style="background:' + gradient + '">' +
+            '<div class="ins-donut-hole">' +
+            '<div class="ins-donut-center-val">' + total + '</div>' +
+            '<div class="ins-donut-center-lbl">Students</div>' +
+            '</div></div>' +
+            '<div class="ins-donut-legend">' + legendHtml + '</div>' +
+            '</div>';
     }
 
     // ════════════════════════════════════════════════════════════════
-    // ZONE 2: Struggle Map
+    // QUESTION ACTIVITY SPARKLINE (SVG)
     // ════════════════════════════════════════════════════════════════
-    function renderStruggleAreas(areas) {
-        var el = document.getElementById('ins-struggle-areas');
+    function renderQuestionSparkline(pulse) {
+        var el = document.getElementById('ins-question-sparkline');
+        if (!el) return;
+
+        var thisWeek = pulse.questions_this_week || 0;
+        var lastWeek = pulse.questions_last_week || 0;
+        var trend = pulse.questions_trend || 'stable';
+        var trendPct = pulse.questions_trend_pct || 0;
+
+        // Create a mini bar comparison: last week vs this week
+        var maxVal = Math.max(thisWeek, lastWeek, 1);
+        var lastH = Math.round((lastWeek / maxVal) * 80);
+        var thisH = Math.round((thisWeek / maxVal) * 80);
+
+        var trendColor = trend === 'up' ? COLORS.critical :
+            (trend === 'down' ? COLORS.low : COLORS.muted);
+
+        var trendIcon = trend === 'up' ? '↑' : (trend === 'down' ? '↓' : '→');
+
+        el.innerHTML = '<div class="ins-sparkline-container">' +
+            '<div class="ins-bars-pair">' +
+            '<div class="ins-bar-col">' +
+            '<div class="ins-bar-fill" style="height:' + lastH + 'px;background:' + COLORS.muted + '"></div>' +
+            '<div class="ins-bar-label">Last Wk</div>' +
+            '<div class="ins-bar-val">' + lastWeek + '</div>' +
+            '</div>' +
+            '<div class="ins-bar-col">' +
+            '<div class="ins-bar-fill" style="height:' + thisH + 'px;background:' + COLORS.blue + '"></div>' +
+            '<div class="ins-bar-label">This Wk</div>' +
+            '<div class="ins-bar-val">' + thisWeek + '</div>' +
+            '</div>' +
+            '</div>' +
+            '<div class="ins-sparkline-meta">' +
+            '<span class="ins-sparkline-trend" style="color:' + trendColor + '">' +
+            '<span class="material-symbols-outlined">trending_' + (trend === 'stable' ? 'flat' : trend) + '</span> ' +
+            trendIcon + ' ' + Math.abs(trendPct) + '%</span>' +
+            '<span class="ins-sparkline-sub">' + (pulse.total_students || 0) + ' students enrolled</span>' +
+            '</div></div>';
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // TOPIC STRUGGLE HEATMAP (horizontal bars with severity)
+    // ════════════════════════════════════════════════════════════════
+    function renderTopicHeatmap(areas) {
+        var el = document.getElementById('ins-topic-heatmap');
         if (!el) return;
         if (!areas || !areas.length) {
-            el.innerHTML = '<div class="ins-empty">No struggle data yet. Student questions will populate this section.</div>';
+            el.innerHTML = '<div class="ins-empty">No struggle data yet. Student questions will populate this.</div>';
             return;
         }
-        el.innerHTML = areas.map(function(a) {
-            var severityLabel = a.severity === 'critical' ? 'Critical' :
-                (a.severity === 'attention' ? 'Needs Attention' : 'Watch');
-            var severityIcon = a.severity === 'critical' ? 'error' :
-                (a.severity === 'attention' ? 'warning' : 'info');
 
-            // Trend indicator
-            var trendHtml = '';
-            if (a.trend === 'up') {
-                trendHtml = '<span class="ins-trend ins-trend-up"><span class="material-symbols-outlined">trending_up</span> +' + a.trend_pct + '%</span>';
-            } else if (a.trend === 'down') {
-                trendHtml = '<span class="ins-trend ins-trend-down"><span class="material-symbols-outlined">trending_down</span> ' + a.trend_pct + '%</span>';
-            } else {
-                trendHtml = '<span class="ins-trend ins-trend-stable"><span class="material-symbols-outlined">trending_flat</span> Stable</span>';
-            }
+        // Sort by struggle_score descending
+        var sorted = areas.slice().sort(function(a, b) {
+            return (b.struggle_score || 0) - (a.struggle_score || 0);
+        });
 
-            // Sample questions
-            var sqHtml = '';
-            if (a.sample_questions && a.sample_questions.length) {
-                sqHtml = '<div class="ins-struggle-questions">' +
-                    a.sample_questions.slice(0, 2).map(function(q) {
-                        return '<div class="ins-struggle-sample-q">"' + escapeHtml(q) + '"</div>';
-                    }).join('') + '</div>';
-            }
+        el.innerHTML = sorted.map(function(a) {
+            var score = a.struggle_score || 0;
+            var color = a.severity === 'critical' ? COLORS.critical :
+                (a.severity === 'attention' ? COLORS.attention : COLORS.watch);
 
-            // Materials
-            var matHtml = '';
-            if (a.materials && a.materials.length) {
-                matHtml = '<div class="ins-struggle-materials">' +
-                    a.materials.map(function(m) {
-                        return '<span class="ins-material-tag">' + escapeHtml(m.name) + '</span>';
-                    }).join('') + '</div>';
-            }
+            var trendIcon = a.trend === 'up' ? '<span class="material-symbols-outlined" style="color:' + COLORS.critical + '">trending_up</span>' :
+                (a.trend === 'down' ? '<span class="material-symbols-outlined" style="color:' + COLORS.low + '">trending_down</span>' :
+                '<span class="material-symbols-outlined" style="color:' + COLORS.muted + '">trending_flat</span>');
 
-            return '<div class="ins-struggle-card severity-' + escapeHtml(a.severity) + '">' +
-                '<div class="ins-struggle-header">' +
-                '<div class="ins-struggle-topic">' +
-                '<span class="material-symbols-outlined ins-severity-icon">' + severityIcon + '</span>' +
-                '<strong>' + escapeHtml(a.topic) + '</strong>' +
-                '<span class="ins-severity-label">' + severityLabel + '</span>' +
+            return '<div class="ins-heatmap-row">' +
+                '<div class="ins-heatmap-label">' +
+                '<span class="ins-heatmap-topic">' + esc(a.topic) + '</span>' +
+                '<span class="ins-heatmap-students">' + a.student_count + '/' + a.total_students + ' students</span>' +
                 '</div>' +
-                trendHtml +
+                '<div class="ins-heatmap-bar-wrap">' +
+                '<div class="ins-heatmap-bar" style="width:' + score + '%;background:' + color + '">' +
+                '<span class="ins-heatmap-bar-val">' + score + '%</span>' +
+                '</div></div>' +
+                '<div class="ins-heatmap-meta">' +
+                trendIcon +
+                '<span class="ins-heatmap-qcount">' + a.question_count + ' Qs</span>' +
                 '</div>' +
-                '<div class="ins-struggle-narrative">' + escapeHtml(a.description) + '</div>' +
-                '<div class="ins-struggle-evidence">' +
-                '<span class="ins-evidence"><span class="material-symbols-outlined">quiz</span> ' + a.question_count + ' questions</span>' +
-                '<span class="ins-evidence"><span class="material-symbols-outlined">people</span> ' + a.student_count + ' of ' + a.total_students + ' students (' + a.student_pct + '%)</span>' +
-                '</div>' +
-                sqHtml +
-                '<div class="ins-struggle-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' +
-                escapeHtml(a.suggestion) + '</div>' +
-                matHtml +
                 '</div>';
         }).join('');
     }
 
-    function renderSectionStruggle(sections) {
-        var el = document.getElementById('ins-section-breakdown');
-        if (!el) return;
-        if (!sections || !sections.length) return;
-        el.innerHTML = '<h4 class="ins-sub-title">Course Sections</h4>' +
-            sections.map(function(s) {
-                var color = s.severity === 'critical' ? '#dc2626' :
-                    (s.severity === 'attention' ? '#f59e0b' : '#16a34a');
-                return '<div class="ins-section-bar">' +
-                    '<div class="ins-section-bar-header">' +
-                    '<span class="ins-section-name">' + escapeHtml(s.section_name) + '</span>' +
-                    '<span class="ins-section-pct" style="color:' + color + '">' + s.struggle_pct + '% struggling (' + s.student_count + ' students)</span>' +
-                    '</div>' +
-                    '<div class="ins-section-track"><div class="ins-section-fill" style="width:' + s.struggle_pct + '%;background:' + color + '"></div></div>' +
-                    '<div class="ins-section-hint">' + escapeHtml(s.hint) + '</div>' +
-                    '</div>';
-            }).join('');
-    }
-
-    function renderMaterialStruggle(materials) {
-        var el = document.getElementById('ins-material-struggle');
-        if (!el) return;
-        if (!materials || !materials.length) return;
-        el.innerHTML = '<h4 class="ins-sub-title">Materials Needing Attention</h4>' +
-            materials.map(function(m, i) {
-                return '<div class="ins-material-item">' +
-                    '<span class="ins-material-rank">#' + (i + 1) + '</span>' +
-                    '<div class="ins-material-info">' +
-                    '<div class="ins-material-name">' + escapeHtml(m.material_name) + ' <span class="ins-material-count">' + m.question_count + ' questions</span></div>' +
-                    '<div class="ins-material-suggestion">' + escapeHtml(m.suggestion) + '</div>' +
-                    '</div></div>';
-            }).join('');
-    }
-
     // ════════════════════════════════════════════════════════════════
-    // ZONE 3: Student Dossiers
+    // AT-RISK STUDENTS (compact list)
     // ════════════════════════════════════════════════════════════════
-    function renderStudentDossiers(students) {
+    function renderAtRiskStudents(students) {
         allStudentNarratives = students || [];
+
+        // Update badge count
+        var atRiskCount = students.filter(function(s) {
+            return s.risk_level === 'high' || s.risk_level === 'medium';
+        }).length;
+        var badge = document.getElementById('ins-at-risk-count');
+        if (badge) badge.textContent = atRiskCount;
+
         applyFilterAndRender();
     }
 
@@ -226,47 +264,44 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         var el = document.getElementById('ins-student-list');
         if (!el) return;
         var filtered = applyFilter(allStudentNarratives);
+
         if (!filtered.length) {
             el.innerHTML = '<div class="ins-empty">No students match the current filter.</div>';
             return;
         }
+
         el.innerHTML = filtered.map(function(s) {
             var riskClass = s.risk_level || 'low';
-            var riskLabel = riskClass === 'high' ? 'High Risk' :
-                (riskClass === 'medium' ? 'Medium Risk' : 'Low Risk');
+            var riskLabel = riskClass === 'high' ? 'High' :
+                (riskClass === 'medium' ? 'Med' : 'Low');
 
-            // Topic chips
-            var topicChips = '';
+            var topics = '';
             if (s.struggle_topics && s.struggle_topics.length) {
-                topicChips = '<div class="ins-student-topics">' +
-                    s.struggle_topics.slice(0, 3).map(function(t) {
-                        return '<span class="ins-topic-chip">' + escapeHtml(t) + '</span>';
-                    }).join('') + '</div>';
+                topics = '<span class="ins-student-topics-inline">' +
+                    s.struggle_topics.slice(0, 2).map(function(t) {
+                        return esc(t);
+                    }).join(', ') + '</span>';
             }
 
-            // Stats line
             var stats = [];
-            if (s.question_count > 0) stats.push(s.question_count + ' questions');
-            if (s.ai_queries > 0) stats.push(s.ai_queries + ' AI queries');
-            if (s.quiz_failures > 0) stats.push(s.quiz_failures + ' quiz fails');
-            var statsHtml = stats.length ? '<div class="ins-student-stats">' + stats.join(' · ') + '</div>' : '';
+            if (s.question_count > 0) stats.push(s.question_count + ' Qs');
+            if (s.ai_queries > 0) stats.push(s.ai_queries + ' AI');
+            if (s.quiz_failures > 0) stats.push(s.quiz_failures + ' F');
+            var statsStr = stats.length ? ' · ' + stats.join(' · ') : '';
 
-            // Suggestion
-            var sugHtml = s.suggestion ? '<div class="ins-student-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' + escapeHtml(s.suggestion) + '</div>' : '';
-
-            return '<div class="ins-student-card" data-uid="' + s.userid + '" onclick="window.struggleDashboard.loadStudentDetail(' + s.userid + ')">' +
-                '<div class="ins-student-header">' +
-                '<div class="ins-student-name-row">' +
-                '<img class="ins-student-avatar" src="' + escapeHtml(s.profileimageurl || '') + '" alt="" onerror="this.style.display=\'none\'">' +
-                '<strong class="ins-student-name">' + escapeHtml(s.fullname) + '</strong>' +
-                '</div>' +
+            return '<div class="ins-student-row" onclick="window.struggleDashboard.loadStudentDetail(' + s.userid + ')">' +
+                '<img class="ins-student-avatar-sm" src="' + esc(s.profileimageurl || '') + '" alt="" onerror="this.style.display=\'none\'">' +
+                '<div class="ins-student-row-body">' +
+                '<div class="ins-student-row-top">' +
+                '<strong class="ins-student-row-name">' + esc(s.fullname) + '</strong>' +
                 '<span class="ins-pill ins-pill-' + riskClass + '">' + riskLabel + '</span>' +
                 '</div>' +
-                '<div class="ins-student-summary">' + escapeHtml(s.summary) + '</div>' +
-                topicChips +
-                statsHtml +
-                '<div class="ins-student-meta">Last active: ' + escapeHtml(s.last_active) + '</div>' +
-                sugHtml +
+                '<div class="ins-student-row-meta">' +
+                topics +
+                (statsStr ? '<span class="ins-student-row-stats">' + statsStr + '</span>' : '') +
+                '</div>' +
+                '</div>' +
+                '<span class="ins-student-row-active">' + esc(s.last_active || '') + '</span>' +
                 '</div>';
         }).join('');
     }
@@ -274,18 +309,10 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
     function applyFilter(students) {
         if (filterMode === 'all') return students;
         return students.filter(function(s) {
-            if (filterMode === 'disengaged') {
-                return (s.days_since_last_login || 0) >= 3;
-            }
-            if (filterMode === 'struggling') {
-                return s.risk_score >= 40 && s.question_count >= 5;
-            }
-            if (filterMode === 'failing') {
-                return (s.quiz_failures || 0) > 0 || s.risk_score >= 60;
-            }
-            if (filterMode === 'issues') {
-                return (s.issue_reports || 0) > 0;
-            }
+            if (filterMode === 'disengaged') return (s.days_since_last_login || 0) >= 3;
+            if (filterMode === 'struggling') return s.risk_score >= 40 && s.question_count >= 5;
+            if (filterMode === 'failing') return (s.quiz_failures || 0) > 0 || s.risk_score >= 60;
+            if (filterMode === 'issues') return (s.issue_reports || 0) > 0;
             return true;
         });
     }
@@ -299,69 +326,30 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
     }
 
     // ════════════════════════════════════════════════════════════════
-    // ZONE 4: Question Radar
+    // COMMON QUESTIONS (compact list)
     // ════════════════════════════════════════════════════════════════
-    function renderQuestionRadar(questions) {
+    function renderCommonQuestions(questions) {
         var el = document.getElementById('ins-common-questions');
         if (!el) return;
         if (!questions || !questions.length) {
             el.innerHTML = '<div class="ins-empty">No common questions yet.</div>';
             return;
         }
-        el.innerHTML = questions.slice(0, 8).map(function(q) {
-            return '<div class="ins-question-card">' +
-                '<div class="ins-question-text">"' + escapeHtml(q.text) + '"</div>' +
-                '<div class="ins-question-meta">' + q.student_count + ' student' + (q.student_count !== 1 ? 's' : '') +
-                ' · ' + q.ask_count + ' time' + (q.ask_count !== 1 ? 's' : '') +
-                ' · Topic: <strong>' + escapeHtml(q.topic) + '</strong></div>' +
-                '<div class="ins-question-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' +
-                escapeHtml(q.suggestion) + '</div>' +
+
+        el.innerHTML = questions.slice(0, 6).map(function(q, i) {
+            var displayText = (q.text || '').replace(/^\[Referencing:\s*[^\]]+\]\s*/i, '');
+            if (displayText.length > 100) displayText = displayText.substring(0, 100) + '...';
+
+            return '<div class="ins-question-row">' +
+                '<div class="ins-question-rank">' + (i + 1) + '</div>' +
+                '<div class="ins-question-body">' +
+                '<div class="ins-question-text">' + esc(displayText) + '</div>' +
+                '<div class="ins-question-meta">' +
+                '<span class="ins-question-tag">' + esc(q.topic) + '</span>' +
+                '<span class="ins-question-count">' + q.student_count + ' students · ' + q.ask_count + ' times</span>' +
+                '</div></div>' +
                 '</div>';
         }).join('');
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // ZONE 5: Course Vitals
-    // ════════════════════════════════════════════════════════════════
-    function renderCoursePulse(pulse) {
-        var el = document.getElementById('ins-course-pulse');
-        if (!el) return;
-        if (!pulse || !pulse.total_students) {
-            el.innerHTML = '<div class="ins-empty">No pulse data available.</div>';
-            return;
-        }
-
-        function trendIcon(trend, pct) {
-            if (trend === 'up') return '<span class="ins-pulse-trend up">↑' + (pct || '') + '%</span>';
-            if (trend === 'down') return '<span class="ins-pulse-trend down">↓' + Math.abs(pct || 0) + '%</span>';
-            return '<span class="ins-pulse-trend stable">—</span>';
-        }
-
-        var html = '<div class="ins-pulse-card">' +
-            '<div class="ins-pulse-val">' + (pulse.avg_quiz || 0) + '%</div>' +
-            '<div class="ins-pulse-label">Avg Quiz</div>' +
-            trendIcon(pulse.quiz_trend, pulse.quiz_trend_pct) +
-            '</div>';
-
-        html += '<div class="ins-pulse-card">' +
-            '<div class="ins-pulse-val">' + (pulse.at_risk_count || 0) + '</div>' +
-            '<div class="ins-pulse-label">At Risk</div>' +
-            '<div class="ins-pulse-sub">of ' + pulse.total_students + ' students</div>' +
-            '</div>';
-
-        html += '<div class="ins-pulse-card">' +
-            '<div class="ins-pulse-val ins-pulse-topic">' + escapeHtml(pulse.top_struggle_topic || '—') + '</div>' +
-            '<div class="ins-pulse-label">Top Struggle</div>' +
-            '<div class="ins-pulse-sub">' + escapeHtml(pulse.top_struggle_trend || '') + '</div>' +
-            '</div>';
-
-        html += '<div class="ins-pulse-card">' +
-            '<div class="ins-pulse-val">' + (pulse.active_this_week || 0) + '</div>' +
-            '<div class="ins-pulse-label">Active This Week</div>' +
-            '<div class="ins-pulse-sub">of ' + pulse.total_students + ' students</div>' +
-            '</div>';
-
-        el.innerHTML = html;
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -376,9 +364,8 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         if (!panel || !body) return;
 
         panel.style.display = 'block';
-        body.innerHTML = '<div class="ins-empty">Loading profile…</div>';
+        body.innerHTML = '<div class="ins-empty">Loading profile...</div>';
 
-        // Find student from cache
         var s = null;
         for (var i = 0; i < allStudentNarratives.length; i++) {
             if (allStudentNarratives[i].userid === uid) { s = allStudentNarratives[i]; break; }
@@ -395,7 +382,7 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         }])[0].done(function(data) {
             if (!data) return;
             body.innerHTML =
-                '<div class="ins-detail-narrative">' + escapeHtml(s ? s.summary : '') + '</div>' +
+                '<div class="ins-detail-narrative">' + esc(s ? s.summary : '') + '</div>' +
                 '<div class="ins-detail-grid">' +
                 '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.risk_score || 0) + '</div><div class="ins-detail-stat-lbl">Risk Score</div></div>' +
                 '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.total_logins || 0) + '</div><div class="ins-detail-stat-lbl">Logins</div></div>' +
@@ -403,13 +390,13 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
                 '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.ai_queries || 0) + '</div><div class="ins-detail-stat-lbl">AI Queries</div></div>' +
                 '</div>';
             if (s && s.suggestion) {
-                body.innerHTML += '<div class="ins-detail-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' + escapeHtml(s.suggestion) + '</div>';
+                body.innerHTML += '<div class="ins-detail-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' + esc(s.suggestion) + '</div>';
             }
             if (data.interventions && data.interventions.length) {
                 body.innerHTML += '<div class="ins-detail-section-title">Recent Interventions</div>';
                 body.innerHTML += data.interventions.slice(0, 5).map(function(inv) {
                     return '<div class="ins-detail-intervention">' +
-                        '<span>' + escapeHtml(inv.action || '') + '</span>' +
+                        '<span>' + esc(inv.action || '') + '</span>' +
                         '<span class="ins-detail-intervention-meta">' + (inv.status || '') + ' · ' + new Date((inv.timecreated || 0) * 1000).toLocaleDateString() + '</span>' +
                         '</div>';
                 }).join('');
@@ -425,18 +412,10 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         currentDetailUid = 0;
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // Priority Action Handler
-    // ════════════════════════════════════════════════════════════════
     function handlePriorityAction(type) {
-        if (type === 'disengagement') {
-            setFilter('disengaged', document.querySelector('[data-filter="disengaged"]'));
-        } else if (type === 'recap_needed') {
-            setFilter('struggling', document.querySelector('[data-filter="struggling"]'));
-        } else if (type === 'issues') {
-            setFilter('issues', document.querySelector('[data-filter="issues"]'));
-        }
-        // Scroll to student section
+        if (type === 'disengagement') setFilter('disengaged', document.querySelector('[data-filter="disengaged"]'));
+        else if (type === 'recap_needed') setFilter('struggling', document.querySelector('[data-filter="struggling"]'));
+        else if (type === 'issues') setFilter('issues', document.querySelector('[data-filter="issues"]'));
         var zone = document.getElementById('ins-students-zone');
         if (zone) zone.scrollIntoView({ behavior: 'smooth' });
     }
@@ -459,9 +438,7 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         for (var i = 0; i < allStudentNarratives.length; i++) {
             if (allStudentNarratives[i].userid === currentDetailUid) { student = allStudentNarratives[i]; break; }
         }
-        if (student) {
-            if (recipient) recipient.textContent = 'To: ' + student.fullname + ' (' + student.risk_level + ')';
-        }
+        if (student && recipient) recipient.textContent = 'To: ' + student.fullname + ' (' + student.risk_level + ')';
 
         var templates = {
             encouragement: 'Hi {{name}}, I noticed you might be struggling with the course material. Remember that I\'m here to help — don\'t hesitate to reach out or use the AI assistant for extra support. Keep going!',
@@ -491,7 +468,7 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
 
         btn.disabled = true;
         status.style.display = 'block';
-        status.textContent = 'Sending…';
+        status.textContent = 'Sending...';
         status.style.color = 'var(--u-ol)';
 
         Ajax.call([{
@@ -504,19 +481,19 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
             }
         }])[0].done(function(resp) {
             if (resp.status === 'sent') {
-                status.textContent = '✓ Message sent successfully!';
+                status.textContent = 'Message sent successfully!';
                 status.style.color = 'var(--u-p)';
                 setTimeout(closeActionDrawer, 2000);
             } else if (resp.status === 'cooldown') {
-                status.textContent = '⏳ Already sent within 24h. Please wait.';
+                status.textContent = 'Already sent within 24h. Please wait.';
                 status.style.color = '#f59e0b';
             } else {
-                status.textContent = '✗ Failed: ' + (resp.message || 'Unknown error');
+                status.textContent = 'Failed: ' + (resp.message || 'Unknown error');
                 status.style.color = 'var(--u-ter)';
             }
             btn.disabled = false;
         }).fail(function() {
-            status.textContent = '✗ Connection error. Please try again.';
+            status.textContent = 'Connection error. Please try again.';
             status.style.color = 'var(--u-ter)';
             btn.disabled = false;
         });
@@ -556,7 +533,7 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
                 activeStream = null;
                 if (spinner) spinner.style.display = 'none';
                 input.disabled = false;
-                response.innerHTML = '<span style="color:var(--u-ter);">' + escapeHtml(err.message || 'Failed to query AI service.') + '</span>';
+                response.innerHTML = '<span style="color:var(--u-ter);">' + esc(err.message || 'Failed to query AI service.') + '</span>';
             }
         });
     }
@@ -564,7 +541,7 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
     // ════════════════════════════════════════════════════════════════
     // Utilities
     // ════════════════════════════════════════════════════════════════
-    function escapeHtml(s) {
+    function esc(s) {
         if (!s) return '';
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
@@ -582,4 +559,3 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         submitNLQ: submitNLQ
     };
 });
-

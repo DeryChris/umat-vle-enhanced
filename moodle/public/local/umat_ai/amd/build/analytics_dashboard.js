@@ -306,8 +306,9 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
             return;
         }
         el.innerHTML = questions.slice(0, 8).map(function(q) {
+            var displayText = (q.text || '').replace(/^\[Referencing:\s*[^\]]+\]\s*/i, '');
             return '<div class="ins-question-card">' +
-                '<div class="ins-question-text">"' + escapeHtml(q.text) + '"</div>' +
+                '<div class="ins-question-text">"' + escapeHtml(displayText) + '"</div>' +
                 '<div class="ins-question-meta">' + q.student_count + ' student' + (q.student_count !== 1 ? 's' : '') +
                 ' · ' + q.ask_count + ' time' + (q.ask_count !== 1 ? 's' : '') +
                 ' · Topic: <strong>' + escapeHtml(q.topic) + '</strong></div>' +

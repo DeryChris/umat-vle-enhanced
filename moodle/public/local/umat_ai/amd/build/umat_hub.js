@@ -9,6 +9,7 @@ var UID = data.userId;
 var streamUrl = data.streamUrl;
 var moodleSesskey = data.moodleSesskey;
 var sessKey = 'hub_'+Math.random().toString(36).substr(2,18);
+var _msgIdCounter = 0;
 /* Rolling 60s rate-limit window — mirrors the server check, refills as entries expire */
 var RATE_MAX = 10;
 var qTimes   = [];
@@ -123,7 +124,7 @@ function renderCourseTiles(courses,g){
       '</div>'+
       '<div class="yt-actions">'+
         '<button class="yt-btn" data-act="tutor" onclick="event.stopPropagation()"><span class="material-symbols-outlined">smart_toy</span>AI Tutor</button>'+
-        '<button class="yt-btn" data-act="library" onclick="event.stopPropagation()"><span class="material-symbols-outlined">local_library</span>Library</button>'+
+        '<button class="yt-btn" data-act="library" onclick="event.stopPropagation()"><span class="material-symbols-outlined">local_library</span>Resource Materials</button>'+
       '</div>'+
     '</div>';
   }).join('');
@@ -368,13 +369,20 @@ function qRemaining(){var now=Date.now();qTimes=qTimes.filter(function(t){return
 function syncRemaining(rem){if(typeof rem!=='number'||rem<0)return;var now=Date.now();while(qRemaining()>rem)qTimes.push(now);}
 function updateRate(){var left=qRemaining();var e=document.getElementById('hub-rate');if(e){e.textContent=left+' Q/min';e.style.color=left<=2?'var(--u-ter)':'';}}
 var _hubRateTimer=setInterval(updateRate,5000);
-function appendMsg(text,isUser,container,sources){
+function appendMsg(text,isUser,container,sources,mats){
   var d=document.createElement('div');
   var mid='msg_'+(++_msgIdCounter);
   d.setAttribute('data-msg-id',mid);
   d.setAttribute('data-msg-role',isUser?'user':'ai');
-  if(isUser)d.innerHTML='<div class="umat-msg-user"><div class="umat-bubble-user"><p>'+esc(text)+'</p></div><button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div>';
-  else{var srcs='';if(sources&&sources.length)srcs='<div class="umat-src-chips">'+sources.map(function(s){return '<span class="umat-src-chip">'+esc(s)+'</span>';}).join('')+'</div>';
+  if(isUser){
+    var refNames=[];var cleanQ=text;
+    var refMatch=cleanQ.match(/^\[Referencing:\s*([^\]]+)\]\s*/i);
+    if(refMatch){refNames=refMatch[1].split(',').map(function(s){return s.trim();}).filter(Boolean);cleanQ=cleanQ.substring(refMatch[0].length);}
+    if(mats&&mats.length&&!refNames.length)refNames=mats.map(function(m){return m.name||m;});
+    var chipHtml='';
+    if(refNames.length){chipHtml='<div class="umat-ref-chips">'+refNames.map(function(n){return '<span class="umat-ref-chip"><span class="material-symbols-outlined">attach_file</span>'+esc(n)+'</span>';}).join('')+'</div>';}
+    d.innerHTML='<div class="umat-msg-user"><div class="umat-bubble-user"><p>'+esc(cleanQ)+'</p></div>'+chipHtml+'<button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div>';
+  } else {var srcs='';if(sources&&sources.length)srcs='<div class="umat-src-chips">'+sources.map(function(s){return '<span class="umat-src-chip">'+esc(s)+'</span>';}).join('')+'</div>';
     d.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">'+_umatFormatAI(text)+'</div>'+srcs+'</div><button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div></div>';}
   var rb=d.querySelector('.umat-reply-btn');
   if(rb)rb.addEventListener('click',_umatHandleReply);
@@ -389,23 +397,27 @@ function sendQ(q){
   var ctx=selMat.length>0?'[Referencing: '+selMat.map(function(m){return m.name;}).join(', ')+'] '+q:q;
   var cid=parseInt(document.getElementById('hub-course-sel').value)||activeCID||defaultCID;
   var msgs=document.getElementById('hub-msgs');
-  appendMsg(q,true,msgs);var hi=document.getElementById('hub-input');if(hi){hi.value='';hi.style.height='auto';}
+  appendMsg(q,true,msgs,undefined,selMat);var hi=document.getElementById('hub-input');if(hi){hi.value='';hi.style.height='auto';}
   var tid='h_'+Date.now();
-  var t=document.createElement('div');t.id=tid;t.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-typing"><span></span><span></span><span></span></div></div></div></div>';
-  msgs.appendChild(t);msgs.scrollTop=msgs.scrollHeight;
+  _umatShowTyping('hub-msgs', tid);
   _umatStreamChat({
     url:streamUrl,sesskey:moodleSesskey,courseid:cid,question:ctx,session_key:sessKey,
     material_ids:selMat.map(function(m){return m.id;}),msgsId:'hub-msgs',
+    sendBtnId:'hub-chat-send',sendInputId:'hub-chat-input',
+    typingId:tid,
     onMeta:function(meta){syncRemaining(meta.remaining);updateRate();},
-    onDone:function(meta){var e=document.getElementById(tid);if(e)e.parentNode.removeChild(e);syncRemaining(meta.remaining);updateRate();},
+    onDone:function(meta){_umatHideTyping(tid);syncRemaining(meta.remaining);updateRate();},
     onError:function(err){
-      var e=document.getElementById(tid);if(e)e.parentNode.removeChild(e);
+      _umatHideTyping(tid);
       if(err.error==='rate_limit'){qTimes.pop();updateRate();}
       appendMsg(err.message||'Connection error.',false,msgs,[]);
     }
   });
 }
-var hubIn=document.getElementById('hub-input');var hubSend=document.getElementById('hub-send');
+/* Remove inline mustache handlers by cloning send/input elements */
+var origSend=document.getElementById('hub-chat-send');if(origSend){var ns=origSend.cloneNode(true);origSend.parentNode.replaceChild(ns,origSend);}
+var origInp=document.getElementById('hub-chat-input');if(origInp){var ni=origInp.cloneNode(true);origInp.parentNode.replaceChild(ni,origInp);ni.value=origInp.value||'';}
+var hubIn=document.getElementById('hub-chat-input');var hubSend=document.getElementById('hub-chat-send');
 hubSend.addEventListener('click',function(){sendQ(hubIn.value);});
 hubIn.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();hubSend.click();}});
 hubIn.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,200)+'px';});

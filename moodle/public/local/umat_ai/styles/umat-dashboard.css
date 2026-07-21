@@ -4682,3 +4682,511 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   CARD-BASED INSIGHTS LAYOUT + CHARTS
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Card Grid Rows ── */
+.ins-cards-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.ins-chart-row {
+  grid-template-columns: 1fr 1fr;
+}
+.ins-half-card {
+  background: var(--u-sflo);
+  border: 1px solid var(--u-olv);
+  border-radius: var(--u-r12);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 120px;
+}
+.ins-full-card {
+  background: var(--u-sflo);
+  border: 1px solid var(--u-olv);
+  border-radius: var(--u-r12);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ins-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--u-ons);
+  letter-spacing: .01em;
+}
+.ins-card-title .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--u-p);
+}
+.ins-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ── Stat Tiles ── */
+.ins-stat-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 12px;
+  background: var(--u-sflo);
+  border: 1px solid var(--u-olv);
+  border-radius: var(--u-r12);
+  text-align: center;
+  transition: box-shadow .15s ease;
+}
+.ins-stat-tile:hover {
+  box-shadow: 0 2px 12px rgba(0,0,0,.06);
+}
+.ins-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(59,130,246,.1);
+  color: var(--u-p);
+}
+.ins-stat-icon .material-symbols-outlined { font-size: 20px; }
+.ins-stat-icon-warn { background: rgba(220,38,38,.08); color: #dc2626; }
+.ins-stat-icon-ok   { background: rgba(34,197,94,.08); color: #22c55e; }
+.ins-stat-icon-blue { background: rgba(59,130,246,.08); color: #3b82f6; }
+.ins-stat-val {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--u-ons);
+  line-height: 1.1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.ins-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--u-ol);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.ins-stat-loading .ins-stat-val {
+  color: var(--u-olv);
+  animation: ins-shimmer 1.5s infinite ease-in-out;
+}
+
+/* ── Trend Pills ── */
+.ins-trend-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.ins-trend-pill.up {
+  background: rgba(220,38,38,.08);
+  color: #dc2626;
+}
+.ins-trend-pill.down {
+  background: rgba(34,197,94,.08);
+  color: #16a34a;
+}
+.ins-trend-extra {
+  display: flex;
+  align-items: center;
+}
+.ins-trend-sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--u-ol);
+}
+
+/* ── Donut Chart (CSS conic-gradient) ── */
+.ins-donut-container {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 8px 0;
+}
+.ins-donut-ring {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ins-donut-hole {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  bottom: 20px;
+  background: var(--u-sflo);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.ins-donut-center-val {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--u-ons);
+  line-height: 1;
+}
+.ins-donut-center-lbl {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--u-ol);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.ins-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ins-donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.ins-donut-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.ins-donut-label {
+  color: var(--u-ons);
+  font-weight: 500;
+  flex: 1;
+}
+.ins-donut-value {
+  color: var(--u-ol);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+/* ── Sparkline / Bar Comparison ── */
+.ins-sparkline-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+}
+.ins-bars-pair {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 24px;
+  height: 100px;
+  padding: 8px 0;
+}
+.ins-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.ins-bar-fill {
+  width: 40px;
+  min-height: 4px;
+  border-radius: 6px 6px 2px 2px;
+  transition: height .5s ease;
+}
+.ins-bar-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--u-ol);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.ins-bar-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--u-ons);
+}
+.ins-sparkline-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ins-sparkline-trend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.ins-sparkline-trend .material-symbols-outlined { font-size: 18px; }
+.ins-sparkline-sub {
+  font-size: 11px;
+  color: var(--u-ol);
+}
+
+/* ── Topic Heatmap (Horizontal Bars) ── */
+.ins-heatmap-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ins-heatmap-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--u-sf);
+  transition: background .15s;
+}
+.ins-heatmap-row:hover {
+  background: var(--u-sflo);
+}
+.ins-heatmap-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  max-width: 180px;
+  gap: 2px;
+}
+.ins-heatmap-topic {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--u-ons);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ins-heatmap-students {
+  font-size: 10px;
+  color: var(--u-ol);
+}
+.ins-heatmap-bar-wrap {
+  flex: 1;
+  height: 22px;
+  background: var(--u-olv);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+.ins-heatmap-bar {
+  height: 100%;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  min-width: 32px;
+  transition: width .6s ease;
+}
+.ins-heatmap-bar-val {
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.ins-heatmap-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 70px;
+  justify-content: flex-end;
+}
+.ins-heatmap-meta .material-symbols-outlined {
+  font-size: 16px;
+}
+.ins-heatmap-qcount {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--u-ol);
+}
+
+/* ── Student List (Compact Rows) ── */
+.ins-student-list-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.ins-student-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.ins-student-row:hover {
+  background: var(--u-sflo);
+}
+.ins-student-avatar-sm {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.ins-student-row-body {
+  flex: 1;
+  min-width: 0;
+}
+.ins-student-row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ins-student-row-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--u-ons);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ins-student-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+.ins-student-topics-inline {
+  font-size: 10px;
+  color: var(--u-ol);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ins-student-row-stats {
+  font-size: 10px;
+  color: var(--u-ol);
+  font-weight: 500;
+}
+.ins-student-row-active {
+  font-size: 10px;
+  color: var(--u-ol);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Questions List (Compact) ── */
+.ins-questions-list-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+.ins-question-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--u-sf);
+}
+.ins-question-rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--u-p);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.ins-question-body {
+  flex: 1;
+  min-width: 0;
+}
+.ins-question-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--u-ons);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ins-question-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.ins-question-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(59,130,246,.08);
+  color: var(--u-p);
+  font-size: 10px;
+  font-weight: 700;
+}
+.ins-question-count {
+  font-size: 10px;
+  color: var(--u-ol);
+}
+
+/* ── Chart Card wrapper ── */
+.ins-chart-card {
+  background: var(--u-sflo);
+  border: 1px solid var(--u-olv);
+  border-radius: var(--u-r12);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Insights Responsive ── */
+@media (max-width: 900px) {
+  .ins-cards-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ins-chart-row,
+  .ins-half-card + .ins-half-card {
+    grid-template-columns: 1fr;
+  }
+  .ins-heatmap-label {
+    min-width: 100px;
+  }
+}
+@media (max-width: 600px) {
+  .ins-cards-row {
+    grid-template-columns: 1fr;
+  }
+  .ins-donut-container {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+

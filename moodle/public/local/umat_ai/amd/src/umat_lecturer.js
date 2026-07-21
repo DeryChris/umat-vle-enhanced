@@ -358,9 +358,10 @@ function loadAnalytics(cid){
         if(!d.top_questions||!d.top_questions.length){qList.innerHTML='<div style="text-align:center;padding:32px;color:var(--u-ol);font-size:13px;">No questions logged yet.</div>';return;}
         var acts=['Prepare Response','Generate AI Summary','Add to FAQ','Create Quiz','Schedule Review'];
         qList.innerHTML=d.top_questions.map(function(q,i){
+          var displayText=(q.text||'').replace(/^\[Referencing:\s*[^\]]+\]\s*/i,'');
           return '<div class="umat-q-row">'+
             '<div class="umat-q-votes"><div class="v-n">'+q.ask_count+'</div><div class="v-l">votes</div></div>'+
-            '<div class="umat-q-content"><div class="umat-q-text">&ldquo;'+esc(q.text)+'&rdquo;</div><div class="umat-q-related">Related to: <span>Course Materials</span></div></div>'+
+            '<div class="umat-q-content"><div class="umat-q-text">&ldquo;'+esc(displayText)+'&rdquo;</div><div class="umat-q-related">Related to: <span>Course Materials</span></div></div>'+
             '<div class="umat-q-action"><button class="umat-q-action-btn" type="button">'+esc(acts[i%acts.length])+'</button></div></div>';
         }).join('');
       }
@@ -1445,10 +1446,14 @@ function openStrugglePicker(){
 }
 
 /* Compact panel lecturer AI send (streaming) */
+var lcpSelMats=[];
 function sendLecQ(q){
   q=(q||'').trim();if(!q)return;
   if(!CID){_umatAppendAi('lcp-msgs','Please open a course page first to ask about its analytics.',[]);return;}
-  _umatAppendUser('lcp-msgs',q);
+  var replyTxt=(typeof _getReplyContext==='function')?_getReplyContext():null;
+  if(replyTxt){q='[Replying to: "'+replyTxt+'"] '+q;_clearReplyContext();var rp=document.getElementById('umat-reply-preview');if(rp)rp.remove();}
+  if(lcpSelMats.length>0){q='[Referencing: '+lcpSelMats.map(function(m){return m.name;}).join(', ')+'] '+q;}
+  _umatAppendUser('lcp-msgs',q,lcpSelMats);
   var inp=document.getElementById('lcp-input');if(inp)inp.value='';
   var tid='lt_'+Date.now();_umatShowTyping('lcp-msgs',tid);
   
@@ -1458,8 +1463,10 @@ function sendLecQ(q){
     courseid: CID,
     question: q,
     session_key: 'lec_cp_' + CID,
-    material_ids: [],
+    material_ids: lcpSelMats.map(function(m){return m.id;}),
     msgsId: 'lcp-msgs',
+    sendBtnId: 'lcp-send',
+    sendInputId: 'lcp-input',
     typingId: tid,
     onMeta: function(meta){},
     onDone: function(meta){ _umatHideTyping(tid); },
@@ -1492,6 +1499,8 @@ if(aiMini&&aiFab)document.addEventListener('click',function(e){if(aiMini.style.d
 var miniIn=document.getElementById('lec-mini-input');var miniSend=document.getElementById('lec-mini-send');
 if(miniSend)miniSend.addEventListener('click',function(){
   var q=(miniIn.value||'').trim();if(!q)return;
+  var replyTxt=(typeof _getReplyContext==='function')?_getReplyContext():null;
+  if(replyTxt){q='[Replying to: "'+replyTxt+'"] '+q;_clearReplyContext();var rp=document.getElementById('umat-reply-preview');if(rp)rp.remove();}
   _umatAppendUser('lec-mini-msgs',q);
   miniIn.value='';
   var tid='lt_mini_'+Date.now();_umatShowTyping('lec-mini-msgs',tid);
@@ -1504,6 +1513,8 @@ if(miniSend)miniSend.addEventListener('click',function(){
     session_key: 'lec_mini_' + CID,
     material_ids: [],
     msgsId: 'lec-mini-msgs',
+    sendBtnId: 'lec-mini-send',
+    sendInputId: 'lec-mini-input',
     typingId: tid,
     onMeta: function(meta){},
     onDone: function(meta){ _umatHideTyping(tid); },
@@ -1548,6 +1559,23 @@ function pollIssueCount(){
 }
 pollIssueCount();
 var _lecBadgeTimer=setInterval(pollIssueCount,30000);
+
+/* Lecturer compact panel attachment drawer */
+_umatInitAttachDrawer({
+  getCourseId:function(){return CID||0;},
+  drawerId:'lcp-attach-drawer',
+  attachBtnId:'lcp-attach-btn',
+  closeBtnId:'lcp-drawer-close',
+  clearId:'lcp-drawer-clear',
+  searchId:'lcp-drawer-search',
+  catsId:'lcp-drawer-cats',
+  recentId:'lcp-drawer-recent',
+  listId:'lcp-drawer-list',
+  confirmId:'lcp-drawer-confirm',
+  countId:'lcp-drawer-count',
+  maxSelections:20,
+  onConfirm:function(mats){lcpSelMats=mats;_umatRenderMatsBar('lcp-mat-bar','lcp-attach-btn',lcpSelMats,function(id){lcpSelMats=lcpSelMats.filter(function(s){return s.id!=id;});return lcpSelMats;});}
+});
 
 /* ESC: close nested-first, root-last */
 _umatInitEsc([

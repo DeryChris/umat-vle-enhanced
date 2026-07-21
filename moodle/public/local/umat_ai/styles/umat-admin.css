@@ -1,19 +1,64 @@
-/* ── Admin Control FAB ── */
+/* ── Health Status Badges ── */
+.umat-hlth-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 700;
+  transition: opacity .3s ease;
+}
+.umat-hlth-badge.online  { background: #dcfce7; color: #065f46; }
+.umat-hlth-badge.offline { background: #fee2e2; color: #991b1b; }
+.umat-hlth-badge.loading { background: #f0f0f0; color: #6b7280; }
+.umat-hlth-badge .spinner {
+  display: inline-block; width: 10px; height: 10px;
+  border: 2px solid #d1d5db; border-top-color: #6b7280;
+  border-radius: 50%; animation: uspin .7s linear infinite;
+}
+.umat-hlth-label { font-size: 10px; color: var(--u-ol); }
+/* Last-checked timestamp */
+.umat-hlth-footer {
+  font-size: 9.5px; color: var(--u-ol); margin-top: 6px;
+  display: flex; align-items: center; gap: 6px;
+}
+.umat-hlth-footer button {
+  background: none; border: none; cursor: pointer;
+  color: var(--u-p); font-size: 9.5px; font-weight: 600;
+  font-family: inherit; padding: 0; text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── Health Card Metric Value ── */
+.umat-hlth-val {
+  font-size: 22px; font-weight: 800; line-height: 1.2;
+  transition: opacity .3s ease;
+}
+.umat-hlth-val.loading { opacity: .4; }
+.umat-hlth-sub {
+  font-size: 10px; color: var(--u-ol);
+}
+.umat-hlth-sub.loading {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: #9ca3af;
+}
+.umat-hlth-sub .spinner {
+  display: inline-block; width: 8px; height: 8px;
+  border: 1.5px solid #d1d5db; border-top-color: #9ca3af;
+  border-radius: 50%; animation: uspin .7s linear infinite;
+}
 .umat-fab-admin {
-  background: linear-gradient(135deg, #003580, #1e3a8a) !important;
+  background: linear-gradient(135deg, var(--u-p), var(--u-pb)) !important;
   color: #fff !important;
-  box-shadow: 0 4px 16px rgba(0, 53, 128, 0.35) !important;
+  box-shadow: 0 4px 16px rgba(0, 107, 47, 0.35) !important;
 }
 .umat-fab-admin:hover {
-  box-shadow: 0 6px 24px rgba(0, 53, 128, 0.5) !important;
+  box-shadow: 0 6px 24px rgba(0, 107, 47, 0.5) !important;
   transform: scale(1.05);
 }
 .umat-fab-admin .umat-fab-tip {
-  background: #1e3a8a !important;
+  background: var(--u-p) !important;
   color: #fff !important;
 }
 
-/* ── Admin Compact Panel ── */
+/* ── Admin Compact Panel Header — Green ── */
 .umat-cp-admin .umat-cp-hdr {
   position: relative;
   overflow: hidden;
@@ -34,18 +79,17 @@
   display: flex !important;
 }
 
-/* ── Expanded Admin Overlay — Blue Theme ── */
+/* ── Expanded Admin Overlay — Green Theme ── */
 #admin-ov {
-  background: #f8faff !important;
-  background-color: #f8faff !important;
+  background: var(--u-sf) !important;
 }
-/* Sidebar body - dark blue so white text is visible */
+/* Sidebar body — dark green so white text is visible */
 #admin-ov .umat-sb {
-  background: linear-gradient(180deg, #1e3a8a 0%, #0f2557 100%);
+  background: linear-gradient(180deg, #004d22 0%, #002f12 100%);
 }
 /* Sidebar head */
 #admin-ov .umat-sb-head {
-  background: linear-gradient(135deg, #003580, #1e3a8a);
+  background: linear-gradient(135deg, var(--u-p), var(--u-pb));
   color: #fff;
 }
 #admin-ov .umat-sb-head .umat-sb-brand strong {
@@ -99,9 +143,9 @@
 #admin-ov .umat-sb-item.active::before {
   background: #fff;
 }
-/* Content headers — blue gradient */
+/* Content headers — green gradient */
 #admin-ov .umat-content-hdr {
-  background: linear-gradient(135deg, #003580, #1e3a8a);
+  background: linear-gradient(135deg, var(--u-p), var(--u-pb));
 }
 #admin-ov .umat-content-hdr h2 {
   color: #fff;
@@ -125,15 +169,17 @@
 /* Sidebar collapsed tooltip override */
 #admin-ov .umat-sb.collapsed .umat-sb-item:hover::after,
 #admin-ov .umat-sb.collapsed .umat-sb-new:hover::after {
-  background: #1e3a8a;
+  background: #004d22;
   color: #fff;
 }
 
 /* ── Dashboard Health Cards ── */
-#acp-health-grid > div {
+#acp-health-grid > div,
+#aexp-health-grid > div {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-#acp-health-grid > div:hover {
+#acp-health-grid > div:hover,
+#aexp-health-grid > div:hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
@@ -174,23 +220,31 @@
 }
 
 /* ── Toggle row ── */
-#acp-toggles label {
+#acp-toggles label,
+#aexp-toggles label {
   transition: background 0.15s ease;
 }
-#acp-toggles label:hover {
+#acp-toggles label:hover,
+#aexp-toggles label:hover {
   background: var(--u-sf) !important;
 }
 
 /* ── Config inputs ── */
 #acp-config input[type="text"],
 #acp-config input[type="number"],
-#acp-config input[type="password"] {
+#acp-config input[type="password"],
+#aexp-config input[type="text"],
+#aexp-config input[type="number"],
+#aexp-config input[type="password"] {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   box-sizing: border-box;
 }
 #acp-config input[type="text"]:focus,
 #acp-config input[type="number"]:focus,
-#acp-config input[type="password"]:focus {
+#acp-config input[type="password"]:focus,
+#aexp-config input[type="text"]:focus,
+#aexp-config input[type="number"]:focus,
+#aexp-config input[type="password"]:focus {
   outline: none;
   border-color: var(--u-p) !important;
   box-shadow: 0 0 0 2px rgba(0,107,47,0.12);
@@ -199,6 +253,9 @@
 /* ── Mobile responsive ── */
 @media (max-width: 480px) {
   #acp-health-grid {
+    grid-template-columns: 1fr !important;
+  }
+  #aexp-health-grid {
     grid-template-columns: 1fr !important;
   }
 }

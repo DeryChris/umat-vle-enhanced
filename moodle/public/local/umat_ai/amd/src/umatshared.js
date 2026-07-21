@@ -29,6 +29,9 @@ define([], function() {
             return '%%CB' + idx + '%%';
         });
 
+        /* Convert HTML line breaks to newlines before escaping */
+        text = text.replace(/<br\s*\/?>/gi, '\n');
+
         /* HTML-escape remaining text */
         text = _umatEsc(text);
 
@@ -226,14 +229,32 @@ define([], function() {
         }
     }
 
-    function _umatAppendUser(cid, q) {
+    function _umatAppendUser(cid, q, mats) {
         var c = document.getElementById(cid);
         if (!c) return;
+        /* Strip [Referencing: ...] prefix if present — display as chips instead */
+        var refNames = [];
+        var cleanQ = q;
+        var refMatch = cleanQ.match(/^\[Referencing:\s*([^\]]+)\]\s*/i);
+        if (refMatch) {
+            refNames = refMatch[1].split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+            cleanQ = cleanQ.substring(refMatch[0].length);
+        }
+        /* Also accept mats param (array of {name,id}) */
+        if (mats && mats.length && !refNames.length) {
+            refNames = mats.map(function(m){ return m.name || m; });
+        }
+        var chipHtml = '';
+        if (refNames.length) {
+            chipHtml = '<div class="umat-ref-chips">' + refNames.map(function(n) {
+                return '<span class="umat-ref-chip"><span class="material-symbols-outlined">attach_file</span>' + _umatEsc(n) + '</span>';
+            }).join('') + '</div>';
+        }
         var d = document.createElement('div');
         var mid = 'msg_' + (++_msgIdCounter);
         d.setAttribute('data-msg-id', mid);
         d.setAttribute('data-msg-role', 'user');
-        d.innerHTML = '<div class="umat-msg-user"><div class="umat-bubble-user"><p>' + _umatEsc(q) + '</p></div><button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div>';
+        d.innerHTML = '<div class="umat-msg-user"><div class="umat-bubble-user"><p>' + _umatEsc(cleanQ) + '</p></div>' + chipHtml + '<button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div>';
         d.querySelector('.umat-reply-btn').addEventListener('click', _umatHandleReply);
         c.appendChild(d);
         c.scrollTop = c.scrollHeight;
@@ -379,13 +400,35 @@ define([], function() {
         function _disableSend() {
             if (sendBtnId) {
                 var btn = document.getElementById(sendBtnId);
-                if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
+                if (btn) {
+                    btn.disabled = false; /* keep clickable for stop */
+                    btn.setAttribute('aria-busy', 'true');
+                    btn.classList.add('is-stop');
+                    var icon = btn.querySelector('.material-symbols-outlined');
+                    if (icon) icon.textContent = 'stop_circle';
+                    /* capture-phase handler aborts stream before bubble handlers fire */
+                    btn._stopStreamHandler = function(e) {
+                        e.stopImmediatePropagation();
+                        try { controller.abort(); } catch(ex) {}
+                    };
+                    btn.addEventListener('click', btn._stopStreamHandler, true);
+                }
             }
         }
         function _enableSend() {
             if (sendBtnId) {
                 var btn = document.getElementById(sendBtnId);
-                if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); }
+                if (btn) {
+                    btn.disabled = false;
+                    btn.removeAttribute('aria-busy');
+                    btn.classList.remove('is-stop');
+                    var icon = btn.querySelector('.material-symbols-outlined');
+                    if (icon) icon.textContent = 'arrow_upward';
+                    if (btn._stopStreamHandler) {
+                        btn.removeEventListener('click', btn._stopStreamHandler, true);
+                        btn._stopStreamHandler = null;
+                    }
+                }
             }
         }
         _disableSend();

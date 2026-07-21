@@ -4,6 +4,8 @@ namespace local_umat_ai\external;
 
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->libdir . '/externallib.php');
+require_once($CFG->libdir . '/filelib.php');
+require_once($CFG->dirroot . '/local/umat_ai/lib.php');
 
 class admin_panel extends \external_api {
 
@@ -138,33 +140,73 @@ class admin_panel extends \external_api {
         require_capability('local/umat_ai:adminpanel', $context);
 
         $cfg  = \local_umat_ai_get_service_config();
-        $client = new \curl(['ignoresecurity' => \local_umat_ai_is_localhost($cfg['url'])]);
-        $client->setHeader([
-            'Authorization: Bearer ' . $cfg['token'],
-            'X-Request-Id: ' . \local_umat_ai_request_id(),
-        ]);
-        $client->setopt(['CURLOPT_TIMEOUT' => 5, 'CURLOPT_CONNECTTIMEOUT' => 3]);
+        $serviceUrl = rtrim($cfg['url'], '/') . '/api/v1/admin/health';
+        $online = false;
+        $latency = 0;
+        $errorDetail = '';
+        $chromaCollections = 0;
+        $chromaDocuments = 0;
+        $pythonMemoryMb = 0;
 
-        $start = microtime(true);
-        $raw   = $client->get($cfg['url'] . '/api/v1/admin/health');
-        $latency = round((microtime(true) - $start) * 1000);
-        $data  = json_decode($raw, true);
+        if (empty($cfg['token'])) {
+            $errorDetail = 'AI service token not configured';
+        } else {
+            try {
+                $client = new \curl(['ignoresecurity' => \local_umat_ai_is_localhost($cfg['url'])]);
+                $client->setHeader([
+                    'Authorization: Bearer ' . $cfg['token'],
+                    'X-Request-Id: ' . \local_umat_ai_request_id(),
+                ]);
+                $client->setopt(['CURLOPT_TIMEOUT' => 5, 'CURLOPT_CONNECTTIMEOUT' => 3]);
 
-        $online  = !empty($data['status']) && $data['status'] === 'healthy';
+                $start = microtime(true);
+                $raw   = $client->get($serviceUrl);
+                $latency = round((microtime(true) - $start) * 1000);
+                $httpCode = $client->get_info()['http_code'] ?? 0;
+                $curlErr = $client->get_errno();
+
+                if ($curlErr) {
+                    $errorMap = [
+                        CURLE_OPERATION_TIMEDOUT => 'Connection timed out (5s)',
+                        CURLE_COULDNT_CONNECT    => 'Could not connect — is the AI service running?',
+                        CURLE_COULDNT_RESOLVE_HOST => 'Could not resolve host',
+                        CURLE_SSL_CONNECT_ERROR  => 'SSL connection error',
+                    ];
+                    $errorDetail = $errorMap[$curlErr] ?? "cURL error ($curlErr)";
+                } elseif ($httpCode !== 200) {
+                    $errorDetail = "AI service returned HTTP $httpCode";
+                } else {
+                    $data = json_decode($raw, true);
+                    if (!empty($data['status']) && $data['status'] === 'healthy') {
+                        $online = true;
+                        $chromaCollections = (int)($data['chroma_collections'] ?? 0);
+                        $chromaDocuments = (int)($data['chroma_total_documents'] ?? 0);
+                        $pythonMemoryMb = (float)($data['python_memory_mb'] ?? 0);
+                    } else {
+                        $errorDetail = 'AI service returned unexpected status';
+                    }
+                }
+            } catch (\Throwable $e) {
+                $errorDetail = 'Error: ' . $e->getMessage();
+            }
+        }
 
         global $DB;
         $cronlast = $DB->get_field_sql('SELECT MAX(lastruntime) FROM {task_scheduled}');
         $cronfresh = $cronlast && (time() - (int)$cronlast) < 600;
 
         return [
-            'online'          => $online,
-            'latency_ms'      => $latency,
-            'chroma_collections' => (int)($data['chroma_collections'] ?? 0),
-            'chroma_documents'   => (int)($data['chroma_total_documents'] ?? 0),
-            'python_memory_mb'   => (float)($data['python_memory_mb'] ?? 0),
-            'cron_last_run'   => $cronlast ? (int)$cronlast : 0,
-            'cron_fresh'      => $cronfresh,
-            'plugin_version'  => function_exists('get_component_version') ? 'v'.(get_component_version('local_umat_ai') ?: 'unknown') : 'unknown',
+            'online'             => $online,
+            'latency_ms'         => $latency,
+            'error_detail'       => $errorDetail,
+            'service_url'        => $serviceUrl,
+            'token_configured'   => !empty($cfg['token']),
+            'chroma_collections' => $chromaCollections,
+            'chroma_documents'   => $chromaDocuments,
+            'python_memory_mb'   => $pythonMemoryMb,
+            'cron_last_run'     => $cronlast ? (int)$cronlast : 0,
+            'cron_fresh'        => $cronfresh,
+            'plugin_version'    => 'v' . (get_config('local_umat_ai', 'version') ?: 'unknown'),
         ];
     }
 
@@ -172,6 +214,9 @@ class admin_panel extends \external_api {
         return new \external_single_structure([
             'online'            => new \external_value(PARAM_BOOL, 'AI service reachable'),
             'latency_ms'        => new \external_value(PARAM_INT, 'Response time in ms'),
+            'error_detail'      => new \external_value(PARAM_RAW, 'Error description if offline'),
+            'service_url'       => new \external_value(PARAM_URL, 'AI service URL that was called'),
+            'token_configured'  => new \external_value(PARAM_BOOL, 'Whether an AI token is set'),
             'chroma_collections'=> new \external_value(PARAM_INT, 'Number of ChromaDB collections'),
             'chroma_documents'  => new \external_value(PARAM_INT, 'Total documents in ChromaDB'),
             'python_memory_mb'  => new \external_value(PARAM_FLOAT, 'Python process memory'),

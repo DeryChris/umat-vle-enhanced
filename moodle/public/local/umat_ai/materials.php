@@ -137,8 +137,8 @@ echo $OUTPUT->header();
 
 <form method="post" enctype="multipart/form-data" class="mb-4">
     <div class="mb-3">
-        <label for="material" class="form-label">Select File (PDF, DOCX, PPTX, TXT)</label>
-        <input type="file" name="material" id="material" class="form-control" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt" required>
+        <label for="material" class="form-label">Select File (PDF, DOCX, PPTX, TXT, MP4, AVI, etc.)</label>
+        <input type="file" name="material" id="material" class="form-control" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.mp4,.avi,.mov,.mkv,.webm,.png,.jpg,.jpeg,.gif,.bmp" required>
     </div>
     <button type="submit" class="btn btn-primary">Upload and Index</button>
 </form>

@@ -617,5 +617,27 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026072000, 'local', 'umat_ai');
     }
 
+    if ($oldversion < 2026072100) {
+        // Add reporter columns to issue_reports for unauthenticated login-page reports.
+        $table = new xmldb_table('umat_ai_issue_reports');
+        $f1 = new xmldb_field('reporter_name', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'lecturer_notes');
+        $f2 = new xmldb_field('reporter_username', XMLDB_TYPE_CHAR, '100', null, null, null, null, 'reporter_name');
+        if (!$dbman->field_exists($table, $f1)) $dbman->add_field($table, $f1);
+        if (!$dbman->field_exists($table, $f2)) $dbman->add_field($table, $f2);
+
+        // Create rate-limit log table for login-page course lookups.
+        $logTable = new xmldb_table('umat_ai_login_lookup_log');
+        if (!$dbman->table_exists($logTable)) {
+            $logTable->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $logTable->add_field('ip_address', XMLDB_TYPE_CHAR, '45', null, XMLDB_NOTNULL, null, null);
+            $logTable->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $logTable->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $logTable->add_index('ip_time', XMLDB_INDEX_NOTUNIQUE, ['ip_address', 'timecreated']);
+            $dbman->create_table($logTable);
+        }
+
+        upgrade_plugin_savepoint(true, 2026072100, 'local', 'umat_ai');
+    }
+
     return true;
 }
