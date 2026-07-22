@@ -190,6 +190,7 @@ class issue_report extends \external_api {
                 'status'            => $r->status,
                 'lecturer_notes'    => $r->lecturer_notes ?? '',
                 'lecturer_response' => $r->lecturer_response ?? '',
+                'timereplied'       => (int)($r->timereplied ?? 0),
                 'timecreated'       => (int)$r->timecreated,
                 'timemodified'      => (int)$r->timemodified,
             ];
@@ -211,6 +212,7 @@ class issue_report extends \external_api {
                     'status'            => new \external_value(PARAM_ALPHAEXT, 'Status'),
                     'lecturer_notes'    => new \external_value(PARAM_RAW, 'Lecturer private notes'),
                     'lecturer_response' => new \external_value(PARAM_RAW, 'Lecturer public response to student'),
+                    'timereplied'       => new \external_value(PARAM_INT, 'Timestamp when lecturer replied', VALUE_OPTIONAL),
                     'timecreated'       => new \external_value(PARAM_INT, 'Created timestamp'),
                     'timemodified'      => new \external_value(PARAM_INT, 'Modified timestamp'),
                 ])
@@ -295,10 +297,14 @@ class issue_report extends \external_api {
         self::validate_context($context);
         issue_manager::require_manage_course((int)$record->courseid);
 
+        $now = time();
         $DB->update_record('umat_ai_issue_reports', (object)[
             'id'                => $issue_id,
             'lecturer_response' => $response !== '' ? $response : null,
-            'timemodified'      => time(),
+            'status'            => $response !== '' ? 'resolved' : $record->status,
+            'timereplied'       => $response !== '' ? $now : null,
+            'response_seen'     => 0,
+            'timemodified'      => $now,
         ]);
 
         return ['success' => true, 'message' => 'Response saved.'];
@@ -369,7 +375,7 @@ class issue_report extends \external_api {
     }
 
     // ------------------------------------------------------------------ //
-    // get_unresponded_issues_count — lecturer counts issues needing reply //
+    // get_unresponded_issues_count — lecturer counts unresolved issues needing reply //
     // ------------------------------------------------------------------ //
     public static function get_unresponded_issues_count_parameters() {
         return new \external_function_parameters([
@@ -386,15 +392,11 @@ class issue_report extends \external_api {
         self::validate_context($ctx);
         require_capability('local/umat_ai:viewanalytics', $ctx);
 
-        $sql = 'SELECT COUNT(*) FROM {umat_ai_issue_reports}';
-        $args = [];
-        $wheres = [];
+        $sql = 'SELECT COUNT(*) FROM {umat_ai_issue_reports} WHERE status IN (?,?)';
+        $args = ['open', 'in_review'];
         if ($cid > 0) {
-            $wheres[] = 'courseid = ?';
+            $sql .= ' AND courseid = ?';
             $args[] = $cid;
-        }
-        if (!empty($wheres)) {
-            $sql .= ' WHERE ' . implode(' AND ', $wheres);
         }
         return ['count' => (int)$DB->get_field_sql($sql, $args)];
     }

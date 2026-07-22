@@ -15,6 +15,143 @@ var moodleSesskey = data.moodleSesskey;
 var anLoaded = {};
 var lecLoaded= {};
 var struggleCache = {};
+var lecSessionKey = ''; /* current session key for chat; empty = fresh session */
+
+/* ─── Resume session in CP Ask AI tab (called from CP sessions) ─── */
+function resumeLecSession(sk, cid, cname) {
+  lecSessionKey = sk;
+  if (cid) CID = cid;
+  openPanel();
+  showLcpPane('lcp-ai');
+  var msgs = document.getElementById('lcp-msgs');
+  if (!msgs) return;
+  msgs.innerHTML = '<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading session…</p></div>';
+  ajax('local_umat_ai_get_chat_history', {courseid: CID, session_key: sk, limit: 50}, function(r) {
+    msgs.innerHTML = '';
+    var w = document.createElement('div');
+    w.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>'
+      + '<div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI ASSISTANT</div>'
+      + '<div class="umat-bubble-ai"><p>Session resumed for <strong>' + esc(cname || 'your course') + '</strong>. Continue your conversation below.</p></div></div></div>';
+    msgs.appendChild(w);
+    (r.messages || []).forEach(function(m) {
+      _umatAppendUser('lcp-msgs', m.question, []);
+      if (m.answer) _umatAppendAi('lcp-msgs', m.answer, m.sources || []);
+    });
+    msgs.scrollTop = msgs.scrollHeight;
+  }, function() {
+    msgs.innerHTML = '<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load session history.</p></div>';
+  });
+}
+window.resumeLecSession = resumeLecSession;
+
+/* ─── Resume session inline in full overlay sessions tab ─── */
+function resumeLecSessionInline(sk, cid, cname) {
+  var sessPane = document.getElementById('lec-sessions');
+  if (!sessPane) return;
+  /* Hide session list UI, show inline chat */
+  var listUI = sessPane.querySelectorAll('.umat-content-hdr, .umat-sess-toggle, .umat-cs-overlay, .umat-sessions-list');
+  listUI.forEach(function(el){ el.style.display = 'none'; });
+
+  /* Build inline chat panel */
+  var chatId = 'lec-sess-chat';
+  var chatEl = document.getElementById(chatId);
+  if (!chatEl) {
+    chatEl = document.createElement('div');
+    chatEl.id = chatId;
+    chatEl.style.cssText = 'display:flex;flex-direction:column;position:absolute;inset:0;background:var(--u-bg);z-index:5;';
+    sessPane.appendChild(chatEl);
+  }
+  chatEl.innerHTML = ''
+    /* Header with back button + session title */
+    + '<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--u-olv);flex-shrink:0;">'
+    +   '<button id="lec-sess-chat-back" type="button" style="background:none;border:none;cursor:pointer;padding:4px;border-radius:var(--u-r6);display:flex;align-items:center;color:var(--u-p);" title="Back to sessions">'
+    +     '<span class="material-symbols-outlined">arrow_back</span></button>'
+    +   '<div style="flex:1;min-width:0;">'
+    +     '<div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(cname || 'AI Session') + '</div>'
+    +     '<div style="font-size:10px;color:var(--u-ol);">Resumed session</div>'
+    +   '</div>'
+    +   '<button id="lec-sess-chat-close" type="button" style="background:none;border:none;cursor:pointer;padding:4px;border-radius:var(--u-r6);color:var(--u-ol);" title="End session">'
+    +     '<span class="material-symbols-outlined">close</span></button>'
+    + '</div>'
+    /* Messages area */
+    + '<div class="umat-msgs" id="lec-sess-chat-msgs" style="flex:1;overflow-y:auto;padding:16px;"></div>'
+    /* Chatbar */
+    + '<div class="umat-chat-overlay" style="position:relative;">'
+    +   '<div class="umat-chatbar">'
+    +     '<textarea id="lec-sess-chat-input" class="umat-chatbar-input" placeholder="Continue the conversation…" rows="1" maxlength="700"></textarea>'
+    +     '<button class="umat-chatbar-send" id="lec-sess-chat-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>'
+    +   '</div>'
+    + '</div>';
+  chatEl.style.display = 'flex';
+
+  /* Wire back button */
+  var backBtn = document.getElementById('lec-sess-chat-back');
+  if (backBtn) backBtn.addEventListener('click', function() {
+    chatEl.style.display = 'none';
+    listUI.forEach(function(el){ el.style.display = ''; });
+  });
+  var closeBtn = document.getElementById('lec-sess-chat-close');
+  if (closeBtn) closeBtn.addEventListener('click', function() {
+    chatEl.style.display = 'none';
+    listUI.forEach(function(el){ el.style.display = ''; });
+  });
+
+  /* Load history */
+  var msgsEl = document.getElementById('lec-sess-chat-msgs');
+  msgsEl.innerHTML = '<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading session…</p></div>';
+
+  ajax('local_umat_ai_get_chat_history', {courseid: cid || CID, session_key: sk, limit: 50}, function(r) {
+    msgsEl.innerHTML = '';
+    /* Welcome */
+    var w = document.createElement('div');
+    w.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>'
+      + '<div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI ASSISTANT</div>'
+      + '<div class="umat-bubble-ai"><p>Session resumed for <strong>' + esc(cname || 'your course') + '</strong>. Continue your conversation below.</p></div></div></div>';
+    msgsEl.appendChild(w);
+    (r.messages || []).forEach(function(m) {
+      _umatAppendUser('lec-sess-chat-msgs', m.question, []);
+      if (m.answer) _umatAppendAi('lec-sess-chat-msgs', m.answer, m.sources || []);
+    });
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }, function() {
+    msgsEl.innerHTML = '<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load session history.</p></div>';
+  });
+
+  /* Wire send */
+  var chatInp = document.getElementById('lec-sess-chat-input');
+  var chatSend = document.getElementById('lec-sess-chat-send');
+  function sendInlineSessQ() {
+    var q = (chatInp.value || '').trim();
+    if (!q) return;
+    _umatAppendUser('lec-sess-chat-msgs', q, []);
+    chatInp.value = '';
+    var tid = 'lt_sess_' + Date.now();
+    _umatShowTyping('lec-sess-chat-msgs', tid);
+    _umatStreamChat({
+      url: streamUrl,
+      sesskey: moodleSesskey,
+      courseid: cid || CID,
+      question: q,
+      session_key: sk,
+      material_ids: [],
+      msgsId: 'lec-sess-chat-msgs',
+      sendBtnId: 'lec-sess-chat-send',
+      sendInputId: 'lec-sess-chat-input',
+      typingId: tid,
+      onMeta: function(){},
+      onDone: function(){ _umatHideTyping(tid); },
+      onError: function(err){
+        _umatHideTyping(tid);
+        _umatAppendAi('lec-sess-chat-msgs', err.message || 'An error occurred.', []);
+      }
+    });
+  }
+  if (chatSend) chatSend.addEventListener('click', sendInlineSessQ);
+  if (chatInp) chatInp.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatSend) chatSend.click(); }
+  });
+}
+window.resumeLecSessionInline = resumeLecSessionInline;
 
 
 /* ----- LECTURER COURSE TILES ----- */
@@ -186,12 +323,13 @@ function renderLcpSessions(body){
       });
     });
 
-    /* Wire card click → open full dashboard sessions tab */
+    /* Wire card click → resume session in chat */
     body.querySelectorAll('.umat-cp-list-card').forEach(function(card){
       card.addEventListener('click',function(e){
         if(e.target.closest('.umat-cp-del-session'))return;
-        openDash();
-        switchPane('lec-sessions');
+        var sk=card.dataset.sk,cid=parseInt(card.dataset.cid)||0;
+        var name=card.querySelector('strong')?card.querySelector('strong').textContent:'';
+        resumeLecSession(sk,cid,name);
       });
     });
   });
@@ -273,16 +411,8 @@ function initHome(){
   },function(){});
 }
 
-function loadPaneData(name){
-  if(name==='lec-analytics'){populateAnalyticsCourseSel();loadAnalytics(CID||lecAnalyticsCourseId);}
-  if(name==='lec-struggle'){populateStruggleCourseSel();loadStruggleInsights(CID||lecStruggleCourseId);}
-  if(name==='lec-courses')loadLecturerCourses();
-  if(name==='lec-library'){populateLibCourseSel();loadLibrary();}
-  if(name==='lec-sessions'){populateSessCourseSel();loadSessions();}
-  if(name==='lec-review')loadReviewPane();
-  if(name==='lec-issues')loadLecturerIssues();
-  if(name==='lec-home')initHome();
-}
+/* Delegate to the IIFE-scoped loadPaneData exposed on window */
+function loadPaneData(name){window.loadPaneData&&window.loadPaneData(name);}
 
 /* Refresh review pane */
 var reviewRefresh=document.getElementById('lec-review-refresh');
@@ -597,9 +727,8 @@ function openLecPlayer(url,name,segments){
   });
 }
 
-/* Sessions — with course overlay selector + dual-mode (lecturer/student) */
+/* Sessions — lecturer's own AI sessions only */
 var lecSessCourseId = 0;
-var lecSessMode='lecturer';
 function populateSessCourseSel(){
   var list=document.getElementById('lec-sess-cs-list');
   if(!list||!UD||!UD.courses)return;
@@ -637,106 +766,62 @@ function openLecSessPicker(){
   if(ov)ov.classList.add('open');
 }
 
-/* Sessions tab — dual-mode: lecturer's own AI sessions OR student sessions */
+/* Sessions tab — lecturer's own AI sessions only */
 function loadSessions(cid){
   var list=document.getElementById('lec-sess-list');
-  var mode=lecSessMode;
-  var courseId=cid||lecSessCourseId||0;
-
-  /* Wire toggle buttons */
-  var toggles=document.querySelectorAll('#lec-sess-toggle .umat-sess-toggle-btn');
-  toggles.forEach(function(b){b.removeEventListener('click',lecSessToggle);b.addEventListener('click',lecSessToggle);});
-
-  if(mode==='student'&&!courseId){
-    list.innerHTML='<div class="umat-lib-picker"><span class="material-symbols-outlined">school</span><p>Select a course to view its student chat sessions.</p><button type="button" id="lec-sess-pick-btn"><span class="material-symbols-outlined">menu_book</span>Select Course</button></div>';
-    wireSessPicker();
-    return;
-  }
+  var courseId=cid||0;
   var hdr=document.getElementById('lec-sess-hdr-actions');
-  if(hdr&&mode==='student'){
-    var course=(UD.courses||[]).find(function(c){return c.id===courseId;});
-    hdr.innerHTML=course?'<button class="umat-lib-sel-label" id="lec-sess-sel-label" type="button"><span class="material-symbols-outlined">menu_book</span>'+esc(course.shortname)+'</button>':'';
-    var lbl=document.getElementById('lec-sess-sel-label');
-    if(lbl)lbl.addEventListener('click',openLecSessPicker);
-  } else if(hdr){
-    hdr.innerHTML='';
-  }
+  if(hdr)hdr.innerHTML='';
 
   list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading sessions…</p></div>';
 
-  if(mode==='lecturer'){
-    ajax('local_umat_ai_get_lecturer_sessions',{courseid:courseId,limit:20},function(r){
-      var sessions=r.sessions||[];
-      if(!sessions.length){
-        list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No AI sessions yet. Ask the assistant a question!</p></div>';
-        return;
-      }
-      list.innerHTML=sessions.map(function(s){
-        return '<div class="umat-session-tile" data-sk="'+esc(s.session_key)+'" data-cid="'+s.courseid+'">'+
-          '<div class="umat-session-tile-hdr"><span class="umat-session-badge">'+esc(s.course_short||'AI')+'</span><span class="umat-session-time">'+esc(s.time_label)+'</span></div>'+
-          '<h4>'+esc(s.course_name||'AI Session')+'</h4><p>'+esc(s.preview)+'</p>'+
-          '<div class="umat-session-tile-foot"><div class="umat-session-meta"><span class="material-symbols-outlined">chat</span>'+s.msg_count+' messages</div>'+
-          '<button class="umat-del-session-btn" type="button" title="Delete session"><span class="material-symbols-outlined">delete</span></button></div></div>';
-      }).join('');
+  ajax('local_umat_ai_get_lecturer_sessions',{courseid:courseId,limit:20},function(r){
+    var sessions=r.sessions||[];
+    if(!sessions.length){
+      list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No AI sessions yet. Ask the assistant a question!</p></div>';
+      return;
+    }
+    list.innerHTML=sessions.map(function(s){
+      return '<div class="umat-session-tile" data-sk="'+esc(s.session_key)+'" data-cid="'+s.courseid+'">'+
+        '<div class="umat-session-tile-hdr"><span class="umat-session-badge">'+esc(s.course_short||'AI')+'</span><span class="umat-session-time">'+esc(s.time_label)+'</span></div>'+
+        '<h4>'+esc(s.course_name||'AI Session')+'</h4><p>'+esc(s.preview)+'</p>'+
+        '<div class="umat-session-tile-foot"><div class="umat-session-meta"><span class="material-symbols-outlined">chat</span>'+s.msg_count+' messages</div>'+
+        '<button class="umat-del-session-btn" type="button" title="Delete session"><span class="material-symbols-outlined">delete</span></button></div></div>';
+    }).join('');
 
-      /* Wire delete buttons */
-      list.querySelectorAll('.umat-del-session-btn').forEach(function(btn){
-        btn.addEventListener('click',function(e){
-          e.stopPropagation();
-          if(!confirm('Delete this conversation? This cannot be undone.'))return;
-          var tile=btn.closest('.umat-session-tile');
-          if(!tile)return;
-          btn.disabled=true;
-          btn.innerHTML='<span class="material-symbols-outlined">hourglass_empty</span>';
-          ajax('local_umat_ai_delete_lecturer_session',{session_key:tile.dataset.sk},function(){
-            tile.remove();
-            if(!list.querySelector('.umat-session-tile')){
-              list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No AI sessions yet. Ask the assistant a question!</p></div>';
-            }
-          },function(){
-            btn.disabled=false;
-            btn.innerHTML='<span class="material-symbols-outlined">delete</span>';
-          });
+    /* Wire delete buttons */
+    list.querySelectorAll('.umat-del-session-btn').forEach(function(btn){
+      btn.addEventListener('click',function(e){
+        e.stopPropagation();
+        if(!confirm('Delete this conversation? This cannot be undone.'))return;
+        var tile=btn.closest('.umat-session-tile');
+        if(!tile)return;
+        btn.disabled=true;
+        btn.innerHTML='<span class="material-symbols-outlined">hourglass_empty</span>';
+        ajax('local_umat_ai_delete_lecturer_session',{session_key:tile.dataset.sk},function(){
+          tile.remove();
+          if(!list.querySelector('.umat-session-tile')){
+            list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No AI sessions yet. Ask the assistant a question!</p></div>';
+          }
+        },function(){
+          btn.disabled=false;
+          btn.innerHTML='<span class="material-symbols-outlined">delete</span>';
         });
       });
+    });
 
-      /* Wire tile click → expand detail */
-      list.querySelectorAll('.umat-session-tile').forEach(function(tile){
-        tile.addEventListener('click',function(e){
-          if(e.target.closest('.umat-del-session-btn'))return;
-          expandLecSession(tile);
-        });
+    /* Wire tile click → resume session in chat */
+    list.querySelectorAll('.umat-session-tile').forEach(function(tile){
+      tile.addEventListener('click',function(e){
+        if(e.target.closest('.umat-del-session-btn'))return;
+        var sk=tile.dataset.sk,cid=parseInt(tile.dataset.cid)||0;
+        var name=tile.querySelector('h4')?tile.querySelector('h4').textContent:'';
+        resumeLecSessionInline(sk,cid,name);
       });
-    },function(){
-      list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load sessions.</p></div>';
     });
-  } else {
-    /* Student sessions mode */
-    ajax('local_umat_ai_get_ai_sessions',{courseid:courseId,limit:20},function(r){
-      var sessions=r.sessions||[];
-      if(!sessions.length){
-        list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No student chat sessions yet for this course.</p></div>';
-        return;
-      }
-      list.innerHTML=sessions.map(function(s){
-        return '<div class="umat-session-tile" data-sk="'+esc(s.session_key)+'" data-cid="'+s.courseid+'">'+
-          '<div class="umat-session-tile-hdr"><span class="umat-session-badge">'+esc(s.course_short||'GEN')+'</span><span class="umat-session-time">'+esc(s.time_label)+'</span></div>'+
-          '<h4>'+esc(s.course_name)+' AI Session</h4><p>'+esc(s.preview)+'</p>'+
-          '<div class="umat-session-tile-foot"><div class="umat-session-meta"><span class="material-symbols-outlined">chat</span>'+s.msg_count+' messages</div></div></div>';
-      }).join('');
-    },function(){
-      list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load sessions.</p></div>';
-    });
-  }
-}
-function lecSessToggle(e){
-  var btn=e.currentTarget;
-  document.querySelectorAll('#lec-sess-toggle .umat-sess-toggle-btn').forEach(function(b){
-    b.style.background='var(--u-bg)';b.style.color='var(--u-ons)';
+  },function(){
+    list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load sessions.</p></div>';
   });
-  btn.style.background='var(--u-p)';btn.style.color='#fff';
-  lecSessMode=btn.dataset.sessTab;
-  loadSessions();
 }
 function expandLecSession(tile){
   var sk=tile.dataset.sk;
@@ -772,10 +857,6 @@ function expandLecSession(tile){
   },function(){
     det.innerHTML='<div style="padding:10px;text-align:center;color:var(--u-ter);font-size:12px;">Failed to load messages.</div>';
   });
-}
-function wireSessPicker(){
-  var btn=document.getElementById('lec-sess-pick-btn');
-  if(btn)btn.addEventListener('click',function(){document.getElementById('lec-sess-cs-ov').classList.add('open');});
 }
 
 /* Analytics -- course overlay selector */
@@ -820,31 +901,6 @@ function openAnalyticsPicker(){
   var ov=document.getElementById('lec-an-cs-ov');
   if(ov)ov.classList.add('open');
 }
-function loadSessions(cid){
-  var list=document.getElementById('lec-sess-list');
-  var courseId=cid||lecSessCourseId||0;
-  if(!courseId){
-    list.innerHTML='<div class="umat-lib-picker"><span class="material-symbols-outlined">school</span><p>Select a course to view its chat sessions.</p><button type="button" id="lec-sess-pick-btn"><span class="material-symbols-outlined">menu_book</span>Select Course</button></div>';
-    return;
-  }
-  var hdr=document.getElementById('lec-sess-hdr-actions');
-  if(hdr){
-    var course=(UD.courses||[]).find(function(c){return c.id===courseId;});
-    hdr.innerHTML=course?'<button class="umat-lib-sel-label" id="lec-sess-sel-label" type="button"><span class="material-symbols-outlined">menu_book</span>'+esc(course.shortname)+'</button>':'';
-    var lbl=document.getElementById('lec-sess-sel-label');
-    if(lbl)lbl.addEventListener('click',openLecSessPicker);
-  }
-  list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading sessions...</p></div>';
-  ajax('local_umat_ai_get_ai_sessions',{courseid:courseId,limit:20},function(r){
-    if(!r.sessions||!r.sessions.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No AI chat sessions yet.</p></div>';return;}
-    list.innerHTML=r.sessions.map(function(s){
-      return '<div class="umat-session-tile">'+
-        '<div class="umat-session-tile-hdr"><span class="umat-session-badge">'+esc(s.course_short||'GEN')+'</span><span class="umat-session-time">'+esc(s.time_label)+'</span></div>'+
-        '<h4>'+esc(s.course_name)+' AI Session</h4><p>'+esc(s.preview)+'</p>'+
-        '<div class="umat-session-tile-foot"><div class="umat-session-meta"><span class="material-symbols-outlined">chat</span>'+s.msg_count+' messages</div></div></div>';
-    }).join('');
-  },function(){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load sessions.</p></div>';});
-}
 
 /* ---- Review Outputs pane ---- */
 function fmtDate(ts){var d=new Date(ts*1000);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
@@ -876,7 +932,7 @@ function loadLecturerIssues(){
   ajax('local_umat_ai_get_course_issues',args,function(r){
     console.log('[lec-issues] response',r);
     var issues=r.issues||[],total=r.total||0;
-    var count=document.getElementById('lec-issues-count');if(count)count.textContent=total;
+    var mb=document.getElementById('gtb-lec-issues');if(mb){mb.textContent=total>99?'99+':total;mb.style.display=total?'':'none';}
     if(!issues.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No student issues'+(status?' with this status':'')+'.</p></div>';return;}
     body.innerHTML=issues.map(function(iss){
       var catLabel={'concept_confusion':'Concept Confusion','material_error':'Material Error','technical_issue':'Technical Issue','suggestion':'Suggestion','other':'Other'}[iss.category]||iss.category;
@@ -1462,7 +1518,7 @@ function sendLecQ(q){
     sesskey: moodleSesskey,
     courseid: CID,
     question: q,
-    session_key: 'lec_cp_' + CID,
+    session_key: lecSessionKey || ('lec_cp_' + CID),
     material_ids: lcpSelMats.map(function(m){return m.id;}),
     msgsId: 'lcp-msgs',
     sendBtnId: 'lcp-send',
@@ -1547,6 +1603,8 @@ if(expand)expand.addEventListener('click',function(){setTimeout(function(){
 function _umatLecMarkViewed(){
   var b=document.getElementById('sb-badge-new-issues');
   if(b)b.style.display='none';
+  var mb=document.getElementById('gtb-lec-issues');
+  if(mb)mb.style.display='none';
   pollIssueCount();
 }
 function pollIssueCount(){
@@ -1555,6 +1613,8 @@ function pollIssueCount(){
     var c=r.count||0;
     var b=document.getElementById('sb-badge-new-issues');
     if(b){b.textContent=c>9?'9+':c;b.style.display=c?'':'none';}
+    var mb=document.getElementById('gtb-lec-issues');
+    if(mb){mb.textContent=c>99?'99+':c;mb.style.display=c?'':'none';}
   });
 }
 pollIssueCount();
@@ -1583,6 +1643,416 @@ _umatInitEsc([
   {id:'lec-ov',isOpen:function(e){return e.classList.contains('open');},close:closeDash},
   {id:'lec-cp-ov',isOpen:function(e){return e.classList.contains('open');},close:function(e){e.classList.remove('open');}}
 ]);
+
+/* ─── RESOURCE BANK (Private Materials) ─── */
+var RB = {
+  currentFolder: null,
+  selected: {},
+  _loaded: false,
+  _rbAjax: function(m,a,d,f){ajax('local_umat_ai_resource_bank_'+m,a,function(r){if(d)d(r);},function(e){if(f)f(e);else console.error('[rb]',m,e);});},
+  /* Format file size */
+  _fmtSize: function(b){if(!b)return '';if(b<1024)return b+'B';if(b<1048576)return (b/1024).toFixed(1)+'KB';return (b/1048576).toFixed(1)+'MB';},
+  /* Time ago */
+  _timeAgo: function(ts){var d=Date.now()/1000-ts;if(d<60)return 'just now';if(d<3600)return Math.floor(d/60)+'m ago';if(d<86400)return Math.floor(d/3600)+'h ago';return Math.floor(d/86400)+'d ago';},
+  /* Breadcrumb trail */
+  _trail: [],
+  /* Load contents of a folder (null = root) */
+  load: function(parentId){
+    RB.currentFolder = parentId;
+    RB.selected = {};
+    _updateRbBatchBtns();
+    document.getElementById('rb-content').innerHTML = '<div class="rb-loading">Loading…</div>';
+    RB._rbAjax('list',{parentid:parentId||0},function(r){
+      _renderRbItems(r.items||[]);
+    });
+  },
+  /* Build breadcrumb from trail */
+  _renderBreadcrumb: function(){
+    var el=document.getElementById('rb-breadcrumb');
+    if(!el)return;
+    var html='<span style="cursor:pointer;color:var(--u-p);font-weight:600;" data-rb-root="1">My Resources</span>';
+    RB._trail.forEach(function(t,i){
+      html+=' <span style="color:var(--u-olv);">/</span> <span style="cursor:pointer;color:var(--u-p);" data-rb-folder="'+t.id+'">'+esc(t.name)+'</span>';
+    });
+    el.innerHTML=html;
+    /* Click root */
+    var root=el.querySelector('[data-rb-root]');
+    if(root)root.addEventListener('click',function(){RB._trail=[];RB.load(null);});
+    /* Click trail folders */
+    el.querySelectorAll('[data-rb-folder]').forEach(function(s){
+      s.addEventListener('click',function(){
+        var fid=parseInt(this.dataset.rbFolder);
+        var idx=RB._trail.findIndex(function(t){return t.id===fid;});
+        if(idx>=0)RB._trail=RB._trail.slice(0,idx);
+        RB.load(fid);
+      });
+    });
+  },
+  /* Navigate into a folder */
+  openFolder: function(id,name){
+    RB._trail.push({id:id,name:name});
+    RB.load(id);
+  },
+  /* Toggle library view with active tab indicator (pill style) */
+  switchView: function(view){
+    document.querySelectorAll('.umat-lib-toggle').forEach(function(b){
+      b.classList.toggle('active',b.dataset.libview===view);
+    });
+    var cv=document.getElementById('lec-lib-course-view');
+    if(cv)cv.style.display=view==='course'?'':'none';
+    var pv=document.getElementById('lec-private-bank-view');
+    if(pv)pv.style.display=view==='private'?'flex':'none';
+    if(view==='private'&&!RB._loaded){RB._loaded=true;RB.load(null);}
+  }
+};
+
+function _renderRbItems(items){
+  var g=document.getElementById('rb-content');
+  if(!g)return;
+  RB._renderBreadcrumb();
+  if(!items.length){
+    g.innerHTML='<div class="rb-empty"><span class="material-symbols-outlined">folder_off</span><p>This folder is empty.</p></div>';
+    return;
+  }
+  var html='<div class="rb-grid">';
+  items.forEach(function(it){
+    var icon=it.isfolder?'folder':'description';
+    var iconCls=it.isfolder?'rb-folder-icon':'rb-file-icon';
+    var sizeLabel=it.isfolder?'':RB._fmtSize(it.filesize);
+    var timeLabel=RB._timeAgo(it.timecreated);
+    html+='<div class="rb-item" data-rb-id="'+it.id+'" data-rb-folder="'+(it.isfolder?1:0)+'" data-rb-name="'+esc(it.name)+'" data-rb-fileurl="'+esc(it.fileurl||'')+'" data-rb-mime="'+esc(it.mimetype||'')+'">'
+      +'<label class="rb-chk" style="position:absolute;top:8px;left:8px;z-index:2;cursor:pointer;display:none;">'
+      +'<input type="checkbox" class="rb-cb" data-rb-id="'+it.id+'" style="accent-color:var(--u-p);width:16px;height:16px;cursor:pointer;"></label>'
+      +'<div class="rb-thumb" style="background:'+(it.isfolder?'rgba(0,107,47,.08)':'rgba(99,102,241,.08)')+';border-radius:var(--u-r8);width:100%;aspect-ratio:1.6;display:flex;align-items:center;justify-content:center;font-size:32px;color:'+(it.isfolder?'var(--u-p)':'#6366f1')+';position:relative;">'
+      +'<span class="material-symbols-outlined">'+icon+'</span>'
+      +(it.isfolder?'':'<span style="position:absolute;bottom:4px;right:4px;font-size:9px;background:var(--u-bg);padding:1px 4px;border-radius:4px;color:var(--u-ol);font-weight:600;">'+_getExtLabel(it.name)+'</span>')
+      +'</div>'
+      +'<div class="rb-info" style="padding:6px 4px;">'
+      +'<div class="rb-name" style="font-size:11px;font-weight:600;color:var(--u-ons);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+esc(it.name)+'">'+esc(it.name)+'</div>'
+      +'<div style="font-size:10px;color:var(--u-ol);margin-top:2px;">'+(it.isfolder?'Folder':sizeLabel+(timeLabel?' · '+timeLabel:''))+'</div>'
+      +'</div></div>';
+  });
+  html+='</div>';
+  g.innerHTML=html;
+
+  /* Click handlers */
+  g.querySelectorAll('.rb-item').forEach(function(el){
+    el.addEventListener('click',function(e){
+      if(e.target.closest('.rb-chk'))return;
+      var id=parseInt(this.dataset.rbId);
+      var isFolder=this.dataset.rbFolder==='1';
+      if(isFolder){
+        RB.openFolder(id,this.dataset.rbName);
+      } else {
+        /* Preview file */
+        var url=this.dataset.rbFileurl;
+        var name=this.dataset.rbName;
+        var mime=this.dataset.rbMime||'';
+        if(url&&window.umatMaterialViewer){
+          var viewType=_mapMimeToViewer(mime,name);
+          window.umatMaterialViewer.open(viewType,{url:url,name:name,downloadUrl:url});
+        }
+      }
+    });
+    /* Right-click for context menu (rename, delete) */
+    el.addEventListener('contextmenu',_rbCtxHandler);
+  });
+
+  /* Checkbox change → update batch buttons */
+  g.querySelectorAll('.rb-cb').forEach(function(cb){
+    cb.addEventListener('change',function(){
+      if(this.checked)RB.selected[parseInt(this.dataset.rbId)]=true;
+      else delete RB.selected[parseInt(this.dataset.rbId)];
+      _updateRbBatchBtns();
+    });
+  });
+
+  /* Show checkboxes on first selection attempt */
+  g.querySelectorAll('.rb-item').forEach(function(el){
+    el.addEventListener('dblclick',function(e){
+      if(e.target.closest('.rb-chk'))return;
+      if(!el.querySelector('.rb-chk').style.display||el.querySelector('.rb-chk').style.display==='none'){
+        _showRbCheckboxes();
+      }
+    });
+  });
+}
+
+function _getExtLabel(name){
+  var ext=(name||'').split('.').pop().toUpperCase();
+  if(ext.length>4)return 'FILE';
+  return ext||'FILE';
+}
+
+function _mapMimeToViewer(mime,name){
+  if(mime.includes('video'))return 'video';
+  if(mime.includes('pdf'))return 'pdf';
+  if(mime.includes('image'))return 'image';
+  if(mime.includes('audio'))return 'audio';
+  if(mime.includes('word')||mime.includes('document')||/\.docx?$/i.test(name))return 'docx';
+  if(mime.includes('spreadsheet')||mime.includes('excel')||/\.xlsx?$/i.test(name))return 'xlsx';
+  if(mime.includes('presentation')||mime.includes('powerpoint')||/\.pptx?$/i.test(name))return 'pptx';
+  if(mime.includes('text')||mime.includes('json')||mime.includes('javascript'))return 'code';
+  return 'pdf';
+}
+
+function _showRbCheckboxes(){
+  document.querySelectorAll('#rb-content .rb-chk').forEach(function(el){el.style.display='block';});
+}
+
+function _toggleRbCheckMode(){
+  var els=document.querySelectorAll('#rb-content .rb-chk');
+  var hidden=!els.length||els[0].style.display==='none'||!els[0].style.display;
+  els.forEach(function(el){el.style.display=hidden?'block':'none';});
+  if(!hidden){RB.selected={};_updateRbBatchBtns();}
+}
+
+function _updateRbBatchBtns(){
+  var count=Object.keys(RB.selected).length;
+  var hasSel=count>0;
+  ['rb-delete-btn','rb-push-btn'].forEach(function(id){
+    var btn=document.getElementById(id);
+    if(!btn)return;
+    btn.disabled=!hasSel;
+    btn.style.opacity=hasSel?'1':'.4';
+    btn.innerHTML=(id==='rb-push-btn'?'<span class="material-symbols-outlined" style="font-size:14px;">publish</span>Push to Course':'<span class="material-symbols-outlined" style="font-size:14px;">delete</span>Delete')
+      +(hasSel?' ('+count+')':'');
+  });
+}
+
+/* Toggle Library views */
+document.querySelectorAll('.umat-lib-toggle').forEach(function(btn){
+  btn.addEventListener('click',function(){RB.switchView(this.dataset.libview);});
+});
+
+/* ── RB: Upload overlay (drag & drop) ── */
+var rbUploadBtn=document.getElementById('rb-upload-btn');
+var rbUploadOv=document.getElementById('rb-upload-ov');
+var rbUploadDropzone=document.getElementById('rb-upload-dropzone');
+var rbUploadProgress=document.getElementById('rb-upload-progress');
+var rbUploadBar=document.getElementById('rb-upload-bar');
+var rbUploadPct=document.getElementById('rb-upload-pct');
+var rbUploadFname=document.getElementById('rb-upload-fname');
+var rbUploadResult=document.getElementById('rb-upload-result');
+
+/* Helper: upload files via XHR with progress */
+function _uploadRbFiles(files){
+  var total=files.length,done=0;
+  if(rbUploadProgress)rbUploadProgress.style.display='block';
+  if(rbUploadResult)rbUploadResult.style.display='none';
+  files.forEach(function(file,i){
+    var fd=new FormData();
+    fd.append('file',file);
+    fd.append('parentid',RB.currentFolder||0);
+    fd.append('sesskey',moodleSesskey);
+    var xhr=new XMLHttpRequest();
+    if(rbUploadFname)xhr.upload&&(xhr.upload.onprogress=function(e){
+      if(e.lengthComputable&&rbUploadBar&&rbUploadPct){
+        var p=Math.round((done*100000+e.loaded/e.total*100)/total);
+        rbUploadBar.style.width=p+'%';rbUploadPct.textContent=Math.round(p)+'%';
+      }
+    });
+    xhr.onload=function(){done++;if(done>=total){RB.load(RB.currentFolder);_closeRbUpload();}};
+    xhr.onerror=function(){done++;if(done>=total){RB.load(RB.currentFolder);_closeRbUpload();}};
+    xhr.send(fd);
+  });
+}
+function _closeRbUpload(){
+  if(rbUploadOv)rbUploadOv.style.display='none';
+  if(rbUploadProgress)rbUploadProgress.style.display='none';
+  if(rbUploadResult)rbUploadResult.style.display='none';
+  if(rbUploadBar)rbUploadBar.style.width='0%';
+  if(rbUploadPct)rbUploadPct.textContent='0%';
+}
+if(rbUploadBtn)rbUploadBtn.addEventListener('click',function(){if(rbUploadOv)rbUploadOv.style.display='flex';});
+/* Upload overlay: dropzone click → hidden file input */
+var _rbUpFileInput=null;
+if(rbUploadDropzone){
+  rbUploadDropzone.addEventListener('click',function(){
+    var fi=document.createElement('input');fi.type='file';fi.multiple=true;fi.style.display='none';
+    fi.addEventListener('change',function(){if(this.files.length){_uploadRbFiles(Array.from(this.files));document.body.removeChild(fi);}});
+    document.body.appendChild(fi);fi.click();
+  });
+  rbUploadDropzone.addEventListener('dragover',function(e){e.preventDefault();this.style.borderColor='var(--u-p)';this.style.background='rgba(0,107,47,.05)';});
+  rbUploadDropzone.addEventListener('dragleave',function(){this.style.borderColor='var(--u-olv)';this.style.background='var(--u-sflo)';});
+  rbUploadDropzone.addEventListener('drop',function(e){
+    e.preventDefault();this.style.borderColor='var(--u-olv)';this.style.background='var(--u-sflo)';
+    if(e.dataTransfer.files.length)_uploadRbFiles(Array.from(e.dataTransfer.files));
+  });
+}
+var rbUploadClose=document.getElementById('rb-upload-close');
+if(rbUploadClose)rbUploadClose.addEventListener('click',_closeRbUpload);
+var rbUploadCancel=document.getElementById('rb-upload-cancel');
+if(rbUploadCancel)rbUploadCancel.addEventListener('click',_closeRbUpload);
+
+/* ── RB: Folder creation overlay ── */
+var rbFolderOv=document.getElementById('rb-folder-ov');
+var rbFolderName=document.getElementById('rb-folder-name');
+var rbFolderSubmit=document.getElementById('rb-folder-submit');
+var rbNewFolderBtn=document.getElementById('rb-new-folder-btn');
+if(rbNewFolderBtn)rbNewFolderBtn.addEventListener('click',function(){
+  if(rbFolderName)rbFolderName.value='';
+  if(rbFolderOv)rbFolderOv.style.display='flex';
+  if(rbFolderName)setTimeout(function(){rbFolderName.focus();},100);
+});
+if(rbFolderSubmit)rbFolderSubmit.addEventListener('click',function(){
+  var name=rbFolderName?rbFolderName.value.trim():'';
+  if(!name)return;
+  RB._rbAjax('create_folder',{parentid:RB.currentFolder||0,name:name},function(){
+    if(rbFolderOv)rbFolderOv.style.display='none';
+    RB.load(RB.currentFolder);
+  });
+});
+var rbFolderClose=document.getElementById('rb-folder-close');
+if(rbFolderClose)rbFolderClose.addEventListener('click',function(){if(rbFolderOv)rbFolderOv.style.display='none';});
+var rbFolderCancel=document.getElementById('rb-folder-cancel');
+if(rbFolderCancel)rbFolderCancel.addEventListener('click',function(){if(rbFolderOv)rbFolderOv.style.display='none';});
+/* Enter key in folder name input */
+if(rbFolderName)rbFolderName.addEventListener('keydown',function(e){if(e.key==='Enter'&&rbFolderSubmit)rbFolderSubmit.click();});
+
+/* ── RB: Rename overlay ── */
+var _rbRenameId=null;
+var rbRenameOv=document.getElementById('rb-rename-ov');
+var rbRenameName=document.getElementById('rb-rename-name');
+var rbRenameSubmit=document.getElementById('rb-rename-submit');
+function _openRbRename(id,name){
+  _rbRenameId=id;
+  if(rbRenameName)rbRenameName.value=name;
+  if(rbRenameOv)rbRenameOv.style.display='flex';
+  if(rbRenameName)setTimeout(function(){rbRenameName.focus();rbRenameName.select();},100);
+}
+var rbRenameClose=document.getElementById('rb-rename-close');
+if(rbRenameClose)rbRenameClose.addEventListener('click',function(){if(rbRenameOv)rbRenameOv.style.display='none';});
+var rbRenameCancel=document.getElementById('rb-rename-cancel');
+if(rbRenameCancel)rbRenameCancel.addEventListener('click',function(){if(rbRenameOv)rbRenameOv.style.display='none';});
+if(rbRenameSubmit)rbRenameSubmit.addEventListener('click',function(){
+  var name=rbRenameName?rbRenameName.value.trim():'';
+  if(!name||!_rbRenameId)return;
+  RB._rbAjax('rename',{itemid:_rbRenameId,name:name},function(){
+    if(rbRenameOv)rbRenameOv.style.display='none';
+    _rbRenameId=null;
+    RB.load(RB.currentFolder);
+  });
+});
+if(rbRenameName)rbRenameName.addEventListener('keydown',function(e){if(e.key==='Enter'&&rbRenameSubmit)rbRenameSubmit.click();});
+
+/* ── Right-click context menu for rename/delete ── */
+function _rbCtxHandler(e){
+  e.preventDefault();
+  var el=this;
+  var id=parseInt(el.dataset.rbId);
+  var name=el.dataset.rbName;
+  /* Remove any existing context menu */
+  var old=document.querySelector('.rb-ctx-menu');
+  if(old)old.remove();
+  /* Build context menu */
+  var menu=document.createElement('div');
+  menu.className='rb-ctx-menu';
+  menu.style.cssText='position:fixed;z-index:9999;background:var(--u-bg);border:1px solid var(--u-olv);border-radius:var(--u-r8);padding:4px 0;min-width:140px;box-shadow:0 4px 20px rgba(0,0,0,.15);font-size:12px;';
+  /* Rename option */
+  var renameItem=document.createElement('div');
+  renameItem.textContent='✏️ Rename';
+  renameItem.style.cssText='padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--u-ons);';
+  renameItem.addEventListener('mouseenter',function(){this.style.background='var(--u-sflo)';});
+  renameItem.addEventListener('mouseleave',function(){this.style.background='transparent';});
+  renameItem.addEventListener('click',function(){
+    menu.remove();
+    _openRbRename(id,name);
+  });
+  menu.appendChild(renameItem);
+  /* Delete option */
+  var delItem=document.createElement('div');
+  delItem.textContent='🗑️ Delete';
+  delItem.style.cssText='padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--u-ter);';
+  delItem.addEventListener('mouseenter',function(){this.style.background='var(--u-sflo)';});
+  delItem.addEventListener('mouseleave',function(){this.style.background='transparent';});
+  delItem.addEventListener('click',function(){
+    menu.remove();
+    if(!confirm('Delete "'+name+'"? This cannot be undone.'))return;
+    RB._rbAjax('delete',{itemids:[id]},function(){RB.load(RB.currentFolder);});
+  });
+  menu.appendChild(delItem);
+  /* Position menu */
+  menu.style.left=Math.min(e.clientX,document.documentElement.clientWidth-160)+'px';
+  menu.style.top=Math.min(e.clientY,document.documentElement.clientHeight-80)+'px';
+  document.body.appendChild(menu);
+  /* Click outside closes */
+  setTimeout(function(){
+    document.addEventListener('click',function _closeCtx(ev){
+      if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('click',_closeCtx);}
+    });
+  },0);
+}
+
+/* ── RB: Delete selected ── */
+var rbDeleteBtn=document.getElementById('rb-delete-btn');
+if(rbDeleteBtn)rbDeleteBtn.addEventListener('click',function(){
+  var ids=Object.keys(RB.selected).map(Number);
+  if(!ids.length)return;
+  if(!confirm('Delete '+ids.length+' item(s)? This cannot be undone.'))return;
+  RB._rbAjax('delete',{itemids:ids},function(r){
+    RB.load(RB.currentFolder);
+  });
+});
+
+/* ── RB: Push to course ── */
+var rbPushBtn=document.getElementById('rb-push-btn');
+if(rbPushBtn)rbPushBtn.addEventListener('click',function(){
+  var ids=Object.keys(RB.selected).map(Number);
+  if(!ids.length)return;
+  var ov=document.getElementById('rb-push-ov');
+  var list=document.getElementById('rb-push-list');
+  if(!ov||!list)return;
+  ov.style.display='flex';
+  list.innerHTML='<div class="umat-cs-item" style="opacity:.5;pointer-events:none;">Loading courses…</div>';
+  RB._rbAjax('teaching_courses',{},function(r){
+    var courses=r.courses||[];
+    if(!courses.length){
+      list.innerHTML='<div class="umat-cs-item" style="opacity:.5;pointer-events:none;">No courses available.</div>';
+      return;
+    }
+    list.innerHTML=courses.map(function(c){
+      return '<div class="umat-cs-item" data-cid="'+c.id+'"><span class="material-symbols-outlined">menu_book</span>'
+        +'<div><strong>'+esc(c.fullname)+'</strong><span style="font-size:11px;color:var(--u-ol);display:block;">'+esc(c.shortname)+'</span></div>'
+        +'<span class="umat-cs-check" style="margin-left:auto;">radio_button_unchecked</span></div>';
+    }).join('');
+    var selectedCid=null;
+    list.querySelectorAll('.umat-cs-item').forEach(function(el){
+      el.addEventListener('click',function(){
+        list.querySelectorAll('.umat-cs-item').forEach(function(e){e.classList.remove('selected');e.querySelector('.umat-cs-check').textContent='radio_button_unchecked';});
+        this.classList.add('selected');
+        this.querySelector('.umat-cs-check').textContent='check_circle';
+        selectedCid=parseInt(this.dataset.cid);
+        var confirmBtn=document.getElementById('rb-push-confirm');
+        if(confirmBtn){confirmBtn.disabled=false;confirmBtn.style.opacity='1';confirmBtn.textContent='Push ('+ids.length+') to '+esc(this.querySelector('strong').textContent);}
+      });
+    });
+    var pushSearch=document.getElementById('rb-push-search');
+    if(pushSearch)pushSearch.addEventListener('input',function(){
+      var q=this.value.toLowerCase();
+      list.querySelectorAll('.umat-cs-item').forEach(function(el){el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';});
+    });
+    var confirmBtn=document.getElementById('rb-push-confirm');
+    if(confirmBtn)confirmBtn.onclick=function(){
+      if(!selectedCid)return;
+      RB._rbAjax('push',{itemids:ids,courseid:selectedCid},function(r){ov.style.display='none';RB.load(RB.currentFolder);});
+    };
+  });
+});
+var rbPushClose=document.getElementById('rb-push-close');
+if(rbPushClose)rbPushClose.addEventListener('click',function(){var ov=document.getElementById('rb-push-ov');if(ov)ov.style.display='none';});
+var rbPushCancel=document.getElementById('rb-push-cancel');
+if(rbPushCancel)rbPushCancel.addEventListener('click',function(){var ov=document.getElementById('rb-push-ov');if(ov)ov.style.display='none';});
+
+/* ── ESC key for RB overlays ── */
+var _rbOverlayIds=['rb-upload-ov','rb-folder-ov','rb-rename-ov','rb-push-ov'];
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape')return;
+  _rbOverlayIds.forEach(function(id){
+    var el=document.getElementById(id);
+    if(el&&el.style.display==='flex')el.style.display='none';
+  });
+});
 
 })();
 }

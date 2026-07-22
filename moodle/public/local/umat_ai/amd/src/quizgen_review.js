@@ -11,6 +11,7 @@ define(['core/ajax'], function(Ajax) {
     var _lastJobId = 0;
     var _materials = [];
     var _reviewViewMode = 'paper';
+    var _courseGroups = [];
 
     // Layout state for resizable split-screen.
     var _layout = {
@@ -127,6 +128,10 @@ define(['core/ajax'], function(Ajax) {
             renderBloomSection() +
             renderDifficultySection() +
             renderQuizDetailsSection() +
+            renderScheduleSection() +
+            renderAccessSecuritySection() +
+            renderPlacementSection() +
+            renderAdvancedSection() +
             renderDeliveryMethodSection() +
             renderDocSettingsSection() +
             renderInstructionsSection() +
@@ -287,6 +292,142 @@ define(['core/ajax'], function(Ajax) {
             '    <label class="qgen-check-label"><input type="checkbox" id="qgen-show-fb" checked> Show feedback</label>' +
             '  </div>' +
             '  <p class="qgen-hint" style="margin-top:6px;">Time limit and max attempts can also be adjusted in Moodle after import.</p>' +
+            '</div>' +
+            '</div>';
+    }
+
+    function renderScheduleSection() {
+        return '<div class="qgen-card qgen-section qgen-section-collapsed qgen-online-only" id="qgen-schedule-section">' +
+            '<h3 class="qgen-section-toggle">' +
+            '  <span class="material-symbols-outlined">schedule</span> Schedule' +
+            '  <span class="material-symbols-outlined qgen-chevron">expand_more</span>' +
+            '</h3>' +
+            '<div class="qgen-section-body" style="display:none;">' +
+            '  <p class="qgen-hint">Control when students can access this quiz. Leave empty for always available.</p>' +
+            '  <div class="qgen-field-row">' +
+            '    <div class="qgen-field">' +
+            '      <label>Open Date &amp; Time</label>' +
+            '      <input type="datetime-local" id="qgen-timeopen" class="qgen-input">' +
+            '    </div>' +
+            '    <div class="qgen-field">' +
+            '      <label>Close Date &amp; Time (Deadline)</label>' +
+            '      <input type="datetime-local" id="qgen-timeclose" class="qgen-input">' +
+            '    </div>' +
+            '  </div>' +
+            '</div>' +
+            '</div>';
+    }
+
+    function renderAccessSecuritySection() {
+        return '<div class="qgen-card qgen-section qgen-section-collapsed qgen-online-only" id="qgen-access-section">' +
+            '<h3 class="qgen-section-toggle">' +
+            '  <span class="material-symbols-outlined">lock</span> Access &amp; Security' +
+            '  <span class="material-symbols-outlined qgen-chevron">expand_more</span>' +
+            '</h3>' +
+            '<div class="qgen-section-body" style="display:none;">' +
+            '  <div class="qgen-field">' +
+            '    <label>Exam Password <span class="qgen-hint">(leave blank for none)</span></label>' +
+            '    <input type="text" id="qgen-password" class="qgen-input" placeholder="Optional password for quiz access">' +
+            '  </div>' +
+            '  <div class="qgen-field">' +
+            '    <label>Browser Security</label>' +
+            '    <select id="qgen-browser-security" class="qgen-select">' +
+            '      <option value="0" selected>None</option>' +
+            '      <option value="1">Full screen pop-up with some JavaScript security</option>' +
+            '      <option value="2">Full screen pop-up with JavaScript security and copy/paste restricted</option>' +
+            '    </select>' +
+            '  </div>' +
+            '  <div class="qgen-field">' +
+            '    <label>Group Mode</label>' +
+            '    <select id="qgen-groupmode" class="qgen-select">' +
+            '      <option value="0" selected>No groups (all students)</option>' +
+            '      <option value="1">Separate groups</option>' +
+            '      <option value="2">Visible groups</option>' +
+            '    </select>' +
+            '  </div>' +
+            '  <div class="qgen-field" id="qgen-grouping-wrap" style="display:none;">' +
+            '    <label>Restrict to Grouping <span class="qgen-hint">(leave blank for all)</span></label>' +
+            '    <select id="qgen-groupingid" class="qgen-select"><option value="0">None (all groups)</option></select>' +
+            '  </div>' +
+            '  <div class="qgen-field" id="qgen-groups-wrap" style="display:none;">' +
+            '    <label>Allowed Groups</label>' +
+            '    <div id="qgen-groups-list" class="qgen-check-list"></div>' +
+            '  </div>' +
+            '</div>' +
+            '</div>';
+    }
+
+    function renderPlacementSection() {
+        return '<div class="qgen-card qgen-section qgen-section-collapsed qgen-online-only" id="qgen-placement-section">' +
+            '<h3 class="qgen-section-toggle">' +
+            '  <span class="material-symbols-outlined">place</span> Placement' +
+            '  <span class="material-symbols-outlined qgen-chevron">expand_more</span>' +
+            '</h3>' +
+            '<div class="qgen-section-body" style="display:none;">' +
+            '  <div class="qgen-field">' +
+            '    <label>Course Section</label>' +
+            '    <select id="qgen-sectionnum" class="qgen-select"><option value="0">General (top section)</option></select>' +
+            '  </div>' +
+            '  <div class="qgen-field">' +
+            '    <label>Gradebook Category</label>' +
+            '    <select id="qgen-gradecat" class="qgen-select"><option value="0">No category (default)</option></select>' +
+            '  </div>' +
+            '</div>' +
+            '</div>';
+    }
+
+    function renderAdvancedSection() {
+        return '<div class="qgen-card qgen-section qgen-section-collapsed qgen-online-only" id="qgen-advanced-section">' +
+            '<h3 class="qgen-section-toggle">' +
+            '  <span class="material-symbols-outlined">tune</span> Advanced Quiz Settings' +
+            '  <span class="material-symbols-outlined qgen-chevron">expand_more</span>' +
+            '</h3>' +
+            '<div class="qgen-section-body" style="display:none;">' +
+            '  <div class="qgen-field-row">' +
+            '    <div class="qgen-field">' +
+            '      <label>Question Behaviour</label>' +
+            '      <select id="qgen-behaviour" class="qgen-select">' +
+            '        <option value="deferredfeedback" selected>Deferred feedback (recommended)</option>' +
+            '        <option value="adaptive">Adaptive mode</option>' +
+            '        <option value="adaptive_no_penalty">Adaptive mode (no penalties)</option>' +
+            '        <option value="interactive">Interactive with multiple tries</option>' +
+            '        <option value="interactive_no_certificate">Interactive (no certificates)</option>' +
+            '      </select>' +
+            '    </div>' +
+            '    <div class="qgen-field">' +
+            '      <label>Grading Method</label>' +
+            '      <select id="qgen-grademethod" class="qgen-select">' +
+            '        <option value="1" selected>Mean of all attempts</option>' +
+            '        <option value="2">Highest attempt</option>' +
+            '        <option value="4">First attempt</option>' +
+            '        <option value="6">Last attempt</option>' +
+            '      </select>' +
+            '    </div>' +
+            '  </div>' +
+            '  <div class="qgen-field-row">' +
+            '    <div class="qgen-field">' +
+            '      <label>Navigation Method</label>' +
+            '      <select id="qgen-navmethod" class="qgen-select">' +
+            '        <option value="free" selected>Free (students answer in any order)</option>' +
+            '        <option value="sequential">Sequential (must answer in order)</option>' +
+            '      </select>' +
+            '    </div>' +
+            '    <div class="qgen-field">' +
+            '      <label>Questions per Page</label>' +
+            '      <input type="number" id="qgen-ppp" class="qgen-input" value="0" min="0" max="50">' +
+            '      <span class="qgen-hint">0 = all on one page</span>' +
+            '    </div>' +
+            '  </div>' +
+            '  <div class="qgen-toggle-row">' +
+            '    <label class="qgen-check-label"><input type="checkbox" id="qgen-review-attempt" checked> During attempt: attempt</label>' +
+            '    <label class="qgen-check-label"><input type="checkbox" id="qgen-review-correctness" checked> During attempt: correctness</label>' +
+            '    <label class="qgen-check-label"><input type="checkbox" id="qgen-review-marks" checked> During attempt: marks</label>' +
+            '  </div>' +
+            '  <div class="qgen-toggle-row">' +
+            '    <label class="qgen-check-label"><input type="checkbox" id="qgen-review-responses" checked> After attempt: responses</label>' +
+            '    <label class="qgen-check-label"><input type="checkbox" id="qgen-review-feedback" checked> After attempt: feedback</label>' +
+            '    <label class="qgen-check-label"><input type="checkbox" id="qgen-review-overall" checked> After attempt: overall feedback</label>' +
+            '  </div>' +
             '</div>' +
             '</div>';
     }
@@ -522,8 +663,12 @@ define(['core/ajax'], function(Ajax) {
                 var destSection = document.querySelector('.qgen-dest-section');
                 var showDoc = this.value === 'printed' || this.value === 'both';
                 var showDest = this.value === 'online' || this.value === 'both';
+                var showOnline = this.value === 'online' || this.value === 'both';
                 if (docSection) docSection.style.display = showDoc ? '' : 'none';
                 if (destSection) destSection.style.display = showDest ? '' : 'none';
+                document.querySelectorAll('.qgen-online-only').forEach(function(el) {
+                    el.style.display = showOnline ? '' : 'none';
+                });
             });
         });
 
@@ -580,9 +725,38 @@ define(['core/ajax'], function(Ajax) {
             }
         });
 
+        document.querySelectorAll('.qgen-online-only .qgen-section-toggle').forEach(function(toggle) {
+            toggle.addEventListener('click', function() {
+                var section = this.closest('.qgen-section');
+                var body = section.querySelector('.qgen-section-body');
+                var chevron = this.querySelector('.qgen-chevron');
+                if (body.style.display === 'none') {
+                    body.style.display = '';
+                    section.classList.remove('qgen-section-collapsed');
+                    chevron.textContent = 'expand_less';
+                } else {
+                    body.style.display = 'none';
+                    section.classList.add('qgen-section-collapsed');
+                    chevron.textContent = 'expand_more';
+                }
+            });
+        });
+
+        var groupmodeEl = document.getElementById('qgen-groupmode');
+        if (groupmodeEl) {
+            groupmodeEl.addEventListener('change', function() {
+                var val = parseInt(this.value);
+                var grpWrap = document.getElementById('qgen-grouping-wrap');
+                var grpListWrap = document.getElementById('qgen-groups-wrap');
+                if (grpWrap) grpWrap.style.display = val > 0 ? '' : 'none';
+                if (grpListWrap) grpListWrap.style.display = val > 0 ? '' : 'none';
+            });
+        }
+
         document.getElementById('qgen-generate-btn').addEventListener('click', function() { generate(cid); });
 
         updateInstrSummary();
+        loadCourseQuizData(cid);
     }
 
     function recalcTotal() {
@@ -1136,6 +1310,40 @@ define(['core/ajax'], function(Ajax) {
         });
     }
 
+    // ── Load course quiz config data ──
+    function loadCourseQuizData(cid) {
+        Ajax.call([{
+            methodname: 'local_umat_ai_get_course_quiz_config_data',
+            args: { courseid: cid }
+        }])[0].done(function(r) {
+            var secSel = document.getElementById('qgen-sectionnum');
+            if (secSel && r.sections) {
+                secSel.innerHTML = r.sections.map(function(s) {
+                    return '<option value="' + s.section + '">' + esc(s.name) + (s.visible ? '' : ' (hidden)') + '</option>';
+                }).join('');
+            }
+            var gcSel = document.getElementById('qgen-gradecat');
+            if (gcSel && r.grade_categories) {
+                gcSel.innerHTML = r.grade_categories.map(function(g) {
+                    return '<option value="' + g.id + '">' + esc(g.name) + '</option>';
+                }).join('');
+            }
+            var grpSel = document.getElementById('qgen-groupingid');
+            if (grpSel && r.groupings) {
+                grpSel.innerHTML = r.groupings.map(function(g) {
+                    return '<option value="' + g.id + '">' + esc(g.name) + '</option>';
+                }).join('');
+            }
+            var grpList = document.getElementById('qgen-groups-list');
+            if (grpList && r.groups) {
+                grpList.innerHTML = r.groups.map(function(g) {
+                    return '<label class="qgen-check-label"><input type="checkbox" class="qgen-group-check" value="' + g.id + '"> ' + esc(g.name) + '</label>';
+                }).join('');
+            }
+            _courseGroups = r.groups || [];
+        }).fail(function() {});
+    }
+
     // ── Gather form data ──
     function gatherFormData() {
         var sourceType = document.getElementById('qgen-source').value;
@@ -1205,7 +1413,34 @@ define(['core/ajax'], function(Ajax) {
             aiInstructions: instrCustom,
             groundingMode: getGroundingMode(),
             instructionPresets: getSelectedPresets(),
-            total: total
+            total: total,
+
+            // Schedule
+            timeopen: document.getElementById('qgen-timeopen') ? document.getElementById('qgen-timeopen').value || '' : '',
+            timeclose: document.getElementById('qgen-timeclose') ? document.getElementById('qgen-timeclose').value || '' : '',
+
+            // Access & Security
+            password: document.getElementById('qgen-password') ? document.getElementById('qgen-password').value.trim() : '',
+            browserSecurity: parseInt(document.getElementById('qgen-browser-security') ? document.getElementById('qgen-browser-security').value : 0) || 0,
+            groupmode: parseInt(document.getElementById('qgen-groupmode') ? document.getElementById('qgen-groupmode').value : 0) || 0,
+            groupingid: parseInt(document.getElementById('qgen-groupingid') ? document.getElementById('qgen-groupingid').value : 0) || 0,
+            groupids: (function(){ var ids = []; document.querySelectorAll('.qgen-group-check:checked').forEach(function(c){ ids.push(parseInt(c.value)); }); return ids; })(),
+
+            // Placement
+            sectionnum: parseInt(document.getElementById('qgen-sectionnum') ? document.getElementById('qgen-sectionnum').value : 0) || 0,
+            gradecat: parseInt(document.getElementById('qgen-gradecat') ? document.getElementById('qgen-gradecat').value : 0) || 0,
+
+            // Advanced
+            preferredBehaviour: document.getElementById('qgen-behaviour') ? document.getElementById('qgen-behaviour').value : 'deferredfeedback',
+            gradeMethod: parseInt(document.getElementById('qgen-grademethod') ? document.getElementById('qgen-grademethod').value : 1) || 1,
+            navMethod: document.getElementById('qgen-navmethod') ? document.getElementById('qgen-navmethod').value : 'free',
+            questionsPerPage: parseInt(document.getElementById('qgen-ppp') ? document.getElementById('qgen-ppp').value : 0) || 0,
+            reviewAttempt: document.getElementById('qgen-review-attempt') ? (document.getElementById('qgen-review-attempt').checked ? 1 : 0) : 1,
+            reviewCorrectness: document.getElementById('qgen-review-correctness') ? (document.getElementById('qgen-review-correctness').checked ? 1 : 0) : 1,
+            reviewMarks: document.getElementById('qgen-review-marks') ? (document.getElementById('qgen-review-marks').checked ? 1 : 0) : 1,
+            reviewResponses: document.getElementById('qgen-review-responses') ? (document.getElementById('qgen-review-responses').checked ? 1 : 0) : 1,
+            reviewFeedback: document.getElementById('qgen-review-feedback') ? (document.getElementById('qgen-review-feedback').checked ? 1 : 0) : 1,
+            reviewOverall: document.getElementById('qgen-review-overall') ? (document.getElementById('qgen-review-overall').checked ? 1 : 0) : 1,
         };
     }
 
@@ -1259,7 +1494,26 @@ define(['core/ajax'], function(Ajax) {
                 shuffle_answers: data.shuffleAnswers,
                 show_feedback: data.showFeedback,
                 time_limit: data.timeLimit,
-                max_attempts: data.maxAttempts
+                max_attempts: data.maxAttempts,
+                time_open: data.timeopen || '',
+                time_close: data.timeclose || '',
+                password: data.password || '',
+                browser_security: data.browserSecurity || 0,
+                groupmode: data.groupmode || 0,
+                groupingid: data.groupingid || 0,
+                group_ids: JSON.stringify(data.groupids || []),
+                section_num: data.sectionnum || 0,
+                grade_category: data.gradecat || 0,
+                preferred_behaviour: data.preferredBehaviour || 'deferredfeedback',
+                grade_method: data.gradeMethod || 1,
+                nav_method: data.navMethod || 'free',
+                questions_per_page: data.questionsPerPage || 0,
+                review_attempt: data.reviewAttempt,
+                review_correctness: data.reviewCorrectness,
+                review_marks: data.reviewMarks,
+                review_responses: data.reviewResponses,
+                review_feedback: data.reviewFeedback,
+                review_overall: data.reviewOverall
             }
         }])[0].done(function(result) {
             if (result.status === 'completed' && result.questions) {

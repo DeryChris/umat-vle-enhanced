@@ -38,6 +38,29 @@ class quizgen extends \external_api {
             'show_feedback'         => new \external_value(PARAM_INT, 'Show feedback during review (0/1)', VALUE_DEFAULT, 1),
             'time_limit'            => new \external_value(PARAM_INT, 'Time limit in minutes (0=unlimited)', VALUE_DEFAULT, 0),
             'max_attempts'          => new \external_value(PARAM_INT, 'Max attempts (-1=unlimited)', VALUE_DEFAULT, -1),
+            // Schedule
+            'time_open'             => new \external_value(PARAM_RAW, 'Quiz open datetime (ISO)', VALUE_DEFAULT, ''),
+            'time_close'            => new \external_value(PARAM_RAW, 'Quiz close datetime (ISO)', VALUE_DEFAULT, ''),
+            // Access & Security
+            'password'              => new \external_value(PARAM_RAW, 'Quiz access password', VALUE_DEFAULT, ''),
+            'browser_security'      => new \external_value(PARAM_INT, 'Browser security level (0-2)', VALUE_DEFAULT, 0),
+            'groupmode'             => new \external_value(PARAM_INT, 'Group mode (0=none,1=separate,2=visible)', VALUE_DEFAULT, 0),
+            'groupingid'            => new \external_value(PARAM_INT, 'Grouping ID for access restriction', VALUE_DEFAULT, 0),
+            'group_ids'             => new \external_value(PARAM_RAW, 'JSON array of allowed group IDs', VALUE_DEFAULT, '[]'),
+            // Placement
+            'section_num'           => new \external_value(PARAM_INT, 'Course section number', VALUE_DEFAULT, 0),
+            'grade_category'        => new \external_value(PARAM_INT, 'Gradebook category ID', VALUE_DEFAULT, 0),
+            // Advanced
+            'preferred_behaviour'   => new \external_value(PARAM_ALPHA, 'Question behaviour', VALUE_DEFAULT, 'deferredfeedback'),
+            'grade_method'          => new \external_value(PARAM_INT, 'Grading method (1=mean,2=highest,4=first,6=last)', VALUE_DEFAULT, 1),
+            'nav_method'            => new \external_value(PARAM_ALPHA, 'Navigation method: free, sequential', VALUE_DEFAULT, 'free'),
+            'questions_per_page'    => new \external_value(PARAM_INT, 'Questions per page (0=all)', VALUE_DEFAULT, 0),
+            'review_attempt'        => new \external_value(PARAM_INT, 'Review: show attempt (0/1)', VALUE_DEFAULT, 1),
+            'review_correctness'    => new \external_value(PARAM_INT, 'Review: show correctness (0/1)', VALUE_DEFAULT, 1),
+            'review_marks'          => new \external_value(PARAM_INT, 'Review: show marks (0/1)', VALUE_DEFAULT, 1),
+            'review_responses'      => new \external_value(PARAM_INT, 'Review: show responses after (0/1)', VALUE_DEFAULT, 1),
+            'review_feedback'       => new \external_value(PARAM_INT, 'Review: show feedback after (0/1)', VALUE_DEFAULT, 1),
+            'review_overall'        => new \external_value(PARAM_INT, 'Review: show overall feedback (0/1)', VALUE_DEFAULT, 1),
         ]);
     }
 
@@ -59,7 +82,26 @@ class quizgen extends \external_api {
         $shuffle_answers = 1,
         $show_feedback = 1,
         $time_limit = 0,
-        $max_attempts = -1
+        $max_attempts = -1,
+        $time_open = '',
+        $time_close = '',
+        $password = '',
+        $browser_security = 0,
+        $groupmode = 0,
+        $groupingid = 0,
+        $group_ids = '[]',
+        $section_num = 0,
+        $grade_category = 0,
+        $preferred_behaviour = 'deferredfeedback',
+        $grade_method = 1,
+        $nav_method = 'free',
+        $questions_per_page = 0,
+        $review_attempt = 1,
+        $review_correctness = 1,
+        $review_marks = 1,
+        $review_responses = 1,
+        $review_feedback = 1,
+        $review_overall = 1
     ) {
         global $DB, $USER;
 
@@ -82,6 +124,25 @@ class quizgen extends \external_api {
             'show_feedback'        => $show_feedback,
             'time_limit'           => $time_limit,
             'max_attempts'         => $max_attempts,
+            'time_open'            => $time_open,
+            'time_close'           => $time_close,
+            'password'             => $password,
+            'browser_security'     => $browser_security,
+            'groupmode'            => $groupmode,
+            'groupingid'           => $groupingid,
+            'group_ids'            => $group_ids,
+            'section_num'          => $section_num,
+            'grade_category'       => $grade_category,
+            'preferred_behaviour'  => $preferred_behaviour,
+            'grade_method'         => $grade_method,
+            'nav_method'           => $nav_method,
+            'questions_per_page'   => $questions_per_page,
+            'review_attempt'       => $review_attempt,
+            'review_correctness'   => $review_correctness,
+            'review_marks'         => $review_marks,
+            'review_responses'     => $review_responses,
+            'review_feedback'      => $review_feedback,
+            'review_overall'       => $review_overall,
         ]);
 
         $context = \context_course::instance($params['courseid']);
@@ -138,6 +199,35 @@ class quizgen extends \external_api {
             $catname = 'AI Quiz — ' . ($course->shortname ?? 'Course ' . $params['courseid']) . ' (' . date('Y-m-d') . ')';
         }
 
+        // Parse group_ids.
+        $groupids = json_decode($params['group_ids'], true);
+        if (!is_array($groupids)) {
+            $groupids = [];
+        }
+
+        // Validate behaviour.
+        $validBehaviours = ['deferredfeedback', 'adaptive', 'adaptive_no_penalty', 'interactive', 'interactive_no_certificate'];
+        $behaviour = in_array($params['preferred_behaviour'], $validBehaviours) ? $params['preferred_behaviour'] : 'deferredfeedback';
+
+        // Validate grade method.
+        $validGradeMethods = [1, 2, 4, 6];
+        $gmethod = in_array((int)$params['grade_method'], $validGradeMethods) ? (int)$params['grade_method'] : 1;
+
+        // Validate nav method.
+        $navmethod = ($params['nav_method'] === 'sequential') ? 'sequential' : 'free';
+
+        // Convert ISO datetime to Unix timestamp for Moodle.
+        $timeOpen = 0;
+        if (!empty($params['time_open'])) {
+            $timeOpen = (int)strtotime($params['time_open']);
+            if ($timeOpen <= 0) $timeOpen = 0;
+        }
+        $timeClose = 0;
+        if (!empty($params['time_close'])) {
+            $timeClose = (int)strtotime($params['time_close']);
+            if ($timeClose <= 0) $timeClose = 0;
+        }
+
         // Build config_json with all settings.
         $config = json_encode([
             'bloom_level'         => $bloom,
@@ -155,6 +245,29 @@ class quizgen extends \external_api {
             'time_limit'          => (int)$params['time_limit'],
             'max_attempts'        => (int)$params['max_attempts'],
             'material_ids'        => $matids,
+            // Schedule
+            'time_open'           => $timeOpen,
+            'time_close'          => $timeClose,
+            // Access & Security
+            'password'            => $params['password'] ?: '',
+            'browser_security'    => (int)$params['browser_security'],
+            'groupmode'           => (int)$params['groupmode'],
+            'groupingid'          => (int)$params['groupingid'],
+            'group_ids'           => $groupids,
+            // Placement
+            'section_num'         => (int)$params['section_num'],
+            'grade_category'      => (int)$params['grade_category'],
+            // Advanced
+            'preferred_behaviour' => $behaviour,
+            'grade_method'        => $gmethod,
+            'nav_method'          => $navmethod,
+            'questions_per_page'  => (int)$params['questions_per_page'],
+            'review_attempt'      => (int)$params['review_attempt'],
+            'review_correctness'  => (int)$params['review_correctness'],
+            'review_marks'        => (int)$params['review_marks'],
+            'review_responses'    => (int)$params['review_responses'],
+            'review_feedback'     => (int)$params['review_feedback'],
+            'review_overall'      => (int)$params['review_overall'],
         ]);
 
         $job = (object)[
@@ -373,12 +486,35 @@ class quizgen extends \external_api {
 
         try {
             $quizSettings = [
-                'intro'             => $config['quiz_description'] ?? '',
-                'shufflequestions'  => $config['shuffle_questions'] ?? 0,
-                'shuffleanswers'    => $config['shuffle_answers'] ?? 1,
-                'showfeedback'      => $config['show_feedback'] ?? 1,
-                'timelimit'         => $config['time_limit'] ?? 0,
-                'attempts'          => $config['max_attempts'] ?? -1,
+                'intro'              => $config['quiz_description'] ?? '',
+                'shufflequestions'   => $config['shuffle_questions'] ?? 0,
+                'shuffleanswers'     => $config['shuffle_answers'] ?? 1,
+                'showfeedback'       => $config['show_feedback'] ?? 1,
+                'timelimit'          => $config['time_limit'] ?? 0,
+                'attempts'           => $config['max_attempts'] ?? -1,
+                // Schedule
+                'timeopen'           => $config['time_open'] ?? 0,
+                'timeclose'          => $config['time_close'] ?? 0,
+                // Access & Security
+                'password'           => $config['password'] ?? '',
+                'browsersecurity'    => $config['browser_security'] ?? 0,
+                'groupmode'          => $config['groupmode'] ?? 0,
+                'groupingid'         => $config['groupingid'] ?? 0,
+                'groupids'           => $config['group_ids'] ?? [],
+                // Placement
+                'sectionnum'         => $config['section_num'] ?? 0,
+                'grade_category'     => $config['grade_category'] ?? 0,
+                // Advanced
+                'preferredbehaviour' => $config['preferred_behaviour'] ?? 'deferredfeedback',
+                'grademethod'        => $config['grade_method'] ?? 1,
+                'navmethod'          => $config['nav_method'] ?? 'free',
+                'questionsperpage'   => $config['questions_per_page'] ?? 0,
+                'reviewattempt'      => $config['review_attempt'] ?? 1,
+                'reviewcorrectness'  => $config['review_correctness'] ?? 1,
+                'reviewmarks'        => $config['review_marks'] ?? 1,
+                'reviewresponses'    => $config['review_responses'] ?? 1,
+                'reviewfeedback'     => $config['review_feedback'] ?? 1,
+                'reviewoverall'      => $config['review_overall'] ?? 1,
             ];
 
             if ($params['category_choice'] === 'existing' && $params['existing_job_id'] > 0) {
@@ -838,6 +974,105 @@ class quizgen extends \external_api {
             'status'         => new \external_value(PARAM_ALPHAEXT, 'completed'),
             'question'       => new \external_value(PARAM_RAW, 'Regenerated question as JSON', VALUE_OPTIONAL),
             'failure_reason' => new \external_value(PARAM_TEXT, 'Error message if regeneration failed', VALUE_OPTIONAL),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // get_course_quiz_config_data — sections, grade cats, groups, etc.    //
+    // ------------------------------------------------------------------ //
+    public static function get_course_quiz_config_data_parameters() {
+        return new \external_function_parameters([
+            'courseid' => new \external_value(PARAM_INT, 'Course ID'),
+        ]);
+    }
+
+    public static function get_course_quiz_config_data($courseid) {
+        global $DB;
+
+        $params = self::validate_parameters(self::get_course_quiz_config_data_parameters(), ['courseid' => $courseid]);
+        $context = \context_course::instance($params['courseid']);
+        self::validate_context($context);
+        require_capability('local/umat_ai:viewanalytics', $context);
+
+        // 1. Course sections
+        $sections = $DB->get_records_sql(
+            "SELECT id, section, name, visible
+             FROM {course_sections}
+             WHERE course = :courseid
+             ORDER BY section ASC",
+            ['courseid' => $courseid]
+        );
+        $sectionList = [];
+        foreach ($sections as $s) {
+            $sectionList[] = [
+                'id' => (int)$s->id,
+                'section' => (int)$s->section,
+                'name' => $s->name ?: ($s->section == 0 ? 'General' : 'Topic ' . $s->section),
+                'visible' => (bool)$s->visible,
+            ];
+        }
+
+        // 2. Grade categories (from grade_items hierarchy)
+        // Use grade_categories table
+        $gradeCats = $DB->get_records_sql(
+            "SELECT gc.id, gc.fullname
+             FROM {grade_categories} gc
+             WHERE gc.courseid = :courseid
+             ORDER BY gc.fullname ASC",
+            ['courseid' => $courseid]
+        );
+        $gradeCatList = [['id' => 0, 'name' => 'No category (default)']];
+        foreach ($gradeCats as $gc) {
+            $gradeCatList[] = ['id' => (int)$gc->id, 'name' => $gc->fullname];
+        }
+
+        // 3. Groups
+        $groups = groups_get_all_groups($courseid, 0, '', 'g.id, g.name, g.groupingid');
+        $groupList = [];
+        foreach ($groups as $g) {
+            $groupList[] = [
+                'id' => (int)$g->id,
+                'name' => $g->name,
+                'groupingid' => (int)$g->groupingid,
+            ];
+        }
+
+        // 4. Groupings
+        $groupings = groups_get_all_groupings($courseid);
+        $groupingList = [['id' => 0, 'name' => 'None']];
+        foreach ($groupings as $g) {
+            $groupingList[] = ['id' => (int)$g->id, 'name' => $g->name];
+        }
+
+        return [
+            'sections' => $sectionList,
+            'grade_categories' => $gradeCatList,
+            'groups' => $groupList,
+            'groupings' => $groupingList,
+        ];
+    }
+
+    public static function get_course_quiz_config_data_returns() {
+        return new \external_single_structure([
+            'sections' => new \external_multiple_structure(new \external_single_structure([
+                'id' => new \external_value(PARAM_INT, 'Section ID'),
+                'section' => new \external_value(PARAM_INT, 'Section number'),
+                'name' => new \external_value(PARAM_TEXT, 'Section name'),
+                'visible' => new \external_value(PARAM_BOOL, 'Whether visible'),
+            ])),
+            'grade_categories' => new \external_multiple_structure(new \external_single_structure([
+                'id' => new \external_value(PARAM_INT, 'Category ID'),
+                'name' => new \external_value(PARAM_TEXT, 'Category name'),
+            ])),
+            'groups' => new \external_multiple_structure(new \external_single_structure([
+                'id' => new \external_value(PARAM_INT, 'Group ID'),
+                'name' => new \external_value(PARAM_TEXT, 'Group name'),
+                'groupingid' => new \external_value(PARAM_INT, 'Parent grouping ID'),
+            ])),
+            'groupings' => new \external_multiple_structure(new \external_single_structure([
+                'id' => new \external_value(PARAM_INT, 'Grouping ID'),
+                'name' => new \external_value(PARAM_TEXT, 'Grouping name'),
+            ])),
         ]);
     }
 }
