@@ -1584,6 +1584,297 @@ _umatInitEsc([
   {id:'lec-cp-ov',isOpen:function(e){return e.classList.contains('open');},close:function(e){e.classList.remove('open');}}
 ]);
 
+/* ─── RESOURCE BANK (Private Materials) ─── */
+var RB = {
+  currentFolder: null,
+  selected: {},
+  _loaded: false,
+  _rbAjax: function(m,a,d,f){ajax('local_umat_ai_resource_bank_'+m,a,function(r){if(d)d(r);},function(e){if(f)f(e);else console.error('[rb]',m,e);});},
+  /* Format file size */
+  _fmtSize: function(b){if(!b)return '';if(b<1024)return b+'B';if(b<1048576)return (b/1024).toFixed(1)+'KB';return (b/1048576).toFixed(1)+'MB';},
+  /* Time ago */
+  _timeAgo: function(ts){var d=Date.now()/1000-ts;if(d<60)return 'just now';if(d<3600)return Math.floor(d/60)+'m ago';if(d<86400)return Math.floor(d/3600)+'h ago';return Math.floor(d/86400)+'d ago';},
+  /* Breadcrumb trail */
+  _trail: [],
+  /* Load contents of a folder (null = root) */
+  load: function(parentId){
+    RB.currentFolder = parentId;
+    RB.selected = {};
+    _updateRbBatchBtns();
+    document.getElementById('rb-content').innerHTML = '<div class="rb-loading">Loading…</div>';
+    RB._rbAjax('list',{parentid:parentId||0},function(r){
+      _renderRbItems(r.items||[]);
+    });
+  },
+  /* Build breadcrumb from trail */
+  _renderBreadcrumb: function(){
+    var el=document.getElementById('rb-breadcrumb');
+    if(!el)return;
+    var html='<span style="cursor:pointer;color:var(--u-p);font-weight:600;" data-rb-root="1">My Resources</span>';
+    RB._trail.forEach(function(t,i){
+      html+=' <span style="color:var(--u-olv);">/</span> <span style="cursor:pointer;color:var(--u-p);" data-rb-folder="'+t.id+'">'+esc(t.name)+'</span>';
+    });
+    el.innerHTML=html;
+    /* Click root */
+    var root=el.querySelector('[data-rb-root]');
+    if(root)root.addEventListener('click',function(){RB._trail=[];RB.load(null);});
+    /* Click trail folders */
+    el.querySelectorAll('[data-rb-folder]').forEach(function(s){
+      s.addEventListener('click',function(){
+        var fid=parseInt(this.dataset.rbFolder);
+        var idx=RB._trail.findIndex(function(t){return t.id===fid;});
+        if(idx>=0)RB._trail=RB._trail.slice(0,idx);
+        RB.load(fid);
+      });
+    });
+  },
+  /* Navigate into a folder */
+  openFolder: function(id,name){
+    RB._trail.push({id:id,name:name});
+    RB.load(id);
+  },
+  /* Toggle toggle view */
+  switchView: function(view){
+    document.querySelectorAll('.umat-lib-toggle').forEach(function(b){b.classList.toggle('active',b.dataset.libview===view);});
+    document.getElementById('lec-lib-course-view').style.display=view==='course'?'':'none';
+    var pv=document.getElementById('lec-private-bank-view');
+    pv.style.display=view==='private'?'flex':'none';
+    if(view==='private'&&!RB._loaded){RB._loaded=true;RB.load(null);}
+  }
+};
+
+function _renderRbItems(items){
+  var g=document.getElementById('rb-content');
+  if(!g)return;
+  RB._renderBreadcrumb();
+  if(!items.length){
+    g.innerHTML='<div class="rb-empty"><span class="material-symbols-outlined">folder_off</span><p>This folder is empty.</p></div>';
+    return;
+  }
+  var html='<div class="rb-grid">';
+  items.forEach(function(it){
+    var icon=it.isfolder?'folder':'description';
+    var iconCls=it.isfolder?'rb-folder-icon':'rb-file-icon';
+    var sizeLabel=it.isfolder?'':RB._fmtSize(it.filesize);
+    var timeLabel=RB._timeAgo(it.timecreated);
+    html+='<div class="rb-item" data-rb-id="'+it.id+'" data-rb-folder="'+(it.isfolder?1:0)+'" data-rb-name="'+esc(it.name)+'" data-rb-fileurl="'+esc(it.fileurl||'')+'" data-rb-mime="'+esc(it.mimetype||'')+'">'
+      +'<label class="rb-chk" style="position:absolute;top:8px;left:8px;z-index:2;cursor:pointer;display:none;">'
+      +'<input type="checkbox" class="rb-cb" data-rb-id="'+it.id+'" style="accent-color:var(--u-p);width:16px;height:16px;cursor:pointer;"></label>'
+      +'<div class="rb-thumb" style="background:'+(it.isfolder?'rgba(0,107,47,.08)':'rgba(99,102,241,.08)')+';border-radius:var(--u-r8);width:100%;aspect-ratio:1.6;display:flex;align-items:center;justify-content:center;font-size:32px;color:'+(it.isfolder?'var(--u-p)':'#6366f1')+';position:relative;">'
+      +'<span class="material-symbols-outlined">'+icon+'</span>'
+      +(it.isfolder?'':'<span style="position:absolute;bottom:4px;right:4px;font-size:9px;background:var(--u-bg);padding:1px 4px;border-radius:4px;color:var(--u-ol);font-weight:600;">'+_getExtLabel(it.name)+'</span>')
+      +'</div>'
+      +'<div class="rb-info" style="padding:6px 4px;">'
+      +'<div class="rb-name" style="font-size:11px;font-weight:600;color:var(--u-ons);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+esc(it.name)+'">'+esc(it.name)+'</div>'
+      +'<div style="font-size:10px;color:var(--u-ol);margin-top:2px;">'+(it.isfolder?'Folder':sizeLabel+(timeLabel?' · '+timeLabel:''))+'</div>'
+      +'</div></div>';
+  });
+  html+='</div>';
+  g.innerHTML=html;
+
+  /* Click handlers */
+  g.querySelectorAll('.rb-item').forEach(function(el){
+    el.addEventListener('click',function(e){
+      if(e.target.closest('.rb-chk'))return;
+      var id=parseInt(this.dataset.rbId);
+      var isFolder=this.dataset.rbFolder==='1';
+      if(isFolder){
+        RB.openFolder(id,this.dataset.rbName);
+      } else {
+        /* Preview file */
+        var url=this.dataset.rbFileurl;
+        var name=this.dataset.rbName;
+        var mime=this.dataset.rbMime||'';
+        if(url&&window.umatMaterialViewer){
+          var viewType=_mapMimeToViewer(mime,name);
+          window.umatMaterialViewer.open(viewType,{url:url,name:name,downloadUrl:url});
+        }
+      }
+    });
+    /* Long-press / right-click for checkbox mode */
+    el.addEventListener('contextmenu',function(e){e.preventDefault();_toggleRbCheckMode();});
+  });
+
+  /* Checkbox change → update batch buttons */
+  g.querySelectorAll('.rb-cb').forEach(function(cb){
+    cb.addEventListener('change',function(){
+      if(this.checked)RB.selected[parseInt(this.dataset.rbId)]=true;
+      else delete RB.selected[parseInt(this.dataset.rbId)];
+      _updateRbBatchBtns();
+    });
+  });
+
+  /* Show checkboxes on first selection attempt */
+  g.querySelectorAll('.rb-item').forEach(function(el){
+    el.addEventListener('dblclick',function(e){
+      if(e.target.closest('.rb-chk'))return;
+      if(!el.querySelector('.rb-chk').style.display||el.querySelector('.rb-chk').style.display==='none'){
+        _showRbCheckboxes();
+      }
+    });
+  });
+}
+
+function _getExtLabel(name){
+  var ext=(name||'').split('.').pop().toUpperCase();
+  if(ext.length>4)return 'FILE';
+  return ext||'FILE';
+}
+
+function _mapMimeToViewer(mime,name){
+  if(mime.includes('video'))return 'video';
+  if(mime.includes('pdf'))return 'pdf';
+  if(mime.includes('image'))return 'image';
+  if(mime.includes('audio'))return 'audio';
+  if(mime.includes('word')||mime.includes('document')||/\.docx?$/i.test(name))return 'docx';
+  if(mime.includes('spreadsheet')||mime.includes('excel')||/\.xlsx?$/i.test(name))return 'xlsx';
+  if(mime.includes('presentation')||mime.includes('powerpoint')||/\.pptx?$/i.test(name))return 'pptx';
+  if(mime.includes('text')||mime.includes('json')||mime.includes('javascript'))return 'code';
+  return 'pdf';
+}
+
+function _showRbCheckboxes(){
+  document.querySelectorAll('#rb-content .rb-chk').forEach(function(el){el.style.display='block';});
+}
+
+function _toggleRbCheckMode(){
+  var els=document.querySelectorAll('#rb-content .rb-chk');
+  var hidden=!els.length||els[0].style.display==='none'||!els[0].style.display;
+  els.forEach(function(el){el.style.display=hidden?'block':'none';});
+  if(!hidden){RB.selected={};_updateRbBatchBtns();}
+}
+
+function _updateRbBatchBtns(){
+  var count=Object.keys(RB.selected).length;
+  var hasSel=count>0;
+  ['rb-delete-btn','rb-push-btn'].forEach(function(id){
+    var btn=document.getElementById(id);
+    if(!btn)return;
+    btn.disabled=!hasSel;
+    btn.style.opacity=hasSel?'1':'.4';
+    btn.innerHTML=(id==='rb-push-btn'?'<span class="material-symbols-outlined" style="font-size:14px;">publish</span>Push to Course':'<span class="material-symbols-outlined" style="font-size:14px;">delete</span>Delete')
+      +(hasSel?' ('+count+')':'');
+  });
+}
+
+/* Toggle Library views */
+document.querySelectorAll('.umat-lib-toggle').forEach(function(btn){
+  btn.addEventListener('click',function(){RB.switchView(this.dataset.libview);});
+});
+
+/* Upload files */
+var rbUploadBtn=document.getElementById('rb-upload-btn');
+if(rbUploadBtn)rbUploadBtn.addEventListener('click',function(){var fi=document.getElementById('rb-file-input');if(fi)fi.click();});
+var rbFileInput=document.getElementById('rb-file-input');
+if(rbFileInput)rbFileInput.addEventListener('change',function(){
+  var files=this.files;
+  if(!files||!files.length)return;
+  _uploadRbFiles(Array.from(files));
+  this.value='';
+});
+
+function _uploadRbFiles(files){
+  var total=files.length;
+  var done=0;
+  files.forEach(function(file){
+    var fd=new FormData();
+    fd.append('file',file);
+    fd.append('parentid',RB.currentFolder||0);
+    fd.append('sesskey',moodleSesskey);
+    var xhr=new XMLHttpRequest();
+    xhr.open('POST','/local/umat_ai/resource_upload.php');
+    xhr.onload=function(){
+      done++;
+      if(done>=total){
+        RB.load(RB.currentFolder);
+      }else{
+        /* Show per-file progress in console (silent) */
+      }
+    };
+    xhr.onerror=function(){done++;if(done>=total)RB.load(RB.currentFolder);};
+    xhr.send(fd);
+  });
+}
+
+/* Create folder */
+var rbNewFolderBtn=document.getElementById('rb-new-folder-btn');
+if(rbNewFolderBtn)rbNewFolderBtn.addEventListener('click',function(){
+  var name=prompt('Enter folder name:');
+  if(!name||!name.trim())return;
+  RB._rbAjax('create_folder',{parentid:RB.currentFolder||0,name:name.trim()},function(){
+    RB.load(RB.currentFolder);
+  });
+});
+
+/* Delete selected */
+var rbDeleteBtn=document.getElementById('rb-delete-btn');
+if(rbDeleteBtn)rbDeleteBtn.addEventListener('click',function(){
+  var ids=Object.keys(RB.selected).map(Number);
+  if(!ids.length)return;
+  if(!confirm('Delete '+ids.length+' item(s)? This cannot be undone.'))return;
+  RB._rbAjax('delete',{itemids:ids},function(r){
+    RB.load(RB.currentFolder);
+  });
+});
+
+/* Push to course — use delegation on #lec-private-bank-view */
+var rbPushBtn=document.getElementById('rb-push-btn');
+if(rbPushBtn)rbPushBtn.addEventListener('click',function(){
+  var ids=Object.keys(RB.selected).map(Number);
+  if(!ids.length)return;
+  /* Show course picker */
+  var ov=document.getElementById('rb-push-ov');
+  var list=document.getElementById('rb-push-list');
+  if(!ov||!list)return;
+  ov.style.display='flex';
+  list.innerHTML='<div class="umat-cs-item" style="opacity:.5;pointer-events:none;">Loading courses…</div>';
+  RB._rbAjax('teaching_courses',{},function(r){
+    var courses=r.courses||[];
+    if(!courses.length){
+      list.innerHTML='<div class="umat-cs-item" style="opacity:.5;pointer-events:none;">No courses available.</div>';
+      return;
+    }
+    list.innerHTML=courses.map(function(c){
+      return '<div class="umat-cs-item" data-cid="'+c.id+'"><span class="material-symbols-outlined">menu_book</span>'
+        +'<div><strong>'+esc(c.fullname)+'</strong><span style="font-size:11px;color:var(--u-ol);display:block;">'+esc(c.shortname)+'</span></div>'
+        +'<span class="umat-cs-check" style="margin-left:auto;">radio_button_unchecked</span></div>';
+    }).join('');
+    /* Select course */
+    var selectedCid=null;
+    list.querySelectorAll('.umat-cs-item').forEach(function(el){
+      el.addEventListener('click',function(){
+        list.querySelectorAll('.umat-cs-item').forEach(function(e){e.classList.remove('selected');e.querySelector('.umat-cs-check').textContent='radio_button_unchecked';});
+        this.classList.add('selected');
+        this.querySelector('.umat-cs-check').textContent='check_circle';
+        selectedCid=parseInt(this.dataset.cid);
+        var confirmBtn=document.getElementById('rb-push-confirm');
+        if(confirmBtn){confirmBtn.disabled=false;confirmBtn.style.opacity='1';confirmBtn.textContent='Push ('+ids.length+') to '+esc(this.querySelector('strong').textContent);}
+      });
+    });
+    /* Filter */
+    var pushSearch=document.getElementById('rb-push-search');
+    if(pushSearch)pushSearch.addEventListener('input',function(){
+      var q=this.value.toLowerCase();
+      list.querySelectorAll('.umat-cs-item').forEach(function(el){
+        el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';
+      });
+    });
+    /* Confirm push */
+    var confirmBtn=document.getElementById('rb-push-confirm');
+    if(confirmBtn)confirmBtn.onclick=function(){
+      if(!selectedCid)return;
+      RB._rbAjax('push',{itemids:ids,courseid:selectedCid},function(r){
+        ov.style.display='none';
+        RB.load(RB.currentFolder);
+      });
+    };
+  });
+});
+var rbPushClose=document.getElementById('rb-push-close');
+if(rbPushClose)rbPushClose.addEventListener('click',function(){var ov=document.getElementById('rb-push-ov');if(ov)ov.style.display='none';});
+var rbPushCancel=document.getElementById('rb-push-cancel');
+if(rbPushCancel)rbPushCancel.addEventListener('click',function(){var ov=document.getElementById('rb-push-ov');if(ov)ov.style.display='none';});
+
 })();
 }
 };

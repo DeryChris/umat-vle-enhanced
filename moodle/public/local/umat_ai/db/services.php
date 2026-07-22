@@ -210,6 +210,11 @@ $functions = [
         'description' => 'Regenerate a single question via AI', 'type' => 'write', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
+    'local_umat_ai_get_course_quiz_config_data' => [
+        'classname'   => '\local_umat_ai\external\quizgen', 'methodname' => 'get_course_quiz_config_data',
+        'description' => 'Fetch course sections, grade categories, groups, groupings for quiz config', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
 
     /* ---- Lecturer Insights Dashboard ---- */
     'local_umat_ai_get_dashboard_summary' => [
@@ -357,6 +362,38 @@ $functions = [
         'classname'   => '\local_umat_ai\external\transcription', 'methodname' => 'direct_upload',
         'description' => 'Handle direct file upload for transcription', 'type' => 'write', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+
+    /* ─── Resource Bank ─── */
+    'local_umat_ai_resource_bank_list' => [
+        'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'list_items',
+        'description' => 'List items in a resource bank folder', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
+    'local_umat_ai_resource_bank_create_folder' => [
+        'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'create_folder',
+        'description' => 'Create a folder in the resource bank', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
+    'local_umat_ai_resource_bank_upload' => [
+        'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'upload_file',
+        'description' => 'Upload a file to the resource bank', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
+    'local_umat_ai_resource_bank_delete' => [
+        'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'delete_items',
+        'description' => 'Delete items from the resource bank', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
+    'local_umat_ai_resource_bank_push' => [
+        'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'push_to_course',
+        'description' => 'Push resource bank items to a course', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
+    'local_umat_ai_resource_bank_teaching_courses' => [
+        'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'list_teaching_courses',
+        'description' => 'List courses the user can push resources to', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
     ],
 ];
 

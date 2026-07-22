@@ -483,5 +483,30 @@
       </INDEXES>
     </TABLE>
 
+    <TABLE NAME="umat_resource_items" COMMENT="Lecturer private resource bank items (files + folders)">
+      <FIELDS>
+        <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid"      TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="courseid"    TYPE="int"  LENGTH="10"  NOTNULL="false"/>
+        <FIELD NAME="parentid"    TYPE="int"  LENGTH="10"  NOTNULL="false"/>
+        <FIELD NAME="name"        TYPE="char" LENGTH="255" NOTNULL="true" DEFAULT=""/>
+        <FIELD NAME="filename"    TYPE="char" LENGTH="255" NOTNULL="false"/>
+        <FIELD NAME="filesize"    TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="mimetype"    TYPE="char" LENGTH="100" NOTNULL="false"/>
+        <FIELD NAME="isfolder"    TYPE="int"  LENGTH="1"   NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="fileid"      TYPE="int"  LENGTH="10"  NOTNULL="false"/>
+        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="idx_rb_user"   UNIQUE="false" FIELDS="userid"/>
+        <INDEX NAME="idx_rb_parent" UNIQUE="false" FIELDS="parentid"/>
+        <INDEX NAME="idx_rb_course" UNIQUE="false" FIELDS="courseid"/>
+      </INDEXES>
+    </TABLE>
+
   </TABLES>
 </XMLDB>

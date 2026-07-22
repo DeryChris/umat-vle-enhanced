@@ -242,6 +242,28 @@ function local_umat_ai_pluginfile($course, $cm, \context $context, $filearea, $a
         return;
     }
 
+    if ($filearea === 'resourcebank') {
+        global $USER, $DB;
+        $itemid = (int)array_shift($args);
+        $filename = array_pop($args);
+        $filepath = $args ? '/' . implode('/', $args) . '/' : '/';
+
+        // Only the owner can access their resource bank files.
+        $item = $DB->get_record('umat_resource_items', ['id' => $itemid]);
+        if (!$item || $item->userid != $USER->id) {
+            return false;
+        }
+
+        $fs = get_file_storage();
+        $file = $fs->get_file($context->id, 'local_umat_ai', 'resourcebank', $itemid, $filepath, $filename);
+        if (!$file) {
+            return false;
+        }
+
+        send_stored_file($file, null, 0, true);
+        return;
+    }
+
     if ($filearea !== 'recordings') {
         return false;
     }

@@ -1318,7 +1318,7 @@ define([], function() {
 
     // ─── Video tiles (student Lectures tab) ────────── //
     function renderVideoTiles(recs) {
-        var grid = document.getElementById('stu-lec-grid') || document.getElementById('ws-video-grid');
+        var grid = document.getElementById('stu-lec-grid') || document.getElementById('ws-lib-lectures') || document.getElementById('ws-video-grid');
         if (!grid) return;
         if (recs && !Array.isArray(recs)) {
             recs = recs.recordings || recs.data || recs.tiles || [];

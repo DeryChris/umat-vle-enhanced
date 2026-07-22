@@ -81,6 +81,9 @@
 .umat-fab-tip::after{content:'';position:absolute;right:-6px;top:50%;transform:translateY(-50%);
   border:6px solid transparent;border-left-color:#1a1c19;}
 .umat-fab:hover .umat-fab-tip{opacity:1;}
+/* Tooltip flip: when FAB is on left half, tooltip goes to the right */
+.umat-fab-tip-right .umat-fab-tip{right:auto;left:68px;}
+.umat-fab-tip-right .umat-fab-tip::after{right:auto;left:-6px;border-left-color:transparent;border-right-color:#1a1c19;}
 /* ==== COMPACT PANEL ==== */
 .umat-cp-ov{position:fixed!important;inset:0!important;z-index:9995!important;
   background:transparent;display:none;justify-content:flex-end;}
@@ -601,6 +604,13 @@
 .umat-ts-seg.active .umat-ts-text{font-weight:600;}
 .umat-player-right{width:380px;flex-shrink:0;display:flex;flex-direction:column;background:var(--u-sflo);}
 /* ==== MATERIAL TILES (horizontal row) ==== */
+.umat-lib-section{margin:0;border-bottom:1px solid var(--u-olv);}
+.umat-lib-section:last-child{border-bottom:none;}
+.umat-lib-section-hdr{display:flex;align-items:center;gap:8px;padding:14px 20px 4px;}
+.umat-lib-section-hdr h3{margin:0;font-size:13px;font-weight:700;color:var(--u-ons);flex:1;}
+.umat-lib-section-refresh{background:none;border:none;cursor:pointer;color:var(--u-ol);padding:4px;border-radius:var(--u-r6);display:flex;align-items:center;justify-content:center;}
+.umat-lib-section-refresh:hover{background:var(--u-sflo);color:var(--u-p);}
+.umat-lib-section .umat-video-grid{padding:4px 20px 14px;}
 .umat-lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;padding:20px;overflow-y:auto;flex:1;}
 .umat-lib-tile{background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r10);box-shadow:0 1px 4px rgba(0,0,0,.04);
   transition:transform .2s var(--u-cb),box-shadow .2s var(--u-cb);
