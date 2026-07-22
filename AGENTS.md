@@ -12,7 +12,7 @@ Before you start ANY task:
 
 - [ ] **Read the request completely** — understand scope and requirements
 - [ ] **Load Agent Skills** - Analyse this dir "C:\Users\amkch\plugins", "C:\Users\amkch\.claude\plugins" and pick the best agent skill or skills for the task and load and use it in the project. 
-- [ ] **Check team ownership** (see "Team Work Areas" below) — coordinate with owner if needed
+-[ ] **Pull, Merge & Push** - Pull latest from github and smartly merge in way that my changes adapts very well with what's coming so everything still functions as intended and seamlessly both on my end and my colleague's. 
 - [ ] **Review docs/** folder — existing patterns, architecture, setup
 - [ ] **Ask clarifying questions** if task is ambiguous (use `vscode_askQuestions`)
 - [ ] **Plan with `manage_todo_list`** — break into small chunks

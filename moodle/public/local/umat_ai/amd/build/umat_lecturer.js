@@ -273,16 +273,8 @@ function initHome(){
   },function(){});
 }
 
-function loadPaneData(name){
-  if(name==='lec-analytics'){populateAnalyticsCourseSel();loadAnalytics(CID||lecAnalyticsCourseId);}
-  if(name==='lec-struggle'){populateStruggleCourseSel();loadStruggleInsights(CID||lecStruggleCourseId);}
-  if(name==='lec-courses')loadLecturerCourses();
-  if(name==='lec-library'){populateLibCourseSel();loadLibrary();}
-  if(name==='lec-sessions'){populateSessCourseSel();loadSessions();}
-  if(name==='lec-review')loadReviewPane();
-  if(name==='lec-issues')loadLecturerIssues();
-  if(name==='lec-home')initHome();
-}
+/* Delegate to the IIFE-scoped loadPaneData exposed on window */
+function loadPaneData(name){window.loadPaneData&&window.loadPaneData(name);}
 
 /* Refresh review pane */
 var reviewRefresh=document.getElementById('lec-review-refresh');
@@ -877,6 +869,7 @@ function loadLecturerIssues(){
     console.log('[lec-issues] response',r);
     var issues=r.issues||[],total=r.total||0;
     var count=document.getElementById('lec-issues-count');if(count)count.textContent=total;
+    var mb=document.getElementById('gtb-lec-issues');if(mb){mb.textContent=total>99?'99+':total;mb.style.display=total?'':'none';}
     if(!issues.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No student issues'+(status?' with this status':'')+'.</p></div>';return;}
     body.innerHTML=issues.map(function(iss){
       var catLabel={'concept_confusion':'Concept Confusion','material_error':'Material Error','technical_issue':'Technical Issue','suggestion':'Suggestion','other':'Other'}[iss.category]||iss.category;
@@ -1555,6 +1548,8 @@ function pollIssueCount(){
     var c=r.count||0;
     var b=document.getElementById('sb-badge-new-issues');
     if(b){b.textContent=c>9?'9+':c;b.style.display=c?'':'none';}
+    var mb=document.getElementById('gtb-lec-issues');
+    if(mb){mb.textContent=c>99?'99+':c;mb.style.display=c?'':'none';}
   });
 }
 pollIssueCount();
@@ -1633,12 +1628,15 @@ var RB = {
     RB._trail.push({id:id,name:name});
     RB.load(id);
   },
-  /* Toggle toggle view */
+  /* Toggle library view with active tab indicator (pill style) */
   switchView: function(view){
-    document.querySelectorAll('.umat-lib-toggle').forEach(function(b){b.classList.toggle('active',b.dataset.libview===view);});
-    document.getElementById('lec-lib-course-view').style.display=view==='course'?'':'none';
+    document.querySelectorAll('.umat-lib-toggle').forEach(function(b){
+      b.classList.toggle('active',b.dataset.libview===view);
+    });
+    var cv=document.getElementById('lec-lib-course-view');
+    if(cv)cv.style.display=view==='course'?'':'none';
     var pv=document.getElementById('lec-private-bank-view');
-    pv.style.display=view==='private'?'flex':'none';
+    if(pv)pv.style.display=view==='private'?'flex':'none';
     if(view==='private'&&!RB._loaded){RB._loaded=true;RB.load(null);}
   }
 };
@@ -1691,8 +1689,8 @@ function _renderRbItems(items){
         }
       }
     });
-    /* Long-press / right-click for checkbox mode */
-    el.addEventListener('contextmenu',function(e){e.preventDefault();_toggleRbCheckMode();});
+    /* Right-click for context menu (rename, delete) */
+    el.addEventListener('contextmenu',_rbCtxHandler);
   });
 
   /* Checkbox change → update batch buttons */
@@ -1762,51 +1760,166 @@ document.querySelectorAll('.umat-lib-toggle').forEach(function(btn){
   btn.addEventListener('click',function(){RB.switchView(this.dataset.libview);});
 });
 
-/* Upload files */
+/* ── RB: Upload overlay (drag & drop) ── */
 var rbUploadBtn=document.getElementById('rb-upload-btn');
-if(rbUploadBtn)rbUploadBtn.addEventListener('click',function(){var fi=document.getElementById('rb-file-input');if(fi)fi.click();});
-var rbFileInput=document.getElementById('rb-file-input');
-if(rbFileInput)rbFileInput.addEventListener('change',function(){
-  var files=this.files;
-  if(!files||!files.length)return;
-  _uploadRbFiles(Array.from(files));
-  this.value='';
-});
+var rbUploadOv=document.getElementById('rb-upload-ov');
+var rbUploadDropzone=document.getElementById('rb-upload-dropzone');
+var rbUploadProgress=document.getElementById('rb-upload-progress');
+var rbUploadBar=document.getElementById('rb-upload-bar');
+var rbUploadPct=document.getElementById('rb-upload-pct');
+var rbUploadFname=document.getElementById('rb-upload-fname');
+var rbUploadResult=document.getElementById('rb-upload-result');
 
+/* Helper: upload files via XHR with progress */
 function _uploadRbFiles(files){
-  var total=files.length;
-  var done=0;
-  files.forEach(function(file){
+  var total=files.length,done=0;
+  if(rbUploadProgress)rbUploadProgress.style.display='block';
+  if(rbUploadResult)rbUploadResult.style.display='none';
+  files.forEach(function(file,i){
     var fd=new FormData();
     fd.append('file',file);
     fd.append('parentid',RB.currentFolder||0);
     fd.append('sesskey',moodleSesskey);
     var xhr=new XMLHttpRequest();
-    xhr.open('POST','/local/umat_ai/resource_upload.php');
-    xhr.onload=function(){
-      done++;
-      if(done>=total){
-        RB.load(RB.currentFolder);
-      }else{
-        /* Show per-file progress in console (silent) */
+    if(rbUploadFname)xhr.upload&&(xhr.upload.onprogress=function(e){
+      if(e.lengthComputable&&rbUploadBar&&rbUploadPct){
+        var p=Math.round((done*100000+e.loaded/e.total*100)/total);
+        rbUploadBar.style.width=p+'%';rbUploadPct.textContent=Math.round(p)+'%';
       }
-    };
-    xhr.onerror=function(){done++;if(done>=total)RB.load(RB.currentFolder);};
+    });
+    xhr.onload=function(){done++;if(done>=total){RB.load(RB.currentFolder);_closeRbUpload();}};
+    xhr.onerror=function(){done++;if(done>=total){RB.load(RB.currentFolder);_closeRbUpload();}};
     xhr.send(fd);
   });
 }
+function _closeRbUpload(){
+  if(rbUploadOv)rbUploadOv.style.display='none';
+  if(rbUploadProgress)rbUploadProgress.style.display='none';
+  if(rbUploadResult)rbUploadResult.style.display='none';
+  if(rbUploadBar)rbUploadBar.style.width='0%';
+  if(rbUploadPct)rbUploadPct.textContent='0%';
+}
+if(rbUploadBtn)rbUploadBtn.addEventListener('click',function(){if(rbUploadOv)rbUploadOv.style.display='flex';});
+/* Upload overlay: dropzone click → hidden file input */
+var _rbUpFileInput=null;
+if(rbUploadDropzone){
+  rbUploadDropzone.addEventListener('click',function(){
+    var fi=document.createElement('input');fi.type='file';fi.multiple=true;fi.style.display='none';
+    fi.addEventListener('change',function(){if(this.files.length){_uploadRbFiles(Array.from(this.files));document.body.removeChild(fi);}});
+    document.body.appendChild(fi);fi.click();
+  });
+  rbUploadDropzone.addEventListener('dragover',function(e){e.preventDefault();this.style.borderColor='var(--u-p)';this.style.background='rgba(0,107,47,.05)';});
+  rbUploadDropzone.addEventListener('dragleave',function(){this.style.borderColor='var(--u-olv)';this.style.background='var(--u-sflo)';});
+  rbUploadDropzone.addEventListener('drop',function(e){
+    e.preventDefault();this.style.borderColor='var(--u-olv)';this.style.background='var(--u-sflo)';
+    if(e.dataTransfer.files.length)_uploadRbFiles(Array.from(e.dataTransfer.files));
+  });
+}
+var rbUploadClose=document.getElementById('rb-upload-close');
+if(rbUploadClose)rbUploadClose.addEventListener('click',_closeRbUpload);
+var rbUploadCancel=document.getElementById('rb-upload-cancel');
+if(rbUploadCancel)rbUploadCancel.addEventListener('click',_closeRbUpload);
 
-/* Create folder */
+/* ── RB: Folder creation overlay ── */
+var rbFolderOv=document.getElementById('rb-folder-ov');
+var rbFolderName=document.getElementById('rb-folder-name');
+var rbFolderSubmit=document.getElementById('rb-folder-submit');
 var rbNewFolderBtn=document.getElementById('rb-new-folder-btn');
 if(rbNewFolderBtn)rbNewFolderBtn.addEventListener('click',function(){
-  var name=prompt('Enter folder name:');
-  if(!name||!name.trim())return;
-  RB._rbAjax('create_folder',{parentid:RB.currentFolder||0,name:name.trim()},function(){
+  if(rbFolderName)rbFolderName.value='';
+  if(rbFolderOv)rbFolderOv.style.display='flex';
+  if(rbFolderName)setTimeout(function(){rbFolderName.focus();},100);
+});
+if(rbFolderSubmit)rbFolderSubmit.addEventListener('click',function(){
+  var name=rbFolderName?rbFolderName.value.trim():'';
+  if(!name)return;
+  RB._rbAjax('create_folder',{parentid:RB.currentFolder||0,name:name},function(){
+    if(rbFolderOv)rbFolderOv.style.display='none';
     RB.load(RB.currentFolder);
   });
 });
+var rbFolderClose=document.getElementById('rb-folder-close');
+if(rbFolderClose)rbFolderClose.addEventListener('click',function(){if(rbFolderOv)rbFolderOv.style.display='none';});
+var rbFolderCancel=document.getElementById('rb-folder-cancel');
+if(rbFolderCancel)rbFolderCancel.addEventListener('click',function(){if(rbFolderOv)rbFolderOv.style.display='none';});
+/* Enter key in folder name input */
+if(rbFolderName)rbFolderName.addEventListener('keydown',function(e){if(e.key==='Enter'&&rbFolderSubmit)rbFolderSubmit.click();});
 
-/* Delete selected */
+/* ── RB: Rename overlay ── */
+var _rbRenameId=null;
+var rbRenameOv=document.getElementById('rb-rename-ov');
+var rbRenameName=document.getElementById('rb-rename-name');
+var rbRenameSubmit=document.getElementById('rb-rename-submit');
+function _openRbRename(id,name){
+  _rbRenameId=id;
+  if(rbRenameName)rbRenameName.value=name;
+  if(rbRenameOv)rbRenameOv.style.display='flex';
+  if(rbRenameName)setTimeout(function(){rbRenameName.focus();rbRenameName.select();},100);
+}
+var rbRenameClose=document.getElementById('rb-rename-close');
+if(rbRenameClose)rbRenameClose.addEventListener('click',function(){if(rbRenameOv)rbRenameOv.style.display='none';});
+var rbRenameCancel=document.getElementById('rb-rename-cancel');
+if(rbRenameCancel)rbRenameCancel.addEventListener('click',function(){if(rbRenameOv)rbRenameOv.style.display='none';});
+if(rbRenameSubmit)rbRenameSubmit.addEventListener('click',function(){
+  var name=rbRenameName?rbRenameName.value.trim():'';
+  if(!name||!_rbRenameId)return;
+  RB._rbAjax('rename',{itemid:_rbRenameId,name:name},function(){
+    if(rbRenameOv)rbRenameOv.style.display='none';
+    _rbRenameId=null;
+    RB.load(RB.currentFolder);
+  });
+});
+if(rbRenameName)rbRenameName.addEventListener('keydown',function(e){if(e.key==='Enter'&&rbRenameSubmit)rbRenameSubmit.click();});
+
+/* ── Right-click context menu for rename/delete ── */
+function _rbCtxHandler(e){
+  e.preventDefault();
+  var el=this;
+  var id=parseInt(el.dataset.rbId);
+  var name=el.dataset.rbName;
+  /* Remove any existing context menu */
+  var old=document.querySelector('.rb-ctx-menu');
+  if(old)old.remove();
+  /* Build context menu */
+  var menu=document.createElement('div');
+  menu.className='rb-ctx-menu';
+  menu.style.cssText='position:fixed;z-index:9999;background:var(--u-bg);border:1px solid var(--u-olv);border-radius:var(--u-r8);padding:4px 0;min-width:140px;box-shadow:0 4px 20px rgba(0,0,0,.15);font-size:12px;';
+  /* Rename option */
+  var renameItem=document.createElement('div');
+  renameItem.textContent='✏️ Rename';
+  renameItem.style.cssText='padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--u-ons);';
+  renameItem.addEventListener('mouseenter',function(){this.style.background='var(--u-sflo)';});
+  renameItem.addEventListener('mouseleave',function(){this.style.background='transparent';});
+  renameItem.addEventListener('click',function(){
+    menu.remove();
+    _openRbRename(id,name);
+  });
+  menu.appendChild(renameItem);
+  /* Delete option */
+  var delItem=document.createElement('div');
+  delItem.textContent='🗑️ Delete';
+  delItem.style.cssText='padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--u-ter);';
+  delItem.addEventListener('mouseenter',function(){this.style.background='var(--u-sflo)';});
+  delItem.addEventListener('mouseleave',function(){this.style.background='transparent';});
+  delItem.addEventListener('click',function(){
+    menu.remove();
+    if(!confirm('Delete "'+name+'"? This cannot be undone.'))return;
+    RB._rbAjax('delete',{itemids:[id]},function(){RB.load(RB.currentFolder);});
+  });
+  menu.appendChild(delItem);
+  /* Position menu */
+  menu.style.left=Math.min(e.clientX,document.documentElement.clientWidth-160)+'px';
+  menu.style.top=Math.min(e.clientY,document.documentElement.clientHeight-80)+'px';
+  document.body.appendChild(menu);
+  /* Click outside closes */
+  setTimeout(function(){
+    document.addEventListener('click',function _closeCtx(ev){
+      if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('click',_closeCtx);}
+    });
+  },0);
+}
+
+/* ── RB: Delete selected ── */
 var rbDeleteBtn=document.getElementById('rb-delete-btn');
 if(rbDeleteBtn)rbDeleteBtn.addEventListener('click',function(){
   var ids=Object.keys(RB.selected).map(Number);
@@ -1817,12 +1930,11 @@ if(rbDeleteBtn)rbDeleteBtn.addEventListener('click',function(){
   });
 });
 
-/* Push to course — use delegation on #lec-private-bank-view */
+/* ── RB: Push to course ── */
 var rbPushBtn=document.getElementById('rb-push-btn');
 if(rbPushBtn)rbPushBtn.addEventListener('click',function(){
   var ids=Object.keys(RB.selected).map(Number);
   if(!ids.length)return;
-  /* Show course picker */
   var ov=document.getElementById('rb-push-ov');
   var list=document.getElementById('rb-push-list');
   if(!ov||!list)return;
@@ -1839,7 +1951,6 @@ if(rbPushBtn)rbPushBtn.addEventListener('click',function(){
         +'<div><strong>'+esc(c.fullname)+'</strong><span style="font-size:11px;color:var(--u-ol);display:block;">'+esc(c.shortname)+'</span></div>'
         +'<span class="umat-cs-check" style="margin-left:auto;">radio_button_unchecked</span></div>';
     }).join('');
-    /* Select course */
     var selectedCid=null;
     list.querySelectorAll('.umat-cs-item').forEach(function(el){
       el.addEventListener('click',function(){
@@ -1851,22 +1962,15 @@ if(rbPushBtn)rbPushBtn.addEventListener('click',function(){
         if(confirmBtn){confirmBtn.disabled=false;confirmBtn.style.opacity='1';confirmBtn.textContent='Push ('+ids.length+') to '+esc(this.querySelector('strong').textContent);}
       });
     });
-    /* Filter */
     var pushSearch=document.getElementById('rb-push-search');
     if(pushSearch)pushSearch.addEventListener('input',function(){
       var q=this.value.toLowerCase();
-      list.querySelectorAll('.umat-cs-item').forEach(function(el){
-        el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';
-      });
+      list.querySelectorAll('.umat-cs-item').forEach(function(el){el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';});
     });
-    /* Confirm push */
     var confirmBtn=document.getElementById('rb-push-confirm');
     if(confirmBtn)confirmBtn.onclick=function(){
       if(!selectedCid)return;
-      RB._rbAjax('push',{itemids:ids,courseid:selectedCid},function(r){
-        ov.style.display='none';
-        RB.load(RB.currentFolder);
-      });
+      RB._rbAjax('push',{itemids:ids,courseid:selectedCid},function(r){ov.style.display='none';RB.load(RB.currentFolder);});
     };
   });
 });
@@ -1874,6 +1978,16 @@ var rbPushClose=document.getElementById('rb-push-close');
 if(rbPushClose)rbPushClose.addEventListener('click',function(){var ov=document.getElementById('rb-push-ov');if(ov)ov.style.display='none';});
 var rbPushCancel=document.getElementById('rb-push-cancel');
 if(rbPushCancel)rbPushCancel.addEventListener('click',function(){var ov=document.getElementById('rb-push-ov');if(ov)ov.style.display='none';});
+
+/* ── ESC key for RB overlays ── */
+var _rbOverlayIds=['rb-upload-ov','rb-folder-ov','rb-rename-ov','rb-push-ov'];
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape')return;
+  _rbOverlayIds.forEach(function(id){
+    var el=document.getElementById(id);
+    if(el&&el.style.display==='flex')el.style.display='none';
+  });
+});
 
 })();
 }

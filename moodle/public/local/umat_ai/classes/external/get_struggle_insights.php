@@ -232,34 +232,16 @@ class get_struggle_insights extends \external_api {
             }
 
             // Fallback for any question that didn't get a topic above:
-            // extract significant words as an ad-hoc topic. (Previously gated
-            // on empty($topicQuestions) — the global accumulator — so only the
-            // first unmatched question ever produced a topic.)
+            // Instead of creating ad-hoc single-word topics (which pollute
+            // the topic matrix with junk like "practice", "create", etc.),
+            // we collect them for the AI service which can extract real
+            // multi-word topics from the full question set.
             if (!$qTopicAssigned) {
-                $stopwords = ['the','a','an','is','are','was','were','do','does','did',
-                              'how','what','why','when','where','which','who','whom',
-                              'this','that','these','those','i','you','he','she','it',
-                              'we','they','to','of','in','for','on','with','at','by',
-                              'from','as','into','through','during','before','after',
-                              'above','below','between','out','off','over','under',
-                              'again','further','then','once','here','there','and',
-                              'but','or','nor','not','so','yet','if','because','about',
-                              'up','down','than','very','just','also','can','will','has',
-                              'have','had','been','being','be','get','got','would','could',
-                              'should','may','might','shall','need','like','make','made'];
-                $words = array_filter(preg_split('/[^a-z0-9]+/', strtolower($l->question)));
-                $words = array_diff($words, $stopwords);
-                $words = array_filter($words, function($w) { return strlen($w) > 3; });
-                $words = array_slice(array_unique($words), 0, 3);
-                // One topic per word (not one combined string) so the same
-                // term aggregates across different students' questions.
-                foreach ($words as $w) {
-                    if (!isset($topicQuestions[$w])) $topicQuestions[$w] = [];
-                    $topicQuestions[$w][$qid] = true;
-                    $topicStudents[$w][$uid] = true;
-                }
+                $unmatchedQuestions[] = $l->question;
             }
         }
+        // Ensure the collector array exists for later use
+        if (!isset($unmatchedQuestions)) $unmatchedQuestions = [];
 
         // ──────────────────────────────────────────────────────────────
         // 5b. Student context events (quiz failures, repeated views,
@@ -483,8 +465,15 @@ class get_struggle_insights extends \external_api {
             ];
         }
 
-        // ── AI service: intelligent topic extraction before PHP fallback ──
-        if (empty($topicMatrix) && $totalQuestions > 0) {
+        // ── AI service: PRIMARY topic extraction (always called when data exists) ──
+        // Uses all data sources (questions, issues, events, materials) to extract
+        // real multi-word course-specific topics. Has memory caching for continuity.
+        $aiTopics = [];
+        $aiSummaryInsight = '';
+        $hasAiResult = false;
+        $hasAnyData = ($totalQuestions > 0) || !empty($issueRecords) || !empty($eventRecords);
+
+        if ($hasAnyData) {
             $cfg = \local_umat_ai_get_service_config();
             if (!empty($cfg['token']) && !empty($cfg['url'])) {
                 try {
@@ -494,176 +483,182 @@ class get_struggle_insights extends \external_api {
                         'Content-Type: application/json',
                         'Authorization: Bearer ' . $cfg['token'],
                     ]);
-                    $client->setopt(['CURLOPT_TIMEOUT' => 20]);
+                    $client->setopt(['CURLOPT_TIMEOUT' => 30]);
 
-                    $questionTexts = [];
-                    foreach ($logs as $l) {
-                        $questionTexts[] = $l->question;
-                        if (count($questionTexts) >= 100) break;
-                    }
+                    // Questions (up to 150)
+                    $questionTexts = array_map(function($l) { return $l->question; },
+                        array_slice($logs, 0, 150));
 
+                    // Materials with AI analysis concepts
                     $materialsList = [];
                     foreach ($materials as $m) {
-                        $materialsList[] = ['filename' => $m->filename];
+                        $entry = ['filename' => $m->filename];
+                        if (isset($matAnalyses[(int)$m->id]['key_concepts'])) {
+                            $entry['key_concepts'] = $matAnalyses[(int)$m->id]['key_concepts'];
+                        }
+                        $materialsList[] = $entry;
+                    }
+
+                    // Issue reports
+                    $issueList = [];
+                    foreach ($issueRecords as $ir) {
+                        $issueList[] = [
+                            'topic' => $ir->topic ?? '',
+                            'category' => $ir->category ?? '',
+                            'description' => $ir->description ?? '',
+                        ];
+                    }
+
+                    // Student events (quiz failures, repeated views, etc.)
+                    $eventList = [];
+                    foreach ($eventRecords as $er) {
+                        $eventList[] = [
+                            'userid' => (int)$er->userid,
+                            'reason' => $er->struggle_reason ?? '',
+                            'topic_label' => $er->topic_label ?? '',
+                        ];
+                    }
+
+                    // Course sections
+                    $sections = $DB->get_records('course_sections', ['course' => $cid], 'section ASC',
+                        'id, section, name, summary');
+                    $sectionListSimple = [];
+                    foreach ($sections as $sec) {
+                        $sectionListSimple[] = [
+                            'name' => $sec->name ?: ('Week ' . ($sec->section + 1)),
+                            'section' => (int)$sec->section,
+                            'summary' => $sec->summary ?? '',
+                        ];
                     }
 
                     $courseName = $DB->get_field('course', 'fullname', ['id' => $cid]) ?: '';
 
+                    // Previous topics for continuity (from cache or current material-based)
+                    $previousTopics = [];
+                    foreach ($topicMatrix as $existing) {
+                        $previousTopics[] = [
+                            'topic_name' => $existing['topic'],
+                            'struggle_score' => $existing['struggle_score'],
+                            'question_count' => $existing['question_count'],
+                        ];
+                    }
+
                     $payload = json_encode([
-                        'questions'       => $questionTexts,
+                        'course_id'        => $cid,
+                        'course_name'      => $courseName,
+                        'questions'        => $questionTexts,
                         'course_materials' => $materialsList,
-                        'course_name'     => $courseName,
+                        'course_sections'  => $sectionListSimple,
+                        'issue_reports'    => $issueList,
+                        'student_events'   => $eventList,
+                        'previous_topics'  => $previousTopics,
                     ]);
 
-                    $raw = $client->post($cfg['url'] . '/api/v1/analytics/extract-topics', $payload);
+                    $raw = $client->post($cfg['url'] . '/api/v1/analytics/extract-topics', $payload, [
+                        'CURLOPT_TIMEOUT' => 30,
+                    ]);
                     $aiResult = json_decode($raw, true);
 
                     if ($aiResult && isset($aiResult['topics']) && !empty($aiResult['topics'])) {
-                        $topicMatrix = [];
-                        $knownTopicNames = [];
+                        $hasAiResult = true;
+                        $aiSummaryInsight = $aiResult['summary_insight'] ?? '';
+
                         foreach ($aiResult['topics'] as $aiTopic) {
                             $tName = $aiTopic['topic_name'] ?? '';
                             if (!$tName) continue;
-                            $knownTopicNames[] = $tName;
-                            $sampleQ = $aiTopic['sample_questions'] ?? [];
-                            $topicMatrix[] = [
-                                'topic'            => $tName,
-                                'question_count'   => (int)($aiTopic['question_count'] ?? 0),
-                                'student_count'    => 0,
-                                'struggle_score'   => min(100, 40 + ((int)($aiTopic['question_count'] ?? 0) * 3)),
-                                'trend'            => 'stable',
-                                'trend_pct'        => 0,
-                                'difficulty'       => 'intermediate',
-                                'event_sources'    => [
-                                    'chat_questions'      => (int)($aiTopic['question_count'] ?? 0),
-                                    'quiz_failures'       => 0,
-                                    'repeated_views'      => 0,
-                                    'assignment_failures' => 0,
-                                    'issue_reports'       => 0,
-                                ],
-                                'materials'        => array_map(function($m) {
-                                    return ['name' => $m, 'question_count' => 0];
-                                }, $aiTopic['related_materials'] ?? []),
-                                'sample_questions' => array_slice($sampleQ, 0, 3),
-                                'ai_classified'    => true,
+
+                            $evSrc = $aiTopic['evidence_sources'] ?? [];
+                            $affectedIds = [];
+                            if (!empty($aiTopic['affected_student_ids'])) {
+                                $affectedIds = array_map('intval',
+                                    array_filter($aiTopic['affected_student_ids'], function($id) {
+                                        return is_numeric($id);
+                                    }));
+                            }
+
+                            // Map evidence_sources to match our schema
+                            $eventSources = [
+                                'chat_questions'      => (int)($evSrc['chat_questions'] ?? 0),
+                                'quiz_failures'       => (int)($evSrc['quiz_failures'] ?? 0),
+                                'repeated_views'      => (int)($evSrc['repeated_views'] ?? 0),
+                                'assignment_failures' => (int)($evSrc['assignment_failures'] ?? 0),
+                                'issue_reports'       => (int)($evSrc['issue_reports'] ?? 0),
+                            ];
+
+                            $relatedMats = [];
+                            foreach ($aiTopic['related_materials'] ?? [] as $rm) {
+                                $relatedMats[] = ['name' => $rm, 'question_count' => 0];
+                            }
+
+                            $aiTopics[] = [
+                                'topic'             => $tName,
+                                'question_count'    => (int)($aiTopic['question_count'] ?? 0),
+                                'student_count'     => (int)($aiTopic['student_count'] ?? count($affectedIds)),
+                                'struggle_score'    => min(100, max(1, (float)($aiTopic['struggle_score'] ?? 50))),
+                                'trend'             => $aiTopic['trend'] ?? 'stable',
+                                'trend_pct'         => 0,
+                                'difficulty'        => 'intermediate',
+                                'severity'          => $aiTopic['severity'] ?? 'watch',
+                                'event_sources'     => $eventSources,
+                                'materials'         => $relatedMats,
+                                'sample_questions'  => array_slice($aiTopic['sample_questions'] ?? [], 0, 3),
+                                'suggestion'        => $aiTopic['suggestion'] ?? '',
+                                'suggestion_type'   => $aiTopic['suggestion_type'] ?? 'recap',
+                                'ai_classified'     => true,
+                                'affected_student_ids' => $affectedIds,
                             ];
                         }
 
-                        // Enrich student counts from logs
-                        foreach ($topicMatrix as &$tm) {
-                            if (!empty($tm['sample_questions'])) {
-                                $stuIds = [];
-                                foreach ($logs as $l) {
-                                    foreach ($tm['sample_questions'] as $sq) {
-                                        if (stripos($l->question, $sq) !== false ||
-                                            stripos($sq, $l->question) !== false) {
-                                            $stuIds[$l->userid] = true;
-                                        }
-                                    }
-                                }
-                                $tm['student_count'] = count($stuIds);
-                            }
-                        }
-                        unset($tm);
-
-                        usort($topicMatrix, function($a, $b) {
+                        // Sort by struggle score descending
+                        usort($aiTopics, function($a, $b) {
                             return ($b['struggle_score'] ?? 0) - ($a['struggle_score'] ?? 0);
                         });
                     }
                 } catch (\Throwable $e) {
-                    // AI failed; proceed to PHP fallback below
+                    // AI failed; proceed with material-based topics below
+                    $hasAiResult = false;
                 }
             }
         }
 
-        // ── Guaranteed fallback: if PHP topic extraction found nothing
-        // (no materials indexed, no keyword matches) but we DO have
-        // questions — extract bigrams/trigrams instead of single words. ──
-        if (empty($topicMatrix) && $totalQuestions > 0) {
-            $stopwords = ['the','a','an','is','are','was','were','do','does','did',
-                          'how','what','why','when','where','which','who','can','will',
-                          'this','that','these','those','and','but','or','not','so',
-                          'to','of','in','for','on','with','at','by','from','as',
-                          'into','through','about','up','down','than','very','just',
-                          'also','has','have','had','been','being','get','got','would',
-                          'could','should','may','might','shall','need','like','make',
-                          // Generic academic verbs
-                          'explain','define','describe','list','discuss','give','practice',
-                          'summarize','outline','identify','state','mention','tell','show',
-                          // Greetings and conversational
-                          'hello','hi','howdy','thanks','please','thank','you','i','me',
-                          'my','our','we','they','them','their','it','its'];
+        // ── MERGE STRATEGY ──
+        // AI topics take precedence. Material-based topics (from concept matching)
+        // supplement any gaps. Ad-hoc word topics and bigram/trigram are ELIMINATED.
+        if ($hasAiResult && !empty($aiTopics)) {
+            // Use AI topics as primary, but merge material-based topics that don't overlap
+            $aiTopicNames = array_map(function($t) {
+                return strtolower(trim(preg_replace('/[^a-z0-9\s]/', '', $t['topic'])));
+            }, $aiTopics);
 
-            $bigramCounts = [];
-            $bigramStudents = [];
-            $bigramQuestions = [];
-            $trigramCounts = [];
-            $trigramStudents = [];
-            $trigramQuestions = [];
-
-            foreach ($logs as $l) {
-                $words = array_values(array_filter(
-                    preg_split('/[^a-z0-9]+/', strtolower($l->question)),
-                    function($w) use ($stopwords) {
-                        return strlen($w) > 2 && !in_array($w, $stopwords);
+            foreach ($topicMatrix as $existingTopic) {
+                $existingNorm = strtolower(trim(preg_replace('/[^a-z0-9\s]/', '', $existingTopic['topic'])));
+                // Skip if AI already covers this topic
+                $isDuplicate = false;
+                foreach ($aiTopicNames as $aiName) {
+                    if ($existingNorm === $aiName || strpos($existingNorm, $aiName) !== false || strpos($aiName, $existingNorm) !== false) {
+                        $isDuplicate = true;
+                        break;
                     }
-                ));
-                $uniqueWords = array_unique($words);
-                if (empty($uniqueWords)) continue;
-
-                // Bigrams
-                for ($i = 0; $i < count($words) - 1; $i++) {
-                    $bigram = $words[$i] . ' ' . $words[$i + 1];
-                    $bigramCounts[$bigram] = ($bigramCounts[$bigram] ?? 0) + 1;
-                    $bigramStudents[$bigram][$l->userid] = true;
-                    $bigramQuestions[$bigram][] = $l->question;
                 }
-                // Trigrams
-                for ($i = 0; $i < count($words) - 2; $i++) {
-                    $trigram = $words[$i] . ' ' . $words[$i + 1] . ' ' . $words[$i + 2];
-                    $trigramCounts[$trigram] = ($trigramCounts[$trigram] ?? 0) + 1;
-                    $trigramStudents[$trigram][$l->userid] = true;
-                    $trigramQuestions[$trigram][] = $l->question;
+                // Also skip if this is a junk single-word topic (no material match, no concept match)
+                $wordCount = str_word_count($existingTopic['topic']);
+                $hasMaterials = !empty($existingTopic['materials']);
+                if (!$isDuplicate && ($wordCount >= 2 || $hasMaterials)) {
+                    $aiTopics[] = $existingTopic;
                 }
             }
 
-            $allPhrases = $bigramCounts;
-            foreach ($trigramCounts as $phrase => $cnt) {
-                if (!isset($allPhrases[$phrase])) {
-                    $allPhrases[$phrase] = $cnt;
-                }
-            }
-            arsort($allPhrases);
+            $topicMatrix = $aiTopics;
 
-            $rank = 0;
-            foreach (array_slice($allPhrases, 0, 15, true) as $phrase => $cnt) {
-                if ($cnt < 2) continue;
-                $stuCnt = count(
-                    $bigramStudents[$phrase] ?? $trigramStudents[$phrase] ?? []
-                );
-                $pct    = $totalQuestions > 0 ? $cnt / $totalQuestions : 0;
-                $score  = min(100, (int)round($pct * 50 + $stuCnt * 8 + ($rank === 0 ? 20 : 0)));
-
-                $samples = array_values(array_unique(
-                    $bigramQuestions[$phrase] ?? $trigramQuestions[$phrase] ?? []
-                ));
-                $topicMatrix[] = [
-                    'topic'           => ucwords($phrase),
-                    'question_count'  => $cnt,
-                    'student_count'   => $stuCnt,
-                    'struggle_score'  => $score,
-                    'trend'           => 'stable',
-                    'trend_pct'       => 0,
-                    'difficulty'      => 'intermediate',
-                    'event_sources'   => ['chat_questions' => $cnt, 'quiz_failures' => 0, 'repeated_views' => 0, 'assignment_failures' => 0, 'issue_reports' => 0],
-                    'materials'       => [],
-                    'sample_questions'=> array_slice($samples, 0, 3),
-                ];
-                $rank++;
-            }
+            // Re-sort
+            usort($topicMatrix, function($a, $b) {
+                return ($b['struggle_score'] ?? 0) - ($a['struggle_score'] ?? 0);
+            });
         }
+        // If AI failed or returned nothing, fall through with the existing material-based
+        // topicMatrix (no ad-hoc word or bigram/trigram fallback applied).
 
-        // Sort by struggle score descending
+        // Sort by struggle score descending (final pass)
         usort($topicMatrix, function($a, $b) {
             return $b['struggle_score'] - $a['struggle_score'];
         });
@@ -1176,13 +1171,17 @@ class get_struggle_insights extends \external_api {
         $stuPct = $enrolledCount > 0 ? round(($tm['student_count'] / $enrolledCount) * 100) : 0;
         $score  = $tm['struggle_score'] ?? 0;
 
-        // Determine severity
-        if ($stuPct >= 50 || $score >= 70) {
-            $severity = 'critical';
-        } elseif ($stuPct >= 25 || $score >= 40) {
-            $severity = 'attention';
+        // Use AI severity if available, otherwise compute from data
+        if (!empty($tm['severity'])) {
+            $severity = $tm['severity'];
         } else {
-            $severity = 'watch';
+            if ($stuPct >= 50 || $score >= 70) {
+                $severity = 'critical';
+            } elseif ($stuPct >= 25 || $score >= 40) {
+                $severity = 'attention';
+            } else {
+                $severity = 'watch';
+            }
         }
 
         // Generate description from data
@@ -1204,10 +1203,17 @@ class get_struggle_insights extends \external_api {
         }
         $description .= '.';
 
-        // Generate suggestion
-        $suggestion = self::generate_topic_suggestion($tm, $stuPct, $enrolledCount);
+        // Use AI suggestion if available, otherwise generate from heuristics
+        if (!empty($tm['suggestion'])) {
+            $suggestionText = $tm['suggestion'];
+            $suggestionType = $tm['suggestion_type'] ?? 'recap';
+        } else {
+            $suggestion = self::generate_topic_suggestion($tm, $stuPct, $enrolledCount);
+            $suggestionText = $suggestion['text'];
+            $suggestionType = $suggestion['type'];
+        }
 
-        // Get sample questions from topic_matrix (may have been added by AI or bigram fallback)
+        // Get sample questions from topic_matrix (may have been added by AI or query matching)
         $topicSampleQ = $tm['sample_questions'] ?? [];
         // Also try to pull actual questions from logs for this topic
         if (empty($topicSampleQ)) {
@@ -1236,12 +1242,12 @@ class get_struggle_insights extends \external_api {
             'struggle_score'     => $score,
             'description'        => $description,
             'sample_questions'   => array_slice($topicSampleQ, 0, 3),
-            'suggestion'         => $suggestion['text'],
-            'suggestion_type'    => $suggestion['type'],
+            'suggestion'         => $suggestionText,
+            'suggestion_type'    => $suggestionType,
             'materials'          => array_map(function($m) {
                 return ['name' => $m['name'], 'question_count' => $m['question_count']];
             }, array_slice($tm['materials'] ?? [], 0, 3)),
-            'affected_student_ids' => array_keys($topicStudents[strtolower($tm['topic'])] ?? []),
+            'affected_student_ids' => $tm['affected_student_ids'] ?? array_keys($topicStudents[strtolower($tm['topic'])] ?? []),
         ];
     }
 
@@ -1606,6 +1612,7 @@ class get_struggle_insights extends \external_api {
             'ai_service_used'    => $aiServiceUsed,
             'ai_overall_summary' => $aiSummary,
             'ai_course_health'   => $aiCourseHealthJson,
+            'summary_insight'    => $aiSummaryInsight ?? '',
             'total_issues'       => $totalIssues,
             'open_issues'        => $openIssues,
             'top_issue_topics'   => $topIssueTopics,
@@ -1848,6 +1855,7 @@ class get_struggle_insights extends \external_api {
                 'ai_service_used'    => new \external_value(PARAM_BOOL),
                 'ai_overall_summary' => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
                 'ai_course_health'   => new \external_value(PARAM_RAW, '', VALUE_OPTIONAL),
+                'summary_insight'    => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
                 'total_issues'       => new \external_value(PARAM_INT),
                 'open_issues'        => new \external_value(PARAM_INT),
                 'top_issue_topics'   => new \external_multiple_structure(

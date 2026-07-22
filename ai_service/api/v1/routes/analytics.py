@@ -141,20 +141,43 @@ class DashboardResponse(BaseModel):
 # ── Extract Topics Schemas ──────────────────────────────────
 
 class ExtractTopicsRequest(BaseModel):
-    questions: List[str]
-    course_materials: Optional[List[dict]] = []
+    course_id: int = 0
     course_name: Optional[str] = ""
+    questions: List[str] = []
+    course_materials: Optional[List[dict]] = []
+    course_sections: Optional[List[dict]] = []
+    issue_reports: Optional[List[dict]] = []
+    student_events: Optional[List[dict]] = []
+    previous_topics: Optional[List[dict]] = []
+
+class ExtractedTopicEvidence(BaseModel):
+    chat_questions: int = 0
+    quiz_failures: int = 0
+    repeated_views: int = 0
+    assignment_failures: int = 0
+    issue_reports: int = 0
 
 class ExtractTopicsTopic(BaseModel):
     topic_name: str
-    question_count: int
+    struggle_score: float = 50.0
+    severity: str = "watch"        # critical / attention / watch
+    trend: str = "stable"          # up / down / stable / new
+    student_count: int = 0
+    question_count: int = 0
+    evidence_sources: ExtractedTopicEvidence = ExtractedTopicEvidence()
     sample_questions: List[str] = []
     related_materials: List[str] = []
+    related_sections: List[str] = []
+    affected_student_ids: List[int] = []
+    suggestion: str = ""
+    suggestion_type: str = "recap" # recap / practice / review / one_on_one / material
 
 class ExtractTopicsResponse(BaseModel):
     topics: List[ExtractTopicsTopic]
-    confidence: float
-    total_questions_analyzed: int
+    confidence: float = 0.0
+    summary_insight: str = ""
+    total_questions_analyzed: int = 0
+    from_cache: bool = False
 
 
 # ── LLM Processor Helper ────────────────────────────────────
@@ -243,44 +266,72 @@ Topics data:
 {topics_json}
 """
 
-EXTRACT_TOPICS_PROMPT = """You are an expert educational content analyst. Extract meaningful COURSE TOPICS from student questions.
+EXTRACT_TOPICS_PROMPT = """You are an expert academic diagnostician. Your job is to identify the REAL topics, concepts, and subject areas where students are genuinely struggling, by triangulating ALL available data sources.
 
-COURSE NAME: {course_name}
+COURSE: {course_name}
 
-COURSE MATERIALS:
+--- DATA SOURCE 1: COURSE STRUCTURE ---
+Course sections / weeks:
+{course_sections}
+
+--- DATA SOURCE 2: COURSE MATERIALS ---
 {material_context}
 
-STUDENT QUESTIONS (sample):
+--- DATA SOURCE 3: STUDENT QUESTIONS (sample of {q_count} total) ---
 {question_list}
 
+--- DATA SOURCE 4: STUDENT ISSUE REPORTS ---
+{issue_context}
+
+--- DATA SOURCE 5: STUDENT EVENT SIGNALS ---
+{event_context}
+- quiz_failure = student failed a quiz/question on this topic
+- repeated_views = student rewatched a video/read material repeatedly
+- assignment_failure = student failed an assignment
+
+--- DATA SOURCE 6: PREVIOUS ANALYSIS (for continuity) ---
+{previous_context}
+
 TASK:
-1. Identify 5-15 meaningful MULTI-WORD topics that students are struggling with
-2. Topics MUST be specific to the course domain
-3. Topics should be 2-4 words long
-4. Group similar questions under the same topic
-5. IGNORE generic academic verbs: explain, define, describe, list, discuss, give, practice, summarize
-6. IGNORE greetings and conversational words: hello, hi, howdy, thanks, please
+1. Identify 5-15 meaningful TOPICS / CONCEPTS / SUBJECT AREAS that students are genuinely struggling with.
+2. Topics MUST be specific to the course domain (e.g. "SSL Certificate Validation", not "practice").
+3. CRITICAL: IGNORE generic academic verbs (explain, define, describe, list, discuss, give, practice, summarize, outline, identify, mention, show, write, create).
+4. IGNORE greetings, conversational words, single-word fragments.
+5. Cross-reference ALL data sources to validate that each topic represents a real struggle, not just one-off questions.
+6. For each topic, determine SEVERITY based on: number of affected students, question volume, event signals, trend momentum.
+7. Assign a STRUGGLE SCORE (0-100) based on: question volume (weight 30%), student breadth (weight 25%), event signals (weight 25%), trend direction (weight 20%).
+8. Provide actionable SUGGESTIONS for each topic that a lecturer could actually do (recap session, practice quiz, one-on-one tutoring, review material, etc.).
 
-For each topic provide:
-- topic_name: the multi-word topic (e.g. "SSL Certificate Validation")
-- question_count: how many questions relate to this topic
-- sample_questions: 2-3 representative questions
-- related_materials: which course materials cover this topic
-
-OUTPUT STRICT JSON:
+OUTPUT STRICT JSON (no markdown, no code fences):
 {{
   "topics": [
     {{
-      "topic_name": "Payment Gateway Integration",
-      "question_count": 15,
+      "topic_name": "SSL Certificate Validation (3-6 words max)",
+      "struggle_score": 78,
+      "severity": "critical",
+      "trend": "up",
+      "student_count": 12,
+      "question_count": 35,
+      "evidence_sources": {{
+        "chat_questions": 28,
+        "quiz_failures": 5,
+        "repeated_views": 8,
+        "assignment_failures": 2,
+        "issue_reports": 3
+      }},
       "sample_questions": [
-        "How do I integrate PayPal API?",
-        "What is the difference between hosted and integrated gateway?"
+        "Why does my SSL certificate keep failing?",
+        "How do I get a valid certificate?"
       ],
-      "related_materials": ["Week3_Payment_Systems.pdf", "Lecture5_Gateways.pptx"]
+      "related_materials": ["Week3_Payment_Systems.pdf"],
+      "related_sections": ["Week 3: Payment Security"],
+      "affected_student_ids": [101, 102, 105, 110, 115],
+      "suggestion": "Dedicated recap session on SSL handshake and certificate chains with live demo",
+      "suggestion_type": "recap"
     }}
   ],
-  "confidence": 0.85
+  "confidence": 0.92,
+  "summary_insight": "Students are struggling most with payment security fundamentals (SSL, certificate validation) and API integration patterns. Recommend a hands-on workshop covering certificate chain validation."
 }}
 """
 
@@ -568,34 +619,94 @@ async def struggle_topics(
 @router.post("/api/v1/analytics/extract-topics", response_model=ExtractTopicsResponse)
 async def extract_course_topics(
     request: ExtractTopicsRequest,
+    db: Session = Depends(get_db),
     _ = Depends(verify_token),
 ):
-    """Extract meaningful course topics from raw student questions using LLM."""
+    """Extract meaningful struggle topics from ALL student data sources using LLM + memory cache."""
     try:
-        if not request.questions:
-            raise HTTPException(status_code=400, detail="No questions provided")
+        if not request.questions and not request.issue_reports and not request.student_events:
+            raise HTTPException(status_code=400, detail="No student data provided")
 
-        material_context = "\n".join(
-            [f"- {m.get('filename', '')}" for m in (request.course_materials or [])[:20]]
-        )
+        # ── Memory cache: check for existing analysis for this course ──
+        cache_key = f"struggle_topics_{request.course_id}"
+        previous_topics_raw = []
+
+        cached = db.query(AnalyticsCache).filter(
+            AnalyticsCache.query_hash == cache_key,
+        ).order_by(AnalyticsCache.created_at.desc()).first()
+
+        if cached:
+            try:
+                prev = json.loads(cached.response_json)
+                previous_topics_raw = prev.get("topics", [])
+            except Exception:
+                pass
+
+        # Merge user-supplied previous topics with cached ones
+        all_previous = request.previous_topics or []
+        if previous_topics_raw:
+            existing_names = {t.get("topic_name", "").lower() for t in all_previous}
+            for pt in previous_topics_raw:
+                if pt.get("topic_name", "").lower() not in existing_names:
+                    all_previous.append(pt)
+
+        # ── Build context from all data sources ──
+        material_context_lines = []
+        for m in (request.course_materials or [])[:30]:
+            fname = m.get("filename", "")
+            concepts = m.get("key_concepts", [])
+            if concepts:
+                material_context_lines.append(f"- {fname} (concepts: {', '.join(concepts[:5])})")
+            else:
+                material_context_lines.append(f"- {fname}")
+        material_context = "\n".join(material_context_lines) or "No course materials available."
+
         question_list = "\n".join(
-            [f"{i+1}. {q}" for i, q in enumerate(request.questions[:100])]
-        )
+            [f"{i+1}. {q}" for i, q in enumerate(request.questions[:150])]
+        ) if request.questions else "No student questions available."
+
+        issue_lines = []
+        for ir in (request.issue_reports or [])[:30]:
+            issue_lines.append(f"- Topic: {ir.get('topic', 'unspecified')} | Category: {ir.get('category', '')} | Description: {ir.get('description', '')[:120]}")
+        issue_context = "\n".join(issue_lines) or "No issue reports."
+
+        event_lines = []
+        for ev in (request.student_events or [])[:40]:
+            event_lines.append(f"- Student {ev.get('userid')}: {ev.get('reason', 'event')} on {ev.get('topic_label', 'unknown topic')}")
+        event_context = "\n".join(event_lines) or "No event signals."
+
+        section_lines = []
+        for sec in (request.course_sections or [])[:20]:
+            section_lines.append(f"- {sec.get('name', 'Week ' + str(sec.get('section', 0)))}: {sec.get('summary', '')[:100]}")
+        course_sections_text = "\n".join(section_lines) or "No course sections."
+
+        previous_context_lines = []
+        for pt in all_previous[:10]:
+            prev_topic = pt.get("topic_name", pt.get("topic", ""))
+            prev_score = pt.get("struggle_score", "N/A")
+            previous_context_lines.append(f"- {prev_topic} (previous score: {prev_score})")
+        previous_context = "\n".join(previous_context_lines) or "No previous analysis available."
 
         prompt = EXTRACT_TOPICS_PROMPT.format(
             course_name=request.course_name or "General Course",
-            material_context=material_context or "No course materials available.",
+            course_sections=course_sections_text,
+            material_context=material_context,
+            q_count=len(request.questions),
             question_list=question_list,
+            issue_context=issue_context,
+            event_context=event_context,
+            previous_context=previous_context,
         )
 
         llm = get_llm()
-        result = llm._invoke(prompt, temperature=0.3, max_chars=4096)
+        result = llm._invoke(prompt, temperature=0.3, max_chars=8192)
         parsed = _parse_llm_json(result)
 
         generic_verbs = {
             'explain', 'define', 'describe', 'list', 'discuss',
             'give', 'practice', 'summarize', 'outline', 'identify',
-            'state', 'mention', 'tell', 'show', 'write',
+            'state', 'mention', 'tell', 'show', 'write', 'create',
+            'referenc', 'common',
         }
 
         validated = []
@@ -608,20 +719,58 @@ async def extract_course_topics(
                 continue
             if any(w in generic_verbs for w in words):
                 continue
-            validated.append(
-                ExtractTopicsTopic(
-                    topic_name=name,
-                    question_count=topic.get("question_count", 0),
-                    sample_questions=topic.get("sample_questions", [])[:3],
-                    related_materials=topic.get("related_materials", []),
-                )
-            )
+            ev_src = topic.get("evidence_sources", {})
+            validated.append(ExtractTopicsTopic(
+                topic_name=name,
+                struggle_score=min(100, max(0, float(topic.get("struggle_score", 50)))),
+                severity=topic.get("severity", "watch"),
+                trend=topic.get("trend", "stable"),
+                student_count=int(topic.get("student_count", 0)),
+                question_count=int(topic.get("question_count", 0)),
+                evidence_sources=ExtractedTopicEvidence(
+                    chat_questions=int(ev_src.get("chat_questions", 0)),
+                    quiz_failures=int(ev_src.get("quiz_failures", 0)),
+                    repeated_views=int(ev_src.get("repeated_views", 0)),
+                    assignment_failures=int(ev_src.get("assignment_failures", 0)),
+                    issue_reports=int(ev_src.get("issue_reports", 0)),
+                ),
+                sample_questions=topic.get("sample_questions", [])[:3],
+                related_materials=topic.get("related_materials", []),
+                related_sections=topic.get("related_sections", []),
+                affected_student_ids=[int(s) for s in (topic.get("affected_student_ids", []) or []) if s],
+                suggestion=topic.get("suggestion", ""),
+                suggestion_type=topic.get("suggestion_type", "recap"),
+            ))
 
-        return ExtractTopicsResponse(
-            topics=validated[:15],
-            confidence=parsed.get("confidence", 0.0),
+        response = ExtractTopicsResponse(
+            topics=validated[:20],
+            confidence=float(parsed.get("confidence", 0.0)),
+            summary_insight=parsed.get("summary_insight", ""),
             total_questions_analyzed=len(request.questions),
+            from_cache=False,
         )
+
+        # ── Save to memory cache for future continuity ──
+        try:
+            existing = db.query(AnalyticsCache).filter(
+                AnalyticsCache.query_hash == cache_key,
+            ).order_by(AnalyticsCache.created_at.desc()).first()
+            if existing:
+                existing.response_json = response.model_dump_json()
+                existing.created_at = datetime.utcnow()
+            else:
+                db.add(AnalyticsCache(
+                    query_hash=cache_key,
+                    query_text=f"struggle_topics_{request.course_id}",
+                    response_json=response.model_dump_json(),
+                    created_at=datetime.utcnow(),
+                ))
+            db.commit()
+        except Exception as e:
+            logger.warning(f"Failed to cache struggle topics: {e}")
+            db.rollback()
+
+        return response
 
     except json.JSONDecodeError:
         logger.error(f"LLM returned invalid JSON for extract-topics: {result}")

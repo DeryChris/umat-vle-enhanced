@@ -132,6 +132,93 @@ class resource_bank extends \external_api {
     }
 
     /**
+     * Rename an item (folder or file).
+     */
+    public static function rename_item_parameters() {
+        return new \external_function_parameters([
+            'itemid' => new \external_value(PARAM_INT, 'Item ID to rename'),
+            'name'   => new \external_value(PARAM_TEXT, 'New name'),
+        ]);
+    }
+
+    public static function rename_item($itemid, $name) {
+        global $DB, $USER;
+        self::validate_parameters(self::rename_item_parameters(), [
+            'itemid' => $itemid,
+            'name'   => $name,
+        ]);
+        $context = \context_user::instance($USER->id);
+        self::validate_context($context);
+        require_capability('local/umat_ai:adminpanel', \context_system::instance());
+
+        $name = trim($name);
+        if (!$name) {
+            throw new \moodle_exception('invalidparameter', 'core', '', 'Name is required');
+        }
+
+        $item = $DB->get_record('umat_resource_items', ['id' => $itemid, 'userid' => $USER->id]);
+        if (!$item) {
+            throw new \moodle_exception('invalidparameter', 'core', '', 'Item not found');
+        }
+
+        // If it's a file, rename the file in the file API too.
+        if (!$item->isfolder && $item->fileid) {
+            $fs = get_file_storage();
+            $file = $fs->get_file_by_id($item->fileid);
+            if ($file) {
+                $userctx = \context_user::instance($USER->id);
+                // Create a new file with the new name.
+                $newfilerecord = [
+                    'contextid' => $userctx->id,
+                    'component' => 'local_umat_ai',
+                    'filearea'  => 'resourcebank',
+                    'itemid'    => $itemid,
+                    'filepath'  => '/',
+                    'filename'  => $name,
+                ];
+                $newfile = $fs->create_file_from_storedfile($newfilerecord, $file);
+                // Delete the old file.
+                $file->delete();
+                $item->fileid = $newfile->get_id();
+                $item->filename = $name;
+                $item->mimetype = $newfile->get_mimetype();
+            }
+        }
+
+        $item->name = $name;
+        $item->timemodified = time();
+        $DB->update_record('umat_resource_items', $item);
+
+        // Build file URL if it's a file.
+        $fileurl = '';
+        if (!$item->isfolder && $item->fileid) {
+            $fs = get_file_storage();
+            $file = $fs->get_file_by_id($item->fileid);
+            if ($file) {
+                $url = \moodle_url::make_pluginfile_url(
+                    $file->get_contextid(),
+                    $file->get_component(),
+                    $file->get_filearea(),
+                    $file->get_itemid(),
+                    $file->get_filepath(),
+                    $file->get_filename()
+                );
+                $fileurl = $url->out(false);
+            }
+        }
+
+        return ['id' => (int)$item->id, 'name' => $item->name, 'fileurl' => $fileurl];
+    }
+
+    public static function rename_item_returns() {
+        return new \external_single_structure([
+            'id'      => new \external_value(PARAM_INT),
+            'name'    => new \external_value(PARAM_TEXT),
+            'fileurl' => new \external_value(PARAM_URL),
+        ]);
+    }
+
+    /**
      * Upload a file to the resource bank.
      */
     public static function upload_file_parameters() {

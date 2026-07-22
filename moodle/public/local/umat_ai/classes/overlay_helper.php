@@ -548,15 +548,15 @@ HTML;
         $logUrl      = $wwwroot . '/login/logout.php';
 
         $safePlatform = htmlspecialchars($platformName, ENT_QUOTES);
-        $enableRb = get_config('local_umat_ai', 'enable_resource_bank') === '1';
+        $enableRb = get_config('local_umat_ai', 'enable_resource_bank') !== '0';
         // Pre-build conditional resource bank HTML snippets (avoids PHP-in-heredoc issues)
         $rbToggleBtn = $enableRb ? '
-          <button class="umat-lib-toggle" data-libview="private" type="button" style="flex:1;padding:10px 8px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:600;color:var(--u-ol);font-family:inherit;border-bottom:2px solid transparent;transition:all .2s;">
-            <span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px;">folder_special</span>Private Bank
+          <button class="umat-lib-toggle" data-libview="private" type="button" style="flex:1;padding:7px 10px;border:none;border-radius:20px;cursor:pointer;font-size:11px;font-family:inherit;">
+            <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;margin-right:3px;">folder_special</span>Private Bank
           </button>' : '';
         $rbViewHtml = $enableRb ? '
         <!-- Private Bank view (hidden initially) -->
-        <div id="lec-private-bank-view" style="display:none;flex-direction:column;height:100%;">
+        <div id="lec-private-bank-view" style="display:none;flex-direction:column;flex:1;min-height:0;">
           <!-- Toolbar -->
           <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--u-olv);flex-wrap:wrap;">
             <span style="font-size:12px;font-weight:600;color:var(--u-ons);margin-right:4px;">Private Resources</span>
@@ -599,6 +599,69 @@ HTML;
               <button type="button" id="rb-push-confirm" disabled style="padding:6px 14px;border:none;border-radius:var(--u-r8);font-size:12px;font-weight:600;background:var(--u-p);color:#fff;cursor:pointer;font-family:inherit;opacity:.5;">Push Selected</button>
             </div>
           </div>
+        </div>
+        <!-- RB Upload overlay (drag & drop) -->
+        <div class="umat-cs-overlay" id="rb-upload-ov" style="display:none;">
+          <div class="umat-cs-modal" style="max-width:420px;">
+            <div class="umat-cs-modal-hdr">
+              <h3><span class="material-symbols-outlined">cloud_upload</span>Upload Resources</h3>
+              <button class="umat-cs-close" id="rb-upload-close" type="button"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <div style="padding:16px;">
+              <div id="rb-upload-dropzone" style="border:2px dashed var(--u-olv);border-radius:var(--u-r12);padding:32px 16px;text-align:center;cursor:pointer;transition:border-color .2s;background:var(--u-sflo);">
+                <span class="material-symbols-outlined" style="font-size:40px;color:var(--u-ol);">cloud_upload</span>
+                <p style="margin:8px 0 4px;font-size:13px;font-weight:600;color:var(--u-ons);">Drop files here or click to browse</p>
+                <p style="margin:0;font-size:11px;color:var(--u-ol);">Any file type (max 500 MB per file)</p>
+              </div>
+              <div id="rb-upload-progress" style="display:none;margin-top:12px;">
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--u-ol);margin-bottom:4px;">
+                  <span id="rb-upload-fname"></span>
+                  <span id="rb-upload-pct">0%</span>
+                </div>
+                <div style="height:4px;background:var(--u-olv);border-radius:2px;overflow:hidden;">
+                  <div id="rb-upload-bar" style="height:100%;width:0%;background:var(--u-p);border-radius:2px;transition:width .3s;"></div>
+                </div>
+              </div>
+              <div id="rb-upload-result" style="display:none;margin-top:12px;padding:10px;border-radius:var(--u-r8);font-size:12px;"></div>
+              <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
+                <button type="button" id="rb-upload-cancel" style="padding:6px 14px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;background:var(--u-sflo);color:var(--u-ons);cursor:pointer;font-family:inherit;">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- RB Folder overlay -->
+        <div class="umat-cs-overlay" id="rb-folder-ov" style="display:none;">
+          <div class="umat-cs-modal" style="max-width:380px;">
+            <div class="umat-cs-modal-hdr">
+              <h3><span class="material-symbols-outlined">create_new_folder</span>Create Folder</h3>
+              <button class="umat-cs-close" id="rb-folder-close" type="button"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <div style="padding:16px;">
+              <label style="font-size:11px;font-weight:600;color:var(--u-ol);display:block;margin-bottom:4px;">Folder Name</label>
+              <input type="text" id="rb-folder-name" placeholder="Enter folder name…" style="width:100%;padding:8px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r6);font-size:13px;background:var(--u-bg);color:var(--u-ons);outline:none;font-family:inherit;box-sizing:border-box;">
+              <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
+                <button type="button" id="rb-folder-cancel" style="padding:6px 14px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;background:var(--u-sflo);color:var(--u-ons);cursor:pointer;font-family:inherit;">Cancel</button>
+                <button type="button" id="rb-folder-submit" style="padding:6px 14px;border:none;border-radius:var(--u-r8);font-size:12px;font-weight:600;background:var(--u-p);color:#fff;cursor:pointer;font-family:inherit;">Create</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- RB Rename overlay -->
+        <div class="umat-cs-overlay" id="rb-rename-ov" style="display:none;">
+          <div class="umat-cs-modal" style="max-width:380px;">
+            <div class="umat-cs-modal-hdr">
+              <h3><span class="material-symbols-outlined">edit</span>Rename</h3>
+              <button class="umat-cs-close" id="rb-rename-close" type="button"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <div style="padding:16px;">
+              <label style="font-size:11px;font-weight:600;color:var(--u-ol);display:block;margin-bottom:4px;">New Name</label>
+              <input type="text" id="rb-rename-name" placeholder="Enter new name…" style="width:100%;padding:8px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r6);font-size:13px;background:var(--u-bg);color:var(--u-ons);outline:none;font-family:inherit;box-sizing:border-box;">
+              <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
+                <button type="button" id="rb-rename-cancel" style="padding:6px 14px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;background:var(--u-sflo);color:var(--u-ons);cursor:pointer;font-family:inherit;">Cancel</button>
+                <button type="button" id="rb-rename-submit" style="padding:6px 14px;border:none;border-radius:var(--u-r8);font-size:12px;font-weight:600;background:var(--u-p);color:#fff;cursor:pointer;font-family:inherit;">Rename</button>
+              </div>
+            </div>
+          </div>
         </div>' : '';
         $sharedJs = self::shared_js('lec-ov', 'lec-ov-close');
         $streamUrl = json_encode('/local/umat_ai/chat_stream.php');
@@ -612,7 +675,7 @@ HTML;
             ['id' => 'lec-courses',   'icon' => 'menu_book',     'label' => 'Courses',  'active' => false],
             ['id' => 'lec-library',   'icon' => 'local_library', 'label' => 'Resource Materials', 'active' => false],
             ['id' => 'lec-sessions',  'icon' => 'history',       'label' => 'Sessions', 'active' => false],
-            ['id' => 'lec-issues',   'icon' => 'flag',          'label' => 'Issues',   'active' => false],
+            ['id' => 'lec-issues',   'icon' => 'flag',          'label' => 'Issues',   'active' => false, 'badge' => 'lec-issues'],
         ];
         $lecMobTabs = self::glassmorph_tab_bar($lecGlassTabs, 'lp', 'lec-glass-tabs');
 
@@ -791,6 +854,9 @@ HTML;
           <select id="lcp-qgen-type" style="flex:1;padding:6px 8px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:11px;background:var(--u-bg);color:var(--u-ons);font-family:inherit;">
             <option value="mcq">MCQ</option><option value="short">Short Answer</option><option value="mixed">Mixed</option>
           </select>
+          <select id="lcp-qgen-diff" style="flex:1;padding:6px 8px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:11px;background:var(--u-bg);color:var(--u-ons);font-family:inherit;">
+            <option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option>
+          </select>
         </div>
         <button class="umat-btn-p" id="lcp-qgen-gen" type="button" style="justify-content:center;font-size:12px;"><span class="material-symbols-outlined" style="font-size:16px;">auto_awesome</span>Generate Quiz</button>
       </div>
@@ -958,16 +1024,20 @@ HTML;
       </div>
 
       <!-- LIBRARY (LECTURER) -->
-      <div class="umat-tab-pane" id="lec-library" style="position:relative;overflow:hidden;">
-        <!-- Toggle: Course Materials / Private Bank -->
-        <div style="display:flex;border-bottom:1px solid var(--u-olv);padding:0 12px;gap:0;">
-          <button class="umat-lib-toggle active" data-libview="course" type="button" style="flex:1;padding:10px 8px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--u-p);font-family:inherit;border-bottom:2px solid var(--u-p);transition:all .2s;">
-            <span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px;">menu_book</span>Course Materials
+      <div class="umat-tab-pane" id="lec-library" style="position:relative;min-height:0;">
+        <style>
+          .umat-lib-toggle{background:var(--u-sfl);color:var(--u-ol);font-weight:600;transition:all .15s;}
+          .umat-lib-toggle.active{background:var(--u-p);color:#fff;font-weight:700;}
+        </style>
+        <!-- Toggle: Course Materials / Private Bank (pill style) -->
+        <div style="display:flex;padding:8px 12px 6px;gap:6px;flex-shrink:0;">
+          <button class="umat-lib-toggle active" data-libview="course" type="button" style="flex:1;padding:7px 10px;border:none;border-radius:20px;cursor:pointer;font-size:11px;font-family:inherit;">
+            <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;margin-right:3px;">menu_book</span>Course Materials
           </button>
           {$rbToggleBtn}
         </div>
-        <!-- Course Materials view (default) -->
-        <div id="lec-lib-course-view">
+        <!-- Course Materials view (default) — fills remaining height -->
+        <div id="lec-lib-course-view" style="display:flex;flex-direction:column;flex:1;min-height:0;">
           <div class="umat-content-hdr">
             <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">local_library</span> Library</h2>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="lec-lib-hdr-actions">
@@ -1017,8 +1087,8 @@ HTML;
               <div class="umat-cs-list" id="lec-lib-cs-list"></div>
             </div>
           </div>
-          <!-- Materials grid -->
-          <div class="umat-lib-grid" id="lec-lib-grid">
+          <!-- Materials grid — fills remaining height -->
+          <div class="umat-lib-grid" id="lec-lib-grid" style="flex:1;overflow-y:auto;min-height:0;">
             <div class="umat-lib-picker">
               <span class="material-symbols-outlined">folder_open</span>
               <p>Select a course to browse its library materials.</p>
@@ -1387,7 +1457,7 @@ function showLcpPane(t){
   document.querySelectorAll('[data-lcp-tab]').forEach(function(x){x.classList.toggle('active',x.dataset.lcpTab===t);});
   document.querySelectorAll('#lec-cp [data-lcp-pane]').forEach(function(x){x.classList.toggle('active',x.dataset.lcpPane===t);});
   document.querySelectorAll('#lec-cp .umat-cp-pane').forEach(function(x){x.classList.toggle('active',x.id===t);});
-  if(!lcpPaneLoaded[t]){lcpPaneLoaded[t]=true;loadLcpPane(t);}
+  if(!lcpPaneLoaded[t]){lcpPaneLoaded[t]=true;try{loadLcpPane(t);}catch(e){console.error('[lcp] loadLcpPane('+t+') error:',e);lcpPaneLoaded[t]=false;var pane=document.getElementById(t);if(pane){var el=pane.querySelector('.lcp-pane-loading');if(el)el.innerHTML='<span style="color:var(--u-ter);">Failed to load. Tap to retry.</span>';}}}
 }
 document.querySelectorAll('[data-lcp-tab]').forEach(function(b){
   b.addEventListener('click',function(){showLcpPane(b.dataset.lcpTab);});
@@ -1436,22 +1506,50 @@ function loadLcpInsightsDash(){
     }).join(''):'<div class="lcp-pane-empty">No questions yet.</div>';
   }
   if(targetCid){ajax('local_umat_ai_get_struggle_insights',{courseid:targetCid,days:60},function(d){render(d);},function(){console.error('[lcp] insights load failed');});}
-  else if(courses.length){var loaded=0,agg={summary:{total_students:0,at_risk_count:0,total_questions:0,avg_quiz_score:null},topic_matrix:[],student_narratives:[],common_questions:[]};courses.forEach(function(c){ajax('local_umat_ai_get_struggle_insights',{courseid:c.id,days:60},function(d){var s=d.summary||{};agg.summary.total_students+=s.total_students||0;agg.summary.at_risk_count+=s.at_risk_count||s.risk_students||0;agg.summary.total_questions+=s.total_questions||0;(d.topic_matrix||[]).forEach(function(t){agg.topic_matrix.push(t);});(d.student_narratives||d.students||[]).forEach(function(st){agg.student_narratives.push(st);});(d.common_questions||[]).forEach(function(q){agg.common_questions.push(q);});loaded++;if(loaded>=courses.length){agg.topic_matrix.sort(function(a,b){return(b.struggle_score||0)-(a.struggle_score||0);});agg.student_narratives.sort(function(a,b){var order={high:0,medium:1,low:2};return(order[a.risk_level||a.risk||'low']||2)-(order[b.risk_level||b.risk||'low']||2);});render(agg);}},{loaded++;if(loaded>=courses.length)render(agg);});});}else{document.getElementById('lcp-d-topics').innerHTML='<div class="lcp-pane-empty">No courses available.</div>';document.getElementById('lcp-d-students-list').innerHTML='';document.getElementById('lcp-d-questions-list').innerHTML='';}
+  else if(courses.length){var loaded=0,agg={summary:{total_students:0,at_risk_count:0,total_questions:0,avg_quiz_score:null},topic_matrix:[],student_narratives:[],common_questions:[]};courses.forEach(function(c){ajax('local_umat_ai_get_struggle_insights',{courseid:c.id,days:60},function(d){var s=d.summary||{};agg.summary.total_students+=s.total_students||0;agg.summary.at_risk_count+=s.at_risk_count||s.risk_students||0;agg.summary.total_questions+=s.total_questions||0;(d.topic_matrix||[]).forEach(function(t){agg.topic_matrix.push(t);});(d.student_narratives||d.students||[]).forEach(function(st){agg.student_narratives.push(st);});(d.common_questions||[]).forEach(function(q){agg.common_questions.push(q);});loaded++;if(loaded>=courses.length){agg.topic_matrix.sort(function(a,b){return(b.struggle_score||0)-(a.struggle_score||0);});agg.student_narratives.sort(function(a,b){var order={high:0,medium:1,low:2};return(order[a.risk_level||a.risk||'low']||2)-(order[b.risk_level||b.risk||'low']||2);});render(agg);}},function(){loaded++;if(loaded>=courses.length)render(agg);});});}else{document.getElementById('lcp-d-topics').innerHTML='<div class="lcp-pane-empty">No courses available.</div>';document.getElementById('lcp-d-students-list').innerHTML='';document.getElementById('lcp-d-questions-list').innerHTML='';}
 }
 function loadLcpQuizgen(){
   var courses=(UD&&UD.courses)||[];var sel=document.getElementById('lcp-qgen-course');
-  if(sel&&!sel.options.length){courses.forEach(function(c){var o=document.createElement('option');o.value=c.id;o.textContent=c.shortname||c.fullname;sel.appendChild(o);});if(CID)sel.value=CID;}
+  if(sel&&!sel.options.length){
+    sel.innerHTML='<option value="">Select course…</option>';
+    courses.forEach(function(c){var o=document.createElement('option');o.value=c.id;o.textContent=c.shortname||c.fullname;sel.appendChild(o);});if(CID)sel.value=CID;
+  }
   var genBtn=document.getElementById('lcp-qgen-gen');if(genBtn&&!genBtn._wired){genBtn._wired=true;genBtn.addEventListener('click',function(){
     var cid=parseInt(sel.value)||CID;if(!cid){alert('Select a course first.');return;}
     var topic=document.getElementById('lcp-qgen-topic').value.trim();var count=document.getElementById('lcp-qgen-count').value;var type=document.getElementById('lcp-qgen-type').value;
-    var res=document.getElementById('lcp-qgen-result');res.innerHTML='<div class="lcp-pane-loading">Generating quiz…</div>';genBtn.disabled=true;
-    ajax('local_umat_ai_generate_quiz',{courseid:cid,topic:topic||'General review',question_count:parseInt(count),question_type:type},function(r){
-      genBtn.disabled=false;var qs=r.questions||[];
-      if(!qs.length){res.innerHTML='<div class="lcp-pane-empty">No questions generated.</div>';return;}
-      res.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--u-ol);margin-bottom:6px;">'+qs.length+' Questions Generated</div>'+qs.slice(0,5).map(function(q,i){
-        return '<div class="lcp-pane-row"><div class="lcp-pane-row-body"><div class="lcp-pane-row-top"><span class="lcp-pane-row-name" style="font-weight:500;">'+(i+1)+'. '+esc((q.question||q.text||'').substring(0,80))+'</span></div><div class="lcp-pane-row-sub">'+esc(q.type||type)+'</div></div></div>';
-      }).join('')+(qs.length>5?'<div class="lcp-pane-empty">+'+(qs.length-5)+' more — open full view</div>':'');
-    },function(){genBtn.disabled=false;res.innerHTML='<div class="lcp-pane-empty">Generation failed. Try again.</div>';});
+    var diffEl=document.getElementById('lcp-qgen-diff');var difficulty=diffEl?diffEl.value:'medium';
+    /* Map compact panel values to new API params */
+    var qtypes={};if(type==='mixed'){qtypes={multichoice:Math.ceil(count/2),truefalse:Math.floor(count/4),shortanswer:Math.floor(count/4)};}else if(type==='mcq'){qtypes={multichoice:parseInt(count)};}else{qtypes={shortanswer:parseInt(count)};}
+    var res=document.getElementById('lcp-qgen-result');res.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:16px;"><div class="umat-vw-spinner"></div><span style="font-size:12px;color:var(--u-ol);">Generating '+count+' '+type+' questions…</span></div>';genBtn.disabled=true;genBtn.style.opacity='.5';
+    ajax('local_umat_ai_generate_quiz_draft',{courseid:cid,source_type:'text',content:topic||'General review',question_types:JSON.stringify(qtypes),difficulty:difficulty},function(r){
+      genBtn.disabled=false;genBtn.style.opacity='1';var qs=r.questions||[];
+      if(!qs.length){res.innerHTML='<div class="lcp-pane-empty"><span class="material-symbols-outlined">quiz</span><p>No questions generated. Try a different topic.</p></div>';return;}
+      var mcCount=qs.filter(function(q){return(q.type||'').indexOf('mc')!==-1||(q.options&&q.options.length);}).length;
+      var shortCount=qs.length-mcCount;
+      res.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0 8px;border-bottom:1px solid var(--u-olv);margin-bottom:8px;">'+
+        '<span style="font-size:12px;font-weight:700;color:var(--u-ons);">'+qs.length+' Questions</span>'+
+        '<span style="font-size:10px;color:var(--u-ol);">'+(mcCount?mcCount+' MCQ':'')+(mcCount&&shortCount?' · ':'')+(shortCount?shortCount+' Short':'')+'</span>'+
+      '</div>'+
+      qs.slice(0,8).map(function(q,i){
+        var isMcq=q.options&&q.options.length;var typeTag=isMcq?'MCQ':'Short';
+        return '<div class="lcp-pane-row" style="padding:6px 0;border-bottom:1px solid var(--u-olv);">'+
+          '<div style="display:flex;gap:6px;align-items:flex-start;">'+
+            '<span style="width:18px;height:18px;border-radius:50%;background:var(--u-sflo);color:var(--u-p);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0;">'+(i+1)+'</span>'+
+            '<div style="min-width:0;flex:1;">'+
+              '<div style="font-size:11px;font-weight:600;color:var(--u-ons);line-height:1.4;">'+esc((q.question||q.text||'').substring(0,120))+'</div>'+
+              (isMcq?'<div style="font-size:9px;color:var(--u-ol);margin-top:2px;">'+q.options.map(function(o){return '○ '+esc(typeof o==='string'?o:(o.text||o));}).join(' · ')+'</div>':'')+
+            '</div>'+
+            '<span style="font-size:8px;padding:1px 4px;border-radius:999px;background:var(--u-sflo);color:var(--u-ol);font-weight:600;flex-shrink:0;">'+typeTag+'</span>'+
+          '</div>'+
+        '</div>';
+      }).join('')+
+      (qs.length>8?'<div style="text-align:center;padding:8px;font-size:10px;color:var(--u-ol);">+'+(qs.length-8)+' more — open full view to see all</div>':'')+
+      '<div style="display:flex;gap:6px;padding-top:8px;">'+
+        '<button class="umat-btn-p" id="lcp-qgen-to-course" type="button" style="flex:1;justify-content:center;font-size:11px;padding:6px;"><span class="material-symbols-outlined" style="font-size:14px;">school</span>Add to Course</button>'+
+        '<button class="lcp-pane-expand" id="lcp-qgen-full-btn" type="button" style="flex:1;font-size:11px;padding:6px;"><span class="material-symbols-outlined" style="font-size:14px;">open_in_full</span>Full View</button>'+
+      '</div>';
+      var fullBtn=document.getElementById('lcp-qgen-full-btn');if(fullBtn)fullBtn.addEventListener('click',function(){closePanel();lecOv.classList.add('open');switchPane('lec-quizgen');updateBodyLock();});
+    },function(){genBtn.disabled=false;genBtn.style.opacity='1';res.innerHTML='<div class="lcp-pane-empty"><span class="material-symbols-outlined">error_outline</span><p>Generation failed. Try again.</p></div>';});
   });}
 }
 function loadLcpCourses(){
@@ -1479,76 +1577,146 @@ function loadLcpCourses(){
 }
 function loadLcpLibraryPane(){
   var body=document.getElementById('lcp-lib-body');var courses=(UD&&UD.courses)||[];
-  body.innerHTML=courses.length?courses.slice(0,8).map(function(c){
-    return '<div class="lcp-pane-row lcp-pane-clickable" data-cid="'+c.id+'" style="cursor:pointer;"><div class="lcp-pane-row-body"><div class="lcp-pane-row-top"><span class="lcp-pane-row-name">'+esc(c.shortname||c.fullname)+'</span><span class="material-symbols-outlined" style="font-size:16px;color:var(--u-ol);">chevron_right</span></div><div class="lcp-pane-row-sub">'+esc(c.fullname||'')+'</div></div></div>';
-  }).join(''):'<div class="lcp-pane-empty">No courses available.</div>';
-  body.querySelectorAll('.lcp-pane-clickable').forEach(function(el){
-    el.addEventListener('click',function(){
-      var cid=parseInt(el.dataset.cid);body.innerHTML='<div class="lcp-pane-loading">Loading materials…</div>';
-      ajax('local_umat_ai_get_course_materials',{courseid:cid},function(r){
-        var mats=r.materials||[];body.innerHTML=mats.length?mats.slice(0,10).map(function(m){
-          return '<div class="lcp-pane-row"><div class="lcp-pane-row-body"><div class="lcp-pane-row-top"><span class="lcp-pane-row-name">'+esc(m.filename||m.name||'Material')+'</span></div><div class="lcp-pane-row-sub">'+esc(m.mimetype||m.type||'Course material')+'</div></div></div>';
-        }).join(''):'<div class="lcp-pane-empty">No materials for this course.</div>';
-      },function(){body.innerHTML='<div class="lcp-pane-empty">Could not load materials.</div>';});
+  function _lcpMime(mt){
+    if(!mt)return 'Course material';var m=mt.toLowerCase();
+    if(m.indexOf('pdf')!==-1)return 'PDF Document';if(m.indexOf('powerpoint')!==-1||m.indexOf('presentationml')!==-1)return 'PowerPoint Presentation';
+    if(m.indexOf('wordprocessingml')!==-1||m.indexOf('msword')!==-1)return 'Word Document';if(m.indexOf('spreadsheetml')!==-1||m.indexOf('excel')!==-1)return 'Spreadsheet';
+    if(m.indexOf('video/')!==-1)return 'Video';if(m.indexOf('audio/')!==-1)return 'Audio';if(m.indexOf('image/')!==-1)return 'Image';
+    var parts=m.split('/');return (parts[parts.length-1]||mt).replace(/[\.\-]/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}).substring(0,30);
+  }
+  function _lcpIcon(mt){
+    var m=(mt||'').toLowerCase();if(m.indexOf('pdf')!==-1)return 'picture_as_pdf';if(m.indexOf('video')!==-1)return 'play_circle';if(m.indexOf('audio')!==-1)return 'headphones';if(m.indexOf('image')!==-1)return 'image';if(m.indexOf('powerpoint')!==-1||m.indexOf('presentation')!==-1)return 'slideshow';if(m.indexOf('word')!==-1||m.indexOf('document')!==-1)return 'description';if(m.indexOf('sheet')!==-1||m.indexOf('excel')!==-1)return 'table_chart';return 'description';
+  }
+  function _fmtSize(bytes){if(!bytes||isNaN(bytes))return '';if(bytes<1024)return bytes+' B';if(bytes<1048576)return (bytes/1024).toFixed(1)+' KB';return (bytes/1048576).toFixed(1)+' MB';}
+  function showCourses(){
+    body.innerHTML=courses.length?courses.slice(0,8).map(function(c,i){
+      var colors=['#006B2F','#d97706','#7c3aed','#dc2626','#0891b2','#059669'];
+      var clr=colors[i%colors.length];var initials=(c.shortname||'').substring(0,2).toUpperCase();
+      return '<div class="lcp-pane-row lcp-pane-clickable" data-cid="'+c.id+'" style="cursor:pointer;display:flex;gap:8px;align-items:center;padding:8px;border:1px solid var(--u-olv);border-radius:var(--u-r10);margin-bottom:4px;">'+
+        '<div style="width:28px;height:28px;border-radius:var(--u-r6);background:'+clr+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;">'+esc(initials)+'</div>'+
+        '<div style="min-width:0;flex:1;"><div style="font-size:12px;font-weight:600;color:var(--u-ons);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(c.shortname||c.fullname)+'</div><div style="font-size:10px;color:var(--u-ol);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(c.fullname||'')+'</div></div>'+
+        '<span class="material-symbols-outlined" style="font-size:16px;color:var(--u-ol);">chevron_right</span>'+
+      '</div>';
+    }).join(''):'<div class="lcp-pane-empty">No courses available.</div>';
+    body.querySelectorAll('.lcp-pane-clickable').forEach(function(el){
+      el.addEventListener('click',function(){
+        var cid=parseInt(el.dataset.cid);body.innerHTML='<div class="lcp-pane-loading" style="display:flex;align-items:center;gap:6px;"><button class="lcp-lib-back" type="button" style="background:none;border:none;cursor:pointer;padding:2px;"><span class="material-symbols-outlined" style="font-size:16px;">arrow_back</span></button>Loading materials…</div>';
+        var backBtn=body.querySelector('.lcp-lib-back');if(backBtn)backBtn.addEventListener('click',function(){showCourses();});
+        ajax('local_umat_ai_get_course_materials',{courseid:cid},function(r){
+          var mats=r.materials||[];
+          var header='<div style="display:flex;align-items:center;gap:6px;padding:4px 0 8px;"><button class="lcp-lib-back" type="button" style="background:none;border:none;cursor:pointer;padding:2px;"><span class="material-symbols-outlined" style="font-size:16px;">arrow_back</span></button><span style="font-size:12px;font-weight:700;color:var(--u-ons);">'+mats.length+' Materials</span></div>';
+          body.innerHTML=header+(mats.length?mats.map(function(m){
+            return '<div class="lcp-pane-row" style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--u-olv);">'+
+              '<span class="material-symbols-outlined" style="font-size:18px;color:var(--u-p);">'+_lcpIcon(m.mimetype||m.type)+'</span>'+
+              '<div style="min-width:0;flex:1;"><div style="font-size:12px;font-weight:600;color:var(--u-ons);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(m.filename||m.name||'Material')+'</div>'+
+              '<div style="font-size:10px;color:var(--u-ol);display:flex;gap:8px;">'+_lcpMime(m.mimetype||m.type)+(m.filesize?' · '+_fmtSize(m.filesize):'')+'</div></div>'+
+            '</div>';
+          }).join(''):'<div class="lcp-pane-empty">No materials for this course.</div>');
+          body.querySelector('.lcp-lib-back').addEventListener('click',function(){showCourses();});
+        },function(){body.innerHTML='<div class="lcp-pane-empty">Could not load materials.</div>';});
+      });
     });
-  });
+  }
+  showCourses();
 }
 function loadLcpSessionsPane(){
   var body=document.getElementById('lcp-sess-body');
-  body.innerHTML='<div class="lcp-pane-loading">Loading sessions…</div>';
-  ajax('local_umat_ai_get_lecturer_sessions',{courseid:CID||0,limit:6},function(r){
-    var sessions=r.sessions||[];
-    if(!sessions.length){body.innerHTML='<div class="lcp-pane-empty">No sessions yet.</div>';return;}
-    body.innerHTML=sessions.map(function(s){
-      return '<div class="lcp-pane-row"><div class="lcp-pane-row-body"><div class="lcp-pane-row-top"><span class="lcp-pane-row-name">'+esc(s.course_name||'AI Session')+'</span><span style="font-size:10px;color:var(--u-ol);">'+esc(s.time_label)+'</span></div><div class="lcp-pane-row-sub">'+esc((s.preview||'').substring(0,60))+'</div></div></div>';
-    }).join('');
-  },function(){body.innerHTML='<div class="lcp-pane-empty">Could not load sessions.</div>';});
+  var currentTab='lecturer';
+  function _timeAgo(ts){if(!ts)return '';var diff=Date.now()/1000-ts;var m=Math.floor(diff/60);if(m<1)return 'Just now';if(m<60)return m+'m ago';var h=Math.floor(m/60);if(h<24)return h+'h ago';var dd=Math.floor(h/24);return dd+'d ago';}
+  body.innerHTML='<div style="display:flex;gap:4px;padding:0 0 8px;"><button class="lcp-sess-tab active" data-st="lecturer" type="button" style="flex:1;padding:5px 8px;border-radius:var(--u-r8);border:1px solid var(--u-olv);background:var(--u-p);color:#fff;font-size:10px;font-weight:700;cursor:pointer;text-align:center;">My AI</button><button class="lcp-sess-tab" data-st="student" type="button" style="flex:1;padding:5px 8px;border-radius:var(--u-r8);border:1px solid var(--u-olv);background:var(--u-bg);color:var(--u-ons);font-size:10px;font-weight:700;cursor:pointer;text-align:center;">Students</button></div><div id="lcp-sess-list"><div class="lcp-pane-loading">Loading sessions…</div></div>';
+  body.querySelectorAll('.lcp-sess-tab').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      currentTab=btn.dataset.st;
+      body.querySelectorAll('.lcp-sess-tab').forEach(function(b){b.classList.toggle('active',b===btn);b.style.background=b===btn?'var(--u-p)':'var(--u-bg)';b.style.color=b===btn?'#fff':'var(--u-ons)';});
+      loadList();
+    });
+  });
+  function loadList(){
+    var list=document.getElementById('lcp-sess-list');list.innerHTML='<div class="lcp-pane-loading">Loading…</div>';
+    if(currentTab==='lecturer'){
+      ajax('local_umat_ai_get_lecturer_sessions',{courseid:CID||0,limit:8},function(r){
+        var sessions=r.sessions||[];
+        if(!sessions.length){list.innerHTML='<div class="lcp-pane-empty">No AI sessions yet.</div>';return;}
+        list.innerHTML=sessions.map(function(s){
+          var msgs=s.message_count||s.msg_count||'';var preview=(s.preview||s.last_message||'').substring(0,80);
+          return '<div class="lcp-pane-row" style="padding:8px;border:1px solid var(--u-olv);border-radius:var(--u-r10);margin-bottom:4px;cursor:pointer;" data-sk="'+esc(s.session_key||s.key||'')+'">'+
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">'+
+              '<span style="font-size:11px;font-weight:700;color:var(--u-ons);">'+esc(s.course_name||s.course||'AI Session')+'</span>'+
+              '<span style="font-size:9px;color:var(--u-ol);">'+esc(s.time_label||'')+'</span>'+
+            '</div>'+
+            '<div style="font-size:10px;color:var(--u-ol);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(preview||'No messages')+'</div>'+
+            (msgs?'<div style="font-size:9px;color:var(--u-p);margin-top:3px;font-weight:600;">'+msgs+' messages</div>':'')+
+          '</div>';
+        }).join('');
+        list.querySelectorAll('.lcp-pane-row[data-sk]').forEach(function(card){
+          card.addEventListener('click',function(){closePanel();lecOv.classList.add('open');switchPane('lec-sessions');updateBodyLock();});
+        });
+      },function(){list.innerHTML='<div class="lcp-pane-empty">Could not load sessions.</div>';});
+    }else{
+      /* Student sessions */
+      ajax('local_umat_ai_get_ai_sessions',{courseid:CID||0,limit:8},function(r){
+        var sessions=r.sessions||[];
+        if(!sessions.length){list.innerHTML='<div class="lcp-pane-empty">No student sessions yet.</div>';return;}
+        list.innerHTML=sessions.map(function(s){
+          var msgs=s.message_count||s.msg_count||'';var preview=(s.preview||s.last_message||'').substring(0,80);
+          return '<div class="lcp-pane-row" style="padding:8px;border:1px solid var(--u-olv);border-radius:var(--u-r10);margin-bottom:4px;cursor:pointer;">'+
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">'+
+              '<span style="font-size:11px;font-weight:700;color:var(--u-ons);">'+esc(s.course_name||'Student Session')+'</span>'+
+              '<span style="font-size:9px;color:var(--u-ol);">'+esc(s.time_label||'')+'</span>'+
+            '</div>'+
+            '<div style="font-size:10px;color:var(--u-ol);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(preview||'No messages')+'</div>'+
+            (msgs?'<div style="font-size:9px;color:var(--u-p);margin-top:3px;font-weight:600;">'+msgs+' messages</div>':'')+
+          '</div>';
+        }).join('');
+        list.querySelectorAll('.lcp-pane-row').forEach(function(card){
+          card.addEventListener('click',function(){closePanel();lecOv.classList.add('open');switchPane('lec-sessions');updateBodyLock();});
+        });
+      },function(){list.innerHTML='<div class="lcp-pane-empty">Could not load student sessions.</div>';}
+      );
+    }
+  }
+  loadList();
 }
 function loadLcpIssuesPane(){
   var body=document.getElementById('lcp-iss-body');
   if(!CID){body.innerHTML='<div class="lcp-pane-empty">Select a course to view issues.</div>';return;}
-  body.innerHTML='<div class="lcp-pane-loading">Loading issues…</div>';
-  ajax('local_umat_ai_get_course_issues',{courseid:CID},function(r){
-    var issues=r.issues||[];
-    if(!issues.length){body.innerHTML='<div class="lcp-pane-empty">No student issues.</div>';return;}
-    body.innerHTML=issues.slice(0,8).map(function(iss){
-      var sc={'open':'#dc2626','in_review':'#f59e0b','resolved':'#22c55e','closed':'var(--u-ol)'}[iss.status]||'var(--u-ol)';
-      return '<div class="lcp-pane-row"><div class="lcp-pane-row-body"><div class="lcp-pane-row-top"><span class="lcp-pane-row-name">'+esc(iss.fullname||'Student')+'</span><span style="font-size:9px;padding:2px 6px;border-radius:999px;background:'+sc+'18;color:'+sc+';font-weight:700;">'+iss.status.replace('_',' ')+'</span></div><div class="lcp-pane-row-sub">'+esc((iss.description||'').substring(0,60))+'</div></div></div>';
-    }).join('');
-  },function(){body.innerHTML='<div class="lcp-pane-empty">Could not load issues.</div>';});
+  function _timeAgo(ts){if(!ts)return '';var diff=Date.now()/1000-ts;var m=Math.floor(diff/60);if(m<1)return 'Just now';if(m<60)return m+'m ago';var h=Math.floor(m/60);if(h<24)return h+'h ago';var dd=Math.floor(h/24);return dd+'d ago';}
+  function _catLabel(cat){var map={'concept_confusion':'Concept','material_error':'Material','technical_issue':'Technical','suggestion':'Suggestion','other':'Other'};return map[cat]||cat||'';}
+  function _catIcon(cat){var map={'concept_confusion':'psychology','material_error':'description','technical_issue':'build','suggestion':'lightbulb','other':'help'};return map[cat]||'flag';}
+  var filter='open';
+  function loadIssues(){
+    body.innerHTML='<div class="lcp-pane-loading">Loading issues…</div>';
+    ajax('local_umat_ai_get_course_issues',{courseid:CID,status:filter==='all'?'':filter},function(r){
+      var issues=r.issues||[];
+      if(!issues.length){body.innerHTML='<div style="display:flex;gap:4px;padding-bottom:8px;"><button class="lcp-iss-f" data-f="open" type="button" style="flex:1;padding:4px 6px;border-radius:var(--u-r8);border:1px solid var(--u-olv);background:'+(filter==='open'?'var(--u-p)':'var(--u-bg)')+';color:'+(filter==='open'?'#fff':'var(--u-ons)')+';font-size:10px;font-weight:600;cursor:pointer;">Open</button><button class="lcp-iss-f" data-f="all" type="button" style="flex:1;padding:4px 6px;border-radius:var(--u-r8);border:1px solid var(--u-olv);background:'+(filter==='all'?'var(--u-p)':'var(--u-bg)')+';color:'+(filter==='all'?'#fff':'var(--u-ons)')+';font-size:10px;font-weight:600;cursor:pointer;">All</button></div><div class="lcp-pane-empty"><span class="material-symbols-outlined">check_circle</span><p>No '+filter+' issues.</p></div>';return;}
+      var header='<div style="display:flex;gap:4px;padding-bottom:8px;"><button class="lcp-iss-f" data-f="open" type="button" style="flex:1;padding:4px 6px;border-radius:var(--u-r8);border:1px solid var(--u-olv);background:'+(filter==='open'?'var(--u-p)':'var(--u-bg)')+';color:'+(filter==='open'?'#fff':'var(--u-ons)')+';font-size:10px;font-weight:600;cursor:pointer;">Open</button><button class="lcp-iss-f" data-f="in_review" type="button" style="flex:1;padding:4px 6px;border-radius:var(--u-r8);border:1px solid var(--u-olv);background:'+(filter==='in_review'?'var(--u-p)':'var(--u-bg)')+';color:'+(filter==='in_review'?'#fff':'var(--u-ons)')+';font-size:10px;font-weight:600;cursor:pointer;">Review</button><button class="lcp-iss-f" data-f="all" type="button" style="flex:1;padding:4px 6px;border-radius:var(--u-r8);border:1px solid var(--u-olv);background:'+(filter==='all'?'var(--u-p)':'var(--u-bg)')+';color:'+(filter==='all'?'#fff':'var(--u-ons)')+';font-size:10px;font-weight:600;cursor:pointer;">All</button></div>';
+      body.innerHTML=header+issues.slice(0,10).map(function(iss){
+        var sc={'open':'#dc2626','in_review':'#f59e0b','resolved':'#22c55e','closed':'var(--u-ol)'}[iss.status]||'var(--u-ol)';
+        var initials=(iss.fullname||'S').substring(0,1).toUpperCase();
+        return '<div class="lcp-pane-row" style="padding:8px;border:1px solid var(--u-olv);border-left:3px solid '+sc+';border-radius:var(--u-r10);margin-bottom:4px;">'+
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">'+
+            '<div style="display:flex;gap:6px;align-items:center;">'+
+              '<div style="width:22px;height:22px;border-radius:50%;background:'+sc+'20;color:'+sc+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;">'+esc(initials)+'</div>'+
+              '<span style="font-size:11px;font-weight:700;color:var(--u-ons);">'+esc(iss.fullname||'Student')+'</span>'+
+            '</div>'+
+            '<span style="font-size:9px;padding:2px 6px;border-radius:999px;background:'+sc+'18;color:'+sc+';font-weight:700;">'+iss.status.replace('_',' ')+'</span>'+
+          '</div>'+
+          '<div style="font-size:10px;color:var(--u-ol);margin-bottom:4px;line-height:1.4;">'+esc((iss.description||'').substring(0,100))+'</div>'+
+          '<div style="display:flex;gap:8px;align-items:center;">'+
+            '<span style="font-size:9px;padding:1px 5px;border-radius:999px;background:var(--u-sflo);color:var(--u-ol);font-weight:600;">'+_catIcon(iss.category||'')+' '+_catLabel(iss.category||'')+'</span>'+
+            '<span style="font-size:9px;color:var(--u-ol);">'+_timeAgo(iss.timecreated||iss.created)+'</span>'+
+            (iss.lecturer_response?'<span style="font-size:9px;color:var(--u-sec);font-weight:600;">Replied</span>':'')+
+          '</div>'+
+        '</div>';
+      }).join('');
+      body.querySelectorAll('.lcp-iss-f').forEach(function(btn){
+        btn.addEventListener('click',function(){filter=btn.dataset.f;loadIssues();});
+      });
+    },function(){body.innerHTML='<div class="lcp-pane-empty">Could not load issues.</div>';});
+  }
+  loadIssues();
 }
 
-    /* Wire delete buttons */
-    body.querySelectorAll('.umat-cp-del-session').forEach(function(btn){
-      btn.addEventListener('click',function(e){
-        e.stopPropagation();
-        var card=e.target.closest('.umat-cp-list-card');
-        if(!card)return;
-        if(!confirm('Delete this conversation? This cannot be undone.'))return;
-        btn.disabled=true;
-        btn.innerHTML='<span class="material-symbols-outlined" style="font-size:18px;">hourglass_empty</span>';
-        ajax('local_umat_ai_delete_lecturer_session',{session_key:card.dataset.sk},function(){
-          card.remove();
-          if(!body.querySelector('.umat-cp-list-card')){
-            body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">history</span><p>No AI sessions yet.</p></div>';
-          }
-        },function(){
-          btn.disabled=false;
-          btn.innerHTML='<span class="material-symbols-outlined" style="font-size:18px;">delete</span>';
-        });
-      });
-    });
-
-    /* Wire card click → open full dashboard sessions tab */
-    body.querySelectorAll('.umat-cp-list-card').forEach(function(card){
-      card.addEventListener('click',function(e){
-        if(e.target.closest('.umat-cp-del-session'))return;
-        openDash();
-        switchPane('lec-sessions');
-      });
-    });
-  });
-}
 var lcpMsgs=document.getElementById('lcp-msgs');
 if(lcpMsgs)lcpMsgs.addEventListener('click',function(e){
   var chip=e.target.closest('.umat-chip[data-lp]');
@@ -1646,6 +1814,8 @@ function loadPaneData(name){
   if(name==='lec-quizgen')loadQuizGenUI();
   if(name==='lec-home')initHome();
 }
+/* Expose to window so AMD modules can delegate */
+window.loadPaneData=loadPaneData;
 
 /* Load panel (compact) data */
 function loadPanelData(){
@@ -2243,6 +2413,7 @@ function loadLecturerIssues(){
     console.log('[lec-issues] response',r);
     var issues=r.issues||[],total=r.total||0;
     var count=document.getElementById('lec-issues-count');if(count)count.textContent=total;
+    var mb=document.getElementById('gtb-lec-issues');if(mb){mb.textContent=total>99?'99+':total;mb.style.display=total?'':'none';}
     if(!issues.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No student issues'+(status?' with this status':'')+'.</p></div>';return;}
     body.innerHTML=issues.map(function(iss){
       var catLabel={'concept_confusion':'Concept Confusion','material_error':'Material Error','technical_issue':'Technical Issue','suggestion':'Suggestion','other':'Other'}[iss.category]||iss.category;
@@ -2347,7 +2518,7 @@ function populateQuizGenCourseSel(){
     });
   });
 }
-function loadQuizGenUI(){
+window.loadQuizGenUI=function(){
   populateQuizGenCourseSel();
   // Auto-select current course if on a course page.
   if (!qgenCid && typeof CID !== 'undefined' && CID > 0) {
@@ -2360,7 +2531,7 @@ function loadQuizGenUI(){
     var body=document.getElementById('qgen-body');
     if(body)body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load Quiz Generator. Check that the AMD build file exists.</p></div>';
   });
-}
+};
 document.querySelectorAll('#qgen-cs-btn').forEach(function(b){
   b.addEventListener('click',function(){document.getElementById('qgen-cs-ov').classList.toggle('open');});
 });
@@ -4326,10 +4497,13 @@ HTML;
             $val  = htmlspecialchars($tab['id'], ENT_QUOTES);
             $icon = htmlspecialchars($tab['icon'], ENT_QUOTES);
             $label = htmlspecialchars($tab['label'], ENT_QUOTES);
+            $badgeId = !empty($tab['badge']) ? htmlspecialchars($tab['badge'], ENT_QUOTES) : '';
+            $badgeHtml = $badgeId ? ' <span class="umat-glass-tab-badge" id="gtb-' . $badgeId . '" style="display:none;"></span>' : '';
             $realTabs .= '<button class="umat-glass-tab' . ($active ? ' active' : '') . '" data-'
                 . $attr . '="' . $val . '" type="button">'
                 . '<span class="material-symbols-outlined">' . $icon . '</span>'
-                . '<span>' . $label . '</span></button>';
+                . '<span>' . $label . '</span>'
+                . $badgeHtml . '</button>';
         }
         return '<div class="umat-glass-tabs" id="' . htmlspecialchars($containerId, ENT_QUOTES) . '">'
             . '<div class="umat-glass-tabs-row">' . $realTabs . '</div>'

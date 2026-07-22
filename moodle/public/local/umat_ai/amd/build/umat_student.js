@@ -89,24 +89,65 @@ document.querySelectorAll('#stu-cp [data-cp-pane]').forEach(function(btn){
 document.querySelectorAll('#stu-cp .lcp-pane-expand').forEach(function(btn){
   btn.addEventListener('click',function(){
     var pane=btn.closest('.umat-cp-pane');if(!pane)return;
-    var tabMap={'cp-library':'library','cp-courses':'courses','cp-sessions':'sessions','cp-report':'report-issue'};
+    var tabMap={'cp-library':'library','cp-courses':'courses','cp-sessions':'sessions','cp-report':'report-issue','cp-notes':'my-notes'};
     var tab=tabMap[pane.id];if(!tab)return;
     cpOv.classList.remove('open');ov.classList.add('open');updateBodyLock();
     setTimeout(function(){switchToTab(tab);},100);
   });
 });
 /* ---- Pane loaders ---- */
+/* Map MIME types to readable labels */
+function _mapMime(mt){
+  if(!mt)return 'Course material';
+  var m=mt.toLowerCase();
+  if(m.indexOf('pdf')!==-1)return 'PDF Document';
+  if(m.indexOf('powerpoint')!==-1||m.indexOf('presentationml')!==-1)return 'PowerPoint Presentation';
+  if(m.indexOf('wordprocessingml')!==-1||m.indexOf('msword')!==-1)return 'Word Document';
+  if(m.indexOf('spreadsheetml')!==-1||m.indexOf('excel')!==-1)return 'Spreadsheet';
+  if(m.indexOf('image/')!==-1)return 'Image';
+  if(m.indexOf('video/')!==-1)return 'Video';
+  if(m.indexOf('audio/')!==-1)return 'Audio';
+  if(m.indexOf('text/plain')!==-1)return 'Text File';
+  if(m.indexOf('text/html')!==-1)return 'HTML Document';
+  if(m.indexOf('zip')!==-1||m.indexOf('archive')!==-1)return 'Archive';
+  if(m.indexOf('json')!==-1)return 'JSON File';
+  /* fallback: strip "application/" or "image/" prefix */
+  var parts=m.split('/');
+  return (parts[parts.length-1]||mt).replace(/[\.\-]/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}).substring(0,30);
+}
 function loadCpPane(id){
+  if(id==='cp-notes')return loadCpNotesPane();
   if(id==='cp-library')return loadCpLibraryPane();
   if(id==='cp-courses')return loadCpCoursesPane();
   if(id==='cp-sessions')return loadCpSessionsPane();
   if(id==='cp-report')return loadCpReportPane();
 }
+function loadCpNotesPane(){
+  /* Wire sub-tab switching and add button (once) */
+  initCpNotes();
+  /* Load notes via AJAX into cp-nt-mine */
+  var pane=document.getElementById('cp-nt-mine');
+  if(!pane)return;
+  if(!courseId){
+    var c=(userData&&userData.courses)||[];
+    if(!c.length){pane.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses found.</p></div>';return;}
+    pane.innerHTML=c.slice(0,12).map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('');
+    pane.querySelectorAll('.umat-chip').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;cpPaneLoaded['cp-notes']=false;showCpPane('cp-notes');});});
+    return;
+  }
+  pane.innerHTML='<div class="lcp-pane-loading">Loading notes…</div>';
+  require(['core/ajax'],function(A){A.call([{methodname:'local_umat_ai_get_notes',args:{courseid:courseId}}])[0].done(function(r){
+    var notes=r.notes||[];_notesCache=notes;renderCpNotes(notes);
+  }).fail(function(){pane.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load notes.</p></div>';});});
+}
 function loadCpLibraryPane(){
   var body=document.getElementById('cp-lib-body');if(!body)return;
   if(!courseId){var c=(userData&&userData.courses)||[];if(!c.length){body.innerHTML='<div class="lcp-pane-empty">No courses available.</div>';return;}body.innerHTML=c.slice(0,8).map(function(cv){return '<div class="lcp-pane-row lcp-pane-clickable" data-cid="'+cv.id+'" style="cursor:pointer;"><div class="lcp-pane-row-body"><div class="lcp-pane-row-top"><span class="lcp-pane-row-name">'+_umatEsc(cv.shortname||cv.fullname)+'</span><span class="material-symbols-outlined" style="font-size:16px;color:var(--u-ol);">chevron_right</span></div><div class="lcp-pane-row-sub">'+_umatEsc(cv.fullname||'')+'</div></div></div>';}).join('');body.querySelectorAll('.lcp-pane-clickable').forEach(function(el){el.addEventListener('click',function(){courseId=parseInt(el.dataset.cid)||courseId;cpPaneLoaded['cp-library']=false;showCpPane('cp-library');});});return;}
   body.innerHTML='<div class="lcp-pane-loading">Loading materials…</div>';
-  require(['core/ajax'],function(Ajax){Ajax.call([{methodname:'local_umat_ai_get_course_materials',args:{courseid:courseId}}])[0].done(function(r){var mats=r.materials||[];body.innerHTML=mats.length?mats.slice(0,10).map(function(m){return '<div class="lcp-pane-row"><div class="lcp-pane-row-body"><div class="lcp-pane-row-top"><span class="lcp-pane-row-name">'+_umatEsc(m.filename||m.name||'Material')+'</span></div><div class="lcp-pane-row-sub">'+_umatEsc(m.mimetype||m.type||'Course material')+'</div></div></div>';}).join(''):'<div class="lcp-pane-empty">No materials for this course.</div>';}).fail(function(){body.innerHTML='<div class="lcp-pane-empty">Could not load materials.</div>';});});
+  require(['core/ajax'],function(Ajax){Ajax.call([{methodname:'local_umat_ai_get_course_materials',args:{courseid:courseId}}])[0].done(function(r){var mats=r.materials||[];body.innerHTML=mats.length?mats.slice(0,10).map(function(m){
+    var icon='description';var mt=(m.mimetype||m.type||'').toLowerCase();if(mt.indexOf('pdf')!==-1)icon='picture_as_pdf';else if(mt.indexOf('video')!==-1)icon='play_circle';else if(mt.indexOf('audio')!==-1)icon='headphones';else if(mt.indexOf('image')!==-1)icon='image';else if(mt.indexOf('powerpoint')!==-1||mt.indexOf('presentation')!==-1)icon='slideshow';else if(mt.indexOf('word')!==-1||mt.indexOf('document')!==-1)icon='description';else if(mt.indexOf('sheet')!==-1||mt.indexOf('excel')!==-1)icon='table_chart';
+    return '<div class="lcp-pane-row"><div class="lcp-pane-row-body"><div class="lcp-pane-row-top"><span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">'+icon+'</span><span class="lcp-pane-row-name">'+_umatEsc(m.filename||m.name||'Material')+'</span></div><div class="lcp-pane-row-sub">'+_mapMime(m.mimetype||m.type)+'</div></div></div>';
+  }).join(''):'<div class="lcp-pane-empty">No materials for this course.</div>';}).fail(function(){body.innerHTML='<div class="lcp-pane-empty">Could not load materials.</div>';});});
 }
 function loadCpCoursesPane(){
   var body=document.getElementById('cp-courses-list');if(!body)return;

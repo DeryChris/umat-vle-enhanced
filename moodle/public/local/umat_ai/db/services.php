@@ -395,6 +395,11 @@ $functions = [
         'description' => 'List courses the user can push resources to', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
     ],
+    'local_umat_ai_resource_bank_rename' => [
+        'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'rename_item',
+        'description' => 'Rename a resource bank item', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
 ];
 
 $services = [
