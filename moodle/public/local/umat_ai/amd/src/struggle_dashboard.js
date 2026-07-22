@@ -29,11 +29,14 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         return { url: '', sesskey: '' };
     }
 
-    // ── Initialisation ──
+    // ── Initialisation (dual-mode: single course or all-courses) ──
     function init(courseId) {
         cid = parseInt(courseId) || 0;
         console.log('[StruggleDashboard] init called, cid=' + cid);
-        if (!cid) return;
+        if (!cid) {
+            loadAllCourses();
+            return;
+        }
         loadData();
     }
 
@@ -61,15 +64,247 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         if (pane) pane.style.opacity = show ? '0.3' : '1';
     }
 
-    // ── Master renderer ──
+    // ── All-Courses Mode ──
+    function loadAllCourses() {
+        console.log('[StruggleDashboard] all-courses mode');
+        showSkeleton(true);
+        Ajax.call([{
+            methodname: 'local_umat_ai_get_struggle_insights',
+            args: { courseid: 0, days: 60 }
+        }])[0].done(function(insights) {
+            console.log('[StruggleDashboard] ALL COURSES API SUCCESS', insights);
+            renderAllCourses(insights);
+            showSkeleton(false);
+        }).fail(function() {
+            console.error('[StruggleDashboard] ALL COURSES API FAILED', Array.prototype.slice.call(arguments));
+            showSkeleton(false);
+            renderAllCourses({});
+        });
+    }
+
+    function renderAllCourses(data) {
+        if (!data) data = {};
+        var mode = data.mode || 'single';
+
+        // Clear any existing course-specific header/selector visual state
+        var header = document.querySelector('.umat-insights-header');
+        if (header) {
+            var modeBadge = header.querySelector('.ins-mode-badge');
+            if (!modeBadge) {
+                modeBadge = document.createElement('span');
+                modeBadge.className = 'ins-mode-badge';
+                header.appendChild(modeBadge);
+            }
+            modeBadge.textContent = mode === 'all_courses' ? 'All Courses' : '';
+            modeBadge.style.display = mode === 'all_courses' ? 'inline-block' : 'none';
+        }
+
+        // ── Cross-cutting insight banner ──
+        var insightBanner = document.getElementById('ins-cross-cutting');
+        if (!insightBanner) {
+            insightBanner = document.createElement('div');
+            insightBanner.id = 'ins-cross-cutting';
+            insightBanner.className = 'ins-cross-cutting-banner';
+            var container = document.querySelector('.umat-insights-pane');
+            if (container) container.insertBefore(insightBanner, container.firstChild);
+        }
+        var crossInsight = data.all_courses_summary || data.cross_cutting_insight || '';
+        insightBanner.innerHTML = crossInsight ?
+            '<span class="material-symbols-outlined">insights</span> ' + esc(crossInsight) :
+            '<span class="material-symbols-outlined">insights</span> Aggregate view across all your courses.';
+
+        // ── Course cards grid ──
+        var cardsContainer = document.getElementById('ins-course-cards');
+        if (!cardsContainer) {
+            cardsContainer = document.createElement('div');
+            cardsContainer.id = 'ins-course-cards';
+            cardsContainer.className = 'ins-course-cards-grid';
+            var pane = document.querySelector('.umat-insights-pane');
+            if (pane) pane.insertBefore(cardsContainer, pane.querySelector('.ins-metrics-row'));
+        }
+
+        var courses = data.courses_summary || [];
+        if (!courses.length) {
+            cardsContainer.innerHTML = '<div class="ins-empty">No course data available yet.</div>';
+        } else {
+            cardsContainer.innerHTML = courses.map(function(c) {
+                var atRisk = c.at_risk || 0;
+                var students = c.students || 1;
+                var riskColor = atRisk > 5 ? COLORS.critical :
+                    (atRisk > 2 ? COLORS.attention : COLORS.watch);
+                var trendIcon = c.trend === 'up' ? '↑' : (c.trend === 'down' ? '↓' : '→');
+                var trendColor = c.trend === 'up' ? COLORS.critical :
+                    (c.trend === 'down' ? COLORS.low : COLORS.muted);
+                // Compute health_pct from at_risk if not provided
+                var healthPct = c.health_pct || Math.max(5, Math.min(100, Math.round((1 - atRisk / students) * 100)));
+                return '<div class="ins-course-card" data-courseid="' + c.id + '" onclick="struggleDashboard.selectCourse(' + (c.id || 0) + ')">' +
+                    '<div class="ins-course-card-header">' +
+                    '<span class="ins-course-card-name">' + esc(c.fullname || 'Course') + '</span>' +
+                    '<span class="ins-course-card-trend" style="color:' + trendColor + '">' + trendIcon + '</span>' +
+                    '</div>' +
+                    '<div class="ins-course-card-stats">' +
+                    '<div class="ins-course-card-stat"><span class="ins-course-stat-val">' + students + '</span><span class="ins-course-stat-lbl">Students</span></div>' +
+                    '<div class="ins-course-card-stat"><span class="ins-course-stat-val" style="color:' + riskColor + '">' + atRisk + '</span><span class="ins-course-stat-lbl">At Risk</span></div>' +
+                    '<div class="ins-course-card-stat"><span class="ins-course-stat-val">' + (c.questions || 0) + '</span><span class="ins-course-stat-lbl">Questions</span></div>' +
+                    '</div>' +
+                    (c.top_topic ? '<div class="ins-course-card-topic">Top: ' + esc(c.top_topic) + '</div>' : '') +
+                    '<div class="ins-course-card-bar"><div class="ins-course-card-bar-fill" style="width:' + healthPct + '%;background:' + riskColor + '"></div></div>' +
+                    '</div>';
+            }).join('');
+        }
+
+        // ── Stats tiles ──
+        renderStatTiles(data.course_pulse || {});
+
+        // ── Course pulse mini-sparklines (aggregate) ──
+        var pulseZone = document.getElementById('ins-course-pulse');
+        if (!pulseZone) {
+            pulseZone = document.createElement('div');
+            pulseZone.id = 'ins-course-pulse';
+            pulseZone.className = 'ins-course-pulse-grid';
+            var pane = document.querySelector('.umat-insights-pane');
+            if (pane) pane.insertBefore(pulseZone, pane.querySelector('.ins-charts-row'));
+        }
+        var pulses = data.course_pulses || [];
+        if (pulses.length) {
+            pulseZone.innerHTML = pulses.map(function(p) {
+                return '<div class="ins-pulse-card">' +
+                    '<div class="ins-pulse-name">' + esc(p.name || '') + '</div>' +
+                    '<div class="ins-pulse-mini sparkline" data-values="' + esc(p.trend_values || '') + '">' +
+                    '</div></div>';
+            }).join('');
+        } else {
+            pulseZone.style.display = 'none';
+        }
+
+        // ── Struggle areas (aggregated) ──
+        renderTopicHeatmap(data.struggle_areas || []);
+
+        // ── Students and questions (aggregated) ──
+        renderAtRiskStudents(data.student_narratives || []);
+        renderCommonQuestions(data.common_questions || []);
+    }
+
+    function selectCourse(courseId) {
+        if (courseId > 0) {
+            // Update the course selector UI
+            var labelEl = document.getElementById('ins-cs-label');
+            var list = document.getElementById('ins-cs-list');
+            if (list) {
+                list.querySelectorAll('.umat-cs-item').forEach(function(it) {
+                    var active = parseInt(it.dataset.cid) === courseId;
+                    it.classList.toggle('umat-cs-item-active', active);
+                    if (active && labelEl) {
+                        labelEl.textContent = it.querySelector('.umat-cs-item-name')?.textContent || 'Course';
+                    }
+                });
+            }
+            // Reload insights for that course
+            init(courseId);
+        }
+    }
+
+    // ── Master renderer (dual-mode) ──
     function renderAll(data) {
         if (!data) data = {};
+        ensureRefreshBtn();
+        // If API returned all-courses mode, delegate to renderAllCourses
+        if (data.mode === 'all_courses') {
+            renderAllCourses(data);
+            return;
+        }
         renderStatTiles(data.course_pulse || {});
         renderRiskDonut(data.student_narratives || []);
         renderQuestionSparkline(data.course_pulse || {});
         renderTopicHeatmap(data.struggle_areas || []);
         renderAtRiskStudents(data.student_narratives || []);
         renderCommonQuestions(data.common_questions || []);
+    }
+
+    // ── Refresh button (topbar) ──
+    function ensureRefreshBtn() {
+        // Button exists in topbar (overlay_helper.php) — just verify it's wired
+        var btn = document.getElementById('ins-refresh-btn');
+        if (!btn) {
+            // Fallback: not in overlay context, create one dynamically
+            var target = document.getElementById('ins-stat-tiles') || document.querySelector('.umat-insights-pane');
+            if (!target) return;
+            btn = document.createElement('button');
+            btn.id = 'ins-refresh-btn';
+            btn.className = 'umat-content-hdr-btn ins-topbar-refresh';
+            btn.type = 'button';
+            btn.title = 'Refresh insights';
+            btn.setAttribute('aria-label', 'Refresh insights');
+            btn.innerHTML = '<span class="material-symbols-outlined" id="ins-refresh-icon">refresh</span>';
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                refresh();
+            });
+            target.parentNode.insertBefore(btn, target.nextSibling);
+        }
+    }
+
+    function refresh() {
+        console.log('[StruggleDashboard] refresh triggered, cid=' + cid);
+        var btn = document.getElementById('ins-refresh-btn');
+        var icon = document.getElementById('ins-refresh-icon');
+        if (btn) btn.disabled = true;
+        if (icon) {
+            icon.textContent = 'sync';
+            icon.classList.add('ins-spin');
+        }
+        var doneTimer = function() {
+            if (icon) {
+                icon.textContent = 'check';
+                icon.classList.remove('ins-spin');
+            }
+            if (btn) btn.disabled = false;
+            setTimeout(function() {
+                if (icon) icon.textContent = 'refresh';
+            }, 1500);
+        };
+        if (cid) {
+            loadDataWithCallback(doneTimer);
+        } else {
+            loadAllCoursesWithCallback(doneTimer);
+        }
+    }
+
+    function loadDataWithCallback(cb) {
+        showSkeleton(true);
+        Ajax.call([{
+            methodname: 'local_umat_ai_get_struggle_insights',
+            args: { courseid: cid, days: 60 }
+        }])[0].done(function(insights) {
+            console.log('[StruggleDashboard] API SUCCESS', insights);
+            renderAll(insights);
+            showSkeleton(false);
+            if (cb) cb();
+        }).fail(function() {
+            console.error('[StruggleDashboard] API FAILED', Array.prototype.slice.call(arguments));
+            showSkeleton(false);
+            renderAll({});
+            if (cb) cb();
+        });
+    }
+
+    function loadAllCoursesWithCallback(cb) {
+        console.log('[StruggleDashboard] all-courses mode');
+        showSkeleton(true);
+        Ajax.call([{
+            methodname: 'local_umat_ai_get_struggle_insights',
+            args: { courseid: 0, days: 60 }
+        }])[0].done(function(insights) {
+            console.log('[StruggleDashboard] ALL COURSES API SUCCESS', insights);
+            renderAllCourses(insights);
+            showSkeleton(false);
+            if (cb) cb();
+        }).fail(function() {
+            console.error('[StruggleDashboard] ALL COURSES API FAILED', Array.prototype.slice.call(arguments));
+            showSkeleton(false);
+            renderAllCourses({});
+            if (cb) cb();
+        });
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -229,7 +464,7 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
 
             return '<div class="ins-heatmap-row">' +
                 '<div class="ins-heatmap-label">' +
-                '<span class="ins-heatmap-topic">' + esc(a.topic) + '</span>' +
+                '<span class="ins-heatmap-topic">' + esc(a.topic || a.topic_name || 'Untitled') + '</span>' +
                 '<span class="ins-heatmap-students">' + a.student_count + '/' + a.total_students + ' students</span>' +
                 '</div>' +
                 '<div class="ins-heatmap-bar-wrap">' +
@@ -363,8 +598,11 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         var riskBadge = document.getElementById('ins-detail-risk-badge');
         if (!panel || !body) return;
 
-        panel.style.display = 'block';
-        body.innerHTML = '<div class="ins-empty">Loading profile...</div>';
+        if (!cid) {
+            panel.style.display = 'block';
+            body.innerHTML = '<div class="ins-empty">Select a specific course to view student details.</div>';
+            return;
+        }
 
         var s = null;
         for (var i = 0; i < allStudentNarratives.length; i++) {
@@ -508,7 +746,12 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         var spinner = document.getElementById('ins-nlq-spinner');
         if (!input || !response) return;
         var q = input.value.trim();
-        if (!q || !cid) return;
+        if (!q) return;
+        if (!cid) {
+            response.style.display = 'block';
+            response.innerHTML = '<span style="color:var(--u-muted);">Please select a specific course to use the AI assistant.</span>';
+            return;
+        }
 
         if (activeStream && activeStream.abort) activeStream.abort();
 
@@ -549,6 +792,9 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
     return {
         init: init,
         loadData: loadData,
+        loadAllCourses: loadAllCourses,
+        selectCourse: selectCourse,
+        refresh: refresh,
         setFilter: setFilter,
         loadStudentDetail: loadStudentDetail,
         closeDetail: closeDetail,

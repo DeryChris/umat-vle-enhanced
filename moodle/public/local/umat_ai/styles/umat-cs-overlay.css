@@ -151,8 +151,12 @@
   opacity: 0;
   transition: opacity .15s;
 }
-.umat-cs-item.selected .umat-cs-item-check {
+.umat-cs-item.selected .umat-cs-item-check,
+.umat-cs-item-active .umat-cs-item-check {
   opacity: 1;
+}
+.umat-cs-item-active {
+  background: rgba(0,107,47,.08);
 }
 
 /* ── Library empty-state course picker ── */

@@ -67,6 +67,7 @@
    - [ ] Ask clarifying questions if intent is unclear
 
 3. **Explore before coding**
+   - [ ] Pull latest from github and smartly merge in way that my changes adapts very well with what's coming so everything still functions as intended and seamlessly both on my end and my colleague's.
    - [ ] Read relevant source files (don't modify yet)
    - [ ] Check for existing similar patterns (DRY principle)
    - [ ] Search for side effects (tests, configs, dependencies)

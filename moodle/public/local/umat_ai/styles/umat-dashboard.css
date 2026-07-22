@@ -4793,6 +4793,45 @@
   animation: ins-shimmer 1.5s infinite ease-in-out;
 }
 
+/* ── Topbar Refresh Button ── */
+.ins-topbar-refresh {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+  transition: all .2s ease !important;
+}
+.ins-topbar-refresh:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.ins-topbar-refresh .material-symbols-outlined {
+  font-size: 18px !important;
+  transition: transform .3s ease;
+}
+.ins-topbar-refresh:not(:disabled):hover .material-symbols-outlined {
+  transform: rotate(180deg);
+}
+.ins-topbar-refresh:not(:disabled):active .material-symbols-outlined {
+  transform: rotate(360deg);
+}
+
+/* ── Spinning refresh icon ── */
+@keyframes ins-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.ins-spin {
+  animation: ins-rotate .8s linear infinite !important;
+}
+.ins-refresh-feedback {
+  pointer-events: none;
+}
+
 /* ── Trend Pills ── */
 .ins-trend-pill {
   display: inline-flex;

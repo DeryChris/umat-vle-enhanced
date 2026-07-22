@@ -616,13 +616,62 @@ async def struggle_topics(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+COMPILE_TOPICS_PROMPT = """You are an expert academic diagnostician. Your task is to COMPILE and MERGE multiple topic analyses from different batches of student data into a single, coherent, deduplicated topic list.
+
+Below are {batch_count} separate topic analyses produced from different subsets/batches of the same course data. Each batch extracted topics from different student questions, issues, and events.
+
+BATCH ANALYSES:
+{batch_analyses}
+
+TASK:
+1. Merge topics that refer to the SAME underlying concept across batches (e.g. "SSL Certificate Problems" and "Certificate Validation Issues" → "SSL Certificate Validation")
+2. For merged topics, COMBINE and SUM: question counts, student counts, evidence source numbers
+3. Keep the HIGHEST struggle_score for merged topics
+4. Preserve the most specific topic_name
+5. Preserve ALL unique sample_questions, related_materials, related_sections, and affected_student_ids from ALL batches
+6. Re-rank final topics by their combined struggle_score
+7. Choose the most severe severity label across merged batches
+8. Choose the most relevant suggestion from merged batches
+9. Provide a concise summary_insight that captures the overall picture
+
+OUTPUT STRICT JSON (no markdown, no code fences) — same format as individual extraction:
+{{
+  "topics": [
+    {{
+      "topic_name": "Merged Topic Name",
+      "struggle_score": 85,
+      "severity": "critical",
+      "trend": "up",
+      "student_count": 25,
+      "question_count": 72,
+      "evidence_sources": {{
+        "chat_questions": 60,
+        "quiz_failures": 8,
+        "repeated_views": 12,
+        "assignment_failures": 3,
+        "issue_reports": 5
+      }},
+      "sample_questions": ["Best question from batch 1", "Best question from batch 2"],
+      "related_materials": ["All unique materials across batches"],
+      "related_sections": ["All unique sections across batches"],
+      "affected_student_ids": [101, 102, 105, 110, 115, 120],
+      "suggestion": "Best suggestion from merged batches",
+      "suggestion_type": "recap"
+    }}
+  ],
+  "confidence": 0.90,
+  "summary_insight": "Concise merged analysis of the course's struggle landscape"
+}}
+"""
+
 @router.post("/api/v1/analytics/extract-topics", response_model=ExtractTopicsResponse)
 async def extract_course_topics(
     request: ExtractTopicsRequest,
     db: Session = Depends(get_db),
     _ = Depends(verify_token),
 ):
-    """Extract meaningful struggle topics from ALL student data sources using LLM + memory cache."""
+    """Extract meaningful struggle topics from ALL student data sources using LLM + memory cache.
+    Handles large datasets by processing in batches and compiling intelligently."""
     try:
         if not request.questions and not request.issue_reports and not request.student_events:
             raise HTTPException(status_code=400, detail="No student data provided")
@@ -650,105 +699,170 @@ async def extract_course_topics(
                 if pt.get("topic_name", "").lower() not in existing_names:
                     all_previous.append(pt)
 
-        # ── Build context from all data sources ──
-        material_context_lines = []
-        for m in (request.course_materials or [])[:30]:
-            fname = m.get("filename", "")
-            concepts = m.get("key_concepts", [])
-            if concepts:
-                material_context_lines.append(f"- {fname} (concepts: {', '.join(concepts[:5])})")
-            else:
-                material_context_lines.append(f"- {fname}")
-        material_context = "\n".join(material_context_lines) or "No course materials available."
-
-        question_list = "\n".join(
-            [f"{i+1}. {q}" for i, q in enumerate(request.questions[:150])]
-        ) if request.questions else "No student questions available."
-
-        issue_lines = []
-        for ir in (request.issue_reports or [])[:30]:
-            issue_lines.append(f"- Topic: {ir.get('topic', 'unspecified')} | Category: {ir.get('category', '')} | Description: {ir.get('description', '')[:120]}")
-        issue_context = "\n".join(issue_lines) or "No issue reports."
-
-        event_lines = []
-        for ev in (request.student_events or [])[:40]:
-            event_lines.append(f"- Student {ev.get('userid')}: {ev.get('reason', 'event')} on {ev.get('topic_label', 'unknown topic')}")
-        event_context = "\n".join(event_lines) or "No event signals."
-
-        section_lines = []
-        for sec in (request.course_sections or [])[:20]:
-            section_lines.append(f"- {sec.get('name', 'Week ' + str(sec.get('section', 0)))}: {sec.get('summary', '')[:100]}")
-        course_sections_text = "\n".join(section_lines) or "No course sections."
-
-        previous_context_lines = []
-        for pt in all_previous[:10]:
-            prev_topic = pt.get("topic_name", pt.get("topic", ""))
-            prev_score = pt.get("struggle_score", "N/A")
-            previous_context_lines.append(f"- {prev_topic} (previous score: {prev_score})")
-        previous_context = "\n".join(previous_context_lines) or "No previous analysis available."
-
-        prompt = EXTRACT_TOPICS_PROMPT.format(
-            course_name=request.course_name or "General Course",
-            course_sections=course_sections_text,
-            material_context=material_context,
-            q_count=len(request.questions),
-            question_list=question_list,
-            issue_context=issue_context,
-            event_context=event_context,
-            previous_context=previous_context,
-        )
-
-        llm = get_llm()
-        result = llm._invoke(prompt, temperature=0.3, max_chars=8192)
-        parsed = _parse_llm_json(result)
-
-        generic_verbs = {
-            'explain', 'define', 'describe', 'list', 'discuss',
-            'give', 'practice', 'summarize', 'outline', 'identify',
-            'state', 'mention', 'tell', 'show', 'write', 'create',
-            'referenc', 'common',
-        }
-
-        validated = []
-        for topic in parsed.get("topics", []):
+        def validate_topic(topic: dict) -> bool:
+            """Validate a single extracted topic."""
             name = topic.get("topic_name", "").strip()
             if not name:
-                continue
+                return False
             words = name.lower().split()
             if len(words) < 2:
-                continue
+                return False
+            generic_verbs = {
+                'explain', 'define', 'describe', 'list', 'discuss',
+                'give', 'practice', 'summarize', 'outline', 'identify',
+                'state', 'mention', 'tell', 'show', 'write', 'create',
+                'referenc', 'common',
+            }
             if any(w in generic_verbs for w in words):
-                continue
-            ev_src = topic.get("evidence_sources", {})
-            validated.append(ExtractTopicsTopic(
-                topic_name=name,
-                struggle_score=min(100, max(0, float(topic.get("struggle_score", 50)))),
-                severity=topic.get("severity", "watch"),
-                trend=topic.get("trend", "stable"),
-                student_count=int(topic.get("student_count", 0)),
-                question_count=int(topic.get("question_count", 0)),
-                evidence_sources=ExtractedTopicEvidence(
-                    chat_questions=int(ev_src.get("chat_questions", 0)),
-                    quiz_failures=int(ev_src.get("quiz_failures", 0)),
-                    repeated_views=int(ev_src.get("repeated_views", 0)),
-                    assignment_failures=int(ev_src.get("assignment_failures", 0)),
-                    issue_reports=int(ev_src.get("issue_reports", 0)),
-                ),
-                sample_questions=topic.get("sample_questions", [])[:3],
-                related_materials=topic.get("related_materials", []),
-                related_sections=topic.get("related_sections", []),
-                affected_student_ids=[int(s) for s in (topic.get("affected_student_ids", []) or []) if s],
-                suggestion=topic.get("suggestion", ""),
-                suggestion_type=topic.get("suggestion_type", "recap"),
-            ))
+                return False
+            return True
 
-        response = ExtractTopicsResponse(
-            topics=validated[:20],
-            confidence=float(parsed.get("confidence", 0.0)),
-            summary_insight=parsed.get("summary_insight", ""),
-            total_questions_analyzed=len(request.questions),
-            from_cache=False,
-        )
+        def parse_topic(topic: dict) -> dict:
+            """Parse a validated topic dict into a structured ExtractTopicsTopic."""
+            ev_src = topic.get("evidence_sources", {})
+            return {
+                "topic_name": topic.get("topic_name", "").strip(),
+                "struggle_score": min(100, max(0, float(topic.get("struggle_score", 50)))),
+                "severity": topic.get("severity", "watch"),
+                "trend": topic.get("trend", "stable"),
+                "student_count": int(topic.get("student_count", 0)),
+                "question_count": int(topic.get("question_count", 0)),
+                "evidence_sources": {
+                    "chat_questions": int(ev_src.get("chat_questions", 0)),
+                    "quiz_failures": int(ev_src.get("quiz_failures", 0)),
+                    "repeated_views": int(ev_src.get("repeated_views", 0)),
+                    "assignment_failures": int(ev_src.get("assignment_failures", 0)),
+                    "issue_reports": int(ev_src.get("issue_reports", 0)),
+                },
+                "sample_questions": topic.get("sample_questions", [])[:3],
+                "related_materials": topic.get("related_materials", []),
+                "related_sections": topic.get("related_sections", []),
+                "affected_student_ids": [int(s) for s in (topic.get("affected_student_ids", []) or []) if s],
+                "suggestion": topic.get("suggestion", ""),
+                "suggestion_type": topic.get("suggestion_type", "recap"),
+            }
+
+        # ── Determine if batching is needed ──
+        total_questions = len(request.questions)
+        BATCH_THRESHOLD = 100  # Max questions per batch
+        needs_batching = total_questions > BATCH_THRESHOLD or (total_questions + len(request.issue_reports or []) * 2 + len(request.student_events or []) * 2) > 300
+
+        if not needs_batching:
+            # ── Single-pass processing (small dataset) ──
+            batch_results = [await _run_extraction_batch(request, request.questions, all_previous)]
+            # Use the first (and only) batch result directly
+            parsed = batch_results[0]
+            validated = []
+            for topic in parsed.get("topics", []):
+                if validate_topic(topic):
+                    validated.append(ExtractTopicsTopic(**parse_topic(topic)))
+
+            response = ExtractTopicsResponse(
+                topics=validated[:20],
+                confidence=float(parsed.get("confidence", 0.0)),
+                summary_insight=parsed.get("summary_insight", ""),
+                total_questions_analyzed=total_questions,
+                from_cache=False,
+            )
+
+        else:
+            # ── Batch processing (large dataset) ──
+            logger.info(f"Batch processing {total_questions} questions across "
+                        f"{len(request.issue_reports or [])} issues and {len(request.student_events or [])} events")
+
+            # Split questions into batches
+            all_questions = request.questions
+            batches = [all_questions[i:i + BATCH_THRESHOLD] for i in range(0, len(all_questions), BATCH_THRESHOLD)]
+
+            # Distribute issues and events across batches proportionally
+            issue_batches = [[] for _ in batches]
+            event_batches = [[] for _ in batches]
+            if request.issue_reports:
+                for i, ir in enumerate(request.issue_reports):
+                    issue_batches[i % len(batches)].append(ir)
+            if request.student_events:
+                for i, ev in enumerate(request.student_events):
+                    event_batches[i % len(batches)].append(ev)
+
+            # Process each batch
+            all_batch_topics = []
+            batch_summaries = []
+            for i, (batch_qs, batch_issues, batch_events) in enumerate(zip(batches, issue_batches, event_batches)):
+                logger.info(f"Processing batch {i+1}/{len(batches)} ({len(batch_qs)} questions)")
+
+                # Create a sub-request for this batch
+                batch_request = ExtractTopicsRequest(
+                    course_id=request.course_id,
+                    course_name=request.course_name,
+                    questions=batch_qs,
+                    course_materials=request.course_materials,
+                    course_sections=request.course_sections,
+                    issue_reports=batch_issues,
+                    student_events=batch_events,
+                    previous_topics=all_previous if i == 0 else all_batch_topics,
+                )
+
+                # Call the shared extraction logic
+                batch_result = await _run_extraction_batch(batch_request, batch_qs, all_previous if i == 0 else all_batch_topics)
+
+                if batch_result and batch_result.get("topics"):
+                    for t in batch_result["topics"]:
+                        if validate_topic(t):
+                            all_batch_topics.append(parse_topic(t))
+                    if batch_result.get("summary_insight"):
+                        batch_summaries.append(batch_result["summary_insight"])
+
+            # ── Compilation step: merge all batch topics into one coherent list ──
+            if len(all_batch_topics) <= 15:
+                # Few topics, skip compilation, just sort and return
+                all_batch_topics.sort(key=lambda t: t["struggle_score"], reverse=True)
+                validated = [ExtractTopicsTopic(**t) for t in all_batch_topics[:20]]
+                combined_insight = " | ".join(filter(None, batch_summaries)) or "Cross-course analysis completed."
+                response = ExtractTopicsResponse(
+                    topics=validated,
+                    confidence=0.85,
+                    summary_insight=combined_insight,
+                    total_questions_analyzed=total_questions,
+                    from_cache=False,
+                )
+            else:
+                # Use LLM to intelligently compile batches
+                logger.info(f"Compiling {len(all_batch_topics)} topics from {len(batches)} batches")
+
+                # Format batch analyses for the compilation prompt
+                batch_analyses_text = ""
+                for bi, batch_topics in enumerate([all_batch_topics]):
+                    for j, t in enumerate(batch_topics):
+                        batch_analyses_text += f"\nBatch Topic {j+1}: {t['topic_name']} (score={t['struggle_score']}, severity={t['severity']}, students={t['student_count']}, questions={t['question_count']})"
+
+                compile_prompt = COMPILE_TOPICS_PROMPT.format(
+                    batch_count=len(batches),
+                    batch_analyses=batch_analyses_text,
+                )
+
+                llm = get_llm()
+                compile_result = llm._invoke(compile_prompt, temperature=0.2, max_chars=8192)
+                compiled = _parse_llm_json(compile_result)
+
+                compiled_topics = []
+                for t in compiled.get("topics", []):
+                    if validate_topic(t):
+                        compiled_topics.append(ExtractTopicsTopic(**parse_topic(t)))
+
+                # If compilation succeeded, use it; otherwise use raw merged list
+                if compiled_topics:
+                    validated = compiled_topics[:20]
+                else:
+                    all_batch_topics.sort(key=lambda t: t["struggle_score"], reverse=True)
+                    validated = [ExtractTopicsTopic(**t) for t in all_batch_topics[:20]]
+
+                response = ExtractTopicsResponse(
+                    topics=validated,
+                    confidence=float(compiled.get("confidence", 0.8)),
+                    summary_insight=compiled.get("summary_insight", " | ".join(filter(None, batch_summaries)) or "Batch analysis compiled."),
+                    total_questions_analyzed=total_questions,
+                    from_cache=False,
+                )
 
         # ── Save to memory cache for future continuity ──
         try:
@@ -778,6 +892,74 @@ async def extract_course_topics(
     except Exception as e:
         logger.error(f"Topic extraction error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _run_extraction_batch(request: ExtractTopicsRequest, batch_questions: list, previous_topics: list) -> dict:
+    """Shared extraction logic for a single batch of data.
+    Returns parsed dict with 'topics' and optional 'summary_insight'."""
+    try:
+        # Build context from all data sources
+        material_context_lines = []
+        for m in (request.course_materials or [])[:30]:
+            fname = m.get("filename", "")
+            concepts = m.get("key_concepts", [])
+            if concepts:
+                material_context_lines.append(f"- {fname} (concepts: {', '.join(concepts[:5])})")
+            else:
+                material_context_lines.append(f"- {fname}")
+        material_context = "\n".join(material_context_lines) or "No course materials available."
+
+        question_list = "\n".join(
+            [f"{i+1}. {q}" for i, q in enumerate(batch_questions[:150])]
+        ) if batch_questions else "No student questions available."
+
+        issue_lines = []
+        for ir in (request.issue_reports or [])[:30]:
+            issue_lines.append(f"- Topic: {ir.get('topic', 'unspecified')} | Category: {ir.get('category', '')} | Description: {ir.get('description', '')[:120]}")
+        issue_context = "\n".join(issue_lines) or "No issue reports."
+
+        event_lines = []
+        for ev in (request.student_events or [])[:40]:
+            event_lines.append(f"- Student {ev.get('userid')}: {ev.get('reason', 'event')} on {ev.get('topic_label', 'unknown topic')}")
+        event_context = "\n".join(event_lines) or "No event signals."
+
+        section_lines = []
+        for sec in (request.course_sections or [])[:20]:
+            section_lines.append(f"- {sec.get('name', 'Week ' + str(sec.get('section', 0)))}: {sec.get('summary', '')[:100]}")
+        course_sections_text = "\n".join(section_lines) or "No course sections."
+
+        previous_context_lines = []
+        for pt in (previous_topics or [])[:10]:
+            if isinstance(pt, dict):
+                prev_topic = pt.get("topic_name", pt.get("topic", ""))
+                prev_score = pt.get("struggle_score", "N/A")
+                previous_context_lines.append(f"- {prev_topic} (previous score: {prev_score})")
+        previous_context = "\n".join(previous_context_lines) or "No previous analysis available."
+
+        prompt = EXTRACT_TOPICS_PROMPT.format(
+            course_name=request.course_name or "General Course",
+            course_sections=course_sections_text,
+            material_context=material_context,
+            q_count=len(batch_questions),
+            question_list=question_list,
+            issue_context=issue_context,
+            event_context=event_context,
+            previous_context=previous_context,
+        )
+
+        llm = get_llm()
+        result = llm._invoke(prompt, temperature=0.3, max_chars=8192)
+        parsed = _parse_llm_json(result)
+
+        return {
+            "topics": parsed.get("topics", []),
+            "summary_insight": parsed.get("summary_insight", ""),
+            "confidence": parsed.get("confidence", 0.0),
+        }
+
+    except Exception as e:
+        logger.error(f"Extraction batch error: {e}")
+        return {"topics": [], "summary_insight": "", "confidence": 0.0}
 
 
 @router.post("/api/v1/analytics/student-risk", response_model=StudentRiskResponse)
