@@ -1,0 +1,62 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Settings file
+ *
+ * @package   theme_boost_magnific
+ * @copyright 2025 Eduardo Kraus {@link https://eduardokraus.com}
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+defined('MOODLE_INTERNAL') || die();
+
+require_once("{$CFG->dirroot}/theme/boost_magnific/lib.php");
+
+if ($hassiteconfig) {
+    $pluginname = get_string("pluginname", "theme_boost_magnific");
+    $title = "{$pluginname} - " . get_string("advancedsettings");
+    $url = new moodle_url("/admin/settings.php?section=themesettingboost_magnific");
+    $ADMIN->add("themes", new admin_externalpage("theme_boost_magnific_link1", $title, $url));
+
+    $title = "{$pluginname} - " . get_string("quickstart_title", "theme_boost_magnific");
+    $url = new moodle_url("/theme/boost_magnific/quickstart/");
+    $ADMIN->add("themes", new admin_externalpage("theme_boost_magnific_link2", $title, $url));
+
+    $title = "{$pluginname} - " . get_string("report_accessibility_title", "theme_boost_magnific");
+    $url = new moodle_url("/theme/boost_magnific/report.php");
+    $ADMIN->add("themes", new admin_externalpage("theme_boost_magnific_report", $title, $url));
+}
+
+if ($ADMIN->fulltree) {
+    $settings = new theme_boost_admin_settingspage_tabs(
+        "themesettingboost_magnific",
+        get_string("configtitle", "theme_boost_magnific")
+    );
+
+    require_once("settings/general.php");
+    require_once("settings/advanced.php");
+    require_once("settings/userprofile.php");
+    require_once("settings/accessibility.php");
+    require_once("settings/course.php");
+    require_once("settings/breadcrumb.php");
+    require_once("settings/footer.php");
+    require_once("settings/login_config.php");
+
+    if (isset($PAGE)) {
+        $PAGE->requires->js_call_amd("theme_boost_magnific/settings", "form_hide");
+    }
+}

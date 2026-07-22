@@ -43,7 +43,7 @@ class get_summary extends \external_api {
         } else {
             $session = $DB->get_record_sql(
                 "SELECT * FROM {umat_ai_sessions}
-                  WHERE courseid = :cid AND status = 'complete'
+                  WHERE courseid = :cid AND status = 'completed'
                   ORDER BY timecreated DESC",
                 ['cid' => $params['courseid']],
                 IGNORE_MULTIPLE

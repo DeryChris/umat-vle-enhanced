@@ -1,0 +1,201 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * view file
+ *
+ * @package   theme_boost_magnific
+ * @copyright 2025 Eduardo Kraus {@link https://eduardokraus.com}
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+use core_course\external\course_summary_exporter;
+
+require_once("../../../config.php");
+require_once("../lib.php");
+global $CFG, $PAGE, $OUTPUT, $DB, $USER;
+
+$courseid = required_param("courseid", PARAM_INT);
+$course = get_course($courseid);
+
+if (!isloggedin()) {
+    $PAGE->set_url(new moodle_url("/course/view.php", ["id" => $course->id]));
+}
+
+require_admin();
+
+if (optional_param("POST", false, PARAM_INT)) {
+    require_sesskey();
+
+    // Save configs.
+    $configkeys = [
+        "course_summary_banner" => PARAM_INT,
+        "course_sections_icons" => PARAM_INT,
+        "override_course_primarycolor" => PARAM_RAW,
+        "override_course_secondarycolor" => PARAM_RAW,
+    ];
+    foreach ($configkeys as $name => $type) {
+        $value = optional_param($name, false, $type);
+        if ($value !== false) {
+            set_config("{$name}_{$course->id}", $value, "theme_boost_magnific");
+        }
+    }
+
+    // Upload files.
+    require_once("{$CFG->libdir}/filelib.php");
+    $filefields = [
+        "banner_course_url" => "theme_boost_magnific",
+        "banner_course_file" => "theme_boost_magnific",
+    ];
+
+    $fs = get_file_storage();
+    $syscontext = context_system::instance();
+    foreach ($filefields as $fieldname => $component) {
+        if ($fieldname == "banner_course_url") {
+            $hasupload = optional_param($fieldname, null, PARAM_URL);
+            if (!$hasupload) {
+                continue;
+            }
+            $filestring = file_get_contents($hasupload);
+            if ($filestring) {
+                $fieldname = "banner_course_file";
+            } else {
+                continue;
+            }
+            $filename = pathinfo($hasupload, PATHINFO_BASENAME);
+        } else {
+            $hasupload = !empty($_FILES[$fieldname]) && is_uploaded_file($_FILES[$fieldname]["tmp_name"]);
+            $filename = clean_param($_FILES[$fieldname]["name"], PARAM_FILE);
+            $filestring = false;
+        }
+        if ($hasupload) {
+            $filearea = "{$fieldname}_{$course->id}";
+
+            // Delete old files (if you want to keep a single file).
+            $fs->delete_area_files($syscontext->id, $component, $filearea, 0);
+            $filerecord = [
+                "contextid" => $syscontext->id,
+                "component" => $component,
+                "filearea" => $filearea,
+                "itemid" => 0,
+                "filepath" => "/",
+                "filename" => $filename,
+            ];
+
+            // Save the new file.
+            if ($filestring) {
+                $fs->create_file_from_string($filerecord, $filestring);
+            } else {
+                $fs->create_file_from_pathname($filerecord, $_FILES[$fieldname]["tmp_name"]);
+            }
+
+            set_config($filearea, $filename, $component);
+        }
+    }
+
+    cache::make("theme_boost_magnific", "course_cache")->purge();
+    cache::make("theme_boost_magnific", "css_cache")->purge();
+    cache::make("theme_boost_magnific", "frontpage_cache")->purge();
+    purge_caches(["theme", "courses", "template"]);
+    purge_caches();
+
+    redirect(new moodle_url("/course/view.php?id={$course->id}"), get_string("quickstart_banner-saved", "theme_boost_magnific"));
+}
+
+$PAGE->set_context(context_system::instance());
+$PAGE->set_url("/theme/boost_magnific/quickstart/index.php#home");
+$PAGE->set_title(get_string("quickstart_title", "theme_boost_magnific"));
+$PAGE->set_heading(get_string("quickstart_title", "theme_boost_magnific"));
+
+$PAGE->requires->css("/theme/boost_magnific/quickstart/style.css");
+$PAGE->requires->css("/theme/boost_magnific/scss/colors.css");
+$PAGE->requires->jquery();
+echo $OUTPUT->header();
+
+// Course.
+$bannerfileurl = theme_boost_magnific_setting_file_url("banner_course_file_{$course->id}");
+if (!$bannerfileurl) {
+    $bannerfileurl = theme_boost_magnific_setting_file_url("banner_course_file");
+}
+$bannerfileurl = $bannerfileurl ? $bannerfileurl->out() : false;
+if (!$bannerfileurl) {
+    $course = $DB->get_record("course", ["id" => $course->id]);
+    $course = new core_course_list_element($course);
+    $courseimage = course_summary_exporter::get_course_image($course);
+    if ($courseimage) {
+        $bannerfileurl = $courseimage;
+    }
+}
+
+$action = "{$CFG->wwwroot}/theme/boost_magnific/quickstart/course-banner.php?courseid={$course->id}";
+echo '<form action="' . $action . '" style="display:block;"
+            enctype="multipart/form-data" method="post"
+            class="quickstart-content">';
+echo '<input type="hidden" name="POST" value="1" />';
+echo '<input type="hidden" name="sesskey" value="' . sesskey() . '" />';
+
+$coursesummary = get_config("theme_boost_magnific", "course_summary_banner");
+$coursesummarycourse = get_config("theme_boost_magnific", "course_summary_banner_{$course->id}");
+if ( $coursesummarycourse !== false) {
+    $coursesummary = $coursesummarycourse;
+}
+
+$showchangecolors = false;
+$savetheme = optional_param("savetheme", "boost_magnific", PARAM_TEXT);
+if ($savetheme == "boost_magnific") {
+    require_once("{$CFG->dirroot}/theme/boost_magnific/lib.php");
+    $themecolors = theme_boost_magnific_colors();
+    $showchangecolors = true;
+} else {
+    $themecolors = [];
+}
+$brandcolor = theme_boost_magnific_default("brandcolor", "#314755", '/^#[a-fA-F0-9]{6}([a-fA-F0-9]{2})?$/', "theme_boost");
+$coursesmustache = [
+    "no_accordion" => true, // For when calling out of the accordion.
+    "course_summary_banner_0" => $coursesummary == 0,
+    "course_summary_banner_1" => $coursesummary == 1,
+    "course_summary_banner_2" => $coursesummary == 2,
+    "banner_course_file_url" => $bannerfileurl,
+    "banner_course_file_extensions" => "PNG, JPG",
+    "show_change_colors" => $showchangecolors,
+    "courseid" => $course->id,
+
+    "has_course_sections_icons" => $course->format == "topics" || $course->format == "weeks",
+    "course_sections_icons" => get_config("theme_boost_magnific", "course_sections_icons_{$course->id}"),
+
+    "override_course_primarycolor" => get_config("theme_boost_magnific", "override_course_primarycolor_{$course->id}"),
+    "override_course_secondarycolor" => get_config("theme_boost_magnific", "override_course_secondarycolor_{$course->id}"),
+    "colorselect" => $OUTPUT->render_from_template("theme_boost_magnific/settings/colors", [
+        "coursecolor" => true,
+        "colors" => $themecolors,
+        "defaultcolor" => theme_boost_magnific_default("override_course_primarycolor_{$course->id}", $brandcolor,
+            '/^#[a-fA-F0-9]{6}([a-fA-F0-9]{2})?$/'),
+        "defaultcolorfooter" => theme_boost_magnific_default("footer_background_color", "#314755",
+            '/^#[a-fA-F0-9]{6}([a-fA-F0-9]{2})?$/'),
+        "brandcolor_background_menu" => (int) theme_boost_magnific_default("brandcolor_background_menu", 0, '/^-?\d+$/'),
+        "navbar_layout_is_institutional" => $OUTPUT->navbar_layout_is_institutional(),
+        "secondary_color" => theme_boost_magnific_secondary_color($course->id),
+    ]),
+];
+echo $OUTPUT->render_from_template("theme_boost_magnific/quickstart/courses", $coursesmustache);
+$PAGE->requires->js_call_amd("theme_boost_magnific/settings", "minicolors", ["override_course_primarycolor"]);
+$PAGE->requires->js_call_amd("theme_boost_magnific/settings", "minicolors", ["override_course_secondarycolor"]);
+
+echo "</form>";
+
+if (!optional_param("modal", false, PARAM_INT)) {
+    echo $OUTPUT->footer();
+}

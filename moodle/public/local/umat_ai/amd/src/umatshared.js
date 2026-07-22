@@ -267,7 +267,7 @@ define([], function() {
     function _umatAppendAi(cid, t, s) {
         var c = document.getElementById(cid);
         if (!c) return;
-        t = (t || '').replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
+        t = (t || '').replace(/```(?:json)?\s*\{[\s\S]*?"quiz"\s*:[\s\S]*?\}\s*```\s*/g, '');
         var src = '';
         if (s && s.length) {
             src = '<div class="umat-src-chips">' + s.map(function(x) {
@@ -409,6 +409,10 @@ define([], function() {
                     btn.classList.add('is-stop');
                     var icon = btn.querySelector('.material-symbols-outlined');
                     if (icon) icon.textContent = 'stop_circle';
+                    /* Remove any previous stop handler to prevent listener leaks on retries */
+                    if (btn._stopStreamHandler) {
+                        btn.removeEventListener('click', btn._stopStreamHandler, true);
+                    }
                     /* capture-phase handler aborts stream before bubble handlers fire */
                     btn._stopStreamHandler = function(e) {
                         e.stopImmediatePropagation();
@@ -511,7 +515,7 @@ define([], function() {
             if (payload && payload.answer) {
                 accumulated = payload.answer;
             }
-            accumulated = accumulated.replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
+            accumulated = accumulated.replace(/```(?:json)?\s*\{[\s\S]*?"quiz"\s*:[\s\S]*?\}\s*```\s*/g, '');
             if (statusPending && !quizDataHandled) {
                 if (statusEl) statusEl.style.display = 'none';
                 if (contentEl) contentEl.style.display = '';
@@ -606,7 +610,6 @@ define([], function() {
                 if (event === 'meta') {
                     _chatState = 'waiting';
                     if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
-                    hideTypingOnce();
                     if (opts.onMeta) opts.onMeta(payload);
                 } else if (event === 'token') {
                     ensureBubble();
@@ -632,7 +635,7 @@ define([], function() {
                     }
                     if (typeof opts.onQuizData === 'function') opts.onQuizData(payload);
                     else if (typeof window._umatOnQuizData === 'function') window._umatOnQuizData(payload);
-                    accumulated = accumulated.replace(/```(?:json)?\s*\{[^`]*"quiz"\s*:[^`]*\}\s*```\s*/gs, '');
+            accumulated = accumulated.replace(/```(?:json)?\s*\{[\s\S]*?"quiz"\s*:[\s\S]*?\}\s*```\s*/g, '');
                     scheduleRender();
                 } else if (event === 'done') {
                     doneReceived = true;
@@ -644,6 +647,10 @@ define([], function() {
                     if (opts.onError) opts.onError(payload);
                 }
             });
+        }).then(function() {
+            if (!doneReceived && _chatState !== 'failed') {
+                throw new Error('The response stream ended before completion.');
+            }
         }).catch(function(err) {
             if (err && err.name === 'AbortError') {
                 finishStream({ answer: accumulated });

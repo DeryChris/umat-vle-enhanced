@@ -225,6 +225,34 @@ function local_umat_ai_request_id(): string {
 function local_umat_ai_pluginfile($course, $cm, \context $context, $filearea, $args, $forcedownload, array $options = []) {
     global $DB;
 
+    if ($filearea === 'issue_attachments') {
+        require_login($course);
+        $messageid = (int)array_shift($args);
+        $filename = array_pop($args);
+        $filepath = $args ? '/' . implode('/', $args) . '/' : '/';
+        $message = $DB->get_record('umat_ai_issue_messages', ['id' => $messageid], '*', IGNORE_MISSING);
+        if (!$message) {
+            return false;
+        }
+        [$conversation, $role, $coursecontext] = \local_umat_ai\issue_manager::require_conversation((int)$message->conversationid);
+        if ((int)$context->id !== (int)$coursecontext->id) {
+            return false;
+        }
+        $file = get_file_storage()->get_file(
+            $coursecontext->id,
+            'local_umat_ai',
+            'issue_attachments',
+            $messageid,
+            $filepath,
+            $filename
+        );
+        if (!$file || $file->is_directory()) {
+            return false;
+        }
+        send_stored_file($file, null, 0, true, $options);
+        return;
+    }
+
     if ($filearea === 'materials') {
         $filename = array_pop($args);
         $filepath = $args ? '/' . implode('/', $args) . '/' : '/';

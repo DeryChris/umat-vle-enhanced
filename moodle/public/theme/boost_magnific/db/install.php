@@ -1,0 +1,108 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Theme custom Installation.
+ *
+ * @package   theme_boost_magnific
+ * @copyright 2025 Eduardo Kraus {@link https://eduardokraus.com}
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+/**
+ * Theme_boost_magnific install function.
+ *
+ * @return void
+ * @throws Exception
+ */
+function xmldb_theme_boost_magnific_install() {
+    global $DB, $CFG;
+
+    // Profile background image.
+    $fs = get_file_storage();
+    $filerecord = [
+        "component" => "theme_boost_magnific",
+        "contextid" => context_system::instance()->id,
+        "userid" => get_admin()->id,
+        "filearea" => "background_profile_image",
+        "filepath" => "/",
+        "itemid" => 0,
+        "filename" => "user-modal-background.jpg",
+    ];
+    $fs->create_file_from_pathname($filerecord, "{$CFG->dirroot}/theme/boost_magnific/pix/user-modal-background.jpg");
+
+    $brandcolor = get_config("theme_boost", "brandcolor");
+    if (isset($brandcolor[3]) && preg_match('/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/', $brandcolor)) {
+        set_config("brandcolor", "#314755", "theme_boost");
+    }
+
+    theme_boost_magnific_set_config("secondary", "#ced4da", "theme_boost");
+
+    theme_boost_magnific_set_config("background_profile_image", "/user-modal-background.jpg");
+    theme_boost_magnific_set_config("brandcolor_background_menu", 1);
+    theme_boost_magnific_set_config("navbarlayout", "classic");
+
+    theme_boost_magnific_set_config("top_scroll_fix", 1);
+    theme_boost_magnific_set_config("top_scroll_background_color", "#5C5D5F");
+    theme_boost_magnific_set_config("top_scroll_text_color", "#FFFFFF");
+    theme_boost_magnific_set_config("logo_write", 0);
+
+    theme_boost_magnific_set_config("backgroundimage", "");
+    theme_boost_magnific_set_config("loginbackgroundimage", "");
+
+    theme_boost_magnific_set_config("scsspre", "");
+    theme_boost_magnific_set_config("scsspos", "");
+
+    theme_boost_magnific_set_config("course_summary", 0);
+    theme_boost_magnific_set_config("course_summary_banner", 0);
+
+    theme_boost_magnific_set_config("enable_accessibility", 0);
+    theme_boost_magnific_set_config("enable_vlibras", 0);
+
+    theme_boost_magnific_set_config("breadcrumb_show_mycourses_courses", 0);
+    theme_boost_magnific_set_config("breadcrumb_show_categories", 0);
+    theme_boost_magnific_set_config("breadcrumb_show_course", 0);
+    theme_boost_magnific_set_config("breadcrumb_show_navigation_duplicates", 0);
+    theme_boost_magnific_set_config("breadcrumb_show_sections", 0);
+    theme_boost_magnific_set_config("breadcrumb_show_no_link_items", 0);
+
+    theme_boost_magnific_set_config("footer_background_color", "#314755");
+    theme_boost_magnific_set_config("footer_title_1", "");
+    theme_boost_magnific_set_config("footer_html_1", "");
+    theme_boost_magnific_set_config("footer_title_2", "");
+    theme_boost_magnific_set_config("footer_html_2", "");
+    theme_boost_magnific_set_config("footer_title_3", "");
+    theme_boost_magnific_set_config("footer_html_3", "");
+    theme_boost_magnific_set_config("footer_title_4", "");
+    theme_boost_magnific_set_config("footer_html_4", "");
+
+    theme_boost_magnific_set_config("footer_show_copywriter", 1);
+}
+
+/**
+ * Function set_config
+ *
+ * @param string $name
+ * @param int|string $value
+ * @param string $plugin
+ * @return void
+ * @throws dml_exception
+ */
+function theme_boost_magnific_set_config($name, $value, $plugin = "theme_boost_magnific") {
+    if (!get_config($plugin, $name)) {
+        set_config($name, $value, $plugin);
+    }
+}

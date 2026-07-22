@@ -1,0 +1,43 @@
+@media print {
+    // Fix body margin for drawer in print mode.
+    body.drawer-open-left.jsenabled,
+    body.drawer-open-right.jsenabled {
+        margin: 0;
+    }
+    // Safari fix see: http://v4-alpha.getbootstrap.com/getting-started/browsers-devices/#printing.
+    .container {
+        width: auto;
+    }
+    .navbar {
+        display: none;
+    }
+    div[vw],
+    #mic-init-access-tool,
+    .alert.alert-dismissible button {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    #page.drawers .main-inner,
+    #page.drawers div[role="main"] {
+        display: block;
+        max-width: initial;
+        width: auto;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .table-responsive {
+        overflow-x: hidden;
+    }
+    table {
+        table-layout: fixed; /* distribui largura de forma previsível */
+        width: 100% !important;
+        max-width: 100% !important;
+        border-collapse: collapse;
+        * {
+            overflow-wrap: anywhere !important;
+            word-break: break-word !important;
+            hyphens: auto !important;
+            white-space: normal !important;
+        }
+    }
+}

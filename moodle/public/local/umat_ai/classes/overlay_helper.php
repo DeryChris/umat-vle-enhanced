@@ -8,6 +8,7 @@ class overlay_helper {
         global $CFG;
         $wwwroot = rtrim($CFG->wwwroot, '/');
         $logUrl  = $wwwroot . '/login/logout.php';
+        $safePlatform = htmlspecialchars($platformName, ENT_QUOTES);
         $tabHtml = '';
         foreach ($tabs as $t) {
             $active = !empty($t['active']) ? ' active' : '';
@@ -24,7 +25,7 @@ class overlay_helper {
 <div class="umat-sb">
     <div class="umat-sb-head">
         <div class="umat-sb-logo"><span class="material-symbols-outlined">school</span></div>
-        <div class="umat-sb-brand"><strong>' . htmlspecialchars($platformName, ENT_QUOTES) . ' Moodle</strong><span>AI Enhanced Learning</span></div>
+        <div class="umat-sb-brand"><strong>{$safePlatform} Moodle</strong><span>AI Enhanced Learning</span></div>
         <button class="umat-sb-close-btn" id="{$closeId}" type="button" title="Collapse sidebar">
             <span class="material-symbols-outlined">chevron_left</span>
         </button>
@@ -80,6 +81,7 @@ JS;
         $jsName    = json_encode($courseName);
         $userName  = fullname($user);
         $safeUser  = htmlspecialchars($userName, ENT_QUOTES, 'UTF-8');
+        $safePlatform = htmlspecialchars($platformName, ENT_QUOTES, 'UTF-8');
         $initials  = strtoupper(mb_substr($user->firstname, 0, 1) . mb_substr($user->lastname, 0, 1));
         $approveUrl = $wwwroot . '/local/umat_ai/approve.php?courseid=' . $courseid;
         $streamUrl = json_encode('/local/umat_ai/chat_stream.php');
@@ -87,13 +89,13 @@ JS;
 
         $tabs = [
             ['id' => 'home',      'icon' => 'home',          'label' => 'Home',      'active' => true],
-            ['id' => 'ai-tutor',  'icon' => 'smart_toy',     'label' => 'AI Tutor',  'active' => false],
+            ['id' => 'ai-tutor',  'icon' => 'smart_toy',     'label' => 'AI Chat',  'active' => false],
+            ['id' => 'report-issue', 'icon' => 'forum',      'label' => 'Student Issues','active' => false, 'badge' => 'responses'],
             ['id' => 'lectures',  'icon' => 'play_circle',   'label' => 'Lectures',  'active' => false],
             ['id' => 'courses',   'icon' => 'menu_book',     'label' => 'My Courses','active' => false],
             ['id' => 'library',   'icon' => 'local_library', 'label' => 'Resource Materials', 'active' => false],
             ['id' => 'my-notes',  'icon' => 'note_add',      'label' => 'My Notes',  'active' => false],
             ['id' => 'sessions',   'icon' => 'chat_bubble',   'label' => 'Sessions',   'active' => false],
-            ['id' => 'report-issue', 'icon' => 'flag',       'label' => 'Report Issue','active' => false, 'badge' => 'responses'],
         ];
         $sidebar = self::sidebar_html($tabs, 'New Session', 'stu-ws-close', $platformName);
         $sharedJs = self::shared_js('umat-student-ov', 'stu-ws-close');
@@ -101,13 +103,13 @@ JS;
         // Glassmorphism mobile tab bar (in-overlay)
         $stuGlassTabs = [
             ['id' => 'home',     'icon' => 'home',        'label' => 'Home',     'active' => true],
-            ['id' => 'ai-tutor', 'icon' => 'smart_toy',   'label' => 'Tutor',    'active' => false],
+            ['id' => 'ai-tutor', 'icon' => 'smart_toy',   'label' => 'AI Chat',  'active' => false],
+            ['id' => 'report-issue', 'icon' => 'forum',    'label' => 'Issues',    'active' => false, 'badge' => 'responses'],
             ['id' => 'lectures', 'icon' => 'play_circle', 'label' => 'Lectures', 'active' => false],
             ['id' => 'courses',  'icon' => 'menu_book',   'label' => 'Courses',  'active' => false],
             ['id' => 'library',  'icon' => 'local_library','label' => 'Resource Materials', 'active' => false],
             ['id' => 'my-notes', 'icon' => 'note_add',    'label' => 'Notes',    'active' => false],
             ['id' => 'sessions',   'icon' => 'chat_bubble', 'label' => 'Sessions',  'active' => false],
-            ['id' => 'report-issue', 'icon' => 'flag',     'label' => 'Report',    'active' => false, 'badge' => 'responses'],
         ];
         $stuMobTabs = self::glassmorph_tab_bar($stuGlassTabs, 'sb-tab', 'stu-glass-tabs');
 
@@ -116,7 +118,7 @@ JS;
 <!-- STUDENT FAB -->
 <button class="umat-fab umat-fab-pulse" id="umat-stu-fab" type="button" aria-label="Open AI Assistant">
   <span class="material-symbols-outlined">smart_toy</span>
-  <span class="umat-fab-tip">' . htmlspecialchars($platformName, ENT_QUOTES) . ' AI Assistant</span>
+  <span class="umat-fab-tip">{$safePlatform} AI Assistant</span>
 </button>
 
 <!-- COMPACT PANEL -->
@@ -143,12 +145,12 @@ JS;
     </div>
     <div class="umat-cp-feature-tabs" aria-label="Quick student tools" role="tablist">
       <button class="umat-cp-feature-tab active" data-cp-pane="cp-chat" type="button"><span class="material-symbols-outlined">smart_toy</span><span>Tutor</span></button>
+      <button class="umat-cp-feature-tab" data-cp-open="report-issue" type="button"><span class="material-symbols-outlined">forum</span><span>Issues</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="lectures" type="button"><span class="material-symbols-outlined">play_circle</span><span>Lectures</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="courses" type="button"><span class="material-symbols-outlined">menu_book</span><span>Courses</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="library" type="button"><span class="material-symbols-outlined">local_library</span><span>Materials</span></button>
       <button class="umat-cp-feature-tab" data-cp-pane="cp-notes" type="button"><span class="material-symbols-outlined">note_add</span><span>Notes</span></button>
       <button class="umat-cp-feature-tab" data-cp-open="sessions" type="button"><span class="material-symbols-outlined">chat_bubble</span><span>Sessions</span></button>
-      <button class="umat-cp-feature-tab" data-cp-open="report-issue" type="button"><span class="material-symbols-outlined">flag</span><span>Report</span></button>
     </div>
     <div class="umat-cp-pane active" id="cp-chat">
       <div class="umat-msgs" id="cp-msgs" style="padding-bottom:80px;">
@@ -291,10 +293,10 @@ JS;
       </div>
     </div>
 
-    <!-- AI TUTOR TAB -->
+    <!-- AI CHAT TAB -->
     <div class="umat-tab-pane" data-tab="ai-tutor" style="position:relative;">
       <div class="umat-content-hdr">
-        <h2>AI Tutor</h2>
+        <h2>AI Chat</h2>
       </div>
       <div style="display:flex;flex:1;overflow:hidden;position:relative;">
         <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;">
@@ -429,51 +431,52 @@ JS;
       </div>
     </div>
 
-      <!-- REPORT ISSUE TAB -->
+      <!-- STUDENT ISSUES TAB -->
     <div class="umat-tab-pane" data-tab="report-issue">
       <div class="umat-content-hdr">
-        <h2><span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px;">flag</span>Report Issue</h2>
-        <button class="umat-sb-new" id="ws-issue-toggle" type="button">
+        <h2><span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px;">forum</span>Student Issues</h2>
+        <button class="umat-sb-new" id="ws-issue-new-btn" type="button">
           <span class="material-symbols-outlined">add</span>
-          <span>New Report</span>
+          <span>Report an Issue</span>
         </button>
       </div>
-      <div class="umat-home-wrap">
-        <!-- New Issue Form (hidden by default) -->
-        <div class="umat-home-section" id="ws-issue-form-wrap" style="display:none;">
-          <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:16px;">
-            <div style="margin-bottom:12px;">
-              <label style="font-size:12px;font-weight:700;color:var(--u-ol);display:block;margin-bottom:4px;">Category</label>
-              <select id="ws-issue-cat" style="width:100%;padding:8px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r8);background:var(--u-bg);font-size:13px;">
-                <option value="concept_confusion">I don't understand a concept</option>
-                <option value="material_error">Error in course material</option>
-                <option value="technical_issue">Technical issue with the platform</option>
-                <option value="suggestion">Suggestion for improvement</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div style="margin-bottom:12px;">
-              <label style="font-size:12px;font-weight:700;color:var(--u-ol);display:block;margin-bottom:4px;">Topic (optional)</label>
-              <input type="text" id="ws-issue-topic" placeholder="e.g. Transistors, Ohm's Law, Week 3 lecture" style="width:100%;padding:8px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r8);background:var(--u-bg);font-size:13px;">
-            </div>
-            <div style="margin-bottom:12px;">
-              <label style="font-size:12px;font-weight:700;color:var(--u-ol);display:block;margin-bottom:4px;">Describe the issue</label>
-              <textarea id="ws-issue-desc" placeholder="Explain what you don't understand or what the problem is…" rows="4" style="width:100%;padding:8px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r8);background:var(--u-bg);font-size:13px;resize:vertical;"></textarea>
-            </div>
-            <button class="umat-btn-p" id="ws-issue-submit" type="button" style="width:100%;justify-content:center;">
-              <span class="material-symbols-outlined">send</span>Submit Report
-            </button>
-            <div id="ws-issue-msg" style="margin-top:8px;font-size:12px;display:none;"></div>
+      <div class="umat-issue-app" id="ws-issue-app">
+        <section class="umat-issue-view active" id="ws-issue-list-view" aria-label="Issue conversations">
+          <div class="umat-issue-list-head">
+            <div><strong>Conversations</strong><span>Private messages for this course</span></div>
+            <button class="umat-icon-btn" id="ws-issue-refresh" type="button" aria-label="Refresh conversations"><span class="material-symbols-outlined">refresh</span></button>
           </div>
-        </div>
-
-        <!-- My Reports list -->
-        <div class="umat-home-section">
-          <h3 style="display:flex;align-items:center;gap:6px;"><span class="material-symbols-outlined" style="font-size:18px;">history</span>My Reports</h3>
-          <div id="ws-issue-list">
-            <div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No issues reported yet.</p></div>
+          <div class="umat-issue-list" id="ws-issue-list">
+            <div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>Loading conversations...</p></div>
           </div>
-        </div>
+        </section>
+        <section class="umat-issue-view" id="ws-issue-new-view" aria-label="Report a new issue">
+          <div class="umat-issue-viewbar"><button class="umat-icon-btn" id="ws-issue-new-back" type="button" aria-label="Back to conversations"><span class="material-symbols-outlined">arrow_back</span></button><div><strong>Report a New Issue</strong><span>Your message is private between you and the course lecturer.</span></div></div>
+          <form class="umat-issue-form" id="ws-issue-form">
+            <label>Issue title<input type="text" id="ws-issue-title" maxlength="255" required placeholder="Briefly describe what you need help with"></label>
+            <label>Category<select id="ws-issue-cat" required>
+              <option value="course_material">Course material</option><option value="assignment">Assignment</option>
+              <option value="quiz_examination">Quiz or examination</option><option value="grade_feedback">Grade or feedback</option>
+              <option value="live_class_recording">Live class or recording</option><option value="technical_problem">Technical problem</option>
+              <option value="access_permission">Access or permission</option><option value="other">Other</option>
+            </select></label>
+            <label>Description<textarea id="ws-issue-desc" rows="6" maxlength="10000" required placeholder="Describe the issue and what you have already tried"></textarea></label>
+            <label class="umat-issue-file-label"><span class="material-symbols-outlined">attach_file</span><span>Optional attachment</span><input type="file" id="ws-issue-file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp3,.mp4,.wav"></label>
+            <div class="umat-issue-form-msg" id="ws-issue-form-msg" role="status" aria-live="polite"></div>
+            <div class="umat-issue-form-actions"><button class="umat-issue-secondary" id="ws-issue-new-cancel" type="button">Cancel</button><button class="umat-btn-p" id="ws-issue-submit" type="submit"><span class="material-symbols-outlined">send</span>Send to Lecturer</button></div>
+          </form>
+        </section>
+        <section class="umat-issue-view" id="ws-issue-thread-view" aria-label="Issue conversation">
+          <div class="umat-issue-thread-head"><button class="umat-icon-btn" id="ws-issue-thread-back" type="button" aria-label="Back to conversations"><span class="material-symbols-outlined">arrow_back</span></button><div class="umat-issue-thread-title"><strong id="ws-issue-thread-title"></strong><span id="ws-issue-thread-meta"></span></div></div>
+          <div class="umat-issue-messages" id="ws-issue-messages" aria-live="polite"></div>
+          <div class="umat-issue-send-error" id="ws-issue-send-error" role="alert"></div>
+          <div class="umat-issue-composer">
+            <label class="umat-issue-attach-btn" for="ws-issue-reply-file" title="Attach a file"><span class="material-symbols-outlined">attach_file</span><span class="sr-only">Attach</span></label>
+            <input type="file" id="ws-issue-reply-file" hidden accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp3,.mp4,.wav">
+            <textarea id="ws-issue-reply" rows="1" maxlength="10000" placeholder="Type your message..."></textarea>
+            <button class="umat-issue-send-btn" id="ws-issue-send" type="button"><span class="material-symbols-outlined">send</span><span class="sr-only">Send</span></button>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -508,11 +511,11 @@ HTML;
         $lecGlassTabs = [
             ['id' => 'lec-home',      'icon' => 'home',         'label' => 'Home',     'active' => true],
             ['id' => 'lec-insights',  'icon' => 'psychology',    'label' => 'Insights','active' => false],
+            ['id' => 'lec-issues',   'icon' => 'forum',          'label' => 'Issues',   'active' => false],
             ['id' => 'lec-quizgen',   'icon' => 'quiz',          'label' => 'Quiz Gen','active' => false],
             ['id' => 'lec-courses',   'icon' => 'menu_book',     'label' => 'Courses',  'active' => false],
             ['id' => 'lec-library',   'icon' => 'local_library', 'label' => 'Resource Materials', 'active' => false],
             ['id' => 'lec-sessions',  'icon' => 'history',       'label' => 'Sessions', 'active' => false],
-            ['id' => 'lec-issues',   'icon' => 'flag',          'label' => 'Issues',   'active' => false],
         ];
         $lecMobTabs = self::glassmorph_tab_bar($lecGlassTabs, 'lp', 'lec-glass-tabs');
 
@@ -555,12 +558,12 @@ HTML;
     <div class="umat-cp-feature-tabs" aria-label="Quick lecturer tools" role="tablist">
       <button class="umat-cp-feature-tab active" data-lcp-pane="lcp-insights" type="button"><span class="material-symbols-outlined">home</span><span>Home</span></button>
       <button class="umat-cp-feature-tab" data-lcp-pane="lcp-ai" type="button"><span class="material-symbols-outlined">smart_toy</span><span>Ask AI</span></button>
+      <button class="umat-cp-feature-tab" data-lcp-open="lec-issues" type="button"><span class="material-symbols-outlined">forum</span><span>Issues</span></button>
       <button class="umat-cp-feature-tab" data-lcp-open="lec-insights" type="button"><span class="material-symbols-outlined">psychology</span><span>Insights</span></button>
       <button class="umat-cp-feature-tab" data-lcp-open="lec-quizgen" type="button"><span class="material-symbols-outlined">quiz</span><span>Quiz Gen</span></button>
       <button class="umat-cp-feature-tab" data-lcp-open="lec-courses" type="button"><span class="material-symbols-outlined">menu_book</span><span>Courses</span></button>
       <button class="umat-cp-feature-tab" data-lcp-open="lec-library" type="button"><span class="material-symbols-outlined">local_library</span><span>Resource Materials</span></button>
       <button class="umat-cp-feature-tab" data-lcp-open="lec-sessions" type="button"><span class="material-symbols-outlined">history</span><span>Sessions</span></button>
-      <button class="umat-cp-feature-tab" data-lcp-open="lec-issues" type="button"><span class="material-symbols-outlined">flag</span><span>Issues</span></button>
     </div>
     <div class="umat-cp-pane active" id="lcp-insights" style="overflow-y:auto;">
       <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:9px;" id="lcp-kpi-grid">
@@ -674,11 +677,11 @@ HTML;
       <nav class="umat-sb-nav">
         <button class="umat-sb-item active" data-lp="lec-home" type="button" title="Home"><span class="material-symbols-outlined">home</span><span class="umat-sb-item-lbl">Home</span></button>
         <button class="umat-sb-item" data-lp="lec-insights" type="button" title="Insights"><span class="material-symbols-outlined">psychology</span><span class="umat-sb-item-lbl">Insights</span></button>
+        <button class="umat-sb-item" data-lp="lec-issues" type="button" title="Student Issues"><span class="material-symbols-outlined">forum</span><span class="umat-sb-item-lbl">Student Issues</span><span class="umat-sb-badge" id="sb-badge-new-issues" style="display:none;margin-left:auto;background:var(--u-ter);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;line-height:14px;min-width:16px;text-align:center;"></span></button>
         <button class="umat-sb-item" data-lp="lec-quizgen" type="button" title="Quiz Generator"><span class="material-symbols-outlined">quiz</span><span class="umat-sb-item-lbl">Quiz Generator</span></button>
         <button class="umat-sb-item" data-lp="lec-courses" type="button" title="My Courses"><span class="material-symbols-outlined">menu_book</span><span class="umat-sb-item-lbl">My Courses</span></button>
         <button class="umat-sb-item" data-lp="lec-library" type="button" title="Resource Materials"><span class="material-symbols-outlined">local_library</span><span class="umat-sb-item-lbl">Resource Materials</span></button>
         <button class="umat-sb-item" data-lp="lec-sessions" type="button" title="Sessions"><span class="material-symbols-outlined">history</span><span class="umat-sb-item-lbl">Sessions</span></button>
-        <button class="umat-sb-item" data-lp="lec-issues" type="button" title="Student Issues"><span class="material-symbols-outlined">flag</span><span class="umat-sb-item-lbl">Student Issues</span><span class="umat-sb-badge" id="sb-badge-new-issues" style="display:none;margin-left:auto;background:var(--u-ter);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;line-height:14px;min-width:16px;text-align:center;"></span></button>
       </nav>
       <div class="umat-sb-divider"></div>
       <div class="umat-sb-foot">
@@ -875,20 +878,24 @@ HTML;
       <!-- STUDENT ISSUES (LECTURER) -->
       <div class="umat-tab-pane" id="lec-issues" style="position:relative;overflow:hidden;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">flag</span> Student Issues <span class="umat-badge-num" id="lec-issues-count"></span></h2>
-          <div style="display:flex;gap:6px;">
-            <select id="lec-issues-filter" style="padding:6px 8px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;background:var(--u-bg);color:var(--u-ons);">
-              <option value="">All</option>
-              <option value="open">Open</option>
-              <option value="in_review">In Review</option>
-              <option value="resolved">Resolved</option>
-              <option value="closed">Closed</option>
-            </select>
-            <button class="umat-content-hdr-btn" id="lec-issues-refresh" type="button"><span class="material-symbols-outlined">refresh</span></button>
-          </div>
+          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">forum</span> Student Issues <span class="umat-badge-num" id="lec-issues-count"></span></h2>
+          <button class="umat-content-hdr-btn" id="lec-issues-refresh" type="button"><span class="material-symbols-outlined">refresh</span></button>
         </div>
-        <div id="lec-issues-body" style="flex:1;overflow-y:auto;padding:16px 20px;">
-          <div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No student issues for this course.</p></div>
+        <div class="umat-issue-app umat-issue-lecturer" id="lec-issue-app">
+          <section class="umat-issue-view active" id="lec-issue-list-view">
+            <div class="umat-issue-filters">
+              <label><span class="sr-only">Search conversations</span><span class="material-symbols-outlined">search</span><input type="search" id="lec-issues-search" placeholder="Search student, title, or message"></label>
+              <select id="lec-issues-course" aria-label="Filter by course"><option value="0">All authorized courses</option></select>
+              <select id="lec-issues-category" aria-label="Filter by category"><option value="">All categories</option><option value="course_material">Course material</option><option value="assignment">Assignment</option><option value="quiz_examination">Quiz or examination</option><option value="grade_feedback">Grade or feedback</option><option value="live_class_recording">Live class or recording</option><option value="technical_problem">Technical problem</option><option value="access_permission">Access or permission</option><option value="other">Other</option></select>
+            </div>
+            <div class="umat-issue-list" id="lec-issues-body"><div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>Loading student issues...</p></div></div>
+          </section>
+          <section class="umat-issue-view" id="lec-issue-thread-view">
+            <div class="umat-issue-thread-head"><button class="umat-icon-btn" id="lec-issue-thread-back" type="button" aria-label="Back to inbox"><span class="material-symbols-outlined">arrow_back</span></button><div class="umat-issue-thread-title"><strong id="lec-issue-thread-title"></strong><span id="lec-issue-thread-meta"></span></div></div>
+            <div class="umat-issue-messages" id="lec-issue-messages" aria-live="polite"></div>
+            <div class="umat-issue-send-error" id="lec-issue-send-error" role="alert"></div>
+            <div class="umat-issue-composer"><label class="umat-issue-attach-btn" for="lec-issue-reply-file" title="Attach a file"><span class="material-symbols-outlined">attach_file</span><span class="sr-only">Attach</span></label><input type="file" id="lec-issue-reply-file" hidden accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp3,.mp4,.wav"><textarea id="lec-issue-reply" rows="1" maxlength="10000" placeholder="Type your message..."></textarea><button class="umat-issue-send-btn" id="lec-issue-send" type="button"><span class="material-symbols-outlined">send</span><span class="sr-only">Send</span></button></div>
+          </section>
         </div>
       </div>
 
@@ -1217,7 +1224,7 @@ function renderLcpFeature(name){
   if(name==='lec-analytics'||name==='lec-struggle'||name==='lec-insights'){if(window.struggleDashboard)window.struggleDashboard.init(resolveInsightsCid());return;}
   if(name==='lec-library')return renderLcpLibrary(body);
   if(name==='lec-sessions')return renderLcpSessions(body);
-  if(name==='lec-issues')return renderLcpIssues(body);
+  if(name==='lec-issues'){openDash();switchPane('lec-issues');return;}
 }
 function renderLcpCourses(body){var courses=(UD&&UD.courses)||[];if(!courses.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses found.</p></div>';return;}body.innerHTML=courses.map(function(c){return '<button class="umat-cp-list-card as-btn" data-cid="'+c.id+'" data-name="'+esc(c.fullname||'')+'" type="button"><strong>'+esc(c.shortname||c.fullname)+'</strong><p>'+esc(c.fullname||'')+'</p></button>';}).join('');body.querySelectorAll('[data-cid]').forEach(function(b){b.addEventListener('click',function(){CID=parseInt(b.dataset.cid)||CID;CN=b.dataset.name||CN;renderLcpFeature('lec-analytics');});});}
 function renderLcpAnalytics(body,name){if(!CID){var courses=(UD&&UD.courses)||[];if(!courses.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">school</span><p>No courses available.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course or view composite:</div><div id="lcp-cs-bar" style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+courses.slice(0,16).map(function(c){return '<button class="umat-chip" data-cid="'+c.id+'" type="button">'+esc(c.shortname||c.fullname)+'</button>';}).join('')+'</div><div id="lcp-ov-body" style="padding:0 14px 14px;"><div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading overview\u2026</p></div></div>';body.querySelectorAll('#lcp-cs-bar .umat-chip').forEach(function(b){b.addEventListener('click',function(){CID=parseInt(this.dataset.cid)||CID;renderLcpFeature(name);});});var ovBody=document.getElementById('lcp-ov-body'),agg=name==='lec-struggle'?{total_questions:0,total_students:0,total_issues:0,open_issues:0,per_course:[],all_topics:[],all_students:[],topic_map:{}}:{active_students:0,enrolled_students:0,total_interactions:0,per_course:[],all_questions:[],high_total:0,risk_total:0,track_total:0},done=0;courses.forEach(function(c){ajax(name==='lec-struggle'?'local_umat_ai_get_struggle_insights':'local_umat_ai_get_analytics',{courseid:c.id,days:name==='lec-struggle'?60:30},function(d){if(name==='lec-struggle'){var s=d.summary||{};agg.total_questions+=s.total_questions||0;agg.total_students+=s.total_students||0;agg.total_issues+=s.total_issues||0;agg.open_issues+=s.open_issues||0;var sc='N/A';if(d.topic_matrix&&d.topic_matrix.length){var scs=d.topic_matrix.map(function(t){return t.struggle_score||0;});sc=Math.round(scs.reduce(function(a,b){return a+b;})/scs.length);d.topic_matrix.forEach(function(t){var k=t.topic;if(agg.topic_map[k]){agg.topic_map[k].question_count+=t.question_count;agg.topic_map[k].student_count+=t.student_count;agg.topic_map[k].struggle_score=(agg.topic_map[k].struggle_score+t.struggle_score)/2;}else{agg.topic_map[k]=JSON.parse(JSON.stringify(t));}});}(d.at_risk_students||[]).forEach(function(s){s.course_name=c.shortname;agg.all_students.push(s);});agg.per_course.push({id:c.id,name:c.shortname,questions:s.total_questions||0,students:s.total_students||0,struggle:sc});}else{agg.active_students+=d.active_students;agg.enrolled_students+=d.enrolled_students;agg.total_interactions+=d.total_interactions;agg.high_total+=d.high_performers||0;agg.risk_total+=Math.max(0,d.enrolled_students-d.active_students);agg.track_total+=Math.max(0,d.active_students-(d.high_performers||0));(d.top_questions||[]).forEach(function(q){agg.all_questions.push(q);});agg.per_course.push({id:c.id,name:c.shortname,active:d.active_students,enrolled:d.enrolled_students,interactions:d.total_interactions,struggle:d.struggle_index});}done++;if(done===courses.length){if(name==='lec-struggle'){var tm=Object.keys(agg.topic_map);var hi=0,md=0,lo=0;tm.forEach(function(k){var sc=agg.topic_map[k].struggle_score||0;if(sc>=60)hi++;else if(sc>=30)md++;else lo++;});ovBody.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">quiz</span><strong>'+agg.total_questions+'</strong><small>total questions</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">people</span><strong>'+agg.total_students+'</strong><small>students</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">flag</span><strong>'+agg.total_issues+'</strong><small>issues ('+agg.open_issues+' open)</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">donut_small</span><strong>'+tm.length+'</strong><small>topics (H:'+hi+' M:'+md+' L:'+lo+')</small></div></div>'+((agg.all_students||[]).slice(0,5).map(function(s){return '<div class="umat-cp-list-card"><strong>'+esc(s.fullname||'Student')+'</strong><p>'+esc(s.course_name||'')+'\u00a0\u00b7\u00a0'+esc(s.topic||'')+'</p></div>';}).join('')||'<div class="umat-empty"><span class="material-symbols-outlined">check_circle</span><p>No at-risk students.</p></div>');}else{ovBody.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">group</span><strong>'+agg.active_students+'/'+agg.enrolled_students+'</strong><small>active students</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">forum</span><strong>'+agg.total_interactions+'</strong><small>total interactions</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">trending_up</span><strong>'+agg.high_total+'</strong><small>high performers</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">warning</span><strong>'+agg.risk_total+'</strong><small>at risk</small></div></div>'+((agg.all_questions||[]).sort(function(a,b){return b.ask_count-a.ask_count;}).slice(0,5).map(function(q){return '<div class="umat-cp-list-card"><strong>'+esc(q.text)+'</strong><p>'+q.ask_count+' students asked</p></div>';}).join('')||'<div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>No questions yet.</p></div>');}}},function(){done++;if(done===courses.length)ovBody.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load some courses.</p></div>';});});return;}ajax('local_umat_ai_get_analytics',{courseid:CID,days:30},function(d){if(name==='lec-struggle'){body.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">psychology</span><strong>'+esc(d.struggle_index||'N/A')+'</strong><small>struggle index</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">forum</span><strong>'+((d.top_questions||[]).length)+'</strong><small>top questions</small></div></div>'+((d.top_questions||[]).slice(0,6).map(function(q){return '<div class="umat-cp-list-card"><strong>'+esc(q.text)+'</strong><p>'+q.ask_count+' students asked</p></div>';}).join('')||'<div class="umat-empty"><span class="material-symbols-outlined">check_circle</span><p>No struggle questions yet.</p></div>');return;}body.innerHTML='<div class="umat-cp-mini-grid"><div class="umat-cp-mini-card"><span class="material-symbols-outlined">group</span><strong>'+d.active_students+'/'+d.enrolled_students+'</strong><small>active students</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">forum</span><strong>'+d.total_interactions+'</strong><small>AI interactions</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">psychology</span><strong>'+esc(d.struggle_index||'N/A')+'</strong><small>struggle index</small></div><div class="umat-cp-mini-card"><span class="material-symbols-outlined">timer</span><strong>'+esc(d.avg_questions_per_session||'0')+'</strong><small>avg Q/session</small></div></div>';},function(){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load analytics.</p></div>';});}
@@ -1364,7 +1371,7 @@ function loadPaneData(name){
   if(name==='lec-courses')loadLecturerCourses();
   if(name==='lec-library'){populateLibCourseSel();loadLibrary();}
   if(name==='lec-sessions'){populateSessCourseSel();loadSessions();}
-  if(name==='lec-issues')loadLecturerIssues();
+  // Student Issues is controlled only by the AMD module to avoid competing renders.
   if(name==='lec-insights'){populateInsightsCourseSel();if(window.struggleDashboard){window.struggleDashboard.init(resolveInsightsCid());}else{loadInsights(resolveInsightsCid());}}
   if(name==='lec-quizgen')loadQuizGenUI();
   if(name==='lec-home')initHome();
@@ -1954,83 +1961,6 @@ function wireSessPicker(){
   var btn=document.getElementById('lec-sess-pick-btn');
   if(btn)btn.addEventListener('click',function(){document.getElementById('lec-sess-cs-ov').classList.add('open');});
 }
-
-/* ─── Student Issues (Lecturer) ───────────────────── */
-function loadLecturerIssues(){
-  var body=document.getElementById('lec-issues-body');if(!body){console.log('[lec-issues] body not found');return;}
-  var filter=document.getElementById('lec-issues-filter');var status=filter?filter.value:'';
-  console.log('[lec-issues] loading CID='+CID+' status='+status);
-  body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading issues…</p></div>';
-  var args={courseid:CID};if(status)args.status=status;
-  ajax('local_umat_ai_get_course_issues',args,function(r){
-    console.log('[lec-issues] response',r);
-    var issues=r.issues||[],total=r.total||0;
-    var count=document.getElementById('lec-issues-count');if(count)count.textContent=total;
-    if(!issues.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No student issues'+(status?' with this status':'')+'.</p></div>';return;}
-    body.innerHTML=issues.map(function(iss){
-      var catLabel={'concept_confusion':'Concept Confusion','material_error':'Material Error','technical_issue':'Technical Issue','suggestion':'Suggestion','other':'Other'}[iss.category]||iss.category;
-      var statusColors={'open':'var(--u-ter)','in_review':'#d97706','resolved':'var(--u-sec)','closed':'var(--u-ol)'};
-      var sc=statusColors[iss.status]||'var(--u-ol)';
-      var ago=iss.timecreated?(function(d){return d===0?'today':d+'d ago';})(Math.floor((Date.now()/1000-iss.timecreated)/86400)):'';
-      return '<div class="umat-issue-card" data-id="'+iss.id+'" style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:14px;margin-bottom:10px;">'
-        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
-        +'<div style="display:flex;align-items:center;gap:8px;">'
-        +(iss.userpicture?'<img src="'+iss.userpicture+'" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">':'<div style="width:28px;height:28px;border-radius:50%;background:var(--u-p);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">'+esc((iss.fullname||'?')[0])+'</div>')
-        +'<div><strong style="font-size:13px;">'+esc(iss.fullname||'Student')+'</strong><span style="font-size:10px;color:var(--u-ol);display:block;">'+catLabel+(iss.topic?' · '+esc(iss.topic):'')+' · '+ago+'</span></div></div>'
-        +'<span style="font-size:10px;padding:2px 8px;border-radius:999px;background:'+sc+'20;color:'+sc+';font-weight:700;white-space:nowrap;">'+iss.status.replace('_',' ')+'</span></div>'
-        +'<p style="font-size:12px;color:var(--u-onsv);margin:0 0 8px;">'+esc(iss.description)+'</p>'
-        +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'
-        +'<select class="umat-issue-status-sel" data-id="'+iss.id+'" style="padding:4px 6px;font-size:11px;border:1px solid var(--u-olv);border-radius:var(--u-r6);">'
-        +'<option value="open"'+(iss.status==='open'?' selected':'')+'>Open</option>'
-        +'<option value="in_review"'+(iss.status==='in_review'?' selected':'')+'>In Review</option>'
-        +'<option value="resolved"'+(iss.status==='resolved'?' selected':'')+'>Resolved</option>'
-        +'<option value="closed"'+(iss.status==='closed'?' selected':'')+'>Closed</option></select>'
-        +'<button class="umat-issue-notes-btn" data-id="'+iss.id+'" style="font-size:10px;padding:4px 8px;border:1px solid var(--u-olv);border-radius:var(--u-r6);background:var(--u-bg);cursor:pointer;">Notes</button>'
-        +'<span style="font-size:10px;color:var(--u-ol);flex:1;text-align:right;display:'+(iss.lecturer_notes?'block':'none')+'" id="has-notes-'+iss.id+'"><span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">note</span> Notes</span></div>'
-        +'<div id="lec-issue-notes-'+iss.id+'" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--u-olv);">'
-        +'<textarea class="umat-issue-notes-ta" data-id="'+iss.id+'" placeholder="Add lecturer notes…" rows="2" style="width:100%;padding:6px 8px;font-size:11px;border:1px solid var(--u-olv);border-radius:var(--u-r6);resize:vertical;">'+esc(iss.lecturer_notes||'')+'</textarea>'
-        +'<button class="umat-issue-save-notes" data-id="'+iss.id+'" style="margin-top:4px;font-size:10px;padding:4px 10px;border:none;border-radius:var(--u-r6);background:var(--u-p);color:#fff;cursor:pointer;">Save Notes</button></div>'
-        +'</div>';
-    }).join('');
-
-    /* Wire status select */
-    body.querySelectorAll('.umat-issue-status-sel').forEach(function(sel){
-      sel.addEventListener('change',function(){
-        ajax('local_umat_ai_update_issue_status',{issue_id:parseInt(this.dataset.id),status:this.value,lecturer_notes:''},function(r){
-          if(r.success)loadLecturerIssues();
-        });
-      });
-    });
-    /* Wire notes toggle */
-    body.querySelectorAll('.umat-issue-notes-btn').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        var id=this.dataset.id;
-        var el=document.getElementById('lec-issue-notes-'+id);
-        if(el)el.style.display=el.style.display==='none'?'block':'none';
-      });
-    });
-    /* Wire notes save */
-    body.querySelectorAll('.umat-issue-save-notes').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        var id=this.dataset.id;
-        var ta=document.querySelector('.umat-issue-notes-ta[data-id="'+id+'"]');
-        if(!ta)return;
-        ajax('local_umat_ai_update_issue_status',{issue_id:parseInt(id),status:'',lecturer_notes:ta.value},function(r){
-          if(r.success)loadLecturerIssues();
-        });
-      });
-    });
-  },function(e){
-    console.log('[lec-issues] error',e);
-    body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load issues.</p></div>';
-  });
-}
-
-/* Filter change refreshes list */
-var issueFilter=document.getElementById('lec-issues-filter');
-if(issueFilter)issueFilter.addEventListener('change',loadLecturerIssues);
-var issueRefresh=document.getElementById('lec-issues-refresh');
-if(issueRefresh)issueRefresh.addEventListener('click',loadLecturerIssues);
 
 /* ──────────────────────────────────────────────
    STRUGGLE INSIGHTS

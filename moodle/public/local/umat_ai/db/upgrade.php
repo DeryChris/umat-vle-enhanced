@@ -639,5 +639,186 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026072100, 'local', 'umat_ai');
     }
 
+    // Reconcile trusted authenticated legacy reports without modifying their source rows.
+    $migratelegacyissues = static function() use ($DB): void {
+        $categorymap = [
+            'concept_confusion' => 'course_material',
+            'material_error' => 'course_material',
+            'technical_issue' => 'technical_problem',
+            'suggestion' => 'other',
+        ];
+        $legacyreports = $DB->get_recordset('umat_ai_issue_reports', null, 'id ASC');
+        foreach ($legacyreports as $legacy) {
+            $isunverified = $legacy->category === 'login_issue' ||
+                !empty($legacy->reporter_name) || !empty($legacy->reporter_username);
+            if ($isunverified || empty($legacy->userid) ||
+                    !$DB->record_exists('user', ['id' => $legacy->userid]) ||
+                    !$DB->record_exists('course', ['id' => $legacy->courseid])) {
+                continue;
+            }
+
+            $transaction = $DB->start_delegated_transaction();
+            $category = $categorymap[$legacy->category] ?? 'other';
+            $fallbacktitle = ucwords(str_replace('_', ' ', $legacy->category ?: 'Course issue'));
+            $title = trim((string)($legacy->topic ?? '')) ?: $fallbacktitle;
+            $lasttime = !empty($legacy->lecturer_response) ?
+                max((int)$legacy->timecreated, (int)$legacy->timemodified) : (int)$legacy->timecreated;
+
+            $conversation = $DB->get_record('umat_ai_issue_conversations', ['legacyissueid' => $legacy->id]);
+            if (!$conversation) {
+                $conversation = (object)[
+                    'courseid' => (int)$legacy->courseid,
+                    'studentid' => (int)$legacy->userid,
+                    'title' => \core_text::substr($title, 0, 255),
+                    'category' => $category,
+                    'clientid' => 'legacy-' . $legacy->id,
+                    'legacyissueid' => (int)$legacy->id,
+                    'timecreated' => (int)$legacy->timecreated,
+                    'lastmessagetime' => $lasttime,
+                ];
+                $conversation->id = $DB->insert_record('umat_ai_issue_conversations', $conversation);
+            }
+
+            $studentclientid = 'legacy-student-' . $legacy->id;
+            if (!$DB->record_exists('umat_ai_issue_messages', [
+                    'conversationid' => $conversation->id,
+                    'clientid' => $studentclientid,
+                ])) {
+                $DB->insert_record('umat_ai_issue_messages', (object)[
+                    'conversationid' => $conversation->id,
+                    'senderid' => (int)$legacy->userid,
+                    'senderrole' => 'student',
+                    'body' => (string)$legacy->description,
+                    'clientid' => $studentclientid,
+                    'attachmentcount' => 0,
+                    'timecreated' => (int)$legacy->timecreated,
+                    'deliveredat' => (int)$legacy->timecreated,
+                    'viewedat' => !empty($legacy->lecturer_response) ? $lasttime : 0,
+                ]);
+            }
+
+            $lecturerclientid = 'legacy-lecturer-' . $legacy->id;
+            if (!empty($legacy->lecturer_response) && !$DB->record_exists('umat_ai_issue_messages', [
+                    'conversationid' => $conversation->id,
+                    'clientid' => $lecturerclientid,
+                ])) {
+                $DB->insert_record('umat_ai_issue_messages', (object)[
+                    'conversationid' => $conversation->id,
+                    'senderid' => 0,
+                    'senderrole' => 'lecturer',
+                    'body' => (string)$legacy->lecturer_response,
+                    'clientid' => $lecturerclientid,
+                    'attachmentcount' => 0,
+                    'timecreated' => $lasttime,
+                    'deliveredat' => $lasttime,
+                    'viewedat' => !empty($legacy->response_seen) ? $lasttime : 0,
+                ]);
+            }
+
+            $newestmessagetime = (int)$DB->get_field_sql(
+                'SELECT MAX(timecreated) FROM {umat_ai_issue_messages} WHERE conversationid = :conversationid',
+                ['conversationid' => $conversation->id]
+            );
+            $lasttime = max($lasttime, $newestmessagetime);
+            if ((int)$conversation->lastmessagetime !== $lasttime) {
+                $DB->set_field('umat_ai_issue_conversations', 'lastmessagetime', $lasttime, ['id' => $conversation->id]);
+            }
+            $transaction->allow_commit();
+        }
+        $legacyreports->close();
+    };
+
+    if ($oldversion < 2026072200) {
+        // Repair legacy schema drift before mapping reports into conversations.
+        $legacytable = new xmldb_table('umat_ai_issue_reports');
+        $responsefield = new xmldb_field('lecturer_response', XMLDB_TYPE_TEXT, null, null, null, null, null, 'lecturer_notes');
+        $seenfield = new xmldb_field('response_seen', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'lecturer_response');
+        if (!$dbman->field_exists($legacytable, $responsefield)) {
+            $dbman->add_field($legacytable, $responsefield);
+        }
+        if (!$dbman->field_exists($legacytable, $seenfield)) {
+            $dbman->add_field($legacytable, $seenfield);
+        }
+
+        $conversationtable = new xmldb_table('umat_ai_issue_conversations');
+        if (!$dbman->table_exists($conversationtable)) {
+            $conversationtable->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $conversationtable->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $conversationtable->add_field('studentid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $conversationtable->add_field('title', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null);
+            $conversationtable->add_field('category', XMLDB_TYPE_CHAR, '30', null, XMLDB_NOTNULL, null, 'other');
+            $conversationtable->add_field('clientid', XMLDB_TYPE_CHAR, '64', null, XMLDB_NOTNULL, null, null);
+            $conversationtable->add_field('legacyissueid', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+            $conversationtable->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $conversationtable->add_field('lastmessagetime', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $conversationtable->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $conversationtable->add_key('course_fk', XMLDB_KEY_FOREIGN, ['courseid'], 'course', ['id']);
+            $conversationtable->add_key('student_fk', XMLDB_KEY_FOREIGN, ['studentid'], 'user', ['id']);
+            $conversationtable->add_index('student_client', XMLDB_INDEX_UNIQUE, ['studentid', 'clientid']);
+            $conversationtable->add_index('legacyissue', XMLDB_INDEX_UNIQUE, ['legacyissueid']);
+            $conversationtable->add_index('course_lastmessage', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'lastmessagetime']);
+            $conversationtable->add_index('student_course_lastmessage', XMLDB_INDEX_NOTUNIQUE, ['studentid', 'courseid', 'lastmessagetime']);
+            $dbman->create_table($conversationtable);
+        }
+
+        $messagetable = new xmldb_table('umat_ai_issue_messages');
+        if (!$dbman->table_exists($messagetable)) {
+            $messagetable->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $messagetable->add_field('conversationid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $messagetable->add_field('senderid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $messagetable->add_field('senderrole', XMLDB_TYPE_CHAR, '10', null, XMLDB_NOTNULL, null, null);
+            $messagetable->add_field('body', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
+            $messagetable->add_field('clientid', XMLDB_TYPE_CHAR, '64', null, XMLDB_NOTNULL, null, null);
+            $messagetable->add_field('attachmentcount', XMLDB_TYPE_INTEGER, '2', null, XMLDB_NOTNULL, null, '0');
+            $messagetable->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $messagetable->add_field('deliveredat', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $messagetable->add_field('viewedat', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $messagetable->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $messagetable->add_key('conversation_fk', XMLDB_KEY_FOREIGN, ['conversationid'], 'umat_ai_issue_conversations', ['id']);
+            $messagetable->add_index('conversation_client', XMLDB_INDEX_UNIQUE, ['conversationid', 'clientid']);
+            $messagetable->add_index('conversation_time', XMLDB_INDEX_NOTUNIQUE, ['conversationid', 'timecreated']);
+            $messagetable->add_index('conversation_receipt', XMLDB_INDEX_NOTUNIQUE, ['conversationid', 'senderrole', 'viewedat']);
+            $dbman->create_table($messagetable);
+        }
+
+        $migratelegacyissues();
+
+        upgrade_plugin_savepoint(true, 2026072200, 'local', 'umat_ai');
+    }
+
+    if ($oldversion < 2026072201) {
+        // Scope idempotency keys to the course and sender, then reconcile any partial migration.
+        $conversationtable = new xmldb_table('umat_ai_issue_conversations');
+        $oldconversationindex = new xmldb_index('student_client', XMLDB_INDEX_UNIQUE, ['studentid', 'clientid']);
+        if ($dbman->index_exists($conversationtable, $oldconversationindex)) {
+            $dbman->drop_index($conversationtable, $oldconversationindex);
+        }
+        $conversationindex = new xmldb_index(
+            'student_course_client',
+            XMLDB_INDEX_UNIQUE,
+            ['studentid', 'courseid', 'clientid']
+        );
+        if (!$dbman->index_exists($conversationtable, $conversationindex)) {
+            $dbman->add_index($conversationtable, $conversationindex);
+        }
+
+        $messagetable = new xmldb_table('umat_ai_issue_messages');
+        $oldmessageindex = new xmldb_index('conversation_client', XMLDB_INDEX_UNIQUE, ['conversationid', 'clientid']);
+        if ($dbman->index_exists($messagetable, $oldmessageindex)) {
+            $dbman->drop_index($messagetable, $oldmessageindex);
+        }
+        $messageindex = new xmldb_index(
+            'conversation_sender_client',
+            XMLDB_INDEX_UNIQUE,
+            ['conversationid', 'senderid', 'clientid']
+        );
+        if (!$dbman->index_exists($messagetable, $messageindex)) {
+            $dbman->add_index($messagetable, $messageindex);
+        }
+
+        $migratelegacyissues();
+        upgrade_plugin_savepoint(true, 2026072201, 'local', 'umat_ai');
+    }
+
     return true;
 }

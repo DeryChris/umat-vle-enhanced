@@ -12,6 +12,7 @@ namespace local_umat_ai\external;
 
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->libdir . '/externallib.php');
+require_once(__DIR__ . '/../../lib.php');
 
 class service_status extends \external_api {
 

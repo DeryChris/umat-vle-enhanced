@@ -103,15 +103,22 @@ async def query_course_ai_stream(
 
         answer = "".join(answer_parts).strip()
 
+        quiz_data = extract_quiz_json(answer)
+
         # --- Privacy Layer 5: output leak detection ----------------------
-        answer = check_response_leakage(answer, request.role)
+        # Extract quiz JSON BEFORE leak detection to avoid false positives
+        # from quiz explanations (e.g. "The correct answer is...").
+        if quiz_data is None:
+            answer = check_response_leakage(answer, request.role)
 
         elapsed_ms = (time.time() - start_time) * 1000
         log_chat(db, request, answer, prepared.sources, elapsed_ms)
 
-        quiz_data = extract_quiz_json(answer)
         if quiz_data is not None:
+            logger.info("Sending quiz_data SSE event (%d questions)", len(quiz_data.get("questions", [])))
             yield _sse("quiz_data", {"quiz": quiz_data})
+        else:
+            logger.debug("No quiz data extracted from answer (len=%d)", len(answer))
 
         yield _sse("done", {
             "answer": answer,
@@ -173,13 +180,17 @@ async def query_course_ai(
             confidence=0.0,
         )
 
+    quiz_raw = extract_quiz_json(answer)
+
     # --- Privacy Layer 5: output leak detection --------------------------
-    answer = check_response_leakage(answer, request.role)
+    # Skip leak detection for quiz responses to avoid false positives
+    # from quiz explanations (e.g. "The correct answer is...").
+    if quiz_raw is None:
+        answer = check_response_leakage(answer, request.role)
 
     elapsed_ms = (time.time() - start_time) * 1000
     log_chat(db, request, answer, prepared.sources, elapsed_ms)
 
-    quiz_raw = extract_quiz_json(answer)
     quiz_data = None
     if quiz_raw is not None:
         try:

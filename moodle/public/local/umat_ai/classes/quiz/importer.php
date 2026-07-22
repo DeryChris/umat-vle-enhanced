@@ -41,8 +41,9 @@ class importer {
         int $jobid,
         string $suffix = ''
     ): array {
-        global $DB;
+        global $DB, $CFG;
         $tmpfile = self::write_temp_xml($xml, $jobid, $suffix);
+        $logfile = $CFG->dataroot . '/quizgen_import.log';
 
         ob_start();
         try {
@@ -61,6 +62,7 @@ class importer {
             if (!$ok) {
                 $errors = $qformat->get_errors();
                 ob_end_clean();
+                @file_put_contents($logfile, date('[Y-m-d H:i:s] ') . "IMPORT FAILED job=$jobid errors=" . implode('; ', $errors ?? []) . "\n", FILE_APPEND);
                 throw new \moodle_exception(
                     'quizgen_import_process_failed',
                     'local_umat_ai',
@@ -78,16 +80,25 @@ class importer {
             }
         }
 
+        $qids = [];
         $ref = new \ReflectionProperty($qformat, 'questionids');
         $ref->setAccessible(true);
         $qids = $ref->getValue($qformat) ?? [];
+
+        @file_put_contents($logfile, date('[Y-m-d H:i:s] ') . "IMPORT job=$jobid category_id={$cat->id} context_id={$contexts[0]->id} reflection_qids=" . count($qids) . " ids=" . implode(',', array_slice($qids, 0, 10)) . "\n", FILE_APPEND);
+
         if (!empty($qids)) {
             return $qids;
         }
 
         sleep(1);
+
         $records = $DB->get_records('question', ['category' => $cat->id, 'deleted' => 0], 'id ASC', 'id');
-        return array_keys($records);
+        $fallbackIds = array_keys($records);
+
+        @file_put_contents($logfile, date('[Y-m-d H:i:s] ') . "FALLBACK job=$jobid category_id={$cat->id} fallback_count=" . count($fallbackIds) . " ids=" . implode(',', array_slice($fallbackIds, 0, 10)) . "\n", FILE_APPEND);
+
+        return $fallbackIds;
     }
 
     /**
@@ -145,6 +156,13 @@ class importer {
         ];
         $quiz->id = $DB->insert_record('quiz', $quiz);
 
+        $DB->insert_record('quiz_sections', [
+            'quizid'           => $quiz->id,
+            'firstslot'        => 1,
+            'heading'          => '',
+            'shufflequestions' => 0,
+        ]);
+
         $cm = new \stdClass();
         $cm->course   = $courseid;
         $cm->module   = $DB->get_field('modules', 'id', ['name' => 'quiz']);
@@ -176,14 +194,33 @@ class importer {
 
         $result->question_ids = self::run_xml_import($xml, $cat, [$context], $courseid, $jobid);
 
+        global $CFG;
+        $logfile = $CFG->dataroot . '/quizgen_import.log';
+        @file_put_contents($logfile, date('[Y-m-d H:i:s] ') . "ADD_TO_QUIZ job=$jobid quiz_id={$quiz->id} cmid={$cm->id} question_ids=" . count($result->question_ids) . "\n", FILE_APPEND);
+
         $quizObj = (object)[
             'id'    => $quiz->id,
             'cmid'  => $cm->id,
             'course' => $courseid,
             'questionsperpage' => 0,
         ];
+        $added = 0;
         foreach ($result->question_ids as $qid) {
-            quiz_add_quiz_question($qid, $quizObj, 0, null);
+            try {
+                quiz_add_quiz_question($qid, $quizObj, 0, null);
+                $added++;
+            } catch (\Throwable $e) {
+                @file_put_contents($logfile, date('[Y-m-d H:i:s] ') . "ADD_FAILED job=$jobid quiz_id={$quiz->id} qid=$qid error=" . $e->getMessage() . "\n", FILE_APPEND);
+            }
+        }
+
+        @file_put_contents($logfile, date('[Y-m-d H:i:s] ') . "ADDED job=$jobid quiz_id={$quiz->id} added=$added/" . count($result->question_ids) . "\n", FILE_APPEND);
+
+        if ($added === 0 && !empty($result->question_ids)) {
+            throw new \moodle_exception(
+                'quizgen_add_questions_failed', 'local_umat_ai', '',
+                null, 'Failed to add any questions to the quiz. Check quizgen_import.log for details.'
+            );
         }
 
         $gradeCalculator = \mod_quiz\quiz_settings::create($quiz->id)->get_grade_calculator();
@@ -272,7 +309,15 @@ class importer {
         ];
 
         foreach ($result->question_ids as $qid) {
-            quiz_add_quiz_question($qid, $quizObj, 0, null);
+            try {
+                quiz_add_quiz_question($qid, $quizObj, 0, null);
+            } catch (\Throwable $e) {
+                @file_put_contents(
+                    $CFG->dataroot . '/quizgen_import.log',
+                    date('[Y-m-d H:i:s] ') . "APPEND_FAILED job=$jobid quiz_id=$existingQuizId qid=$qid error=" . $e->getMessage() . "\n",
+                    FILE_APPEND
+                );
+            }
         }
 
         $gradeCalculator = \mod_quiz\quiz_settings::create($existingQuizId)->get_grade_calculator();

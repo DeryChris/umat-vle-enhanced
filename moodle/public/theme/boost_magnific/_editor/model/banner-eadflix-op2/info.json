@@ -1,0 +1,32 @@
+{
+  "title": "lang::banner_no_video",
+  "category": "banner",
+  "type": "form",
+  "form": {
+    "title": "lang::form_title",
+    "label": "lang::form_label2",
+    "blocks": {
+      "courseid": {
+        "type": "select",
+        "label": "lang::select_course",
+        "data": "courses",
+        "valuetype": "int",
+        "required": true
+      },
+      "description": {
+        "type": "textarea",
+        "label": "lang::course_description",
+        "valuetype": "text"
+      }
+    },
+    "scripts": [
+      "jquery",
+      "../_assets/owl.carousel.js",
+      "../_assets/owl.init.js"
+    ],
+    "styles": [
+      "bootstrap",
+      "../_assets/owl.carousel.css"
+    ]
+  }
+}

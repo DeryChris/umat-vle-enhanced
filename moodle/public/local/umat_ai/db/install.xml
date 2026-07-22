@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="local/umat_ai/db" VERSION="2026071600" COMMENT="UMaT AI plugin v2.1.0 schema">
+<XMLDB PATH="local/umat_ai/db" VERSION="2026072201" COMMENT="UMaT AI plugin v2.1.1 schema">
   <TABLES>
 
     <TABLE NAME="umat_ai_sessions" COMMENT="Tracks BBB recordings and uploaded lectures being processed by the AI service">
@@ -135,7 +135,7 @@
         <FIELD NAME="userid"          TYPE="int"    LENGTH="10"  NOTNULL="true"/>
         <FIELD NAME="courseid"        TYPE="int"    LENGTH="10"  NOTNULL="true"/>
         <FIELD NAME="materialid"      TYPE="int"    LENGTH="10"  NOTNULL="true"/>
-        <FIELD NAME="progress_pct"    TYPE="number" LENGTH="5, 1" NOTNULL="true" DEFAULT="0.0"/>
+        <FIELD NAME="progress_pct"    TYPE="number" LENGTH="5" DECIMALS="1" NOTNULL="true" DEFAULT="0.0"/>
         <FIELD NAME="time_spent_sec"  TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="last_position"   TYPE="int"    LENGTH="10"  NOTNULL="false"/>
         <FIELD NAME="timemodified"    TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
@@ -154,9 +154,9 @@
       <FIELDS>
         <FIELD NAME="id"              TYPE="int"    LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="courseid"        TYPE="int"    LENGTH="10"  NOTNULL="true"/>
-        <FIELD NAME="topic_label"     TYPE="char"   LENGTH="255" NOTNULL="true" DEFAULT=""/>
+        <FIELD NAME="topic_label"     TYPE="char"   LENGTH="255" NOTNULL="true"/>
         <FIELD NAME="question_volume" TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
-        <FIELD NAME="friction_score"  TYPE="number" LENGTH="5, 1" NOTNULL="true" DEFAULT="0.0"/>
+        <FIELD NAME="friction_score"  TYPE="number" LENGTH="5" DECIMALS="1" NOTNULL="true" DEFAULT="0.0"/>
         <FIELD NAME="student_count"   TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="severity"        TYPE="char"   LENGTH="20"  NOTNULL="true" DEFAULT="minor"/>
         <FIELD NAME="computed_at"     TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
@@ -174,7 +174,7 @@
       <FIELDS>
         <FIELD NAME="id"               TYPE="int"    LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="courseid"         TYPE="int"    LENGTH="10"  NOTNULL="true"/>
-        <FIELD NAME="engagement_score" TYPE="number" LENGTH="5, 1" NOTNULL="true" DEFAULT="0.0"/>
+        <FIELD NAME="engagement_score" TYPE="number" LENGTH="5" DECIMALS="1" NOTNULL="true" DEFAULT="0.0"/>
         <FIELD NAME="at_risk_count"    TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="total_students"   TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="snapshot_date"    TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
@@ -252,6 +252,8 @@
         <FIELD NAME="description"      TYPE="text" NOTNULL="true"/>
         <FIELD NAME="status"           TYPE="char" LENGTH="20"  NOTNULL="true" DEFAULT="open"/>
         <FIELD NAME="lecturer_notes"   TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="lecturer_response" TYPE="text" NOTNULL="false" COMMENT="Legacy public lecturer response"/>
+        <FIELD NAME="response_seen"    TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" COMMENT="Legacy response read flag"/>
         <FIELD NAME="reporter_name"    TYPE="char" LENGTH="255" NOTNULL="false" COMMENT="Name provided by unauthenticated reporter"/>
         <FIELD NAME="reporter_username" TYPE="char" LENGTH="100" NOTNULL="false" COMMENT="Username/idnumber provided by unauthenticated reporter"/>
         <FIELD NAME="timecreated"      TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
@@ -261,6 +263,55 @@
       <INDEXES>
         <INDEX NAME="user_course" UNIQUE="false" FIELDS="userid,courseid"/>
         <INDEX NAME="course_status" UNIQUE="false" FIELDS="courseid,status"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_issue_conversations" COMMENT="Private student and lecturer course issue conversations">
+      <FIELDS>
+        <FIELD NAME="id"              TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid"        TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="studentid"       TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="title"           TYPE="char" LENGTH="255" NOTNULL="true"/>
+        <FIELD NAME="category"        TYPE="char" LENGTH="30"  NOTNULL="true" DEFAULT="other"/>
+        <FIELD NAME="clientid"        TYPE="char" LENGTH="64"  NOTNULL="true"/>
+        <FIELD NAME="legacyissueid"   TYPE="int"  LENGTH="10"  NOTNULL="false"/>
+        <FIELD NAME="timecreated"     TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="lastmessagetime" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="course_fk" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+        <KEY NAME="student_fk" TYPE="foreign" FIELDS="studentid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="student_course_client" UNIQUE="true" FIELDS="studentid,courseid,clientid"/>
+        <INDEX NAME="legacyissue" UNIQUE="true" FIELDS="legacyissueid"/>
+        <INDEX NAME="course_lastmessage" UNIQUE="false" FIELDS="courseid,lastmessagetime"/>
+        <INDEX NAME="student_course_lastmessage" UNIQUE="false" FIELDS="studentid,courseid,lastmessagetime"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="umat_ai_issue_messages" COMMENT="Messages and receipts in private issue conversations">
+      <FIELDS>
+        <FIELD NAME="id"              TYPE="int"  LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="conversationid"  TYPE="int"  LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="senderid"        TYPE="int"  LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="senderrole"      TYPE="char" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="body"            TYPE="text" NOTNULL="true"/>
+        <FIELD NAME="clientid"        TYPE="char" LENGTH="64" NOTNULL="true"/>
+        <FIELD NAME="attachmentcount" TYPE="int"  LENGTH="2"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timecreated"     TYPE="int"  LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="deliveredat"     TYPE="int"  LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="viewedat"        TYPE="int"  LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="conversation_fk" TYPE="foreign" FIELDS="conversationid" REFTABLE="umat_ai_issue_conversations" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="conversation_sender_client" UNIQUE="true" FIELDS="conversationid,senderid,clientid"/>
+        <INDEX NAME="conversation_time" UNIQUE="false" FIELDS="conversationid,timecreated"/>
+        <INDEX NAME="conversation_receipt" UNIQUE="false" FIELDS="conversationid,senderrole,viewedat"/>
       </INDEXES>
     </TABLE>
 
@@ -372,9 +423,9 @@
         <FIELD NAME="userid"          TYPE="int"    LENGTH="10"  NOTNULL="true"/>
         <FIELD NAME="courseid"        TYPE="int"    LENGTH="10"  NOTNULL="true"/>
         <FIELD NAME="logins"          TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
-        <FIELD NAME="avg_quiz_grade"  TYPE="number" LENGTH="10, 2" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="avg_quiz_grade"  TYPE="number" LENGTH="10" DECIMALS="2" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="ai_questions_asked" TYPE="int" LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
-        <FIELD NAME="risk_score"      TYPE="number" LENGTH="10, 2" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="risk_score"      TYPE="number" LENGTH="10" DECIMALS="2" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="last_active"     TYPE="int"    LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
       </FIELDS>
       <KEYS>
@@ -400,6 +451,7 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="user_course_action" UNIQUE="false" FIELDS="userid,courseid,action_type,timecreated"/>
+      </INDEXES>
     </TABLE>
 
     <TABLE NAME="umat_ai_group_study" COMMENT="Study group sessions for collaborative AI chat">
@@ -442,7 +494,7 @@
       </INDEXES>
     </TABLE>
 
-    <TABLE NAME="umat_ai_group_messages" COMMENT="Group chat messages and shared AI Q&A">
+    <TABLE NAME="umat_ai_group_messages" COMMENT="Group chat messages and shared AI Q&amp;A">
       <FIELDS>
         <FIELD NAME="id"          TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="groupid"     TYPE="int"  LENGTH="10"  NOTNULL="true"/>

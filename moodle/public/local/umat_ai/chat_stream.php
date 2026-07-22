@@ -211,6 +211,8 @@ curl_setopt_array($ch, [
 
             if ($event === 'token' && !empty($parsed['text'])) {
                 $fullanswer .= $parsed['text'];
+            } else if ($event === 'quiz_data') {
+                error_log('chat_stream.php: forwarding quiz_data event, questions=' . count($parsed['quiz']['questions'] ?? []));
             } else if ($event === 'done') {
                 $fullanswer = $parsed['answer'] ?? $fullanswer;
                 $sources = $parsed['sources'] ?? $sources;

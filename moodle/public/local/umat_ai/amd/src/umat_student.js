@@ -94,7 +94,7 @@ function setCpFeatureActive(name){
 }
 function renderCpFeature(name){
   var meta={
-    home:['home','Home','Course snapshot'],lectures:['play_circle','Lectures','Recent recordings'],courses:['menu_book','Courses','Your enrolled courses'],library:['local_library','Resource Materials','Course materials'],sessions:['chat_bubble','Sessions','Recent AI chats'],'report-issue':['flag','Report Issue','Submit a complaint']
+    home:['home','Home','Course snapshot'],lectures:['play_circle','Lectures','Recent recordings'],courses:['menu_book','Courses','Your enrolled courses'],library:['local_library','Resource Materials','Course materials'],sessions:['chat_bubble','Sessions','Recent AI chats'],'report-issue':['forum','Student Issues','Private course messages']
   }[name]||['widgets','Feature','Quick view'];
   showCpPane('cp-feature');setCpFeatureActive(name);
   document.getElementById('cp-feature-icon').textContent=meta[0];document.getElementById('cp-feature-title').textContent=meta[1];document.getElementById('cp-feature-sub').textContent=meta[2];
@@ -107,61 +107,8 @@ function renderCpFeature(name){
   if(name==='report-issue')return renderCpReportIssue(body);
 }
 function renderCpReportIssue(body){
-  if(!courseId){var c=(userData&&userData.courses)||[];if(!c.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses available.</p></div>';return;}body.innerHTML='<div class="umat-cp-help" style="padding:10px 14px 2px;font-size:10px;color:var(--u-ol);font-weight:600;">Select a course to report an issue:</div><div style="padding:4px 14px 6px;display:flex;flex-wrap:wrap;gap:4px;">'+c.slice(0,12).map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';body.querySelectorAll('.umat-chip').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;renderCpFeature('report-issue');});});return;}
-  /* Reports list at top (WhatsApp-style), form below */
-  body.innerHTML='<div id="cp-issue-list" style="padding:14px 14px 0;"></div>'
-    +'<div style="padding:14px;border-top:1px solid var(--u-olv);">'
-    +'<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;color:var(--u-ol);display:block;margin-bottom:3px;">Category</label>'
-    +'<select id="cp-issue-cat" style="width:100%;padding:7px 9px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;">'
-    +'<option value="concept_confusion">Concept Confusion</option><option value="material_error">Material Error</option>'
-    +'<option value="technical_issue">Technical Issue</option><option value="suggestion">Suggestion</option><option value="other">Other</option></select></div>'
-    +'<div style="margin-bottom:12px;"><input type="text" id="cp-issue-topic" placeholder="Topic (optional)" style="width:100%;padding:7px 9px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;"></div>'
-    +'<div style="margin-bottom:12px;"><textarea id="cp-issue-desc" placeholder="Describe the issue\u2026" rows="3" style="width:100%;padding:7px 9px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;resize:vertical;"></textarea></div>'
-    +'<button class="umat-btn-p" id="cp-issue-submit" type="button" style="width:100%;justify-content:center;font-size:12px;padding:8px;"><span class="material-symbols-outlined" style="font-size:16px;">send</span>Submit</button>'
-    +'<div id="cp-issue-msg" style="margin-top:6px;font-size:11px;display:none;"></div></div>';
-  loadCpIssues();
-  document.getElementById('cp-issue-submit').addEventListener('click',function(){
-    var cat=document.getElementById('cp-issue-cat').value;
-    var topic=document.getElementById('cp-issue-topic').value.trim();
-    var desc=document.getElementById('cp-issue-desc').value.trim();
-    var msg=document.getElementById('cp-issue-msg');
-    if(desc.length<10){msg.textContent='Please provide more detail.';msg.style.display='block';msg.style.color='var(--u-ter)';return;}
-    var btn=this;btn.disabled=true;btn.textContent='Submitting\u2026';
-    console.log('[cp-issue] submitting cat='+cat+' cid='+courseId);
-    require(['core/ajax'],function(Ajax){
-      Ajax.call([{methodname:'local_umat_ai_submit_issue',args:{courseid:courseId,category:cat,topic:topic,description:desc}}])[0]
-        .done(function(r){
-          console.log('[cp-issue] response',r);
-          if(r.success){msg.textContent='Submitted!';msg.style.display='block';msg.style.color='var(--u-sec)';document.getElementById('cp-issue-topic').value='';document.getElementById('cp-issue-desc').value='';loadCpIssues();}else{msg.textContent=r.message||'Failed.';msg.style.display='block';msg.style.color='var(--u-ter)';}
-        })
-        .fail(function(e){
-          console.log('[cp-issue] AJAX fail',e);
-          var errMsg=e&&(e.message||e.errorcode||e);
-          msg.textContent=errMsg||'Connection error.';msg.style.display='block';msg.style.color='var(--u-ter)';
-        })
-        .always(function(){btn.disabled=false;btn.innerHTML='<span class="material-symbols-outlined" style="font-size:16px;">send</span>Submit';});
-    });
-  });
-}
-function loadCpIssues(){
-  var list=document.getElementById('cp-issue-list');if(!list)return;
-  require(['core/ajax'],function(Ajax){
-    Ajax.call([{methodname:'local_umat_ai_get_student_issues',args:{courseid:courseId||0}}])[0]
-      .done(function(rows){
-        if(!rows||!rows.length){list.innerHTML='<div class="umat-empty" style="padding:6px 0;"><span class="material-symbols-outlined" style="font-size:20px;">flag</span><p style="font-size:11px;">No issues reported.</p></div>';return;}
-        list.innerHTML=rows.map(function(r){
-          var catLabel={'concept_confusion':'Concept Confusion','material_error':'Material Error','technical_issue':'Technical Issue','suggestion':'Suggestion','other':'Other'}[r.category]||r.category;
-          var ago='';if(r.timecreated){var d=Math.floor((Date.now()/1000-r.timecreated)/86400);ago=d===0?'today':d+'d ago';}
-          return '<div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:8px;padding:10px;margin-bottom:6px;">'
-            +'<div style="font-size:11px;font-weight:700;margin-bottom:2px;">'+_umatEsc(r.topic||catLabel)+'</div>'
-            +'<p style="font-size:10px;color:var(--u-onsv);margin:0 0 2px;">'+_umatEsc(r.description.replace(/^(.{100}[^\\s]*).*$/,'$1')+(r.description.length>100?'...':''))+'</p>'
-            +'<div style="font-size:9px;color:var(--u-ol);">'+catLabel+' A' + ' '+ago+'</div>'
-            +(r.lecturer_response?'<div style="margin-top:4px;padding-top:4px;border-top:1px solid var(--u-olv);font-size:10px;color:var(--u-sec);"><strong>Lecturer:</strong> '+_umatEsc(r.lecturer_response)+'</div>':'')
-            +'</div>';
-        }).join('');
-      })
-      .fail(function(){list.innerHTML='<div class="umat-empty" style="padding:6px 0;"><span class="material-symbols-outlined">error</span><p style="font-size:11px;">Could not load.</p></div>';});
-  });
+  body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>Student Issues opens in the full workspace so your conversations and drafts stay together.</p><button class="umat-btn-p" id="cp-open-student-issues" type="button"><span class="material-symbols-outlined">open_in_full</span>Open Student Issues</button></div>';
+  document.getElementById('cp-open-student-issues').addEventListener('click',function(){cpOv.classList.remove('open');openOverlay();switchToTab('report-issue');});
 }
 function renderCpHome(body){
   var d=userData||{};var courses=d.courses||[],sessions=d.sessions||[];
@@ -222,17 +169,13 @@ function switchToTab(name){
   if(name==='courses'    && !coursesLoaded){  renderCourses(userData.courses||[]); coursesLoaded=true; }
   if(name==='my-notes'   && !notesLoaded){   initNotesTab();  notesLoaded=true;    }
   if(name==='sessions'   && !sessionsLoaded){ loadSessions();  sessionsLoaded=true; }
-  if(name==='report-issue'){ if(!reportLoaded){ initReportIssueTab(); reportLoaded=true; }else loadMyIssues(); markResponsesRead(); pollUnreadCount(); }
+  if(name==='report-issue'){ if(!reportLoaded){ initStudentIssues(); reportLoaded=true; }else refreshStudentIssues(true); }
 }
 /* Select course: set context and switch to AI Tutor */
 function selectCourse(cid,cname){
   courseId=cid;
   switchToTab('ai-tutor');
 }
-ov.querySelectorAll('[data-sb-tab]').forEach(function(btn){
-  btn.addEventListener('click',function(){ switchToTab(btn.dataset.sbTab); });
-});
-/* Quick action buttons on Home tab */
 ov.querySelectorAll('[data-sb-tab]').forEach(function(btn){
   btn.addEventListener('click',function(){ switchToTab(btn.dataset.sbTab); });
 });
@@ -366,7 +309,8 @@ function sendQuestion(q, msgsId){
     },
     onDone: function(meta){
       _umatHideTyping(tid); syncRemaining(meta.remaining); updateRate(); markConn(true);
-      setTimeout(function(){ try{_umatDetectQuiz(msgsId);}catch(e){} }, 100);
+      setTimeout(function(){ try{_umatDetectQuiz(msgsId);}catch(e){} }, 300);
+      setTimeout(function(){ try{_umatDetectQuiz(msgsId);}catch(e){} }, 800);
     },
     onError: function(err){
       _umatHideTyping(tid);
@@ -383,10 +327,17 @@ function _umatDetectQuiz(msgsId){
   var cont=document.getElementById(msgsId);if(!cont)return;
   var bubbles=cont.querySelectorAll('.umat-bubble-ai');if(!bubbles.length)return;
   var last=bubbles[bubbles.length-1];
-  var txt=last.textContent||'';
-  var m=txt.match(/\`\`\`(?:json)?\s*(\{[^`]*?"quiz"\s*:[^`]*?\})\s*\`\`\`/s);
-  if(!m)return;
-  var rawJson=m[1];
+  var txt=last.innerText||last.textContent||'';
+  var patterns=[
+    /\`\`\`(?:json)?\s*(\{[\s\S]*?"quiz"\s*:[\s\S]*?\})\s*\`\`\`/s,
+    /(\{[\s\S]*?"quiz"\s*:[\s\S]*?"questions"\s*:\s*\[[\s\S]*?\]\s*\})/s,
+  ];
+  var rawJson=null;
+  for(var pi=0;pi<patterns.length;pi++){
+    var m=txt.match(patterns[pi]);
+    if(m){rawJson=m[1];break;}
+  }
+  if(!rawJson)return;
   // Remove all <p> elements that are part of the code block
   var inBlock=false;
   last.querySelectorAll('p').forEach(function(p){
@@ -470,16 +421,15 @@ function _umatOpenQuiz(containerId){
 function _umatSaveAllQuizState(){
   _umatSyncQuizState();
   try{sessionStorage.setItem('qz_all',JSON.stringify({quizzes:qz.quizzes,currentId:qz.currentId}));}catch(e){}
-  if(qz._saveTimer)clearTimeout(qz._saveTimer);
-  qz._saveTimer=setTimeout(function(){
-    if(!courseId)return;
-    // Save each in-progress quiz to server
-    Object.keys(qz.quizzes).forEach(function(qid){
-      var qs=qz.quizzes[qid];if(!qs||!qs.data||!qs.data.questions)return;
-      var allGraded=qs.data.questions.every(function(_,i){return qs.graded[i]!==undefined;});
-      var score=0,total=qs.data.questions.length;
-      Object.keys(qs.graded).forEach(function(k){if(qs.graded[k].correct)score++;});
-      if(allGraded&&!qs.attempt_id)return; // Already saved completed quiz
+  Object.keys(qz.quizzes).forEach(function(qid){
+    var qs=qz.quizzes[qid];if(!qs||!qs.data||!qs.data.questions)return;
+    var allGraded=qs.data.questions.every(function(_,i){return qs.graded[i]!==undefined;});
+    var score=0,total=qs.data.questions.length;
+    Object.keys(qs.graded).forEach(function(k){if(qs.graded[k].correct)score++;});
+    if(allGraded&&!qs.attempt_id)return;
+    if(qs._saveTimer)clearTimeout(qs._saveTimer);
+    qs._saveTimer=setTimeout(function(){
+      if(!courseId)return;
       require(['core/ajax'],function(Ajax){
         Ajax.call([{methodname:'local_umat_ai_save_quiz_attempt',args:{
           attempt_id:qs.attempt_id||0,courseid:courseId,session_key:sessionKey,
@@ -490,11 +440,11 @@ function _umatSaveAllQuizState(){
           score:allGraded?score:null,total:total,
           status:allGraded?'completed':'in_progress'
         }}])[0]
-        .done(function(r){qs.attempt_id=r.attempt_id;if(allGraded)delete qz.quizzes[qid];})
-        .fail(function(e){console.error('Quiz save failed:',e);});
+          .done(function(r){qs.attempt_id=r.attempt_id;})
+          .fail(function(e){console.error('Quiz save failed:',e);});
       });
-    });
-  },800);
+    },800);
+  });
 }
 function _umatLoadQuizState(){
   try{
@@ -766,17 +716,39 @@ function _umatGradeText(idx){
   var q=qz.data.questions[idx];if(!q)return;
   if(q.type!=='fill_in'&&q.type!=='theoretical')return;
   var expected=(q.correct||'').trim();
-  var correct=false;
   var explanation=q.explanation||'';
+
+  if(q.type==='theoretical'){
+    var sub=document.getElementById('qz-submit');
+    if(sub){sub.disabled=true;sub.textContent='Grading\u2026';}
+    require(['core/ajax'],function(Ajax){
+      Ajax.call([{methodname:'local_umat_ai_grade_theory_answer',args:{
+        courseid:courseId,question_text:q.question,
+        answer_hint:q.correct||q.answer_hint||'',student_answer:ans
+      }}])[0]
+        .done(function(r){
+          qz.graded[idx]={correct:!!r.correct,explanation:r.explanation||explanation,score:r.score||0};
+          _umatRenderQuestion(idx);_umatSaveAllQuizState();
+          var allGraded=qz.data.questions.every(function(_,i){return qz.graded[i]!==undefined;});
+          if(allGraded){setTimeout(_umatShowScore,600);}
+        })
+        .fail(function(){
+          qz.graded[idx]={correct:false,explanation:'Grading service unavailable. Please try again.',score:0};
+          _umatRenderQuestion(idx);_umatSaveAllQuizState();
+        });
+    });
+    return;
+  }
+
+  var correct=false;
   if(!expected){
-    // No expected answer defined — accept any response as correct (backward compat)
     correct=true;
     explanation=explanation||'Answer submitted.';
   } else {
     var alts=expected.split('/').map(function(a){return a.trim().toLowerCase();});
-    var sl=ans.toLowerCase();
+    var sl=ans.toLowerCase().trim();
     for(var ai=0;ai<alts.length;ai++){
-      if(sl===alts[ai]||sl.indexOf(alts[ai])!==-1||alts[ai].indexOf(sl)!==-1){
+      if(sl===alts[ai]){
         correct=true;break;
       }
     }
@@ -973,71 +945,135 @@ if(cpInput)cpInput.addEventListener('keypress',function(e){if(e.key==='Enter'&&!
   obs.observe(cpMsgs,{childList:true,subtree:false});
 })();
 
-/* ---- REPORT ISSUE ---- */
-function initReportIssueTab(){
-  var form=document.getElementById('ws-issue-form-wrap');
-  if(!courseId){var c=(userData&&userData.courses)||[];var list=document.getElementById('ws-issue-list');if(list){if(!c.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses available.</p></div>';}else{list.innerHTML='<div style="padding:14px;"><div style="font-size:11px;color:var(--u-ol);font-weight:600;margin-bottom:8px;">Select a course to report an issue:</div>'+c.map(function(cv){return '<button class="umat-chip" data-cid="'+cv.id+'" type="button" style="margin:2px;">'+_umatEsc(cv.shortname||cv.fullname)+'</button>';}).join('')+'</div>';list.querySelectorAll('[data-cid]').forEach(function(b){b.addEventListener('click',function(){courseId=parseInt(this.dataset.cid)||courseId;initReportIssueTab();});});}}if(form)form.style.display='none';return;}
-  var toggle=document.getElementById('ws-issue-toggle');
-  if(toggle) toggle.addEventListener('click',function(){form.style.display=form.style.display==='none'?'block':'none';});
-  if(form) form.style.display='none';
-  var submit=document.getElementById('ws-issue-submit');
-    if(submit) submit.addEventListener('click',function(){
-      var cat=document.getElementById('ws-issue-cat').value;
-      var topic=document.getElementById('ws-issue-topic').value.trim();
-      var desc=document.getElementById('ws-issue-desc').value.trim();
-      var msg=document.getElementById('ws-issue-msg');
-      if(desc.length<10){msg.textContent='Please provide a more detailed description (at least 10 characters).';msg.style.display='block';msg.style.color='var(--u-ter)';return;}
-      submit.disabled=true;submit.textContent='Submitting\u2026';
-      console.log('[issue] submitting cat='+cat+' cid='+courseId+' desc='+desc.substring(0,30));
-      require(['core/ajax'],function(Ajax){
-        Ajax.call([{methodname:'local_umat_ai_submit_issue',args:{courseid:courseId,category:cat,topic:topic,description:desc}}])[0]
-          .done(function(r){
-            console.log('[issue] response',r);
-            if(r.success){
-              msg.textContent='Issue reported successfully!';msg.style.display='block';msg.style.color='var(--u-sec)';
-              document.getElementById('ws-issue-topic').value='';document.getElementById('ws-issue-desc').value='';
-              form.style.display='none';loadMyIssues();
-            }else{msg.textContent=r.message||'Failed to submit.';msg.style.display='block';msg.style.color='var(--u-ter)';}
-          })
-          .fail(function(e){
-            console.log('[issue] AJAX fail',e);
-            var errMsg=e&&(e.message||e.errorcode||e);
-            msg.textContent=errMsg||'Connection error. Please try again.';msg.style.display='block';msg.style.color='var(--u-ter)';
-          })
-          .always(function(){submit.disabled=false;submit.innerHTML='<span class="material-symbols-outlined">send</span>Submit Report';});
-      });
-    });
-  loadMyIssues();
+/* ---- STUDENT ISSUES CONVERSATIONS ---- */
+var issueConversations=[];
+var issueConversationId=0;
+var issueCreateClientId='';
+var issueFailedSend=null;
+var issueReadObserver=null;
+var issuePolling=false;
+var issueCategoryLabels={course_material:'Course material',assignment:'Assignment',quiz_examination:'Quiz or examination',grade_feedback:'Grade or feedback',live_class_recording:'Live class or recording',technical_problem:'Technical problem',access_permission:'Access or permission',other:'Other'};
+
+function issueClientId(){
+  return 'ui_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,12);
 }
-function loadMyIssues(){
-  var list=document.getElementById('ws-issue-list');if(!list){console.log('[issues] list not found');return;}
-  if(!courseId){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">school</span><p>Select a course above to view your reports.</p></div>';return;}
-  console.log('[issues] loading for cid='+courseId);
-  require(['core/ajax'],function(Ajax){
-    Ajax.call([{methodname:'local_umat_ai_get_student_issues',args:{courseid:courseId}}])[0]
-      .done(function(rows){
-        console.log('[issues] got rows',rows,typeof rows,Array.isArray(rows),rows&&rows.length);
-        if(!rows||!rows.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No issues reported yet.</p></div>';return;}
-        list.innerHTML=rows.map(function(r){
-          var catLabel={'concept_confusion':'Concept Confusion','material_error':'Material Error','technical_issue':'Technical Issue','suggestion':'Suggestion','other':'Other'}[r.category]||r.category;
-          var statusLabels={'open':'Open','in_review':'In Review','resolved':'Resolved','closed':'Closed'};
-          var statusColors={'open':'var(--u-ter)','in_review':'#d97706','resolved':'var(--u-sec)','closed':'var(--u-ol)'};
-          var statusColor=statusColors[r.status]||'var(--u-ol)';
-          var statusLabel=statusLabels[r.status]||r.status;
-          var ago='';
-          if(r.timecreated){var d=Math.floor((Date.now()/1000-r.timecreated)/86400);ago=d===0?'today':d+'d ago';}
-          return '<div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:14px;margin-bottom:8px;">'
-            +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
-            +'<span style="font-weight:700;font-size:13px;">'+_umatEsc(r.topic||catLabel)+'</span>'
-            +'<span style="font-size:10px;padding:2px 8px;border-radius:999px;background:'+statusColor+'20;color:'+statusColor+';font-weight:700;">'+statusLabel+'</span></div>'
-            +'<p style="font-size:12px;color:var(--u-onsv);margin:0 0 4px;">'+_umatEsc(r.description.replace(/^(.{120}[^\\s]*).*$/,'$1')+(r.description.length>120?'...':''))+'</p>'
-            +'<div style="font-size:10px;color:var(--u-ol);">'+catLabel+(r.topic?' A' + ' '+_umatEsc(r.topic):'')+' A' + ' '+ago+'</div>'
-            +(r.lecturer_response?'<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--u-olv);font-size:11px;color:var(--u-sec);"><strong>Lecturer response:</strong> '+_umatEsc(r.lecturer_response)+'</div>':'')
-            +'</div>';
-        }).join('');
-      })
-      .fail(function(e){console.log('[issues] AJAX fail',e);list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load issues.</p></div>';});
+function issueView(name){
+  ['list','new','thread'].forEach(function(view){var el=document.getElementById('ws-issue-'+view+'-view');if(el)el.classList.toggle('active',view===name);});
+}
+function issueReceiptHtml(receipt){
+  if(!receipt)return '';
+  var viewed=receipt==='viewed';
+  var ticks=receipt==='sent'?'&#10003;':'&#10003;&#10003;';
+  var label=receipt==='viewed'?'Viewed':(receipt==='delivered'?'Delivered':'Sent');
+  return '<span class="umat-issue-mini-receipt '+(viewed?'viewed':'')+'" aria-label="'+label+'" title="'+label+'">'+ticks+'</span>';
+}
+function issueInitials(name){return (name||'Course').split(/\s+/).slice(0,2).map(function(p){return p.charAt(0);}).join('').toUpperCase();}
+function issueRelativeTime(ts){return _umatFmtTime(ts);}
+function issueDraftKey(){return 'umat_issue_draft_'+courseId+'_'+(issueConversationId||'new');}
+function saveIssueDraft(){var input=document.getElementById('ws-issue-reply');if(input&&issueConversationId){try{sessionStorage.setItem(issueDraftKey(),input.value);}catch(e){}}}
+function restoreIssueDraft(){var input=document.getElementById('ws-issue-reply');if(!input)return;try{input.value=sessionStorage.getItem(issueDraftKey())||'';}catch(e){input.value='';}}
+function clearIssueDraft(){try{sessionStorage.removeItem(issueDraftKey());}catch(e){}}
+
+function initStudentIssues(){
+  var newBtn=document.getElementById('ws-issue-new-btn');
+  var back=document.getElementById('ws-issue-new-back');
+  var cancel=document.getElementById('ws-issue-new-cancel');
+  var threadBack=document.getElementById('ws-issue-thread-back');
+  var refresh=document.getElementById('ws-issue-refresh');
+  if(newBtn)newBtn.addEventListener('click',function(){issueCreateClientId=issueCreateClientId||issueClientId();issueView('new');document.getElementById('ws-issue-title').focus();});
+  if(back)back.addEventListener('click',function(){issueView('list');});
+  if(cancel)cancel.addEventListener('click',function(){issueView('list');});
+  if(threadBack)threadBack.addEventListener('click',function(){saveIssueDraft();issueConversationId=0;try{sessionStorage.removeItem('umat_issue_active_'+courseId);}catch(e){}issueView('list');refreshStudentIssues(false);});
+  if(refresh)refresh.addEventListener('click',function(){refreshStudentIssues(false);});
+  var form=document.getElementById('ws-issue-form');if(form)form.addEventListener('submit',createStudentIssue);
+  var reply=document.getElementById('ws-issue-reply');if(reply){reply.addEventListener('input',saveIssueDraft);reply.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendStudentIssueMessage();}});}
+  var send=document.getElementById('ws-issue-send');if(send)send.addEventListener('click',sendStudentIssueMessage);
+  var retry=document.getElementById('ws-issue-send-error');if(retry)retry.addEventListener('click',function(e){if(e.target.closest('[data-issue-retry]')&&issueFailedSend)sendStudentIssueMessage(issueFailedSend);});
+  refreshStudentIssues(false);
+  var linked=parseInt(new URLSearchParams(window.location.search).get('umat_issue'))||0;
+  try{issueConversationId=linked||parseInt(sessionStorage.getItem('umat_issue_active_'+courseId))||0;}catch(e){issueConversationId=linked;}
+  if(issueConversationId)openStudentIssue(issueConversationId);
+}
+
+function refreshStudentIssues(quiet){
+  if(!courseId||issuePolling)return;
+  issuePolling=true;
+  var list=document.getElementById('ws-issue-list');
+  if(list&&!quiet)list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading conversations...</p></div>';
+  ajax('local_umat_ai_list_issue_conversations',{inbox:'student',courseid:courseId,category:'',query:''},function(r){
+    issuePolling=false;issueConversations=r.conversations||[];renderStudentIssueList();updateStudentIssueBadge(r.totalunread||0);
+    if(issueConversationId&&document.getElementById('ws-issue-thread-view').classList.contains('active'))loadStudentIssueMessages(true);
+  },function(){
+    issuePolling=false;if(list&&!quiet)list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load conversations.</p><button class="umat-chip" id="ws-issue-list-retry" type="button">Retry</button></div>';
+    var retry=document.getElementById('ws-issue-list-retry');if(retry)retry.addEventListener('click',function(){refreshStudentIssues(false);});
   });
+}
+function renderStudentIssueList(){
+  var list=document.getElementById('ws-issue-list');if(!list)return;
+  if(!issueConversations.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>No issues reported yet. If you need help with this course, send a message to your lecturer.</p><button class="umat-btn-p" id="ws-issue-empty-new" type="button"><span class="material-symbols-outlined">add</span>Report an Issue</button></div>';var emptyNew=document.getElementById('ws-issue-empty-new');if(emptyNew)emptyNew.addEventListener('click',function(){document.getElementById('ws-issue-new-btn').click();});return;}
+  list.innerHTML=issueConversations.map(function(c){return '<button class="umat-issue-row '+(c.unreadcount?'unread':'')+'" data-conversation-id="'+c.id+'" type="button"><span class="umat-issue-avatar">'+_umatEsc(issueInitials(c.courseshortname||c.coursename))+'</span><span class="umat-issue-row-main"><span class="umat-issue-row-title"><strong>'+_umatEsc(c.title)+'</strong><span class="umat-issue-category">'+_umatEsc(issueCategoryLabels[c.category]||c.category)+'</span></span><span class="umat-issue-preview">'+_umatEsc(c.lastmessage||'No messages yet')+'</span><span class="umat-issue-row-sub">'+_umatEsc(c.coursename)+'</span></span><span class="umat-issue-row-side"><time>'+_umatEsc(issueRelativeTime(c.lastmessagetime))+'</time>'+(c.unreadcount?'<span class="umat-issue-unread">'+(c.unreadcount>99?'99+':c.unreadcount)+'</span>':issueReceiptHtml(c.latestsentreceipt))+'</span></button>';}).join('');
+  list.querySelectorAll('[data-conversation-id]').forEach(function(row){row.addEventListener('click',function(){openStudentIssue(parseInt(row.dataset.conversationId));});});
+}
+function openStudentIssue(id){
+  issueConversationId=id;try{sessionStorage.setItem('umat_issue_active_'+courseId,String(id));}catch(e){}
+  issueView('thread');restoreIssueDraft();loadStudentIssueMessages(false);
+}
+function loadStudentIssueMessages(preserveScroll){
+  if(!issueConversationId)return;
+  var expected=issueConversationId;var box=document.getElementById('ws-issue-messages');if(!box)return;
+  var nearBottom=box.scrollHeight-box.scrollTop-box.clientHeight<90;var oldTop=box.scrollTop;
+  if(!preserveScroll)box.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading conversation...</p></div>';
+  ajax('local_umat_ai_get_issue_messages',{conversationid:expected},function(r){
+    if(expected!==issueConversationId)return;
+    var c=r.conversation;document.getElementById('ws-issue-thread-title').textContent=c.title;document.getElementById('ws-issue-thread-meta').textContent=(issueCategoryLabels[c.category]||c.category)+' · '+c.coursename;
+    renderStudentIssueMessages(r.messages||[]);
+    if(!preserveScroll||nearBottom)box.scrollTop=box.scrollHeight;else box.scrollTop=oldTop;
+  },function(){if(expected!==issueConversationId)return;box.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Conversation could not be loaded.</p><button class="umat-chip" id="ws-issue-thread-retry" type="button">Retry</button></div>';var retry=document.getElementById('ws-issue-thread-retry');if(retry)retry.addEventListener('click',function(){loadStudentIssueMessages(false);});});
+}
+function renderStudentIssueMessages(messages){
+  var box=document.getElementById('ws-issue-messages');if(!box)return;
+  if(!messages.length){box.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>No messages in this conversation.</p></div>';return;}
+  box.innerHTML=messages.map(renderIssueMessage).join('');observeStudentIssueMessages();
+}
+function renderIssueMessage(m){
+  var attachments=(m.attachments||[]).map(function(a){return '<a class="umat-issue-attachment" href="'+_umatEsc(a.url)+'" target="_blank" rel="noopener"><span class="material-symbols-outlined">description</span><span>'+_umatEsc(a.filename)+'</span></a>';}).join('');
+  var receipt=m.ismine?'<span class="umat-issue-receipt '+(m.receipt==='viewed'?'viewed':'')+'" aria-label="'+(m.receipt==='viewed'?'Viewed':(m.receipt==='delivered'?'Delivered':'Sent'))+'">'+(m.receipt==='sent'?'&#10003;':'&#10003;&#10003;')+'</span>':'';
+  return '<article class="umat-issue-message '+(m.ismine?'mine':'')+'" data-message-id="'+m.id+'" data-other="'+(m.ismine?'0':'1')+'" data-viewed="'+(m.viewedat?'1':'0')+'"><span class="umat-issue-sender">'+_umatEsc(m.ismine?'You':m.sendername)+'</span><div class="umat-issue-bubble"><div class="umat-issue-body">'+_umatEsc(m.body)+'</div>'+attachments+'<div class="umat-issue-message-meta"><time>'+_umatEsc(issueRelativeTime(m.timecreated))+'</time>'+receipt+'</div></div></article>';
+}
+function observeStudentIssueMessages(){
+  if(issueReadObserver)issueReadObserver.disconnect();
+  var root=document.getElementById('ws-issue-messages');if(!root||!window.IntersectionObserver)return;
+  var pending={};var timer=null;
+  issueReadObserver=new IntersectionObserver(function(entries){entries.forEach(function(entry){if(entry.isIntersecting&&entry.intersectionRatio>=.35){var el=entry.target;if(el.dataset.other==='1'&&el.dataset.viewed!=='1'){pending[el.dataset.messageId]=true;el.dataset.viewed='1';issueReadObserver.unobserve(el);}}});if(Object.keys(pending).length&&!timer){timer=setTimeout(function(){var ids=Object.keys(pending).map(Number);pending={};timer=null;ajax('local_umat_ai_mark_issue_messages_viewed',{conversationid:issueConversationId,messageids:ids},function(){refreshStudentIssues(true);},function(){ids.forEach(function(id){var el=root.querySelector('[data-message-id="'+id+'"]');if(el){el.dataset.viewed='0';issueReadObserver.observe(el);}});});},250);}}, {root:root,threshold:[.35]});
+  root.querySelectorAll('[data-other="1"][data-viewed="0"]').forEach(function(el){issueReadObserver.observe(el);});
+}
+function createStudentIssue(e){
+  e.preventDefault();var title=document.getElementById('ws-issue-title').value.trim();var category=document.getElementById('ws-issue-cat').value;var description=document.getElementById('ws-issue-desc').value.trim();var file=document.getElementById('ws-issue-file').files[0]||null;var msg=document.getElementById('ws-issue-form-msg');var btn=document.getElementById('ws-issue-submit');
+  if(!title||description.length<3){msg.textContent='Enter a title and a clear description.';msg.classList.remove('success');return;}
+  issueCreateClientId=issueCreateClientId||issueClientId();btn.disabled=true;btn.setAttribute('aria-busy','true');msg.textContent='Sending your message...';msg.classList.remove('success');
+  ajax('local_umat_ai_create_issue_conversation',{courseid:courseId,title:title,category:category,description:description,clientid:issueCreateClientId},function(r){
+    var finish=function(){btn.disabled=false;btn.removeAttribute('aria-busy');msg.textContent='Your message has been sent to the lecturer.';msg.classList.add('success');issueConversationId=r.conversationid;issueCreateClientId='';document.getElementById('ws-issue-form').reset();setTimeout(function(){openStudentIssue(r.conversationid);},350);refreshStudentIssues(true);};
+    if(file)uploadIssueAttachment(r.messageid,file,finish,function(error){btn.disabled=false;btn.removeAttribute('aria-busy');msg.textContent='Message sent, but the attachment was not uploaded. '+error;msg.classList.remove('success');issueConversationId=r.conversationid;setTimeout(function(){openStudentIssue(r.conversationid);showStudentIssueError('Attachment not sent. Select it again and retry from the conversation.');},500);});else finish();
+  },function(error){btn.disabled=false;btn.removeAttribute('aria-busy');msg.textContent=(error&&error.message)||'Message not sent. Please retry.';msg.classList.remove('success');});
+}
+function uploadIssueAttachment(messageid,file,done,fail){
+  var form=new FormData();form.append('sesskey',moodleSesskey);form.append('messageid',messageid);form.append('attachment',file);
+  fetch(M.cfg.wwwroot+'/local/umat_ai/issue_attachment.php',{method:'POST',body:form,credentials:'same-origin'}).then(function(response){return response.json().then(function(data){if(!response.ok||!data.success)throw new Error(data.message||'Upload failed.');return data;});}).then(done).catch(function(error){fail(error.message||'Upload failed.');});
+}
+function appendStudentPendingMessage(item){
+  var box=document.getElementById('ws-issue-messages');if(!box)return;
+  var el=document.createElement('article');el.className='umat-issue-message mine';el.id='issue-temp-'+item.clientid;el.innerHTML='<span class="umat-issue-sender">You</span><div class="umat-issue-bubble"><div class="umat-issue-body">'+_umatEsc(item.body)+'</div><div class="umat-issue-message-meta"><span>Sending...</span></div></div>';box.appendChild(el);box.scrollTop=box.scrollHeight;
+}
+function showStudentIssueError(text){var el=document.getElementById('ws-issue-send-error');if(!el)return;el.innerHTML=_umatEsc(text)+' <button class="umat-issue-retry" data-issue-retry type="button">Retry</button>';el.classList.add('show');}
+function clearStudentIssueError(){var el=document.getElementById('ws-issue-send-error');if(el){el.classList.remove('show');el.innerHTML='';}}
+function sendStudentIssueMessage(retry){
+  if(!issueConversationId)return;var input=document.getElementById('ws-issue-reply');var fileInput=document.getElementById('ws-issue-reply-file');var item=retry||{body:input.value.trim(),file:fileInput.files[0]||null,clientid:issueClientId()};if(!item.body)return;
+  var btn=document.getElementById('ws-issue-send');btn.disabled=true;btn.setAttribute('aria-busy','true');clearStudentIssueError();var existing=document.getElementById('issue-temp-'+item.clientid);if(existing)existing.remove();appendStudentPendingMessage(item);
+  ajax('local_umat_ai_send_issue_message',{conversationid:issueConversationId,body:item.body,clientid:item.clientid},function(r){
+    var temp=document.getElementById('issue-temp-'+item.clientid);if(temp){var meta=temp.querySelector('.umat-issue-message-meta');if(meta)meta.innerHTML='<span>'+_umatEsc(issueRelativeTime(r.message.timecreated))+'</span><span class="umat-issue-receipt" aria-label="Sent">&#10003;</span>';}
+    var finish=function(){btn.disabled=false;btn.removeAttribute('aria-busy');issueFailedSend=null;if(input.value.trim()===item.body)input.value='';if(fileInput)fileInput.value='';clearIssueDraft();setTimeout(function(){loadStudentIssueMessages(true);refreshStudentIssues(true);},350);};
+    if(item.file)uploadIssueAttachment(r.message.id,item.file,finish,function(error){btn.disabled=false;btn.removeAttribute('aria-busy');issueFailedSend=item;showStudentIssueError('Attachment not sent. '+error);});else finish();
+  },function(error){btn.disabled=false;btn.removeAttribute('aria-busy');issueFailedSend=item;var temp=document.getElementById('issue-temp-'+item.clientid);if(temp){temp.classList.add('failed');temp.querySelector('.umat-issue-message-meta').innerHTML='<span>Message not sent.</span>';}showStudentIssueError((error&&error.message)||'Message not sent.');});
 }
 
 /* voice */
@@ -1774,24 +1810,19 @@ sendQuestion=function(q,msgsId){
   return _origSendQ(q,msgsId);
 };
 
-/* ' + '"?' + '"? Notification polling: unread lecturer responses ' + '"?' + '"? */
-function markResponsesRead(){
-  require(['core/ajax'],function(A){A.call([{methodname:'local_umat_ai_mark_responses_read',args:{courseid:courseId||0}}])[0].done(function(){});});
-  var b=document.getElementById('sb-badge-responses');if(b)b.style.display='none';
-  var gt=document.querySelector('#stu-glass-tabs [data-sb-tab="report-issue"] .umat-gb');
-  if(gt)gt.style.display='none';
-}
+/* Notification polling only counts unread messages; viewport observers mark exact messages viewed. */
 function pollUnreadCount(){
-  require(['core/ajax'],function(A){
-    A.call([{methodname:'local_umat_ai_get_unread_response_count',args:{courseid:courseId||0}}])[0].done(function(r){
-      var c=r.count||0;
-      var b=document.getElementById('sb-badge-responses');
-      if(b){b.textContent=c>9?'9+':c;b.style.display=c?'':'none';}
-      /* Also badge on glass tabs (mobile) */
-      var gt=document.querySelector('#stu-glass-tabs [data-sb-tab="report-issue"]');
-      if(gt){var gb=gt.querySelector('.umat-gb');if(!gb){gb=document.createElement('span');gb.className='umat-gb';gb.style.cssText='position:absolute;top:2px;right:2px;background:var(--u-ter);color:#fff;font-size:8px;font-weight:700;padding:1px 4px;border-radius:999px;line-height:12px;min-width:14px;text-align:center;';gt.style.position='relative';gt.appendChild(gb);}gb.textContent=c>9?'9+':c;gb.style.display=c?'':'none';}
-    });
-  });
+  var overlayOpen=ov&&ov.classList.contains('open');
+  var panelOpen=cpOv&&cpOv.classList.contains('open');
+  if(document.hidden||(!overlayOpen&&!panelOpen))return;
+  ajax('local_umat_ai_get_issue_unread_count',{inbox:'student',courseid:courseId||0},function(r){updateStudentIssueBadge(r.count||0);},function(){});
+  if(overlayOpen&&document.querySelector('[data-tab="report-issue"].active'))refreshStudentIssues(true);
+}
+function updateStudentIssueBadge(c){
+  var b=document.getElementById('sb-badge-responses');
+  if(b){b.textContent=c>99?'99+':c;b.style.display=c?'':'none';}
+  var gt=document.querySelector('#stu-glass-tabs [data-sb-tab="report-issue"]');
+  if(gt){var gb=gt.querySelector('.umat-gb');if(!gb){gb=document.createElement('span');gb.className='umat-gb';gb.style.cssText='position:absolute;top:2px;right:2px;background:var(--u-ter);color:#fff;font-size:8px;font-weight:700;padding:1px 4px;border-radius:999px;line-height:12px;min-width:14px;text-align:center;';gt.style.position='relative';gt.appendChild(gb);}gb.textContent=c>99?'99+':c;gb.style.display=c?'':'none';}
 }
 /* Save quiz state to server before page unload */
 window.addEventListener('beforeunload',function(){
@@ -1914,7 +1945,9 @@ switchToTab=function(name){
 };
 
 pollUnreadCount();
-var _stuBadgeTimer=setInterval(pollUnreadCount,30000);
+var _stuBadgeTimer=setInterval(pollUnreadCount,20000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)pollUnreadCount();});
+if(parseInt(new URLSearchParams(window.location.search).get('umat_issue'))){openOverlay();switchToTab('report-issue');}
 })();
 }
 };

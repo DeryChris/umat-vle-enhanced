@@ -52,6 +52,17 @@ $capabilities = [
         ],
     ],
 
+    // Read and reply to private Student Issues conversations for a course.
+    'local/umat_ai:manageissues' => [
+        'captype'      => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes'   => [
+            'editingteacher' => CAP_ALLOW,
+            'teacher'        => CAP_ALLOW,
+            'manager'        => CAP_ALLOW,
+        ],
+    ],
+
     // View the lecturer analytics dashboard (teachers + managers only).
     'local/umat_ai:viewanalytics' => [
         'captype'      => 'read',

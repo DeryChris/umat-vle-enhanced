@@ -67,11 +67,6 @@ define(['core/ajax'], function(Ajax) {
         var body = document.getElementById('qgen-body');
         if (!body) return;
 
-        if (courseId === 0) {
-            body.innerHTML = '<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>Select a course to generate quiz questions.</p></div>';
-            return;
-        }
-
         body.innerHTML =
             '<div class="qgen-skeleton">' +
             '  <div class="qgen-sk-card"><div class="qgen-sk-line w60"></div><div class="qgen-sk-line w80"></div><div class="qgen-sk-line h80"></div><div class="qgen-sk-line w40"></div></div>' +
@@ -104,7 +99,12 @@ define(['core/ajax'], function(Ajax) {
             });
         });
 
-        renderForm(courseId);
+        if (courseId === 0) {
+            var genTab = document.getElementById('qgen-tab-generate');
+            if (genTab) genTab.innerHTML = '<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>Select a course to generate quiz questions.</p></div>';
+        } else {
+            renderForm(courseId);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -1495,9 +1495,9 @@ define(['core/ajax'], function(Ajax) {
         }
 
         html += '<div class="qgen-paper-q-actions">';
-        html += '<button class="qgen-pa-btn qgen-pa-edit" data-action="edit" data-idx="' + (num - 1) + '" title="Edit question"><span class="material-symbols-outlined">edit</span></button>';
-        html += '<button class="qgen-pa-btn qgen-pa-regen" data-action="regenerate" data-idx="' + (num - 1) + '" title="Regenerate this question"><span class="material-symbols-outlined">auto_awesome</span></button>';
-        html += '<button class="qgen-pa-btn qgen-pa-delete" data-action="delete" data-idx="' + (num - 1) + '" title="Remove question"><span class="material-symbols-outlined">delete</span></button>';
+        html += '<button type="button" class="qgen-pa-btn qgen-pa-edit" data-action="edit" data-idx="' + (num - 1) + '" title="Edit question"><span class="material-symbols-outlined">edit</span></button>';
+        html += '<button type="button" class="qgen-pa-btn qgen-pa-regen" data-action="regenerate" data-idx="' + (num - 1) + '" title="Regenerate this question"><span class="material-symbols-outlined">auto_awesome</span></button>';
+        html += '<button type="button" class="qgen-pa-btn qgen-pa-delete" data-action="delete" data-idx="' + (num - 1) + '" title="Remove question"><span class="material-symbols-outlined">delete</span></button>';
         html += '</div>';
 
         html += '</div>';
@@ -1635,10 +1635,13 @@ define(['core/ajax'], function(Ajax) {
 
         // Question action buttons (delegated).
         var content = document.getElementById('qgen-review-content');
+        console.log('[qgen] wireReviewEvents: content element =', content, 'cid =', cid);
         if (content) {
             content.addEventListener('click', function(e) {
                 var btn = e.target.closest('.qgen-pa-btn');
                 if (!btn) return;
+                e.preventDefault();
+                e.stopPropagation();
                 var action = btn.dataset.action;
                 var idx = parseInt(btn.dataset.idx);
                 if (isNaN(idx)) return;
@@ -1779,14 +1782,23 @@ define(['core/ajax'], function(Ajax) {
             showMsg('Cannot delete the last question.', 'var(--u-ter)');
             return;
         }
+        var q = _questions[idx];
+        var label = 'Question ' + (idx + 1);
+        if (q && q.question_text) {
+            label += ': ' + q.question_text.substring(0, 60) + (q.question_text.length > 60 ? '...' : '');
+        }
+        if (!window.confirm('Delete ' + label + '?\n\nThis action cannot be undone.')) {
+            return;
+        }
         _questions.splice(idx, 1);
         refreshReviewView(cid);
         showMsg('Question removed.', 'var(--u-ol)');
     }
 
     function showEditModal(idx, cid) {
+        console.log('[qgen] showEditModal called: idx=', idx, 'cid=', cid, '_questions.length=', _questions.length);
         var q = _questions[idx];
-        if (!q) return;
+        if (!q) { console.error('[qgen] showEditModal: _questions[' + idx + '] is undefined'); return; }
 
         var isMCQ = q.type === 'multichoice' || q.type === 'truefalse';
 
@@ -1813,7 +1825,7 @@ define(['core/ajax'], function(Ajax) {
             '<div class="qgen-modal" id="qgen-edit-modal">' +
             '<div class="qgen-modal-header">' +
             '<h3><span class="material-symbols-outlined">edit</span> Edit Question ' + (idx + 1) + '</h3>' +
-            '<button class="qgen-modal-close" id="qgen-edit-close"><span class="material-symbols-outlined">close</span></button>' +
+            '<button type="button" class="qgen-modal-close" id="qgen-edit-close"><span class="material-symbols-outlined">close</span></button>' +
             '</div>' +
             '<div class="qgen-modal-body">' +
             '<div class="qgen-edit-field">' +
@@ -1837,8 +1849,8 @@ define(['core/ajax'], function(Ajax) {
             '</div>' +
             '</div>' +
             '<div class="qgen-modal-footer">' +
-            '<button class="umat-btn-s" id="qgen-edit-cancel">Cancel</button>' +
-            '<button class="umat-btn-p" id="qgen-edit-save"><span class="material-symbols-outlined">check</span> Save Changes</button>' +
+            '<button type="button" class="umat-btn-s" id="qgen-edit-cancel">Cancel</button>' +
+            '<button type="button" class="umat-btn-p" id="qgen-edit-save"><span class="material-symbols-outlined">check</span> Save Changes</button>' +
             '</div>' +
             '</div>' +
             '</div>';
@@ -1847,9 +1859,10 @@ define(['core/ajax'], function(Ajax) {
 
         var overlay = document.getElementById('qgen-edit-overlay');
         if (!overlay) {
-            console.error('[qgen] showEditModal: overlay not found after insert');
+            console.error('[qgen] showEditModal: overlay not found after insert. Modal HTML length:', modalHtml.length);
             return;
         }
+        console.log('[qgen] showEditModal: overlay created. Parent:', overlay.parentElement.tagName, '#id=' + overlay.parentElement.id);
         var closeBtn = document.getElementById('qgen-edit-close');
         var cancelBtn = document.getElementById('qgen-edit-cancel');
         var saveBtn = document.getElementById('qgen-edit-save');
@@ -1891,8 +1904,9 @@ define(['core/ajax'], function(Ajax) {
     }
 
     function showRegenerateDialog(idx, cid) {
+        console.log('[qgen] showRegenerateDialog called: idx=', idx, 'cid=', cid, '_questions.length=', _questions.length);
         var q = _questions[idx];
-        if (!q) return;
+        if (!q) { console.error('[qgen] showRegenerateDialog: _questions[' + idx + '] is undefined'); return; }
 
         var oldQ = JSON.parse(JSON.stringify(q));
         var REGEN_ACTIONS = [
@@ -1914,7 +1928,7 @@ define(['core/ajax'], function(Ajax) {
             '<div class="qgen-modal" id="qgen-regen-modal">' +
             '<div class="qgen-modal-header">' +
             '<h3><span class="material-symbols-outlined">auto_awesome</span> Regenerate Question ' + (idx + 1) + '</h3>' +
-            '<button class="qgen-modal-close" id="qgen-regen-close"><span class="material-symbols-outlined">close</span></button>' +
+            '<button type="button" class="qgen-modal-close" id="qgen-regen-close"><span class="material-symbols-outlined">close</span></button>' +
             '</div>' +
             '<div class="qgen-modal-body">' +
             '<div class="qgen-regen-current">' +
@@ -1932,8 +1946,8 @@ define(['core/ajax'], function(Ajax) {
             '<div id="qgen-regen-result" style="display:none;"></div>' +
             '</div>' +
             '<div class="qgen-modal-footer">' +
-            '<button class="umat-btn-s" id="qgen-regen-cancel">Cancel</button>' +
-            '<button class="umat-btn-p" id="qgen-regen-start"><span class="material-symbols-outlined">auto_awesome</span> Regenerate</button>' +
+            '<button type="button" class="umat-btn-s" id="qgen-regen-cancel">Cancel</button>' +
+            '<button type="button" class="umat-btn-p" id="qgen-regen-start"><span class="material-symbols-outlined">auto_awesome</span> Regenerate</button>' +
             '</div>' +
             '</div>' +
             '</div>';
@@ -1942,9 +1956,10 @@ define(['core/ajax'], function(Ajax) {
 
         var overlay = document.getElementById('qgen-regen-overlay');
         if (!overlay) {
-            console.error('[qgen] showRegenerateDialog: overlay not found after insert');
+            console.error('[qgen] showRegenerateDialog: overlay not found after insert. Modal HTML length:', modalHtml.length);
             return;
         }
+        console.log('[qgen] showRegenerateDialog: overlay created. Parent:', overlay.parentElement.tagName, '#id=' + overlay.parentElement.id);
         var closeBtn = document.getElementById('qgen-regen-close');
         var cancelBtn = document.getElementById('qgen-regen-cancel');
         var startBtn = document.getElementById('qgen-regen-regen') || document.getElementById('qgen-regen-start');
@@ -1996,8 +2011,8 @@ define(['core/ajax'], function(Ajax) {
                         '<div class="qgen-regen-text">' + esc(newQ.question_text) + '</div>' +
                         '</div>' +
                         '<div class="qgen-regen-compare-actions">' +
-                        '<button class="umat-btn-s" id="qgen-regen-keep-old"><span class="material-symbols-outlined">history</span> Keep Original</button>' +
-                        '<button class="umat-btn-p" id="qgen-regen-use-new"><span class="material-symbols-outlined">check</span> Use New</button>' +
+                        '<button type="button" class="umat-btn-s" id="qgen-regen-keep-old"><span class="material-symbols-outlined">history</span> Keep Original</button>' +
+                        '<button type="button" class="umat-btn-p" id="qgen-regen-use-new"><span class="material-symbols-outlined">check</span> Use New</button>' +
                         '</div>';
 
                     document.getElementById('qgen-regen-keep-old').addEventListener('click', function() {
@@ -2369,7 +2384,13 @@ define(['core/ajax'], function(Ajax) {
             var statusLabel = j.status.charAt(0).toUpperCase() + j.status.slice(1);
             var config = {};
             try { config = JSON.parse(j.config_summary || '{}'); } catch(e) {}
-            var configStr = [config.bloom_level, config.difficulty, (config.question_types || []).join('/'), config.total_questions + 'q'].join(' \u00b7 ');
+            var qtypes = config.question_types || [];
+            if (Array.isArray(qtypes)) {
+                qtypes = qtypes.join('/');
+            } else if (typeof qtypes === 'object') {
+                qtypes = Object.keys(qtypes).join('/');
+            }
+            var configStr = [config.bloom_level, config.difficulty, qtypes, (config.total_questions || 0) + 'q'].join(' \u00b7 ');
 
             html += '<tr class="qgen-hrow-' + j.status + '">' +
                 '<td class="qgen-hdate">' + esc(dateStr) + '</td>' +

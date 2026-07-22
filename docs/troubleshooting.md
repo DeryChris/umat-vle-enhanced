@@ -182,6 +182,26 @@ class Base(DeclarativeBase):
 
 ---
 
+**Problem:** An AMD source change works in `amd/src` but Moodle still serves old chat JavaScript
+
+**Solution:** Build the affected modules with Moodle's Grunt configuration, purge Moodle caches, and hard-refresh the browser. Run these commands from the repository root:
+
+```powershell
+cd moodle
+npm exec --yes --package=node@22 --package=grunt-cli -- grunt rollup --root=public/local/umat_ai --files=public/local/umat_ai/amd/src/umat_hub.js,public/local/umat_ai/amd/src/umatshared.js
+C:\xampp\php\php.exe admin\cli\purge_caches.php
+```
+
+The authoritative runtime build is `amd/build/*.min.js`. Moodle's Grunt task also creates `*.min.js.map`; when `cachejs` is disabled, `requirejs.php` uses that map to serve the rebuilt minified file with source debugging. Do not manually copy source into the legacy unminified `amd/build/*.js` files.
+
+For modules that already pass Moodle ESLint, use the full validation and build task instead:
+
+```powershell
+npm exec --yes --package=node@22 --package=grunt-cli -- grunt amd --root=public/local/umat_ai --files=public/local/umat_ai/amd/src/module.js
+```
+
+---
+
 ## Git
 
 **Problem:** `git push` asks for username and password every time

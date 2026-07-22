@@ -8,6 +8,8 @@ namespace local_umat_ai\external;
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->libdir . '/externallib.php');
 
+use local_umat_ai\issue_manager;
+
 class issue_report extends \external_api {
 
     // ------------------------------------------------------------------ //
@@ -23,7 +25,8 @@ class issue_report extends \external_api {
     }
 
     public static function submit_issue($courseid, $category, $topic, $description) {
-        global $DB, $USER;
+        global $USER;
+
         try {
             $params = self::validate_parameters(self::submit_issue_parameters(), [
                 'courseid'    => $courseid,
@@ -35,78 +38,40 @@ class issue_report extends \external_api {
             $category    = $params['category'];
             $topic       = trim($params['topic'] ?? '');
             $description = trim($params['description']);
-            $userid      = (int)$USER->id;
-
             if (!$courseid) {
                 return ['success' => false, 'issue_id' => 0, 'message' => 'Please open a course page to submit an issue report.'];
             }
-
-            $context = \context_course::instance($courseid);
-            self::validate_context($context);
-            require_capability('local/umat_ai:chatwithai', $context);
-
-            if (strlen($description) < 10) {
-                throw new \moodle_exception('Please provide a more detailed description (at least 10 characters).');
-            }
-
-            $now = time();
-            $id = $DB->insert_record('umat_ai_issue_reports', (object)[
-                'userid'       => $userid,
-                'courseid'     => $courseid,
-                'category'     => $category,
-                'topic'        => $topic,
-                'description'  => $description,
-                'status'       => 'open',
-                'lecturer_notes' => null,
-                'timecreated'  => $now,
-                'timemodified' => $now,
-            ]);
-
-            $DB->insert_record('umat_ai_activity_log', (object)[
-                'userid'      => $userid,
-                'courseid'    => $courseid,
-                'cmid'        => null,
-                'event_type'  => 'issue_reported',
-                'event_data'  => json_encode(['category' => $category, 'topic' => $topic, 'issue_id' => $id]),
-                'timecreated' => $now,
-            ]);
-
-            if ($category === 'concept_confusion' && $topic !== '') {
-                $existing = $DB->get_record('umat_ai_student_context', [
-                    'userid' => $userid, 'courseid' => $courseid, 'topic_label' => $topic,
-                ]);
-                if ($existing) {
-                    $DB->update_record('umat_ai_student_context', (object)[
-                        'id'             => $existing->id,
-                        'struggle_score' => min(100, $existing->struggle_score + 15),
-                        'is_struggle'    => 1,
-                        'timemodified'   => $now,
-                    ]);
-                } else {
-                    $DB->insert_record('umat_ai_student_context', (object)[
-                        'userid'         => $userid,
-                        'courseid'       => $courseid,
-                        'cmid'           => null,
-                        'topic_label'    => $topic,
-                        'struggle_reason'=> 'issue_reported',
-                        'struggle_score' => 60,
-                        'is_struggle'    => 1,
-                        'timecreated'    => $now,
-                        'timemodified'   => $now,
-                    ]);
-                }
-            }
-
-            // Purge struggle-insights cache so lecturer dashboard picks up the new issue.
-            try {
-                \cache::make('local_umat_ai', 'struggle_insights')->delete("struggle_{$courseid}_60");
-            } catch (\Throwable $e) {
-                // Best-effort.
-            }
-
-            return ['success' => true, 'issue_id' => $id, 'message' => 'Issue reported successfully.'];
+            $categorymap = [
+                'concept_confusion' => 'course_material',
+                'material_error' => 'course_material',
+                'technical_issue' => 'technical_problem',
+                'suggestion' => 'other',
+                'other' => 'other',
+            ];
+            $title = $topic !== '' ? $topic : ucwords(str_replace('_', ' ', $category));
+            $clientid = 'legacyapi_' . sha1(implode('|', [
+                $USER->id,
+                $courseid,
+                $category,
+                $title,
+                $description,
+                sesskey(),
+            ]));
+            $created = issue_conversation::create_conversation(
+                $courseid,
+                $title,
+                $categorymap[$category] ?? 'other',
+                $description,
+                $clientid
+            );
+            return [
+                'success' => true,
+                'issue_id' => $created['conversationid'],
+                'message' => $created['notice'],
+            ];
         } catch (\Throwable $e) {
-            return ['success' => false, 'issue_id' => 0, 'message' => 'Error: ' . $e->getMessage()];
+            debugging('Legacy Student Issues submission failed: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            return ['success' => false, 'issue_id' => 0, 'message' => 'Message not sent. Please try again.'];
         }
     }
 
@@ -197,7 +162,7 @@ class issue_report extends \external_api {
 
         $context = \context_course::instance($courseid);
         self::validate_context($context);
-        require_capability('local/umat_ai:viewanalytics', $context);
+        issue_manager::require_manage_course($courseid);
 
         $sql  = 'SELECT r.*, u.firstname, u.lastname, u.picture, u.imagealt, u.email
                  FROM {umat_ai_issue_reports} r
@@ -282,7 +247,7 @@ class issue_report extends \external_api {
 
         $context = \context_course::instance($record->courseid);
         self::validate_context($context);
-        require_capability('local/umat_ai:viewanalytics', $context);
+        issue_manager::require_manage_course((int)$record->courseid);
 
         $update = (object)[
             'id'            => $issue_id,
@@ -328,7 +293,7 @@ class issue_report extends \external_api {
 
         $context = \context_course::instance($record->courseid);
         self::validate_context($context);
-        require_capability('local/umat_ai:viewanalytics', $context);
+        issue_manager::require_manage_course((int)$record->courseid);
 
         $DB->update_record('umat_ai_issue_reports', (object)[
             'id'                => $issue_id,

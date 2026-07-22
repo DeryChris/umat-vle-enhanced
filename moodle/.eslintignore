@@ -13,8 +13,8 @@ public/enrol/lti/ims-blti/
 public/filter/algebra/AlgParser.pm
 public/filter/codehighlighter/amd/src/prism.js
 public/filter/tex/mimetex.*
-public/h5p/h5plib/v127/joubel/core/
-public/h5p/h5plib/v127/joubel/editor/
+public/h5p/h5plib/v128/joubel/core/
+public/h5p/h5plib/v128/joubel/editor/
 public/lib/editor/tiny/plugins/html/amd/src/codemirror-lazy.js
 public/lib/editor/tiny/plugins/html/amd/src/beautify/
 public/lib/editor/tiny/plugins/recordrtc/amd/src/lame.all.js
@@ -109,4 +109,9 @@ public/theme/boost/scss/bootstrap/
 public/theme/boost/amd/src/bootstrap/
 public/theme/boost/amd/src/index.js
 public/theme/boost/scss/fontawesome/
+public/theme/boost_magnific/_editor/
+public/theme/boost_magnific/scss/bootstrap/
+public/theme/boost_magnific/scss/fontawesome/
+public/theme/boost_magnific/amd/src/minicolors.js
+public/theme/boost_magnific/amd/src/acctoolbar.js
 public/theme/moove/fonts/

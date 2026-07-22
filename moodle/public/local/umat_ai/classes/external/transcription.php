@@ -254,9 +254,11 @@ class transcription extends external_api {
         $raw = $client->get($cfg['url'] . '/api/v1/transcription/list/' . $courseid);
         $result = json_decode($raw, true);
 
+        $jobs = $result['jobs'] ?? [];
+
         return [
             'success' => true,
-            'jobs'    => $result['jobs'] ?? [],
+            'jobs'    => json_encode($jobs),
             'count'   => $result['count'] ?? 0,
         ];
     }

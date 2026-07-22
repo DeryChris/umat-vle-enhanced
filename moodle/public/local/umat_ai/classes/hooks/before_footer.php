@@ -61,7 +61,11 @@ class before_footer {
             $hook->add_html('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">');
             /* Admin check — site admins see only the admin FAB, bypass all other overlays */
             $isAdmin = has_capability('local/umat_ai:adminpanel', \context_system::instance());
-            if ($isAdmin && get_config('local_umat_ai', 'enable_admin_fab')) {
+            $isCourseIssueManager = $courseid && has_capability(
+                'local/umat_ai:viewanalytics',
+                \context_course::instance($courseid)
+            );
+            if ($isAdmin && get_config('local_umat_ai', 'enable_admin_fab') && !$isCourseIssueManager) {
                 $hook->add_html(\local_umat_ai\overlay_helper::admin_overlay($wwwroot, $USER, $platformName));
                 $hook->add_html(\local_umat_ai\overlay_helper::glassmorph_init_js());
                 return;
@@ -70,7 +74,8 @@ class before_footer {
                 $courseCtx  = \context_course::instance($courseid);
                 $courseName = format_string($COURSE->fullname ?? '', true, ['context' => $courseCtx]);
                 $isLecturer = has_capability('local/umat_ai:viewanalytics', $courseCtx);
-                $isStudent  = !$isLecturer && is_enrolled($courseCtx, $USER, '', false);
+                $isStudent  = !$isLecturer && is_enrolled($courseCtx, $USER, '', true) &&
+                    has_capability('local/umat_ai:reportissue', $courseCtx);
                 if ($isLecturer && get_config('local_umat_ai', 'enable_lecturer_fab')) {
                     $userData = \local_umat_ai\user_data::preload_user_data($USER->id, $wwwroot);
                     $hook->add_html(\local_umat_ai\overlay_helper::lecturer_overlay($courseid, $courseName, $wwwroot, $USER, $userData, $platformName));

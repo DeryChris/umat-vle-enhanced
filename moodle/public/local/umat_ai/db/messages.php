@@ -1,7 +1,7 @@
 <?php
 /**
  * Message providers for local_umat_ai.
- * Notifies lecturers when AI-generated outputs are waiting for approval.
+ * Defines approval and private Student Issues notification channels.
  *
  * @package    local_umat_ai
  */
@@ -12,4 +12,5 @@ $messageproviders = [
     'pendingapproval' => [
         'capability' => 'local/umat_ai:approveoutput',
     ],
+    'studentissues' => [],
 ];

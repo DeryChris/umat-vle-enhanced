@@ -1,0 +1,257 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Strings for component 'theme_boost_magnific', language 'en'
+ *
+ * @package   theme_boost_magnific
+ * @copyright 2024 Eduardo Kraus {@link https://eduardokraus.com}
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+// phpcs:ignoreFile moodle.Files.LangFilesOrdering.IncorrectOrder
+
+defined('MOODLE_INTERNAL') || die;
+
+$string['access_course'] = 'Access the course';
+$string['access_course_buy'] = 'Course details';
+$string['accessibilityreport_active_items_by_student'] = 'Active items by student';
+$string['accessibilityreport_category_description'] = 'Reports provided by theme Bost Magnific.';
+$string['accessibilityreport_col_action'] = 'Action';
+$string['accessibilityreport_col_activations'] = 'Activations';
+$string['accessibilityreport_col_active_items'] = 'Active items';
+$string['accessibilityreport_col_active_items_after_action'] = 'Active items after action';
+$string['accessibilityreport_col_cmid'] = 'CM ID';
+$string['accessibilityreport_col_course'] = 'Course';
+$string['accessibilityreport_col_current_active_items'] = 'Active items in the last state';
+$string['accessibilityreport_col_datetime'] = 'Date/time';
+$string['accessibilityreport_col_deactivations'] = 'Deactivations';
+$string['accessibilityreport_col_email'] = 'Email';
+$string['accessibilityreport_col_event'] = 'Event';
+$string['accessibilityreport_col_item'] = 'Item';
+$string['accessibilityreport_col_last_interaction'] = 'Last interaction';
+$string['accessibilityreport_col_page'] = 'Page';
+$string['accessibilityreport_col_resource'] = 'Resource';
+$string['accessibilityreport_col_status'] = 'Status';
+$string['accessibilityreport_col_student'] = 'Student';
+$string['accessibilityreport_col_updated_at'] = 'Updated at';
+$string['accessibilityreport_description'] = 'theme_boost_magnific report with VLibras clicks, accessibility toolbar openings, and resource activation/deactivation.';
+$string['accessibilityreport_full_history'] = 'Full accessibility history';
+$string['accessibilityreport_open_page'] = 'Open page';
+$string['accessibilityreport_summary_by_student'] = 'Summary by student';
+$string['accessibilityreport_title'] = 'Accessibility - student usage';
+$string['accessibilityreport_toolbar_opens'] = 'Toolbar openings';
+$string['accessibilityreport_users_with_interaction'] = 'Students with interaction';
+$string['accessibilityreport_vlibras_clicks'] = 'VLibras clicks';
+$string['accessibilityreport_who_toggled_each_resource'] = 'Who activated/deactivated each resource';
+$string['acctoolbar_access_declaration'] = 'Accessibility statement';
+$string['acctoolbar_btn_bright'] = 'Bright contrast';
+$string['acctoolbar_btn_cursor_black'] = 'Big black cursor';
+$string['acctoolbar_btn_cursor_white'] = 'Big white cursor';
+$string['acctoolbar_btn_font_down'] = 'Decrease text';
+$string['acctoolbar_btn_font_readable'] = 'Readable text';
+$string['acctoolbar_btn_font_up'] = 'Increase text';
+$string['acctoolbar_btn_images_titles'] = 'Images titles';
+$string['acctoolbar_btn_invert'] = 'Reverse contrast';
+$string['acctoolbar_btn_monochrome'] = 'Uncolored display';
+$string['acctoolbar_btn_open'] = 'Accessibility menu';
+$string['acctoolbar_btn_underline_headers'] = 'Underline headers';
+$string['acctoolbar_btn_underline_links'] = 'Underline links';
+$string['acctoolbar_btn_zoom_in'] = 'Zoom screen';
+$string['acctoolbar_content_block_header'] = 'Highlighting content';
+$string['acctoolbar_contrast_block_header'] = 'Color contrast';
+$string['acctoolbar_debug_contacts'] = 'Report an accessibility problem';
+$string['acctoolbar_disable_animattions'] = 'Block animations';
+$string['acctoolbar_dyslexic'] = 'Dyslexia Legible Font';
+$string['acctoolbar_image_without_alt'] = 'Image without text';
+$string['acctoolbar_keyboard_root'] = 'keyboard navigation';
+$string['acctoolbar_reset_all_settings'] = 'Reset settings';
+$string['acctoolbar_text_block_header'] = 'Text size';
+$string['acctoolbar_toolbar'] = 'Accessibility';
+$string['acctoolbar_zoom_block_header'] = 'Zoom in';
+$string['add_block'] = '+ Add new block';
+$string['add_block_edit'] = 'Add and edit this block';
+$string['advancedsettings'] = 'Advanced settings';
+$string['background_profile_image'] = 'Default course background image';
+$string['background_profile_image_desc'] = 'Sets a default background image for the header of all courses. This image will be displayed at the top of the course page and can be individually replaced in the course settings.';
+$string['backgroundimage'] = 'Background image';
+$string['backgroundimage_desc'] = 'The image to display as a background of the site. The background image you upload here will override the background image in your theme preset files.';
+$string['brandcolor'] = 'Primary interface color';
+$string['brandcolor_background_menu'] = 'Apply brand color to menu background';
+$string['brandcolor_background_menu_desc'] = 'This setting defines whether the color set in "Brand color" will be applied to the menu items or to the menu background.<br>If applied to the background, the menu text will be displayed in white to ensure proper contrast.';
+$string['brandcolor_desc'] = 'Set the highlight color using the selection above or by choosing from the palette below.';
+$string['breadcrumb_settings'] = 'Breadcrumb';
+$string['breadcrumb_show_categories'] = 'Show course categories in the breadcrumb';
+$string['breadcrumb_show_categories_desc'] = 'If enabled, category items will remain visible in the breadcrumb in course and activity pages.';
+$string['breadcrumb_show_course'] = 'Show the course in the breadcrumb';
+$string['breadcrumb_show_course_desc'] = 'If enabled, the course breadcrumb node will remain visible when the theme would normally remove it.';
+$string['breadcrumb_show_mycourses_courses'] = 'Show “My courses” and “Courses” in the breadcrumb';
+$string['breadcrumb_show_mycourses_courses_desc'] = 'If enabled, the “My courses” and “Courses” items will remain visible in course and activity pages.';
+$string['breadcrumb_show_navigation_duplicates'] = 'Show items that already exist in the primary or secondary navigation';
+$string['breadcrumb_show_navigation_duplicates_desc'] = 'If enabled, breadcrumb items that already exist in the primary or secondary navigation will not be removed.';
+$string['breadcrumb_show_no_link_items'] = 'Show items without link in the breadcrumb';
+$string['breadcrumb_show_no_link_items_desc'] = 'If enabled, items without action URL will remain visible in the breadcrumb, except the last item rule still applies normally.';
+$string['breadcrumb_show_sections'] = 'Show sections in the breadcrumb';
+$string['breadcrumb_show_sections_desc'] = 'If enabled, section items will remain visible in the breadcrumb even when the course format allows removing them.';
+$string['cachedef_course_cache'] = 'Course data cache';
+$string['cachedef_course_module_cache'] = 'Course modules cache';
+$string['cachedef_css_cache'] = 'CSS stylesheets cache';
+$string['cachedef_data_cache'] = 'Data cache';
+$string['cachedef_frontpage_cache'] = 'Frontpage cache';
+$string['choosereadme'] = 'Boost Magnific is a modern highly-customisable theme. This theme is intended to be used directly, or as a parent theme when creating new themes utilising Bootstrap 4.';
+$string['configtitle'] = 'Boost Magnific';
+$string['course_colors_desc'] = 'Set the highlight color for this course only, or choose one of the samples below.';
+$string['course_colors_title'] = 'Override the primary color in this course.';
+$string['course_scorm_autoenter'] = 'Auto-enter SCORM';
+$string['course_scorm_autoenter_desc'] = 'If enabled, the SCORM player opens automatically after the initial page loads. If disabled, the user must click "Enter" to start the SCORM.';
+$string['course_sections_icons_banner'] = 'Show courses with icons instead of a list';
+$string['course_sections_icons_banner_block'] = 'Activities as blocks';
+$string['course_sections_icons_banner_desc'] = 'Choose how you want to view the courses: in <strong>list</strong> to see more details for each course, or in <strong>icons (grid)</strong> for a more visual navigation. You can change this option at any time.';
+$string['course_sections_icons_banner_list'] = 'Activities as list';
+$string['course_summary'] = 'Show course summary before the Course';
+$string['course_summary_banner'] = 'Show course summary before the Course';
+$string['course_summary_banner_desc'] = 'If enabled, the course summary will be displayed before the main course content on the course page.';
+$string['course_summary_banner_edit'] = 'Edit the banner image of this course';
+$string['course_summary_banner_none'] = 'No header';
+$string['course_summary_banner_simple'] = 'Simple header';
+$string['course_summary_banner_title'] = 'Header with banner';
+$string['course_summary_desc'] = 'If enabled, the course summary will be displayed before the main course content on the course page.';
+$string['courseindexoptions'] = 'Course index options';
+$string['coursesettings'] = 'Course';
+$string['delete_block_confirm'] = 'Are you sure you want to delete the block?';
+$string['delete_block_success'] = 'Block successfully deleted';
+$string['delete_block_title'] = 'Delete block';
+$string['details-completaram'] = 'Completed the course';
+$string['details-emprogresso'] = 'In progress';
+$string['details-not-access'] = 'Never accessed';
+$string['details-teachers'] = 'Teachers';
+$string['details-users'] = 'Students';
+$string['edit_block'] = 'Edit block';
+$string['error_invalidscss'] = 'Invalid SCSS: {$a}';
+$string['favicon'] = 'Favicon';
+$string['favicon_desc'] = 'The favicon is displayed next to the page title in the browser tab. A Moodle favicon is displayed if a custom favicon is not provided.';
+$string['footer_background_color'] = 'Footer background color';
+$string['footer_background_color_desc'] = 'Select the background color for the website’s footer section. Leave blank to use the primary color.';
+$string['footer_copywriter'] = 'Made with ❤️ by';
+$string['footer_heading'] = 'Block {$a}';
+$string['footer_heading_description_desc'] = '<ul>
+  <li><strong>No blocks filled:</strong> the footer will not be displayed.</li>
+  <li><strong>1 block filled:</strong> the content will be displayed as text, without block formatting.</li>
+  <li><strong>2, 3, or 4 blocks filled:</strong> the theme will automatically adjust the layout to display the blocks responsively and proportionally.</li>
+</ul>
+Fill in only the blocks you need, the theme takes care of the rest.';
+$string['footer_heading_description_title'] = 'The theme automatically adapts to the number of footer blocks you fill in:';
+$string['footer_html'] = 'Footer Block {$a} HTML';
+$string['footer_html_desc'] = 'Add the custom HTML code that will be displayed in footer block {$a}.';
+$string['footer_show_copywriter'] = 'Show Made with ❤️';
+$string['footer_show_copywriter_desc'] = 'Uncheck if you want to hide the "Made with ❤️"';
+$string['footer_title'] = 'Block Title {$a}';
+$string['footer_title_desc'] = 'Set the title that will appear above the HTML content in footer block {$a}.';
+$string['footersettings'] = 'Footer Settings';
+$string['frontpage_add_block'] = 'Add new block';
+$string['frontpage_add_block_title'] = 'Select the sample block to add';
+$string['frontpage_change_editor'] = 'Create the homepage with the Page editor?';
+$string['frontpage_enable_editing'] = 'Enable editing to add items to the homepage';
+$string['generalsettings'] = 'General settings';
+$string['homesettings'] = 'Home Settings';
+$string['imageacceptedtypes'] = 'Only image files of type {$a} are allowed';
+$string['language_all'] = 'All available languages';
+$string['loginbackgroundimage'] = 'Login page background image';
+$string['loginbackgroundimage_desc'] = 'The image to display as a background for the login page.';
+$string['loginlogo'] = 'PNG/SVG logo for login screen';
+$string['loginlogo_desc'] = 'Upload the logo in PNG or SVG format to be displayed on the login screen. The logo should be clear and representative of your institution or company\'s visual identity, ensuring a professional and consistent login experience for users.';
+$string['loginsettings'] = 'Login Settings';
+$string['logintheme'] = 'Login canvas theme';
+$string['logintheme_aurora'] = 'Aurora';
+$string['logintheme_clean-minimal'] = 'Clean Minimal';
+$string['logintheme_clean-outline'] = 'Clean Outline';
+$string['logintheme_dark-elegante'] = 'Dark Elegante';
+$string['logintheme_desc'] = 'Select a visual theme that will be shown in the login canvas.';
+$string['logintheme_glassmorphism'] = 'Glassmorphism';
+$string['logintheme_selva-canopy'] = 'Forest Canopy';
+$string['logintheme_serenity-med-blue'] = 'Serenity Med Blue';
+$string['logintheme_serenity-med-red'] = 'Serenity Med Emergency/Cardiology';
+$string['navbarlayout'] = 'Navbar layout';
+$string['navbarlayout_classic'] = 'Classic (single row)';
+$string['navbarlayout_desc'] = 'Choose the navbar visual structure used on desktop pages.';
+$string['navbarlayout_institutional'] = 'Institutional (two rows)';
+$string['notenrolledincourse'] = 'You are not enrolled in this course.';
+$string['pluginname'] = 'Boost Magnific';
+$string['preview'] = 'Block preview';
+$string['privacy:accessibilitylogpath'] = 'Accessibility usage log';
+$string['privacy:drawerblockclosed'] = 'The current preference for the block drawer is closed.';
+$string['privacy:drawerblockopen'] = 'The current preference for the block drawer is open.';
+$string['privacy:drawerindexclosed'] = 'The current preference for the index drawer is closed.';
+$string['privacy:drawerindexopen'] = 'The current preference for the index drawer is open.';
+$string['privacy:metadata'] = 'The Boost Magnific theme does not store any personal data about any user.';
+$string['privacy:metadata:preference:draweropenblock'] = 'The user\'s preference for hiding or showing the drawer with blocks.';
+$string['privacy:metadata:preference:draweropenindex'] = 'The user\'s preference for hiding or showing the drawer with course index.';
+$string['privacy:metadata:preference:draweropennav'] = 'The user\'s preference for hiding or showing the drawer menu navigation.';
+$string['privacy:metadata:theme_boost_magnific_accesslog'] = 'Stores clicks and state changes in the theme accessibility tools.';
+$string['privacy:metadata:theme_boost_magnific_accesslog:action'] = 'The type of accessibility interaction.';
+$string['privacy:metadata:theme_boost_magnific_accesslog:activeitems'] = 'The active accessibility items after the interaction.';
+$string['privacy:metadata:theme_boost_magnific_accesslog:cmid'] = 'The course module detected when the interaction happened.';
+$string['privacy:metadata:theme_boost_magnific_accesslog:courseid'] = 'The course detected when the interaction happened.';
+$string['privacy:metadata:theme_boost_magnific_accesslog:item'] = 'The accessibility item that was clicked or changed.';
+$string['privacy:metadata:theme_boost_magnific_accesslog:pageurl'] = 'The page where the interaction happened.';
+$string['privacy:metadata:theme_boost_magnific_accesslog:statejson'] = 'The browser accessibility state after the interaction.';
+$string['privacy:metadata:theme_boost_magnific_accesslog:status'] = 'The resulting status after the interaction.';
+$string['privacy:metadata:theme_boost_magnific_accesslog:timecreated'] = 'The time when the interaction happened.';
+$string['privacy:metadata:theme_boost_magnific_accesslog:userid'] = 'The user who interacted with the accessibility tool.';
+$string['quickstart_alert_notadd'] = 'It is not possible to change the homepage banner after it has been added. To modify it, you need to go to the <a href="{$a}/">homepage</a> and delete the existing banner.';
+$string['quickstart_alert_notdelete'] = 'It is not possible to remove blocks added here. To delete them, go to the <a href="{$a}/">homepage</a> and remove the blocks you no longer want.';
+$string['quickstart_banner-recreation-room'] = 'Recreation room';
+$string['quickstart_banner-saved'] = 'The settings have been saved successfully.';
+$string['quickstart_course_choose_below'] = 'Or choose a banner below';
+$string['quickstart_course_upload_or_choose'] = 'Upload an image or choose the type of banner you want';
+$string['quickstart_home_pagebuilder'] = 'Home with Page Editor';
+$string['quickstart_home_pagebuilder_desc'] = 'Customizable interface with editable sections.';
+$string['quickstart_home_selectsections'] = 'Select the desired sections:';
+$string['quickstart_home_selectstyle'] = 'Choose the Home style';
+$string['quickstart_home_traditional'] = 'Traditional Moodle Home';
+$string['quickstart_home_traditional_desc'] = 'Default Moodle homepage with blocks and courses. Click the button below to edit system settings.';
+$string['quickstart_settings_link'] = '<div class="card mb-5">
+<div class="card-header">Quick Start</div>
+<div class="card-body"><a href="{$a}">Access the Quick Start Guide</a> and use the intuitive configurator to customize these and other settings of the Boost Magnific theme.</div>
+</div>';
+$string['quickstart_title'] = 'Theme Settings Center';
+$string['region-side-pre'] = 'Right';
+$string['report_accessibility_title'] = 'Accessibility reports';
+$string['report_kopere_bi_install_step_1'] = 'Download the Kopere BI plugin from the Moodle plugins directory.';
+$string['report_kopere_bi_install_step_2'] = 'Install it in local/kopere_bi and complete the Moodle upgrade.';
+$string['report_kopere_bi_install_step_3'] = 'Return to this page. The theme will install the accessibility reports before redirecting to Kopere BI.';
+$string['report_kopere_bi_missing_intro'] = 'The accessibility report is delivered through Kopere BI. Install the local_kopere_bi plugin before opening this report.';
+$string['report_kopere_bi_missing_title'] = 'Kopere BI is not installed';
+$string['report_kopere_bi_plugin_link'] = 'Open local_kopere_bi on moodle.org';
+$string['reportfilemissing'] = 'The Kopere BI report file was not found in the theme.';
+$string['secondary'] = 'Secondary color';
+$string['secondary_desc'] = 'Select the secondary color used by the theme for accents and complementary elements (e.g., buttons, links, highlights, and borders). Choose a color that contrasts well with the primary color for better readability and accessibility.';
+$string['settings_accessibility'] = 'Enable accessibility options';
+$string['settings_accessibility_desc'] = 'Allows customization of options to improve platform accessibility, such as contrast, font size, and keyboard navigation.';
+$string['settings_accessibility_heading'] = 'Accessibility';
+$string['settings_icons_change_icons'] = 'Change the default icon in the course list';
+$string['settings_icons_color_icon'] = 'Set a custom color for the icon.';
+$string['settings_icons_color_icon_desc'] = 'Select the background color for the icon displayed in the course list. Leave blank to use the theme\'s default color.';
+$string['settings_icons_upload_icon'] = 'Upload the custom icon.';
+$string['settings_icons_upload_image'] = 'Block Image';
+$string['settings_icons_upload_image_desc'] = 'If an image is provided, the theme will convert the module row into a block, using the image as its background. The image must have a 16:9 aspect ratio.';
+$string['showfooter'] = 'Show footer';
+$string['top_color_heading'] = 'Scroll Top Color';
+$string['top_scroll_background_color'] = 'Background Color of Top Menu on Scroll';
+$string['top_scroll_background_color_desc'] = 'Set the background color when scrolling the page.';
+$string['top_scroll_fix'] = 'Pin the menu when scrolling the page';
+$string['top_scroll_fix_desc'] = 'When enabled, the menu will be pinned to the top of the screen while you scroll the page, ensuring easy access to menu options.';
+$string['userprofilesettings'] = 'User Profile';

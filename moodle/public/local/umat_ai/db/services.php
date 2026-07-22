@@ -134,8 +134,8 @@ $functions = [
     /* ---- Issue Reports ---- */
     'local_umat_ai_submit_issue' => [
         'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'submit_issue',
-        'description' => 'Student submits an issue/complaint', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+        'description' => 'Compatibility endpoint for creating a private issue conversation', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:reportissue',
     ],
     'local_umat_ai_get_student_issues' => [
         'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'get_student_issues',
@@ -145,32 +145,37 @@ $functions = [
     'local_umat_ai_get_course_issues' => [
         'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'get_course_issues',
         'description' => 'Lecturer views all issues for a course', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:manageissues',
     ],
-    'local_umat_ai_update_issue_status' => [
-        'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'update_issue_status',
-        'description' => 'Lecturer updates issue status and notes', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    'local_umat_ai_create_issue_conversation' => [
+        'classname' => '\local_umat_ai\external\issue_conversation', 'methodname' => 'create_conversation',
+        'description' => 'Create a private course issue conversation', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:reportissue',
     ],
-    'local_umat_ai_update_issue_response' => [
-        'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'update_issue_response',
-        'description' => 'Lecturer posts a public response to a student issue', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    'local_umat_ai_list_issue_conversations' => [
+        'classname' => '\local_umat_ai\external\issue_conversation', 'methodname' => 'list_conversations',
+        'description' => 'List authorized private course issue conversations', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true,
     ],
-    'local_umat_ai_get_unread_response_count' => [
-        'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'get_unread_response_count',
-        'description' => 'Student checks how many lecturer responses are unread', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    'local_umat_ai_get_issue_messages' => [
+        'classname' => '\local_umat_ai\external\issue_conversation', 'methodname' => 'get_messages',
+        'description' => 'Open one authorized private issue conversation', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true,
     ],
-    'local_umat_ai_mark_responses_read' => [
-        'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'mark_responses_read',
-        'description' => 'Student marks all lecturer responses as read', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    'local_umat_ai_send_issue_message' => [
+        'classname' => '\local_umat_ai\external\issue_conversation', 'methodname' => 'send_message',
+        'description' => 'Send an idempotent private issue message', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true,
     ],
-    'local_umat_ai_get_unresponded_issues_count' => [
-        'classname'   => '\local_umat_ai\external\issue_report', 'methodname' => 'get_unresponded_issues_count',
-        'description' => 'Lecturer counts total issues for notification badge', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    'local_umat_ai_mark_issue_messages_viewed' => [
+        'classname' => '\local_umat_ai\external\issue_conversation', 'methodname' => 'mark_viewed',
+        'description' => 'Mark only displayed recipient messages as viewed', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true,
+    ],
+    'local_umat_ai_get_issue_unread_count' => [
+        'classname' => '\local_umat_ai\external\issue_conversation', 'methodname' => 'get_unread_count',
+        'description' => 'Count unread private issue messages', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true,
     ],
 
 

@@ -1,0 +1,291 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template theme_boost_magnific/drawers
+
+    Theme drawer template.
+
+    Context variables required for this template:
+    * sitename - The name of the site
+    * output - The core renderer for the page
+    * bodyattributes - attributes for the body tag as a string of html attributes
+    * sidepreblocks - HTML for the blocks
+    * hasblocks - true if there are blocks on this page
+    * courseindexopen - true if the nav drawer should be open on page load
+    * regionmainsettingsmenu - HTML for the region main settings menu
+    * hasregionmainsettingsmenu - There is a region main settings menu on this page.
+
+    Example context (json):
+    {
+        "sitename": "Moodle",
+        "output": {
+            "doctype": "<!DOCTYPE html>",
+            "page_title": "Test page",
+            "favicon": "favicon.ico",
+            "main_content": "<h1>Headings make html validators happier</h1>"
+         },
+        "bodyattributes":"",
+        "sidepreblocks": "<h2>Blocks html goes here</h2>",
+        "hasblocks":true,
+        "courseindexopen": true,
+        "navdraweropen": false,
+        "blockdraweropen": true,
+        "regionmainsettingsmenu": "",
+        "hasregionmainsettingsmenu": false,
+        "addblockbutton": ""
+    }
+}}
+{{> theme_boost_magnific/head }}
+
+<body {{{bodyattributes}}}>
+{{> core/local/toast/wrapper}}
+<div id="page-wrapper" class="d-print-block">
+
+{{{ output.standard_top_of_body_html }}}
+
+{{> theme_boost_magnific/navbar }}
+{{#courseindex}}
+    {{< theme_boost_magnific/drawer }}
+        {{$id}}theme_boost_magnific-drawers-courseindex{{/id}}
+        {{$drawerclasses}}drawer drawer-left {{#courseindexopen}}show{{/courseindexopen}}{{/drawerclasses}}
+        {{$drawercontent}}
+            {{{courseindex}}}
+        {{/drawercontent}}
+        {{$drawerpreferencename}}drawer-open-index{{/drawerpreferencename}}
+        {{$drawerstate}}show-drawer-left{{/drawerstate}}
+        {{$tooltipplacement}}right{{/tooltipplacement}}
+        {{$closebuttontext}}{{#str}}closecourseindex, core{{/str}}{{/closebuttontext}}
+        {{$drawershowprogress}}
+             {{#isprogress}}
+                <div class="progress-info">
+                    <div class="progress-label">
+                        <span>{{#str}}completed{{/str}} {{{progress}}}%</span>
+                    </div>
+                    {{#progress_completed}}
+                        {{#progress_count}}
+                            <div class="progress-percentage progress-count">
+                                <span>{{{progress_completed}}} / {{{progress_count}}}</span>
+                            </div>
+                        {{/progress_count}}
+                    {{/progress_completed}}
+                </div>
+                <div class="progress">
+                    <div class="progress-bar bg-primary"
+                         role="progressbar"
+                         aria-valuenow="0"
+                         aria-valuemin="{{{progress}}}"
+                         aria-valuemax="100"
+                         style="width: {{{progress}}}%;"
+                         title="{{{progress}}}%"
+                         data-toggle="tooltip"></div>
+                </div>
+            {{/isprogress}}
+        {{/drawershowprogress}}
+    {{/ theme_boost_magnific/drawer}}
+{{/courseindex}}
+{{#hasblocks}}
+    {{< theme_boost_magnific/drawer }}
+        {{$id}}theme_boost_magnific-drawers-blocks{{/id}}
+        {{$drawerclasses}}drawer drawer-right{{#blockdraweropen}} show{{/blockdraweropen}}{{/drawerclasses}}
+        {{$drawercontent}}
+            <section class="d-print-none" aria-label="{{#str}}blocks{{/str}}">
+                {{{addblockbutton}}}
+                {{{sidepreblocks}}}
+            </section>
+        {{/drawercontent}}
+        {{$drawerpreferencename}}drawer-open-block{{/drawerpreferencename}}
+        {{$forceopen}}{{#forceblockdraweropen}}1{{/forceblockdraweropen}}{{/forceopen}}
+        {{$drawerstate}}show-drawer-right{{/drawerstate}}
+        {{$tooltipplacement}}left{{/tooltipplacement}}
+        {{$drawercloseonresize}}1{{/drawercloseonresize}}
+        {{$closebuttontext}}{{#str}}closeblockdrawer, core{{/str}}{{/closebuttontext}}
+    {{/ theme_boost_magnific/drawer}}
+{{/hasblocks}}
+    <div id="page" data-region="mainpage" data-usertour="scroller"
+         class="drawers {{#courseindexopen}}show-drawer-left{{/courseindexopen}} {{#blockdraweropen}}show-drawer-right{{/blockdraweropen}} drag-container">
+        <div id="topofscroll" class="container main-inner">
+            <div class="drawer-toggles d-flex">
+                {{#courseindex}}
+                    <div class="drawer-toggler drawer-left-toggle open-nav d-print-none">
+                        <button
+                                class="btn icon-no-margin"
+                                data-toggler="drawers"
+                                data-action="toggle"
+                                data-target="theme_boost_magnific-drawers-courseindex"
+                                data-toggle="tooltip"
+                                data-placement="right"
+                                title="{{#str}}opendrawerindex, core{{/str}}">
+                            <span class="sr-only">{{#str}}opendrawerindex, core{{/str}}</span>
+                            {{#pix}} t/index_drawer, moodle {{/pix}}
+                        </button>
+                    </div>
+                {{/courseindex}}
+                {{#hasblocks}}
+                    <div class="drawer-toggler drawer-right-toggle ms-auto d-print-none">
+                        <button
+                                class="btn icon-no-margin"
+                                data-toggler="drawers"
+                                data-action="toggle"
+                                data-target="theme_boost_magnific-drawers-blocks"
+                                data-toggle="tooltip"
+                                data-placement="right"
+                                title="{{#str}}opendrawerblocks, core{{/str}}">
+                            <span class="sr-only">{{#str}}opendrawerblocks, core{{/str}}</span>
+                            <span class="dir-rtl-hide">{{#pix}}t/blocks_drawer, core{{/pix}}</span>
+                            <span class="dir-ltr-hide">{{#pix}}t/blocks_drawer_rtl, core{{/pix}}</span>
+                        </button>
+                    </div>
+                {{/hasblocks}}
+            </div>
+            {{{ output.full_header }}}
+            {{{ output.course_content_header }}}
+            {{#secondarymoremenu}}
+                <div class="secondary-navigation d-print-none">
+                    {{> core/moremenu}}
+                </div>
+            {{/secondarymoremenu}}
+            <div id="page-content" class="pb-3 d-print-block">
+                <div id="region-main-box">
+                    {{#hasregionmainsettingsmenu}}
+                        <div id="region-main-settings-menu" class="d-print-none">
+                            <div> {{{regionmainsettingsmenu}}} </div>
+                        </div>
+                    {{/hasregionmainsettingsmenu}}
+                    <section id="region-main"
+                             {{#hasnavbarcourse}}class="hasnavbarcourse"{{/hasnavbarcourse}}
+                             aria-label="{{#str}}content{{/str}}">
+
+                        {{#hasregionmainsettingsmenu}}
+                            <div class="region_main_settings_menu_proxy"></div>
+                        {{/hasregionmainsettingsmenu}}
+                        {{#headercontent}}
+                            {{> core/activity_header }}
+                        {{/headercontent}}
+                        {{#overflow}}
+                            <div class="container-fluid tertiary-navigation">
+                                <div class="navitem">
+                                    {{> core/url_select}}
+                                </div>
+                            </div>
+                        {{/overflow}}
+
+                        {{#course_summary}}
+                            <div class="course-section">
+                                <div class="section-item">
+                                    {{{course_summary_banner}}}
+                                </div>
+                            </div>
+                        {{/course_summary}}
+
+                        {{{ output.main_content }}}
+                        {{{ output.activity_navigation }}}
+                        {{{ output.course_content_footer }}}
+
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+{{> theme_boost_magnific/footer }}
+{{{ output.standard_after_main_region_html }}}
+</div>
+
+</body>
+</html>
+{{#js}}
+    M.util.js_pending("theme_boost/loader");
+    require(["theme_boost/loader", "theme_boost/drawer"], function(Loader, Drawer) {
+        Drawer.init();
+        M.util.js_complete("theme_boost/loader");
+    });
+
+    {{#scorm_autoenter}}
+        {{#mod_scorm_view}}
+            (function () {
+                // Automatically submit the form when accessing the SCORM so the user isn’t prompted to log in.
+                const form = document.getElementById("scormviewform");
+                if (form) {
+                    form.method = "GET"; // changes the method to GET.
+                    form.submit();       // submits the form.
+                }
+            })();
+        {{/mod_scorm_view}}
+    {{/scorm_autoenter}}
+    {{#mod_scorm_player}}
+        (function () {
+            // 1) Add the "disabled" class and the "disabled-by" attribute to the TOC.
+            const scormtoc = document.getElementById("scorm_toc");
+            if (scormtoc) {
+                scormtoc.classList.add("disabled");
+                scormtoc.setAttribute("disabled-by", "user");
+            }
+
+            // 2) Update the toggle button — set the title to "Show" and the text to ">".
+            const scormtoctogglebtn = document.getElementById("scorm_toc_toggle_btn");
+            if (scormtoctogglebtn) {
+                scormtoctogglebtn.title = "{{#str}}show{{/str}}";
+                scormtoctogglebtn.textContent = ">";
+            }
+
+            // 3) Expand the content area — change the class from "yui3-u-3-4" to "yui3-u-1".
+            const scormcontent = document.getElementById("scorm_content");
+            if (scormcontent) {
+                scormcontent.classList.remove("yui3-u-3-4");
+                if (!scormcontent.classList.contains("yui3-u-1")) {
+                    scormcontent.classList.add("yui3-u-1");
+                }
+            }
+
+            // Selects the side drawer
+            const drawer = document.querySelector(".drawer.drawer-left:not(.drawer-primary-mobile)");
+            if (drawer) {
+                drawer.classList.remove("show");
+                drawer.removeAttribute("aria-hidden", "true");
+            }
+
+            const drawerheadercontent = document.querySelector(".drawerheadercontent");
+            if (drawerheadercontent) {
+                drawerheadercontent.classList.add("hidden");
+            }
+
+            // Selects the element with id="page"
+            const page = document.getElementById("page");
+            if (page) {
+                page.classList.remove("show-drawer-left");
+            }
+        })();
+    {{/mod_scorm_player}}
+    (function () {
+        const drawers = document.querySelectorAll(".drawer:not(.drawer-primary-mobile)");
+        const START_TOP = 90; // px
+        let drawer__lastTop = -1;
+        document.addEventListener("scroll", document_scroll_drawers);
+        document_scroll_drawers();
+
+        function document_scroll_drawers() {
+            const y = window.scrollY || document.documentElement.scrollTop;
+            const newTop = Math.max(START_TOP - y, 0); // clamp 90 → 0
+            if (drawer__lastTop !== newTop) {
+                drawer__lastTop = newTop;
+                drawers.forEach((drawer) => {
+                    drawer.style.top = `${newTop}px`;
+                    drawer.style.height = `calc(100vh - ${newTop}px)`;
+                });
+            }
+        }
+    })();
+{{/js}}

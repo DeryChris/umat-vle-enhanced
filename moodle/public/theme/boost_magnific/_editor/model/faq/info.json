@@ -1,0 +1,29 @@
+{
+  "title": "lang::faq",
+  "category": "faq",
+  "type": "html-form",
+  "form": {
+    "title": "lang::form_title",
+    "label": "lang::form_label",
+    "info": "lang::form_info",
+    "blocks": {
+      "title": {
+        "type": "text",
+        "label": "lang::faq_title",
+        "valuetype": "text"
+      },
+      "description": {
+        "type": "textarea",
+        "label": "lang::faq_text",
+        "valuetype": "text"
+      }
+    },
+    "scripts": [
+      "jquery",
+      "editor.js"
+    ],
+    "styles": [
+      "bootstrap"
+    ]
+  }
+}

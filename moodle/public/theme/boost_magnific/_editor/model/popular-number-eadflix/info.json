@@ -1,0 +1,28 @@
+{
+  "title": "lang::top_courses_number_eadflix",
+  "category": "carousel",
+  "type": "html-form",
+  "form": {
+    "title": "lang::form_title",
+    "label": "lang::form_label",
+    "info": "lang::form_info",
+    "blocks": {
+      "courseid": {
+        "type": "select",
+        "label": "lang::select_course",
+        "data": "courses",
+        "valuetype": "int",
+        "required": true
+      }
+    },
+    "scripts": [
+      "jquery",
+      "../_assets/owl.carousel.js",
+      "../_assets/owl.init.js"
+    ],
+    "styles": [
+      "bootstrap",
+      "../_assets/owl.carousel.css"
+    ]
+  }
+}

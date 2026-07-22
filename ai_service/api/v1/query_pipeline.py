@@ -120,22 +120,29 @@ def detect_task(question: str) -> str:
     return "qa"
 
 
-_QUIZ_JSON_PATTERN = re.compile(r"```(?:json)?\s*(\{.*\"quiz\"\s*:.*\})\s*```", re.DOTALL)
+_QUIZ_JSON_PATTERN = re.compile(r"```(?:json)?\s*(\{.*?\"quiz\"\s*:.*?\})\s*```", re.DOTALL)
+_QUIZ_BARE_PATTERN = re.compile(r'(\{[\s\S]*?"quiz"\s*:[\s\S]*?"questions"\s*:\s*\[[\s\S]*?\]\s*\})', re.DOTALL)
 
 
 def extract_quiz_json(text: str) -> Optional[dict]:
     """Scan the LLM response text for a JSON quiz code block and parse it.
     Returns the parsed quiz dict (i.e. the value of the 'quiz' key), or None."""
-    m = _QUIZ_JSON_PATTERN.search(text)
-    if not m:
-        return None
-    try:
-        data = json.loads(m.group(1))
-        quiz = data.get("quiz")
-        if quiz and isinstance(quiz.get("questions"), list) and len(quiz["questions"]) > 0:
-            return quiz
-    except (json.JSONDecodeError, KeyError, TypeError):
-        pass
+    patterns = [_QUIZ_JSON_PATTERN, _QUIZ_BARE_PATTERN]
+    for pat in patterns:
+        m = pat.search(text)
+        if not m:
+            continue
+        try:
+            data = json.loads(m.group(1))
+            quiz = data.get("quiz") if isinstance(data, dict) else None
+            if quiz and isinstance(quiz.get("questions"), list) and len(quiz["questions"]) > 0:
+                logger.info("Quiz JSON extracted successfully (%d questions)", len(quiz["questions"]))
+                return quiz
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            logger.debug("Quiz JSON parse failed with pattern %s: %s", pat.pattern[:40], e)
+            continue
+    if '"quiz"' in text and '"questions"' in text:
+        logger.warning("Quiz keywords found but no valid JSON extracted. Text snippet: %s", text[:300])
     return None
 
 

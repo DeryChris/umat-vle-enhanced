@@ -96,18 +96,26 @@ TRANSCRIPT:
 
 QUIZ_PROMPT = """You are an academic assistant for the University of Mines and Technology (UMaT), Ghana.
 
-Based on this lecture transcript, generate 5 multiple-choice practice questions.
+Based on this lecture transcript, generate 5 practice questions as a JSON code block.
 
-For each question use this exact format:
-Q[number]: [Question text]
-A) [Option A]
-B) [Option B]
-C) [Option C]
-D) [Option D]
-Answer: [Letter]
-Explanation: [Brief explanation of why this is correct]
+Output ONLY a JSON code block (wrapped in ```json ... ```) with this exact schema:
+```json
+{"quiz":{"title":"Practice Quiz: [Topic]","questions":[
+  {"type":"objective","question":"Question text?","options":["Opt A","Opt B","Opt C","Opt D"],"correct":0,"explanation":"Why this is correct."},
+  {"type":"truefalse","question":"Statement is true or false?","options":["True","False"],"correct":0,"explanation":"Why this is the case."},
+  {"type":"fill_in","question":"The capital of Ghana is ___","correct":"Accra","explanation":"Accra is the capital city of Ghana."}
+]}}
+```
 
-Only generate questions based on content explicitly covered in the transcript.
+RULES:
+- Generate exactly 5 questions mixing types: ~2 objective, ~1 truefalse, ~1-2 fill_in.
+- `objective`: exactly 4 options, `correct` is 0-based index of the right answer.
+- `truefalse`: exactly 2 options ["True","False"], `correct` is 0 (True) or 1 (False).
+- `fill_in`: `correct` is the expected answer text. For multiple acceptable answers, separate with "/" (e.g. "Accra / Ghana").
+- Every question MUST include an `explanation` field.
+- Vary difficulty: ~2 straightforward, ~2 moderate, ~1 challenging.
+- Only use information explicitly present in the transcript.
+- Make distractors plausible but clearly incorrect.
 
 TRANSCRIPT:
 {transcript}"""

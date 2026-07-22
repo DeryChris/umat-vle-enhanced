@@ -64,6 +64,18 @@
   .umat-quiz-opt{padding:11px 14px;font-size:13px;}
   .umat-quiz-score-num{font-size:34px;}
   .umat-quiz-body{padding:12px;}
+  /* Student Issues uses the full mobile height and keeps the composer reachable. */
+  .umat-issue-list-head,.umat-issue-viewbar,.umat-issue-thread-head{padding:11px 12px;}
+  .umat-issue-list{padding:8px 9px 18px;}
+  .umat-issue-row{grid-template-columns:36px minmax(0,1fr) auto;padding:10px;gap:9px;border-radius:15px;}
+  .umat-issue-avatar{width:36px;height:36px;border-radius:12px;}
+  .umat-issue-category{display:none;}
+  .umat-issue-form{width:calc(100% - 18px);margin:9px auto;padding:14px;border-radius:17px;}
+  .umat-issue-message{max-width:88%;}
+  .umat-issue-messages{padding:14px 10px;}
+  .umat-issue-composer{padding:8px 10px max(8px,env(safe-area-inset-bottom));}
+  .umat-issue-filters{grid-template-columns:1fr 1fr;padding:8px;}
+  .umat-issue-filters label{grid-column:1/-1;}
 }
 /* ---- Very small (< 380px) ---- */
 @media(max-width:380px){

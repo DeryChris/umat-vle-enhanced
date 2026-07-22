@@ -130,7 +130,7 @@ function setLcpFeatureActive(name){
 }
 function renderLcpFeature(name){
   var meta={
-    'lec-analytics':['bar_chart','Analytics','Course performance'],'lec-struggle':['psychology','Struggle','Learning gaps'],'lec-courses':['menu_book','Courses','Your teaching courses'],'lec-library':['local_library','Resource Materials','Course materials'],'lec-sessions':['history','Sessions','AI interaction history'],'lec-review':['fact_check','Review','Pending AI outputs'],    'lec-issues':['flag','Issues','Student complaints'],
+    'lec-analytics':['bar_chart','Analytics','Course performance'],'lec-struggle':['psychology','Struggle','Learning gaps'],'lec-courses':['menu_book','Courses','Your teaching courses'],'lec-library':['local_library','Resource Materials','Course materials'],'lec-sessions':['history','Sessions','AI interaction history'],'lec-review':['fact_check','Review','Pending AI outputs'],    'lec-issues':['forum','Student Issues','Private course messages'],
     'lec-quiz-review':['rate_review','Quiz Review','Student quiz responses']
   }[name]||['widgets','Feature','Quick view'];
   showLcpPane('lcp-feature');setLcpFeatureActive(name);
@@ -141,7 +141,7 @@ function renderLcpFeature(name){
   if(name==='lec-analytics'||name==='lec-struggle')return renderLcpAnalytics(body,name);
   if(name==='lec-library')return renderLcpLibrary(body);
   if(name==='lec-sessions')return renderLcpSessions(body);
-  if(name==='lec-issues')return renderLcpIssues(body);
+  if(name==='lec-issues'){closePanel();openDash();switchPane('lec-issues');return;}
   if(name==='lec-quiz-review')return renderLcpQuizReview(body);
 }
 function renderLcpCourses(body){var courses=(UD&&UD.courses)||[];if(!courses.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses found.</p></div>';return;}body.innerHTML=courses.map(function(c){return '<button class="umat-cp-list-card as-btn" data-cid="'+c.id+'" data-name="'+esc(c.fullname||'')+'" type="button"><strong>'+esc(c.shortname||c.fullname)+'</strong><p>'+esc(c.fullname||'')+'</p></button>';}).join('');body.querySelectorAll('[data-cid]').forEach(function(b){b.addEventListener('click',function(){CID=parseInt(b.dataset.cid)||CID;CN=b.dataset.name||CN;renderLcpFeature('lec-analytics');});});}
@@ -280,7 +280,7 @@ function loadPaneData(name){
   if(name==='lec-library'){populateLibCourseSel();loadLibrary();}
   if(name==='lec-sessions'){populateSessCourseSel();loadSessions();}
   if(name==='lec-review')loadReviewPane();
-  if(name==='lec-issues')loadLecturerIssues();
+  if(name==='lec-issues')initLecturerIssues();
   if(name==='lec-home')initHome();
 }
 
@@ -864,101 +864,78 @@ function loadReviewPane(){
   });
 }
 
-/* ----- Student Issues (Lecturer) ----- */
-function loadLecturerIssues(){
-  _umatLecMarkViewed();
-  var body=document.getElementById('lec-issues-body');if(!body){console.log('[lec-issues] body not found');return;}
-  if(!CID){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">school</span><p>Select a course from the courses pane above to view its issues.</p></div>';return;}
-  var filter=document.getElementById('lec-issues-filter');var status=filter?filter.value:'';
-  console.log('[lec-issues] loading CID='+CID+' status='+status);
-  body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading issues...</p></div>';
-  var args={courseid:CID};if(status)args.status=status;
-  ajax('local_umat_ai_get_course_issues',args,function(r){
-    console.log('[lec-issues] response',r);
-    var issues=r.issues||[],total=r.total||0;
-    var count=document.getElementById('lec-issues-count');if(count)count.textContent=total;
-    if(!issues.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No student issues'+(status?' with this status':'')+'.</p></div>';return;}
-    body.innerHTML=issues.map(function(iss){
-      var catLabel={'concept_confusion':'Concept Confusion','material_error':'Material Error','technical_issue':'Technical Issue','suggestion':'Suggestion','other':'Other'}[iss.category]||iss.category;
-      var ago=iss.timecreated?(function(d){return d===0?'today':d+'d ago';})(Math.floor((Date.now()/1000-iss.timecreated)/86400)):'';
-      return '<div class="umat-issue-card" data-id="'+iss.id+'" style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:14px;margin-bottom:10px;">'
-        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
-        +(iss.userpicture?'<img src="'+iss.userpicture+'" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">':'<div style="width:28px;height:28px;border-radius:50%;background:var(--u-p);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">'+esc((iss.fullname||'?')[0])+'</div>')
-        +'<div><strong style="font-size:13px;">'+esc(iss.fullname||'Student')+'</strong><span style="font-size:10px;color:var(--u-ol);display:block;">'+catLabel+(iss.topic?' \u00b7 '+esc(iss.topic):'')+' \u00b7 '+ago+'</span></div></div>'
-        +'<p style="font-size:12px;color:var(--u-onsv);margin:0 0 8px;">'+esc(iss.description)+'</p>'
-        +(iss.lecturer_response?'<div style="font-size:12px;color:var(--u-sec);margin-bottom:6px;padding:10px;background:rgba(0,107,47,.06);border-radius:var(--u-r8);border-left:3px solid var(--u-p);">'+esc(iss.lecturer_response)+'</div>':'')
-        +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'
-        +'<button class="umat-issue-resp-btn" data-id="'+iss.id+'" style="font-size:10px;padding:4px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r6);background:var(--u-bg);cursor:pointer;">Reply</button>'
-        +'<span style="font-size:10px;color:var(--u-ol);flex:1;text-align:right;display:'+(iss.lecturer_response?'block':'none')+'" id="has-resp-'+iss.id+'"><span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;color:var(--u-p);">forum</span> Responded</span></div>'
-        +'<div class="umat-issue-resp-box" id="lec-issue-resp-'+iss.id+'" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--u-olv);">'
-        +'<textarea class="umat-issue-resp-ta" data-id="'+iss.id+'" placeholder="Write a reply..." rows="2" style="width:100%;padding:8px;font-size:12px;border:1px solid var(--u-olv);border-radius:var(--u-r6);resize:vertical;">'+(iss.lecturer_response?'':'')+'</textarea>'
-        +'<div style="margin-top:4px;display:flex;gap:4px;justify-content:flex-end;">'
-        +'<button class="umat-issue-cancel-resp" data-id="'+iss.id+'" style="font-size:10px;padding:4px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r6);background:var(--u-bg);cursor:pointer;">Cancel</button>'
-        +'<button class="umat-issue-save-resp" data-id="'+iss.id+'" style="font-size:10px;padding:4px 14px;border:none;border-radius:var(--u-r6);background:var(--u-p);color:#fff;cursor:pointer;">Send</button></div></div>'
-        +'</div>';
-    }).join('');
+/* ----- Private Student Issues inbox ----- */
+var lecturerIssuesReady=false;
+var lecturerIssueConversations=[];
+var lecturerIssueConversationId=0;
+var lecturerIssueFailedSend=null;
+var lecturerIssueReadObserver=null;
+var lecturerIssueLoading=false;
+var lecturerIssueSearchTimer=null;
+var lecturerIssueCategoryLabels={course_material:'Course material',assignment:'Assignment',quiz_examination:'Quiz or examination',grade_feedback:'Grade or feedback',live_class_recording:'Live class or recording',technical_problem:'Technical problem',access_permission:'Access or permission',other:'Other'};
 
-    /* Wire response toggle -- show reply box */
-    body.querySelectorAll('.umat-issue-resp-btn').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        var id=this.dataset.id;
-        var box=document.getElementById('lec-issue-resp-'+id);
-        if(box){
-          var all=document.querySelectorAll('.umat-issue-resp-box');
-          all.forEach(function(b){if(b.id!=='lec-issue-resp-'+id)b.style.display='none';});
-          box.style.display=box.style.display==='none'?'block':'none';
-          if(box.style.display==='block')box.querySelector('.umat-issue-resp-ta').focus();
-        }
-      });
-    });
-    /* Wire cancel */
-    body.querySelectorAll('.umat-issue-cancel-resp').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        var box=document.getElementById('lec-issue-resp-'+this.dataset.id);
-        if(box)box.style.display='none';
-      });
-    });
-    /* Wire response save -- inline update, no full reload */
-    body.querySelectorAll('.umat-issue-save-resp').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        var id=this.dataset.id;
-        var ta=document.querySelector('.umat-issue-resp-ta[data-id="'+id+'"]');
-        var card=document.querySelector('.umat-issue-card[data-id="'+id+'"]');
-        if(!ta||!card)return;
-        var txt=ta.value.trim();if(!txt)return;
-        btn.disabled=true;btn.textContent='Sending...';
-        ajax('local_umat_ai_update_issue_response',{issue_id:parseInt(id),response:txt},function(r){
-          if(!r.success){btn.disabled=false;btn.textContent='Send';return;}
-          /* Inline update -- keep card, just refresh the display */
-          var existing=card.querySelector('.umat-issue-resp-box');
-          var replied=document.getElementById('has-resp-'+id);
-          /* Insert response display if not already there */
-          var disp=card.querySelector('.umat-issue-rdisp');
-          if(!disp){
-            disp=document.createElement('div');
-            disp.className='umat-issue-rdisp';
-            disp.style.cssText='font-size:12px;color:var(--u-sec);margin-bottom:6px;padding:10px;background:rgba(0,107,47,.06);border-radius:var(--u-r8);border-left:3px solid var(--u-p);';
-            card.insertBefore(disp,card.querySelector('.umat-issue-resp-box')||card.lastChild);
-          }
-          disp.textContent=txt;
-          disp.style.display='';
-          if(existing)existing.style.display='none';
-          if(replied)replied.style.display='block';
-        });
-      });
-    });
-  },function(e){
-    console.log('[lec-issues] error',e);
-    var msg=e&&e.message?esc(e.message):'Could not load issues. Check console (F12) for details.';
-    body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>'+msg+'</p></div>';
-  });
+function lecturerIssueClientId(){return 'ui_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,12);}
+function lecturerIssueTime(ts){if(!ts)return '';var d=new Date(ts*1000),now=new Date();var opts={hour:'numeric',minute:'2-digit'};if(d.toDateString()===now.toDateString())return d.toLocaleTimeString([],opts);return d.toLocaleDateString([],{month:'short',day:'numeric'})+' '+d.toLocaleTimeString([],opts);}
+function lecturerIssueInitials(name){return (name||'Student').split(/\s+/).slice(0,2).map(function(part){return part.charAt(0);}).join('').toUpperCase();}
+function lecturerIssueReceiptHtml(receipt){if(!receipt)return '';var label=receipt==='viewed'?'Viewed':(receipt==='delivered'?'Delivered':'Sent');return '<span class="umat-issue-mini-receipt '+(receipt==='viewed'?'viewed':'')+'" aria-label="'+label+'" title="'+label+'">'+(receipt==='sent'?'&#10003;':'&#10003;&#10003;')+'</span>';}
+function lecturerIssueView(name){['list','thread'].forEach(function(view){var el=document.getElementById('lec-issue-'+view+'-view');if(el)el.classList.toggle('active',view===name);});}
+function lecturerIssueDraftKey(){return 'umat_lec_issue_draft_'+(lecturerIssueConversationId||'none');}
+function saveLecturerIssueDraft(){var input=document.getElementById('lec-issue-reply');if(input&&lecturerIssueConversationId){try{sessionStorage.setItem(lecturerIssueDraftKey(),input.value);}catch(e){}}}
+function restoreLecturerIssueDraft(){var input=document.getElementById('lec-issue-reply');if(!input)return;try{input.value=sessionStorage.getItem(lecturerIssueDraftKey())||'';}catch(e){input.value='';}}
+function clearLecturerIssueDraft(){try{sessionStorage.removeItem(lecturerIssueDraftKey());}catch(e){}}
+
+function initLecturerIssues(){
+  if(!lecturerIssuesReady){
+    lecturerIssuesReady=true;
+    var courseSelect=document.getElementById('lec-issues-course');
+    if(courseSelect){courseSelect.innerHTML='<option value="0">All authorized courses</option>'+((UD&&UD.courses)||[]).map(function(c){return '<option value="'+c.id+'">'+esc(c.shortname||c.fullname)+'</option>';}).join('');courseSelect.value=CID?String(CID):'0';courseSelect.addEventListener('change',function(){loadLecturerIssueInbox(false);});}
+    var category=document.getElementById('lec-issues-category');if(category)category.addEventListener('change',function(){loadLecturerIssueInbox(false);});
+    var search=document.getElementById('lec-issues-search');if(search)search.addEventListener('input',function(){clearTimeout(lecturerIssueSearchTimer);lecturerIssueSearchTimer=setTimeout(function(){loadLecturerIssueInbox(true);},300);});
+    var refresh=document.getElementById('lec-issues-refresh');if(refresh)refresh.addEventListener('click',function(){loadLecturerIssueInbox(false);});
+    var back=document.getElementById('lec-issue-thread-back');if(back)back.addEventListener('click',function(){saveLecturerIssueDraft();lecturerIssueConversationId=0;try{sessionStorage.removeItem('umat_lec_issue_active');}catch(e){}lecturerIssueView('list');loadLecturerIssueInbox(true);});
+    var reply=document.getElementById('lec-issue-reply');if(reply){reply.addEventListener('input',saveLecturerIssueDraft);reply.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendLecturerIssueMessage();}});}
+    var send=document.getElementById('lec-issue-send');if(send)send.addEventListener('click',function(){sendLecturerIssueMessage();});
+    var error=document.getElementById('lec-issue-send-error');if(error)error.addEventListener('click',function(e){if(e.target.closest('[data-issue-retry]')&&lecturerIssueFailedSend)sendLecturerIssueMessage(lecturerIssueFailedSend);});
+    var linked=parseInt(new URLSearchParams(window.location.search).get('umat_issue'))||0;
+    try{lecturerIssueConversationId=linked||parseInt(sessionStorage.getItem('umat_lec_issue_active'))||0;}catch(e){lecturerIssueConversationId=linked;}
+  }
+  loadLecturerIssueInbox(false);
+  if(lecturerIssueConversationId)openLecturerIssue(lecturerIssueConversationId);
 }
-
-/* Filter change refreshes list */
-var issueFilter=document.getElementById('lec-issues-filter');
-if(issueFilter)issueFilter.addEventListener('change',loadLecturerIssues);
-var issueRefresh=document.getElementById('lec-issues-refresh');
-if(issueRefresh)issueRefresh.addEventListener('click',loadLecturerIssues);
+function loadLecturerIssueInbox(quiet){
+  if(lecturerIssueLoading)return;lecturerIssueLoading=true;
+  var list=document.getElementById('lec-issues-body');if(!list)return;
+  var courseSelect=document.getElementById('lec-issues-course');var category=document.getElementById('lec-issues-category');var search=document.getElementById('lec-issues-search');
+  var courseid=courseSelect?parseInt(courseSelect.value)||0:(CID||0);
+  if(!quiet)list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading student issues...</p></div>';
+  ajax('local_umat_ai_list_issue_conversations',{inbox:'lecturer',courseid:courseid,category:category?category.value:'',query:search?search.value.trim():''},function(r){lecturerIssueLoading=false;lecturerIssueConversations=r.conversations||[];renderLecturerIssueInbox();updateLecturerIssueBadge(r.totalunread||0);var count=document.getElementById('lec-issues-count');if(count)count.textContent=r.total?'('+r.total+')':'';if(lecturerIssueConversationId&&document.getElementById('lec-issue-thread-view').classList.contains('active'))loadLecturerIssueMessages(true);},function(error){lecturerIssueLoading=false;if(!quiet)list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load Student Issues.</p><button class="umat-chip" id="lec-issues-list-retry" type="button">Retry</button></div>';var retry=document.getElementById('lec-issues-list-retry');if(retry)retry.addEventListener('click',function(){loadLecturerIssueInbox(false);});});
+}
+function renderLecturerIssueInbox(){
+  var list=document.getElementById('lec-issues-body');if(!list)return;
+  if(!lecturerIssueConversations.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>No student issues have been reported for this course.</p></div>';return;}
+  list.innerHTML=lecturerIssueConversations.map(function(c){var identity=c.studentidnumber?' · '+c.studentidnumber:'';return '<button class="umat-issue-row '+(c.unreadcount?'unread':'')+'" data-conversation-id="'+c.id+'" type="button"><span class="umat-issue-avatar">'+esc(lecturerIssueInitials(c.studentname))+'</span><span class="umat-issue-row-main"><span class="umat-issue-row-title"><strong>'+esc(c.studentname)+'</strong><span class="umat-issue-category">'+esc(lecturerIssueCategoryLabels[c.category]||c.category)+'</span></span><span class="umat-issue-preview"><strong>'+esc(c.title)+':</strong> '+esc(c.lastmessage||'No messages yet')+'</span><span class="umat-issue-row-sub">'+esc(c.courseshortname+identity)+'</span></span><span class="umat-issue-row-side"><time>'+esc(lecturerIssueTime(c.lastmessagetime))+'</time>'+(c.unreadcount?'<span class="umat-issue-unread">'+(c.unreadcount>99?'99+':c.unreadcount)+'</span>':lecturerIssueReceiptHtml(c.latestsentreceipt))+'</span></button>';}).join('');
+  list.querySelectorAll('[data-conversation-id]').forEach(function(row){row.addEventListener('click',function(){openLecturerIssue(parseInt(row.dataset.conversationId));});});
+}
+function openLecturerIssue(id){lecturerIssueConversationId=id;try{sessionStorage.setItem('umat_lec_issue_active',String(id));}catch(e){}lecturerIssueView('thread');restoreLecturerIssueDraft();loadLecturerIssueMessages(false);}
+function loadLecturerIssueMessages(preserveScroll){
+  if(!lecturerIssueConversationId)return;var expected=lecturerIssueConversationId;var box=document.getElementById('lec-issue-messages');if(!box)return;var nearBottom=box.scrollHeight-box.scrollTop-box.clientHeight<90;var oldTop=box.scrollTop;if(!preserveScroll)box.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading conversation...</p></div>';
+  ajax('local_umat_ai_get_issue_messages',{conversationid:expected},function(r){if(expected!==lecturerIssueConversationId)return;var c=r.conversation;document.getElementById('lec-issue-thread-title').textContent=c.title;document.getElementById('lec-issue-thread-meta').textContent=c.studentname+(c.studentidnumber?' · '+c.studentidnumber:'')+' · '+c.coursename+' · '+(lecturerIssueCategoryLabels[c.category]||c.category);renderLecturerIssueMessages(r.messages||[]);if(!preserveScroll||nearBottom)box.scrollTop=box.scrollHeight;else box.scrollTop=oldTop;},function(){if(expected!==lecturerIssueConversationId)return;box.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Conversation could not be loaded.</p><button class="umat-chip" id="lec-issue-thread-retry" type="button">Retry</button></div>';var retry=document.getElementById('lec-issue-thread-retry');if(retry)retry.addEventListener('click',function(){loadLecturerIssueMessages(false);});});
+}
+function renderLecturerIssueMessages(messages){var box=document.getElementById('lec-issue-messages');if(!box)return;box.innerHTML=messages.map(renderLecturerIssueMessage).join('');observeLecturerIssueMessages();}
+function renderLecturerIssueMessage(m){var attachments=(m.attachments||[]).map(function(a){return '<a class="umat-issue-attachment" href="'+esc(a.url)+'" target="_blank" rel="noopener"><span class="material-symbols-outlined">description</span><span>'+esc(a.filename)+'</span></a>';}).join('');var label=m.receipt==='viewed'?'Viewed':(m.receipt==='delivered'?'Delivered':'Sent');var receipt=m.ismine?'<span class="umat-issue-receipt '+(m.receipt==='viewed'?'viewed':'')+'" aria-label="'+label+'">'+(m.receipt==='sent'?'&#10003;':'&#10003;&#10003;')+'</span>':'';return '<article class="umat-issue-message '+(m.ismine?'mine':'')+'" data-message-id="'+m.id+'" data-other="'+(m.ismine?'0':'1')+'" data-viewed="'+(m.viewedat?'1':'0')+'"><span class="umat-issue-sender">'+esc(m.ismine?'You':m.sendername)+'</span><div class="umat-issue-bubble"><div class="umat-issue-body">'+esc(m.body)+'</div>'+attachments+'<div class="umat-issue-message-meta"><time>'+esc(lecturerIssueTime(m.timecreated))+'</time>'+receipt+'</div></div></article>';}
+function observeLecturerIssueMessages(){
+  if(lecturerIssueReadObserver)lecturerIssueReadObserver.disconnect();var root=document.getElementById('lec-issue-messages');if(!root||!window.IntersectionObserver)return;var pending={};var timer=null;
+  lecturerIssueReadObserver=new IntersectionObserver(function(entries){entries.forEach(function(entry){if(entry.isIntersecting&&entry.intersectionRatio>=.35){var el=entry.target;if(el.dataset.other==='1'&&el.dataset.viewed!=='1'){pending[el.dataset.messageId]=true;el.dataset.viewed='1';lecturerIssueReadObserver.unobserve(el);}}});if(Object.keys(pending).length&&!timer){timer=setTimeout(function(){var ids=Object.keys(pending).map(Number);pending={};timer=null;ajax('local_umat_ai_mark_issue_messages_viewed',{conversationid:lecturerIssueConversationId,messageids:ids},function(){loadLecturerIssueInbox(true);},function(){ids.forEach(function(id){var el=root.querySelector('[data-message-id="'+id+'"]');if(el){el.dataset.viewed='0';lecturerIssueReadObserver.observe(el);}});});},250);}}, {root:root,threshold:[.35]});
+  root.querySelectorAll('[data-other="1"][data-viewed="0"]').forEach(function(el){lecturerIssueReadObserver.observe(el);});
+}
+function uploadLecturerIssueAttachment(messageid,file,done,fail){var form=new FormData();form.append('sesskey',moodleSesskey);form.append('messageid',messageid);form.append('attachment',file);fetch(M.cfg.wwwroot+'/local/umat_ai/issue_attachment.php',{method:'POST',body:form,credentials:'same-origin'}).then(function(response){return response.json().then(function(data){if(!response.ok||!data.success)throw new Error(data.message||'Upload failed.');return data;});}).then(done).catch(function(error){fail(error.message||'Upload failed.');});}
+function appendLecturerPendingMessage(item){var box=document.getElementById('lec-issue-messages');if(!box)return;var el=document.createElement('article');el.className='umat-issue-message mine';el.id='lec-issue-temp-'+item.clientid;el.innerHTML='<span class="umat-issue-sender">You</span><div class="umat-issue-bubble"><div class="umat-issue-body">'+esc(item.body)+'</div><div class="umat-issue-message-meta"><span>Sending...</span></div></div>';box.appendChild(el);box.scrollTop=box.scrollHeight;}
+function showLecturerIssueError(text){var el=document.getElementById('lec-issue-send-error');if(!el)return;el.innerHTML=esc(text)+' <button class="umat-issue-retry" data-issue-retry type="button">Retry</button>';el.classList.add('show');}
+function clearLecturerIssueError(){var el=document.getElementById('lec-issue-send-error');if(el){el.classList.remove('show');el.innerHTML='';}}
+function sendLecturerIssueMessage(retry){
+  if(!lecturerIssueConversationId)return;var input=document.getElementById('lec-issue-reply');var fileInput=document.getElementById('lec-issue-reply-file');var item=retry||{body:input.value.trim(),file:fileInput.files[0]||null,clientid:lecturerIssueClientId()};if(!item.body)return;var btn=document.getElementById('lec-issue-send');btn.disabled=true;btn.setAttribute('aria-busy','true');clearLecturerIssueError();var previous=document.getElementById('lec-issue-temp-'+item.clientid);if(previous)previous.remove();appendLecturerPendingMessage(item);
+  ajax('local_umat_ai_send_issue_message',{conversationid:lecturerIssueConversationId,body:item.body,clientid:item.clientid},function(r){var temp=document.getElementById('lec-issue-temp-'+item.clientid);if(temp)temp.querySelector('.umat-issue-message-meta').innerHTML='<span>'+esc(lecturerIssueTime(r.message.timecreated))+'</span><span class="umat-issue-receipt" aria-label="Sent">&#10003;</span>';var finish=function(){btn.disabled=false;btn.removeAttribute('aria-busy');lecturerIssueFailedSend=null;if(input.value.trim()===item.body)input.value='';if(fileInput)fileInput.value='';clearLecturerIssueDraft();setTimeout(function(){loadLecturerIssueMessages(true);loadLecturerIssueInbox(true);},350);};if(item.file)uploadLecturerIssueAttachment(r.message.id,item.file,finish,function(error){btn.disabled=false;btn.removeAttribute('aria-busy');lecturerIssueFailedSend=item;showLecturerIssueError('Attachment not sent. '+error);});else finish();},function(error){btn.disabled=false;btn.removeAttribute('aria-busy');lecturerIssueFailedSend=item;var temp=document.getElementById('lec-issue-temp-'+item.clientid);if(temp){temp.classList.add('failed');temp.querySelector('.umat-issue-message-meta').innerHTML='<span>Message not sent.</span>';}showLecturerIssueError((error&&error.message)||'Message not sent.');});
+}
 
 function renderReviewOutputs(data){
   var body=document.getElementById('lec-review-body');
@@ -1543,22 +1520,29 @@ if(expand)expand.addEventListener('click',function(){setTimeout(function(){
   struggleCache['0']=false;
   loadStruggleInsights(stCid);
 },100);});
-/* Lecturer issue badge: hide on view, re-poll so badge re-appears if new issues come in */
-function _umatLecMarkViewed(){
-  var b=document.getElementById('sb-badge-new-issues');
-  if(b)b.style.display='none';
-  pollIssueCount();
-}
+/* Lecturer issue badge and open inbox refresh. Exact messages are viewed by viewport observers. */
+function _umatLecMarkViewed(){pollIssueCount();}
 function pollIssueCount(){
+  var overlayOpen=lecOv&&lecOv.classList.contains('open');
+  var panelOpen=cpOv&&cpOv.classList.contains('open');
+  if(document.hidden||(!overlayOpen&&!panelOpen))return;
   var ecid=CID||0;
-  ajax('local_umat_ai_get_unresponded_issues_count',{courseid:ecid},function(r){
+  ajax('local_umat_ai_get_issue_unread_count',{inbox:'lecturer',courseid:ecid},function(r){
     var c=r.count||0;
-    var b=document.getElementById('sb-badge-new-issues');
-    if(b){b.textContent=c>9?'9+':c;b.style.display=c?'':'none';}
+    updateLecturerIssueBadge(c);
   });
+  if(overlayOpen&&document.getElementById('lec-issues').classList.contains('active')&&lecturerIssuesReady)loadLecturerIssueInbox(true);
+}
+function updateLecturerIssueBadge(c){
+  var b=document.getElementById('sb-badge-new-issues');
+  if(b){b.textContent=c>99?'99+':c;b.style.display=c?'':'none';}
+  var mobile=document.querySelector('#lec-glass-tabs [data-lp="lec-issues"]');
+  if(mobile){var badge=mobile.querySelector('.umat-gb');if(!badge){badge=document.createElement('span');badge.className='umat-gb';badge.style.cssText='position:absolute;top:2px;right:2px;background:var(--u-ter);color:#fff;font-size:8px;font-weight:700;padding:1px 4px;border-radius:999px;line-height:12px;min-width:14px;text-align:center;';mobile.style.position='relative';mobile.appendChild(badge);}badge.textContent=c>99?'99+':c;badge.style.display=c?'':'none';}
 }
 pollIssueCount();
-var _lecBadgeTimer=setInterval(pollIssueCount,30000);
+var _lecBadgeTimer=setInterval(pollIssueCount,20000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)pollIssueCount();});
+if(parseInt(new URLSearchParams(window.location.search).get('umat_issue'))){closePanel();openDash();switchPane('lec-issues');}
 
 /* Lecturer compact panel attachment drawer */
 _umatInitAttachDrawer({
