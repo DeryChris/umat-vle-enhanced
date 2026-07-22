@@ -1173,11 +1173,22 @@ function loadLibrary(){
   loadLectures();
 }
 var _libRefresh=document.getElementById('ws-lib-refresh');if(_libRefresh)_libRefresh.addEventListener('click',function(){libraryLoaded=false;loadLibrary();libraryLoaded=true;});
-var _matSearch=document.getElementById('ws-lib-mat-search');
-if(_matSearch)_matSearch.addEventListener('input',function(){
+
+/* Unified library search (recordings + materials) */
+var _libSearch=document.getElementById('ws-lib-search');
+if(_libSearch)_libSearch.addEventListener('input',function(){
   var q=this.value.toLowerCase();
-  if(!q){renderLibrary(_matData,courseId);return;}
-  renderLibrary(_matData.filter(function(m){
+  var lecGrid=document.getElementById('ws-lib-lectures');
+  var matGrid=document.getElementById('ws-lib-grid');
+  if(!q){
+    if(lecGrid)renderVideoTiles(_lecData);
+    if(matGrid)renderLibrary(_matData,courseId);
+    return;
+  }
+  if(lecGrid)renderVideoTiles(_lecData.filter(function(r){
+    return(r.title||'').toLowerCase().indexOf(q)!==-1||(r.description||'').toLowerCase().indexOf(q)!==-1||(r.duration||'').toLowerCase().indexOf(q)!==-1;
+  }));
+  if(matGrid)renderLibrary(_matData.filter(function(m){
     return(m.filename||'').toLowerCase().indexOf(q)!==-1||(m.mimetype||'').toLowerCase().indexOf(q)!==-1;
   }),courseId);
 });

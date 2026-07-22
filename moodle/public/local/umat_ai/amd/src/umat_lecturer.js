@@ -396,6 +396,7 @@ function switchPane(name){
 }
 window.switchPane=switchPane;
 window.initLecturerIssues=initLecturerIssues;
+window.renderLcpFeature=renderLcpFeature;
 /* Handle data-lp clicks from compact panel -> open full overlay */
 document.querySelectorAll('#lec-cp [data-lp^="lec-"]').forEach(function(b){
   b.addEventListener('click',function(){closePanel();openDash();switchPane(b.dataset.lp);});

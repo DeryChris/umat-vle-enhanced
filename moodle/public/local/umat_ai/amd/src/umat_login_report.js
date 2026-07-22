@@ -20,19 +20,25 @@ define([], function() {
             var closeBtn = document.getElementById('lr-close-btn');
             var wrapper  = document.getElementById('lr-wrapper');
             var reportCard = document.getElementById('lr-report-card');
-            if (!toggle || !reportCard) return;
-
-            // Find the login form — it's the sibling before our wrapper.
-            var loginForm = wrapper ? wrapper.previousElementSibling : null;
-            if (!loginForm || !loginForm.closest) {
-                loginForm = document.querySelector('.loginform') ||
-                            document.querySelector('#page-login-index form');
+            console.log('[umat-login-report] init:', {toggle:!!toggle, backBtn:!!backBtn, closeBtn:!!closeBtn, wrapper:!!wrapper, reportCard:!!reportCard});
+            if (!toggle || !reportCard) {
+                console.error('[umat-login-report] Missing critical elements, aborting');
+                return;
             }
-            if (!loginForm) loginForm = document.querySelector('form[action*="login"]');
+
+            // Find the login form — use reliable selectors since wrapper is injected into form
+            var loginForm = document.querySelector('.loginform') ||
+                            document.querySelector('#page-login-index form') ||
+                            document.querySelector('form[action*="login"]');
+            console.log('[umat-login-report] loginForm found:', !!loginForm, loginForm);
+
+            // Debug: check if toggle is clickable
+            console.log('[umat-login-report] toggle element:', toggle, 'href:', toggle.href);
 
             /* ---- Toggle: show report form ---- */
             toggle.addEventListener('click', function(e) {
                 e.preventDefault();
+                console.log('[umat-login-report] toggle clicked');
                 if (loginForm) loginForm.style.display = 'none';
                 if (wrapper) wrapper.style.display = 'none';
                 reportCard.style.display = '';
