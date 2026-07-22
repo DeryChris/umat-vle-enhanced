@@ -288,7 +288,7 @@ function renderLcpFeature(name){
   if(name==='lec-analytics'||name==='lec-struggle')return renderLcpAnalytics(body,name);
   if(name==='lec-library')return renderLcpLibrary(body);
   if(name==='lec-sessions')return renderLcpSessions(body);
-  if(name==='lec-issues')return renderLcpIssues(body);
+  if(name==='lec-issues'){closePanel();lecOv.classList.add('open');switchPane('lec-issues');updateBodyLock();return;}
   if(name==='lec-quiz-review')return renderLcpQuizReview(body);
 }
 function renderLcpCourses(body){var courses=(UD&&UD.courses)||[];if(!courses.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">menu_book</span><p>No courses found.</p></div>';return;}body.innerHTML=courses.map(function(c){return '<button class="umat-cp-list-card as-btn" data-cid="'+c.id+'" data-name="'+esc(c.fullname||'')+'" type="button"><strong>'+esc(c.shortname||c.fullname)+'</strong><p>'+esc(c.fullname||'')+'</p></button>';}).join('');body.querySelectorAll('[data-cid]').forEach(function(b){b.addEventListener('click',function(){CID=parseInt(b.dataset.cid)||CID;CN=b.dataset.name||CN;renderLcpFeature('lec-analytics');});});}
@@ -395,6 +395,7 @@ function switchPane(name){
   if(!lecLoaded[name]){lecLoaded[name]=true;loadPaneData(name);}
 }
 window.switchPane=switchPane;
+window.initLecturerIssues=initLecturerIssues;
 /* Handle data-lp clicks from compact panel -> open full overlay */
 document.querySelectorAll('#lec-cp [data-lp^="lec-"]').forEach(function(b){
   b.addEventListener('click',function(){closePanel();openDash();switchPane(b.dataset.lp);});

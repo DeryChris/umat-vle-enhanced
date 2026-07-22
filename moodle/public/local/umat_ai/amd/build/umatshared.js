@@ -515,7 +515,9 @@ define([], function() {
             if (payload && payload.answer) {
                 accumulated = payload.answer;
             }
+            console.log('[UMAT-SSE] finishStream called', {accumulatedLength:accumulated.length, hasQuizJson:/```(?:json)?\s*\{[\s\S]*?"quiz"/.test(accumulated)});
             accumulated = accumulated.replace(/```(?:json)?\s*\{[\s\S]*?"quiz"\s*:[\s\S]*?\}\s*```\s*/g, '');
+            console.log('[UMAT-SSE] after quiz strip', {newLength:accumulated.length});
             if (statusPending && !quizDataHandled) {
                 if (statusEl) statusEl.style.display = 'none';
                 if (contentEl) contentEl.style.display = '';
@@ -628,6 +630,7 @@ define([], function() {
                     }
                 } else if (event === 'quiz_data') {
                     quizDataHandled = true;
+                    console.log('[UMAT-SSE] quiz_data event received', {hasQuiz:!!(payload&&payload.quiz), questionsCount:(payload&&payload.quiz&&payload.quiz.questions)?payload.quiz.questions.length:0, onQuizDataExists:typeof opts.onQuizData==='function'});
                     if (statusPending && statusEl) {
                         statusEl.style.display = 'none';
                         if (contentEl) contentEl.style.display = '';
@@ -1325,7 +1328,8 @@ define([], function() {
 
     // ─── Video tiles (student Lectures tab) ────────── //
     function renderVideoTiles(recs) {
-        var grid = document.getElementById('stu-lec-grid') || document.getElementById('ws-video-grid');
+        var grid = document.getElementById('stu-lec-grid') || document.getElementById('ws-lib-lectures') || document.getElementById('ws-video-grid');
+        console.log('[UMAT-REC] renderVideoTiles', {gridId:grid?grid.id:'null', recsCount:recs?recs.length:0});
         if (!grid) return;
         if (recs && !Array.isArray(recs)) {
             recs = recs.recordings || recs.data || recs.tiles || [];

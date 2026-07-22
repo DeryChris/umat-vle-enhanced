@@ -3,7 +3,7 @@
 # ============================================================
 
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Union
 from enum import Enum
 
 
@@ -37,10 +37,10 @@ class QueryRequest(BaseModel):
 
 
 class QuizQuestion(BaseModel):
-    type:        str = "objective"  # "objective" or "theoretical"
+    type:        str = "objective"  # "objective", "fill_in", "true_false", or "theoretical"
     question:    str
     options:     Optional[List[str]] = None
-    correct:     Optional[int] = None
+    correct:     Optional[Union[int, str]] = None
     explanation: Optional[str] = None
     answer_hint: Optional[str] = None
 
