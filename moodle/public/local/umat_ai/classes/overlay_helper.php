@@ -98,7 +98,7 @@ JS;
             ['id' => 'library',   'icon' => 'local_library', 'label' => 'Resource Materials', 'active' => false],
             ['id' => 'my-notes',  'icon' => 'note_add',      'label' => 'My Notes',  'active' => false],
             ['id' => 'sessions',   'icon' => 'chat_bubble',   'label' => 'Sessions',   'active' => false],
-            ['id' => 'report-issue', 'icon' => 'flag',       'label' => 'Report Issue','active' => false, 'badge' => 'responses'],
+            ['id' => 'report-issue', 'icon' => 'forum',      'label' => 'Student Issues','active' => false, 'badge' => 'responses'],
         ];
         $sidebar = self::sidebar_html($tabs, 'New Session', 'stu-ws-close', $platformName);
         $sharedJs = self::shared_js('umat-student-ov', 'stu-ws-close');
@@ -111,7 +111,7 @@ JS;
             ['id' => 'library',  'icon' => 'local_library','label' => 'Resource Materials', 'active' => false],
             ['id' => 'my-notes', 'icon' => 'note_add',    'label' => 'Notes',    'active' => false],
             ['id' => 'sessions',   'icon' => 'chat_bubble', 'label' => 'Sessions',  'active' => false],
-            ['id' => 'report-issue', 'icon' => 'flag',     'label' => 'Report',    'active' => false, 'badge' => 'responses'],
+            ['id' => 'report-issue', 'icon' => 'forum',    'label' => 'Issues',    'active' => false, 'badge' => 'responses'],
         ];
         $stuMobTabs = self::glassmorph_tab_bar($stuGlassTabs, 'sb-tab', 'stu-glass-tabs');
 
@@ -477,51 +477,52 @@ JS;
       </div>
     </div>
 
-      <!-- REPORT ISSUE TAB -->
+      <!-- STUDENT ISSUES TAB -->
     <div class="umat-tab-pane" data-tab="report-issue">
       <div class="umat-content-hdr">
-        <h2><span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px;">flag</span>Report Issue</h2>
-        <button class="umat-sb-new" id="ws-issue-toggle" type="button">
+        <h2><span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px;">forum</span>Student Issues</h2>
+        <button class="umat-sb-new" id="ws-issue-new-btn" type="button">
           <span class="material-symbols-outlined">add</span>
-          <span>New Report</span>
+          <span>Report an Issue</span>
         </button>
       </div>
-      <div class="umat-home-wrap">
-        <!-- New Issue Form (hidden by default) -->
-        <div class="umat-home-section" id="ws-issue-form-wrap" style="display:none;">
-          <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:16px;">
-            <div style="margin-bottom:12px;">
-              <label style="font-size:12px;font-weight:700;color:var(--u-ol);display:block;margin-bottom:4px;">Category</label>
-              <select id="ws-issue-cat" style="width:100%;padding:8px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r8);background:var(--u-bg);font-size:13px;">
-                <option value="concept_confusion">I don't understand a concept</option>
-                <option value="material_error">Error in course material</option>
-                <option value="technical_issue">Technical issue with the platform</option>
-                <option value="suggestion">Suggestion for improvement</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div style="margin-bottom:12px;">
-              <label style="font-size:12px;font-weight:700;color:var(--u-ol);display:block;margin-bottom:4px;">Topic (optional)</label>
-              <input type="text" id="ws-issue-topic" placeholder="e.g. Transistors, Ohm's Law, Week 3 lecture" style="width:100%;padding:8px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r8);background:var(--u-bg);font-size:13px;">
-            </div>
-            <div style="margin-bottom:12px;">
-              <label style="font-size:12px;font-weight:700;color:var(--u-ol);display:block;margin-bottom:4px;">Describe the issue</label>
-              <textarea id="ws-issue-desc" placeholder="Explain what you don't understand or what the problem is…" rows="4" style="width:100%;padding:8px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r8);background:var(--u-bg);font-size:13px;resize:vertical;"></textarea>
-            </div>
-            <button class="umat-btn-p" id="ws-issue-submit" type="button" style="width:100%;justify-content:center;">
-              <span class="material-symbols-outlined">send</span>Submit Report
-            </button>
-            <div id="ws-issue-msg" style="margin-top:8px;font-size:12px;display:none;"></div>
+      <div class="umat-issue-app" id="ws-issue-app">
+        <section class="umat-issue-view active" id="ws-issue-list-view" aria-label="Issue conversations">
+          <div class="umat-issue-list-head">
+            <div><strong>Conversations</strong><span>Private messages for this course</span></div>
+            <button class="umat-icon-btn" id="ws-issue-refresh" type="button" aria-label="Refresh conversations"><span class="material-symbols-outlined">refresh</span></button>
           </div>
-        </div>
-
-        <!-- My Reports list -->
-        <div class="umat-home-section">
-          <h3 style="display:flex;align-items:center;gap:6px;"><span class="material-symbols-outlined" style="font-size:18px;">history</span>My Reports</h3>
-          <div id="ws-issue-list">
-            <div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No issues reported yet.</p></div>
+          <div class="umat-issue-list" id="ws-issue-list">
+            <div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>Loading conversations...</p></div>
           </div>
-        </div>
+        </section>
+        <section class="umat-issue-view" id="ws-issue-new-view" aria-label="Report a new issue">
+          <div class="umat-issue-viewbar"><button class="umat-icon-btn" id="ws-issue-new-back" type="button" aria-label="Back to conversations"><span class="material-symbols-outlined">arrow_back</span></button><div><strong>Report a New Issue</strong><span>Your message is private between you and the course lecturer.</span></div></div>
+          <form class="umat-issue-form" id="ws-issue-form">
+            <label>Issue title<input type="text" id="ws-issue-title" maxlength="255" required placeholder="Briefly describe what you need help with"></label>
+            <label>Category<select id="ws-issue-cat" required>
+              <option value="course_material">Course material</option><option value="assignment">Assignment</option>
+              <option value="quiz_examination">Quiz or examination</option><option value="grade_feedback">Grade or feedback</option>
+              <option value="live_class_recording">Live class or recording</option><option value="technical_problem">Technical problem</option>
+              <option value="access_permission">Access or permission</option><option value="other">Other</option>
+            </select></label>
+            <label>Description<textarea id="ws-issue-desc" rows="6" maxlength="10000" required placeholder="Describe the issue and what you have already tried"></textarea></label>
+            <label class="umat-issue-file-label"><span class="material-symbols-outlined">attach_file</span><span>Optional attachment</span><input type="file" id="ws-issue-file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp3,.mp4,.wav"></label>
+            <div class="umat-issue-form-msg" id="ws-issue-form-msg" role="status" aria-live="polite"></div>
+            <div class="umat-issue-form-actions"><button class="umat-issue-secondary" id="ws-issue-new-cancel" type="button">Cancel</button><button class="umat-btn-p" id="ws-issue-submit" type="submit"><span class="material-symbols-outlined">send</span>Send to Lecturer</button></div>
+          </form>
+        </section>
+        <section class="umat-issue-view" id="ws-issue-thread-view" aria-label="Issue conversation">
+          <div class="umat-issue-thread-head"><button class="umat-icon-btn" id="ws-issue-thread-back" type="button" aria-label="Back to conversations"><span class="material-symbols-outlined">arrow_back</span></button><div class="umat-issue-thread-title"><strong id="ws-issue-thread-title"></strong><span id="ws-issue-thread-meta"></span></div></div>
+          <div class="umat-issue-messages" id="ws-issue-messages" aria-live="polite"></div>
+          <div class="umat-issue-send-error" id="ws-issue-send-error" role="alert"></div>
+          <div class="umat-issue-composer">
+            <label class="umat-issue-attach-btn" for="ws-issue-reply-file" title="Attach a file"><span class="material-symbols-outlined">attach_file</span><span class="sr-only">Attach</span></label>
+            <input type="file" id="ws-issue-reply-file" hidden accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp3,.mp4,.wav">
+            <textarea id="ws-issue-reply" rows="1" maxlength="10000" placeholder="Type your message..."></textarea>
+            <button class="umat-issue-send-btn" id="ws-issue-send" type="button"><span class="material-symbols-outlined">send</span><span class="sr-only">Send</span></button>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -675,7 +676,7 @@ HTML;
             ['id' => 'lec-courses',   'icon' => 'menu_book',     'label' => 'Courses',  'active' => false],
             ['id' => 'lec-library',   'icon' => 'local_library', 'label' => 'Resource Materials', 'active' => false],
             ['id' => 'lec-sessions',  'icon' => 'history',       'label' => 'Sessions', 'active' => false],
-            ['id' => 'lec-issues',   'icon' => 'flag',          'label' => 'Issues',   'active' => false, 'badge' => 'lec-issues'],
+            ['id' => 'lec-issues',   'icon' => 'forum',          'label' => 'Issues',   'active' => false, 'badge' => 'lec-issues'],
         ];
         $lecMobTabs = self::glassmorph_tab_bar($lecGlassTabs, 'lp', 'lec-glass-tabs');
 
@@ -891,7 +892,7 @@ HTML;
     <!-- COMPACT ISSUES PANE -->
     <div class="umat-cp-pane" id="lcp-issues" style="overflow-y:auto;">
       <div class="lcp-pane-hdr">
-        <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">flag</span>
+        <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">forum</span>
         <strong style="font-size:12px;">Student Issues</strong>
         <button class="lcp-pane-expand" id="lcp-iss-open-btn" type="button" title="Open full issues"><span class="material-symbols-outlined">open_in_full</span></button>
       </div>
@@ -927,7 +928,7 @@ HTML;
         <button class="umat-sb-item" data-lp="lec-courses" type="button" title="My Courses"><span class="material-symbols-outlined">menu_book</span><span class="umat-sb-item-lbl">My Courses</span></button>
         <button class="umat-sb-item" data-lp="lec-library" type="button" title="Resource Materials"><span class="material-symbols-outlined">local_library</span><span class="umat-sb-item-lbl">Resource Materials</span></button>
         <button class="umat-sb-item" data-lp="lec-sessions" type="button" title="Sessions"><span class="material-symbols-outlined">history</span><span class="umat-sb-item-lbl">Sessions</span></button>
-        <button class="umat-sb-item" data-lp="lec-issues" type="button" title="Student Issues"><span class="material-symbols-outlined">flag</span><span class="umat-sb-item-lbl">Student Issues</span><span class="umat-sb-badge" id="sb-badge-new-issues" style="display:none;margin-left:auto;background:var(--u-ter);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;line-height:14px;min-width:16px;text-align:center;"></span></button>
+        <button class="umat-sb-item" data-lp="lec-issues" type="button" title="Student Issues"><span class="material-symbols-outlined">forum</span><span class="umat-sb-item-lbl">Student Issues</span><span class="umat-sb-badge" id="sb-badge-new-issues" style="display:none;margin-left:auto;background:var(--u-ter);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;line-height:14px;min-width:16px;text-align:center;"></span></button>
       </nav>
       <div class="umat-sb-divider"></div>
       <div class="umat-sb-foot">
@@ -1128,20 +1129,24 @@ HTML;
       <!-- STUDENT ISSUES (LECTURER) -->
       <div class="umat-tab-pane" id="lec-issues" style="position:relative;overflow:hidden;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">flag</span> Student Issues</h2>
-          <div style="display:flex;gap:6px;">
-            <select id="lec-issues-filter" style="padding:6px 8px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;background:var(--u-bg);color:var(--u-ons);">
-              <option value="">All</option>
-              <option value="open">Open</option>
-              <option value="in_review">In Review</option>
-              <option value="resolved">Resolved</option>
-              <option value="closed">Closed</option>
-            </select>
-            <button class="umat-content-hdr-btn" id="lec-issues-refresh" type="button"><span class="material-symbols-outlined">refresh</span></button>
-          </div>
+          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">forum</span> Student Issues <span class="umat-badge-num" id="lec-issues-count"></span></h2>
+          <button class="umat-content-hdr-btn" id="lec-issues-refresh" type="button"><span class="material-symbols-outlined">refresh</span></button>
         </div>
-        <div id="lec-issues-body" style="flex:1;overflow-y:auto;padding:16px 20px;">
-          <div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No student issues for this course.</p></div>
+        <div class="umat-issue-app umat-issue-lecturer" id="lec-issue-app">
+          <section class="umat-issue-view active" id="lec-issue-list-view">
+            <div class="umat-issue-filters">
+              <label><span class="sr-only">Search conversations</span><span class="material-symbols-outlined">search</span><input type="search" id="lec-issues-search" placeholder="Search student, title, or message"></label>
+              <select id="lec-issues-course" aria-label="Filter by course"><option value="0">All authorized courses</option></select>
+              <select id="lec-issues-category" aria-label="Filter by category"><option value="">All categories</option><option value="course_material">Course material</option><option value="assignment">Assignment</option><option value="quiz_examination">Quiz or examination</option><option value="grade_feedback">Grade or feedback</option><option value="live_class_recording">Live class or recording</option><option value="technical_problem">Technical problem</option><option value="access_permission">Access or permission</option><option value="other">Other</option></select>
+            </div>
+            <div class="umat-issue-list" id="lec-issues-body"><div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>Loading student issues...</p></div></div>
+          </section>
+          <section class="umat-issue-view" id="lec-issue-thread-view">
+            <div class="umat-issue-thread-head"><button class="umat-icon-btn" id="lec-issue-thread-back" type="button" aria-label="Back to inbox"><span class="material-symbols-outlined">arrow_back</span></button><div class="umat-issue-thread-title"><strong id="lec-issue-thread-title"></strong><span id="lec-issue-thread-meta"></span></div></div>
+            <div class="umat-issue-messages" id="lec-issue-messages" aria-live="polite"></div>
+            <div class="umat-issue-send-error" id="lec-issue-send-error" role="alert"></div>
+            <div class="umat-issue-composer"><label class="umat-issue-attach-btn" for="lec-issue-reply-file" title="Attach a file"><span class="material-symbols-outlined">attach_file</span><span class="sr-only">Attach</span></label><input type="file" id="lec-issue-reply-file" hidden accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp3,.mp4,.wav"><textarea id="lec-issue-reply" rows="1" maxlength="10000" placeholder="Type your message..."></textarea><button class="umat-issue-send-btn" id="lec-issue-send" type="button"><span class="material-symbols-outlined">send</span><span class="sr-only">Send</span></button></div>
+          </section>
         </div>
       </div>
 
@@ -1655,41 +1660,13 @@ function loadLcpSessionsPane(){
 function loadLcpIssuesPane(){
   var body=document.getElementById('lcp-iss-body');
   if(!CID){body.innerHTML=_lecCourseAlert('student issues');_lecWireAlertChips(body,function(cid){CID=cid;lcpPaneLoaded['lcp-issues']=false;showLcpPane('lcp-issues');});return;}
-  function _timeAgo(ts){if(!ts)return '';var diff=Date.now()/1000-ts;var m=Math.floor(diff/60);if(m<1)return 'Just now';if(m<60)return m+'m ago';var h=Math.floor(m/60);if(h<24)return h+'h ago';var dd=Math.floor(h/24);return dd+'d ago';}
-  function _catLabel(cat){var map={'concept_confusion':'Concept','material_error':'Material','technical_issue':'Technical','suggestion':'Suggestion','other':'Other'};return map[cat]||cat||'';}
-  function _catIcon(cat){var map={'concept_confusion':'psychology','material_error':'description','technical_issue':'build','suggestion':'lightbulb','other':'help'};return map[cat]||'flag';}
-  var filter='open';
-  function loadIssues(){
-    body.innerHTML='<div class="lcp-pane-loading">Loading issues…</div>';
-    ajax('local_umat_ai_get_course_issues',{courseid:CID,status:filter==='all'?'':filter},function(r){
-      var issues=r.issues||[];
-      if(!issues.length){body.innerHTML='<div style="display:flex;gap:4px;padding-bottom:8px;"><button class="lcp-iss-f" data-f="open" type="button" style="flex:1;padding:4px 6px;border-radius:var(--u-r8);border:1px solid var(--u-olv);background:'+(filter==='open'?'var(--u-p)':'var(--u-bg)')+';color:'+(filter==='open'?'#fff':'var(--u-ons)')+';font-size:10px;font-weight:600;cursor:pointer;">Open</button><button class="lcp-iss-f" data-f="all" type="button" style="flex:1;padding:4px 6px;border-radius:var(--u-r8);border:1px solid var(--u-olv);background:'+(filter==='all'?'var(--u-p)':'var(--u-bg)')+';color:'+(filter==='all'?'#fff':'var(--u-ons)')+';font-size:10px;font-weight:600;cursor:pointer;">All</button></div><div class="lcp-pane-empty"><span class="material-symbols-outlined">check_circle</span><p>No '+filter+' issues.</p></div>';return;}
-      var header='<div style="display:flex;gap:4px;padding-bottom:8px;"><button class="lcp-iss-f" data-f="open" type="button" style="flex:1;padding:4px 6px;border-radius:var(--u-r8);border:1px solid var(--u-olv);background:'+(filter==='open'?'var(--u-p)':'var(--u-bg)')+';color:'+(filter==='open'?'#fff':'var(--u-ons)')+';font-size:10px;font-weight:600;cursor:pointer;">Open</button><button class="lcp-iss-f" data-f="in_review" type="button" style="flex:1;padding:4px 6px;border-radius:var(--u-r8);border:1px solid var(--u-olv);background:'+(filter==='in_review'?'var(--u-p)':'var(--u-bg)')+';color:'+(filter==='in_review'?'#fff':'var(--u-ons)')+';font-size:10px;font-weight:600;cursor:pointer;">Review</button><button class="lcp-iss-f" data-f="all" type="button" style="flex:1;padding:4px 6px;border-radius:var(--u-r8);border:1px solid var(--u-olv);background:'+(filter==='all'?'var(--u-p)':'var(--u-bg)')+';color:'+(filter==='all'?'#fff':'var(--u-ons)')+';font-size:10px;font-weight:600;cursor:pointer;">All</button></div>';
-      body.innerHTML=header+issues.slice(0,10).map(function(iss){
-        var sc={'open':'#dc2626','in_review':'#f59e0b','resolved':'#22c55e','closed':'var(--u-ol)'}[iss.status]||'var(--u-ol)';
-        var initials=(iss.fullname||'S').substring(0,1).toUpperCase();
-        return '<div class="lcp-pane-row" style="padding:8px;border:1px solid var(--u-olv);border-left:3px solid '+sc+';border-radius:var(--u-r10);margin-bottom:4px;">'+
-          '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">'+
-            '<div style="display:flex;gap:6px;align-items:center;">'+
-              '<div style="width:22px;height:22px;border-radius:50%;background:'+sc+'20;color:'+sc+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;">'+esc(initials)+'</div>'+
-              '<span style="font-size:11px;font-weight:700;color:var(--u-ons);">'+esc(iss.fullname||'Student')+'</span>'+
-            '</div>'+
-            '<span style="font-size:9px;padding:2px 6px;border-radius:999px;background:'+sc+'18;color:'+sc+';font-weight:700;">'+iss.status.replace('_',' ')+'</span>'+
-          '</div>'+
-          '<div style="font-size:10px;color:var(--u-ol);margin-bottom:4px;line-height:1.4;">'+esc((iss.description||'').substring(0,100))+'</div>'+
-          '<div style="display:flex;gap:8px;align-items:center;">'+
-            '<span style="font-size:9px;padding:1px 5px;border-radius:999px;background:var(--u-sflo);color:var(--u-ol);font-weight:600;">'+_catIcon(iss.category||'')+' '+_catLabel(iss.category||'')+'</span>'+
-            '<span style="font-size:9px;color:var(--u-ol);">'+_timeAgo(iss.timecreated||iss.created)+'</span>'+
-            (iss.lecturer_response?'<span style="font-size:9px;color:var(--u-sec);font-weight:600;">Replied</span>':'')+
-          '</div>'+
-        '</div>';
-      }).join('');
-      body.querySelectorAll('.lcp-iss-f').forEach(function(btn){
-        btn.addEventListener('click',function(){filter=btn.dataset.f;loadIssues();});
-      });
-    },function(){body.innerHTML='<div class="lcp-pane-empty">Could not load issues.</div>';});
-  }
-  loadIssues();
+  body.innerHTML='<div class="lcp-pane-loading">Loading issues…</div>';
+  ajax('local_umat_ai_list_issue_conversations',{inbox:'lecturer',courseid:CID,category:'',query:''},function(r){
+    var convs=r.conversations||[];
+    if(!convs.length){body.innerHTML='<div class="lcp-pane-empty"><span class="material-symbols-outlined">forum</span><p>No student issues.</p></div>';return;}
+    var labels={concept_confusion:'Concept',material_error:'Material',technical_issue:'Technical',suggestion:'Suggestion',other:'Other'};
+    body.innerHTML=convs.slice(0,10).map(function(c){return '<div class="lcp-pane-row" style="padding:8px;border:1px solid var(--u-olv);border-radius:var(--u-r10);margin-bottom:4px;cursor:pointer;" data-conversation-id="'+c.id+'"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:11px;color:var(--u-ons);">'+esc(c.title)+'</strong>'+(c.unreadcount?'<span class="umat-issue-unread" style="flex-shrink:0;">'+c.unreadcount+'</span>':'')+'</div><div style="font-size:10px;color:var(--u-ol);margin-top:2px;">'+esc(c.studentname)+' · '+(labels[c.category]||c.category)+'</div></div>';}).join('');
+    body.querySelectorAll('[data-conversation-id]').forEach(function(el){el.addEventListener('click',function(){closePanel();lecOv.classList.add('open');switchPane('lec-issues');setTimeout(function(){openLecturerIssue(parseInt(el.dataset.conversationId));},200);});});},function(){body.innerHTML='<div class="lcp-pane-empty">Could not load issues.</div>';});
 }
 
 var lcpMsgs=document.getElementById('lcp-msgs');
@@ -1791,7 +1768,7 @@ function loadPaneData(name){
   if(name==='lec-courses')loadLecturerCourses();
   if(name==='lec-library'){populateLibCourseSel();loadLibrary(lecLibCourseId);}
   if(name==='lec-sessions'){populateSessCourseSel();loadSessions(lecSessCourseId);}
-  if(name==='lec-issues')loadLecturerIssues();
+  if(name==='lec-issues')initLecturerIssues();
   if(name==='lec-insights'){populateInsightsCourseSel();if(window.struggleDashboard){window.struggleDashboard.init(resolveInsightsCid());}else{loadInsights(resolveInsightsCid());}}
   if(name==='lec-quizgen')loadQuizGenUI();
   if(name==='lec-home')initHome();
@@ -2362,128 +2339,8 @@ function wireSessPicker(){
 
 /* ─── Student Issues (Lecturer) ───────────────────── */
 /* Hide notification badges when lecturer views/interacts with issues */
-function _umatLecMarkViewed(){
-  var b=document.getElementById('sb-badge-new-issues');
-  if(b)b.style.display='none';
-  var mb=document.getElementById('gtb-lec-issues');
-  if(mb)mb.style.display='none';
-}
-function loadLecturerIssues(){
-  var body=document.getElementById('lec-issues-body');if(!body){console.log('[lec-issues] body not found');return;}
-  _umatLecMarkViewed();
-  /* Show course alert when CID=0 */
-  if(!CID){
-    body.innerHTML=_lecCourseAlert('student issues');
-    _lecWireAlertChips(body,function(cid){CID=cid;loadLecturerIssues();});
-    return;
-  }
-  var filter=document.getElementById('lec-issues-filter');var status=filter?filter.value:'';
-  console.log('[lec-issues] loading CID='+CID+' status='+status);
-  body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading issues…</p></div>';
-  var args={courseid:CID};if(status)args.status=status;
-  ajax('local_umat_ai_get_course_issues',args,function(r){
-    console.log('[lec-issues] response',r);
-    var issues=r.issues||[],total=r.total||0;
-    var mb=document.getElementById('gtb-lec-issues');if(mb){mb.textContent=total>99?'99+':total;mb.style.display=total?'':'none';}
-    if(!issues.length){body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">flag</span><p>No student issues'+(status?' with this status':'')+'.</p></div>';return;}
-    body.innerHTML=issues.map(function(iss){
-      var catLabel={'concept_confusion':'Concept Confusion','material_error':'Material Error','technical_issue':'Technical Issue','suggestion':'Suggestion','other':'Other'}[iss.category]||iss.category;
-      var statusColors={'open':'var(--u-ter)','in_review':'#d97706','resolved':'var(--u-sec)','closed':'var(--u-ol)'};
-      var sc=statusColors[iss.status]||'var(--u-ol)';
-      var ago=iss.timecreated?(function(d){return d===0?'today':d+'d ago';})(Math.floor((Date.now()/1000-iss.timecreated)/86400)):'';
-      return '<div class="umat-issue-card" data-id="'+iss.id+'" style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:14px;margin-bottom:10px;">'
-        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
-        +'<div style="display:flex;align-items:center;gap:8px;">'
-        +(iss.userpicture?'<img src="'+iss.userpicture+'" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">':'<div style="width:28px;height:28px;border-radius:50%;background:var(--u-p);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">'+esc((iss.fullname||'?')[0])+'</div>')
-        +'<div><strong style="font-size:13px;">'+esc(iss.fullname||'Student')+'</strong><span style="font-size:10px;color:var(--u-ol);display:block;">'+catLabel+(iss.topic?' · '+esc(iss.topic):'')+' · '+ago+'</span></div></div>'
-        +'<span style="font-size:10px;padding:2px 8px;border-radius:999px;background:'+sc+'20;color:'+sc+';font-weight:700;white-space:nowrap;">'+iss.status.replace('_',' ')+'</span></div>'
-        +'<p style="font-size:12px;color:var(--u-onsv);margin:0 0 8px;">'+esc(iss.description)+'</p>'
-        +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'
-        +'<select class="umat-issue-status-sel" data-id="'+iss.id+'" style="padding:4px 6px;font-size:11px;border:1px solid var(--u-olv);border-radius:var(--u-r6);">'
-        +'<option value="open"'+(iss.status==='open'?' selected':'')+'>Open</option>'
-        +'<option value="in_review"'+(iss.status==='in_review'?' selected':'')+'>In Review</option>'
-        +'<option value="resolved"'+(iss.status==='resolved'?' selected':'')+'>Resolved</option>'
-        +'<option value="closed"'+(iss.status==='closed'?' selected':'')+'>Closed</option></select>'
-        +'<button class="umat-issue-notes-btn" data-id="'+iss.id+'" style="font-size:10px;padding:4px 8px;border:1px solid var(--u-olv);border-radius:var(--u-r6);background:var(--u-bg);cursor:pointer;">Notes</button>'
-        +'<button class="umat-issue-reply-btn" data-id="'+iss.id+'" style="font-size:10px;padding:4px 8px;border:1px solid var(--u-olv);border-radius:var(--u-r6);background:var(--u-bg);cursor:pointer;">'+(iss.lecturer_response?'Edit Reply':'Reply')+'</button>'
-        +'<span style="font-size:10px;color:var(--u-ol);flex:1;text-align:right;display:'+(iss.lecturer_notes?'block':'none')+'" id="has-notes-'+iss.id+'"><span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">note</span> Notes</span></div>'
-        +'<div id="lec-issue-notes-'+iss.id+'" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--u-olv);">'
-        +'<textarea class="umat-issue-notes-ta" data-id="'+iss.id+'" placeholder="Add lecturer notes…" rows="2" style="width:100%;padding:6px 8px;font-size:11px;border:1px solid var(--u-olv);border-radius:var(--u-r6);resize:vertical;">'+esc(iss.lecturer_notes||'')+'</textarea>'
-        +'<button class="umat-issue-save-notes" data-id="'+iss.id+'" style="margin-top:4px;font-size:10px;padding:4px 10px;border:none;border-radius:var(--u-r6);background:var(--u-p);color:#fff;cursor:pointer;">Save Notes</button></div>'
-        /* Existing response bubble if already replied */
-        +(iss.lecturer_response?'<div style="margin-top:6px;padding:8px 10px;background:var(--u-sec)15;border-radius:var(--u-r8);border-left:3px solid var(--u-sec);font-size:11px;"><strong style="color:var(--u-sec);">Your response to student:</strong><p style="margin:4px 0 0;color:var(--u-onsv);">'+esc(iss.lecturer_response)+'</p></div>':'')
-        /* Reply section (hidden by default, shown via Reply btn) */
-        +'<div id="lec-issue-reply-'+iss.id+'" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--u-olv);">'
-        +'<textarea class="umat-issue-reply-ta" data-id="'+iss.id+'" placeholder="Write a public response to the student…" rows="2" style="width:100%;padding:6px 8px;font-size:11px;border:1px solid var(--u-olv);border-radius:var(--u-r6);resize:vertical;">'+esc(iss.lecturer_response||'')+'</textarea>'
-        +'<button class="umat-issue-send-reply" data-id="'+iss.id+'" style="margin-top:4px;font-size:10px;padding:4px 12px;border:none;border-radius:var(--u-r6);background:var(--u-sec);color:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><span class="material-symbols-outlined" style="font-size:12px;">reply</span> Send Response</button></div>'
-        +'</div>';
-    }).join('');
-
-    /* Pane-level interaction → mark issues as viewed */
-    body.addEventListener('click',_umatLecMarkViewed);
-    body.addEventListener('mousedown',_umatLecMarkViewed);
-    /* Wire status select */
-    body.querySelectorAll('.umat-issue-status-sel').forEach(function(sel){
-      sel.addEventListener('change',function(){
-        _umatLecMarkViewed();
-        ajax('local_umat_ai_update_issue_status',{issue_id:parseInt(this.dataset.id),status:this.value,lecturer_notes:''},function(r){
-          if(r.success)loadLecturerIssues();
-        });
-      });
-    });
-    /* Wire notes toggle */
-    body.querySelectorAll('.umat-issue-notes-btn').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        _umatLecMarkViewed();
-        var id=this.dataset.id;
-        var el=document.getElementById('lec-issue-notes-'+id);
-        if(el)el.style.display=el.style.display==='none'?'block':'none';
-      });
-    });
-    /* Wire notes save */
-    body.querySelectorAll('.umat-issue-save-notes').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        _umatLecMarkViewed();
-        var id=this.dataset.id;
-        var ta=document.querySelector('.umat-issue-notes-ta[data-id="'+id+'"]');
-        if(!ta)return;
-        ajax('local_umat_ai_update_issue_status',{issue_id:parseInt(id),status:'',lecturer_notes:ta.value},function(r){
-          if(r.success)loadLecturerIssues();
-        });
-      });
-    });
-    /* Wire reply toggle */
-    body.querySelectorAll('.umat-issue-reply-btn').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        _umatLecMarkViewed();
-        var id=this.dataset.id;
-        var el=document.getElementById('lec-issue-reply-'+id);
-        if(el)el.style.display=el.style.display==='none'?'block':'none';
-      });
-    });
-    /* Wire reply send */
-    body.querySelectorAll('.umat-issue-send-reply').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        _umatLecMarkViewed();
-        var id=this.dataset.id;
-        var ta=document.querySelector('.umat-issue-reply-ta[data-id="'+id+'"]');
-        if(!ta||!ta.value.trim())return;
-        ajax('local_umat_ai_update_issue_response',{issue_id:parseInt(id),response:ta.value.trim()},function(r){
-          if(r.success)loadLecturerIssues();
-        });
-      });
-    });
-  },function(e){
-    console.log('[lec-issues] error',e);
-    body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load issues.</p></div>';
-  });
-}
-
-/* Filter change refreshes list */
-var issueFilter=document.getElementById('lec-issues-filter');
-if(issueFilter)issueFilter.addEventListener('change',loadLecturerIssues);
-var issueRefresh=document.getElementById('lec-issues-refresh');
-if(issueRefresh)issueRefresh.addEventListener('click',loadLecturerIssues);
+/* Old loadLecturerIssues removed — conversation system handled by initLecturerIssues() in umat_lecturer.js */
+function loadLecturerIssues(){initLecturerIssues();}
 
 /* ──────────────────────────────────────────────
    STRUGGLE INSIGHTS

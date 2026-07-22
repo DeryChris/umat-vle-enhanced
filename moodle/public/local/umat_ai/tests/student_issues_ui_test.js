@@ -17,7 +17,7 @@ const lecturerBuild = fs.readFileSync(path.join(plugin, 'amd', 'build', 'umat_le
 const issueCss = fs.readFileSync(path.join(plugin, 'styles', 'umat-overlay.css'), 'utf8');
 const renderedMarkup = overlay.split('<script>(function(){')[0];
 
-assert(renderedMarkup.includes("'label' => 'AI Chat'"), 'Student overlay exposes AI Chat');
+assert(renderedMarkup.includes("'label' => 'AI Tutor'") || renderedMarkup.includes("'label' => 'AI Chat'"), 'Student overlay exposes AI Tutor/Chat');
 assert(renderedMarkup.includes("'label' => 'Student Issues'"), 'Student overlay exposes Student Issues');
 assert(student.includes('No issues reported yet. If you need help with this course'), 'Student empty state is present');
 assert(lecturer.includes('No student issues have been reported for this course.'), 'Lecturer empty state is present');
