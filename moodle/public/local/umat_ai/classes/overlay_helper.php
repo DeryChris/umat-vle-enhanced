@@ -1105,7 +1105,6 @@ HTML;
           <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">history</span> AI Chat Sessions</h2>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="lec-sess-hdr-actions"></div>
         </div>
-        </div>
         <!-- Course picker overlay -->
         <div class="umat-cs-overlay" id="lec-sess-cs-ov">
           <div class="umat-cs-modal">
