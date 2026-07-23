@@ -1129,7 +1129,7 @@ HTML;
       <!-- STUDENT ISSUES (LECTURER) -->
       <div class="umat-tab-pane" id="lec-issues" style="position:relative;overflow:hidden;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">forum</span> Student Issues <span class="umat-badge-num" id="lec-issues-count"></span></h2>
+          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">forum</span> Student Issues</h2>
           <button class="umat-content-hdr-btn" id="lec-issues-refresh" type="button"><span class="material-symbols-outlined">refresh</span></button>
         </div>
         <div class="umat-issue-app umat-issue-lecturer" id="lec-issue-app">
