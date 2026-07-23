@@ -11,6 +11,8 @@
   border-radius: 10px;
   color: #4a6a4e;
   transition: background .2s, border-color .2s;
+  width: 100%;
+  box-sizing: border-box;
 }
 .lr-toggle-link:hover {
   background: #e8f2e3;
@@ -45,6 +47,7 @@
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0,0,0,.08);
+  width: 100%;
   max-width: 400px;
   margin: 0 auto;
   overflow: hidden;
@@ -156,6 +159,8 @@
   cursor: pointer;
   transition: background .15s, border-color .15s, transform .12s;
   margin-top: 10px;
+  width: 100%;
+  justify-content: center;
 }
 .umat-login-report-btn:hover {
   background: #e8f2e3;
@@ -234,8 +239,71 @@
 }
 
 /* Responsive tweaks */
+@media(max-width: 640px) {
+  .lr-toggle-link {
+    margin: 12px 0 0;
+    padding: 10px 12px;
+  }
+  .lr-toggle-link a {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+  .umat-login-report-card {
+    border-radius: 0;
+    max-width: 100%;
+    margin: 0;
+    box-shadow: none;
+    border: 1px solid #e0e8e0;
+  }
+  .umat-login-report-hdr {
+    padding: 14px 18px 10px;
+  }
+  .umat-login-report-body {
+    padding: 0 16px 16px;
+  }
+  .umat-login-report-input {
+    padding: 12px 14px;
+    font-size: 16px; /* prevent zoom on iOS */
+  }
+  .umat-login-report-btn {
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+  .umat-login-report-hint {
+    font-size: 12px;
+  }
+}
+
 @media(max-width: 420px) {
-  .umat-login-report-card { border-radius: 8px; }
-  .umat-login-report-hdr { padding: 14px 18px 12px; }
-  .umat-login-report-body { padding: 0 18px 16px; }
+  .umat-login-report-hdr h2 {
+    font-size: 15px;
+  }
+  .umat-login-report-hdr p {
+    font-size: 11px;
+  }
+  .umat-login-report-input {
+    padding: 14px 14px;
+  }
+  .umat-login-report-btn {
+    padding: 14px 18px;
+  }
+  .umat-login-report-success {
+    padding: 24px 12px;
+  }
+}
+
+/* Landscape phone tweak */
+@media(max-height: 480px) and (orientation: landscape) {
+  .umat-login-report-hdr {
+    padding: 10px 16px 8px;
+  }
+  .umat-login-report-body {
+    padding: 0 14px 12px;
+  }
+  .umat-login-report-hint {
+    margin-bottom: 4px;
+  }
+  .umat-login-report-btn {
+    margin-top: 6px;
+  }
 }

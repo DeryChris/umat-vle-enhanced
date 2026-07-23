@@ -934,7 +934,7 @@ HTML;
     </div>
 
     <!-- CONTENT -->
-    <div class="umat-ov-content">
+    <div class="umat-ov-content" style="width:100%;min-width:0;flex:1;">
       <button class="umat-ov-close-btn" type="button" onclick="document.getElementById('lec-ov').classList.remove('open')" title="Close">
         <span class="material-symbols-outlined">close</span>
       </button>
@@ -1105,7 +1105,6 @@ HTML;
           <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">history</span> AI Chat Sessions</h2>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="lec-sess-hdr-actions"></div>
         </div>
-        </div>
         <!-- Course picker overlay -->
         <div class="umat-cs-overlay" id="lec-sess-cs-ov">
           <div class="umat-cs-modal">
@@ -1122,7 +1121,7 @@ HTML;
       </div>
 
       <!-- STUDENT ISSUES (LECTURER) -->
-      <div class="umat-tab-pane" id="lec-issues">
+      <div class="umat-tab-pane" id="lec-issues" style="width:100%;min-width:0;">
         <div class="umat-content-hdr">
           <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">forum</span> Student Issues</h2>
           <button class="umat-content-hdr-btn" id="lec-issues-refresh" type="button"><span class="material-symbols-outlined">refresh</span></button>
@@ -4312,7 +4311,54 @@ HTML;
 
 <script>
 /* Immediately inject toggle link after the login submit button */
-(function(){var w=document.getElementById('lr-wrapper');if(!w){console.log('[umat] lr-wrapper not found');return;}var f=document.querySelector('.loginform')||document.querySelector('#page-login-index form')||document.querySelector('form[action*="login"]');if(f){var sb=f.querySelector('.fitem.fsubmit')||f.querySelector('.login-submit')||f.querySelector('input[type="submit"],button[type="submit"]');var target=sb&&sb.parentNode?sb.parentNode:f;target.appendChild(w);console.log('[umat] lr-wrapper injected into form');}else{w.style.display='';console.log('[umat] lr-wrapper shown at bottom, no form found');}})();
+(function(){
+  var w=document.getElementById('lr-wrapper');
+  if(!w){console.log('[umat] lr-wrapper not found');return;}
+  var f=document.querySelector('.loginform')||document.querySelector('#page-login-index form')||document.querySelector('form[action*="login"]');
+  if(f){
+    var sb=f.querySelector('.fitem.fsubmit')||f.querySelector('.login-submit')||f.querySelector('input[type="submit"],button[type="submit"]');
+    var target=sb&&sb.parentNode?sb.parentNode:f;
+    target.appendChild(w);
+    console.log('[umat] lr-wrapper injected into form');
+    /* Ensure card is centered on mobile when shown */
+    var card=document.getElementById('lr-report-card');
+    if(card){card.style.margin='0 auto';}
+  }else{
+    w.style.display='';
+    console.log('[umat] lr-wrapper shown at bottom, no form found');
+  }
+})();
+</script>
+
+<script>
+/* Fallback: direct toggle init without AMD (works even if AMD fails) */
+(function(){
+  var toggle=document.getElementById('lr-show-form');
+  var backBtn=document.getElementById('lr-report-back');
+  var closeBtn=document.getElementById('lr-close-btn');
+  var wrapper=document.getElementById('lr-wrapper');
+  var reportCard=document.getElementById('lr-report-card');
+  console.log('[umat-login-report-fallback] init:', {toggle:!!toggle, backBtn:!!backBtn, closeBtn:!!closeBtn, wrapper:!!wrapper, reportCard:!!reportCard});
+  if(!toggle || !reportCard) return;
+
+  var loginForm=document.querySelector('.loginform')||document.querySelector('#page-login-index form')||document.querySelector('form[action*="login"]');
+  console.log('[umat-login-report-fallback] loginForm:', !!loginForm);
+
+  toggle.addEventListener('click', function(e){
+    e.preventDefault();
+    console.log('[umat-login-report-fallback] toggle clicked');
+    if(loginForm) loginForm.style.display='none';
+    if(wrapper) wrapper.style.display='none';
+    reportCard.style.display='';
+  });
+  function showLoginForm(){
+    reportCard.style.display='none';
+    if(loginForm) loginForm.style.display='';
+    if(wrapper) wrapper.style.display='';
+  }
+  if(backBtn) backBtn.addEventListener('click', function(e){e.preventDefault();showLoginForm();});
+  if(closeBtn) closeBtn.addEventListener('click', function(e){e.preventDefault();showLoginForm();});
+})();
 </script>
 
 <!-- REPORT FORM (hidden initially, replaces login form when toggled) -->

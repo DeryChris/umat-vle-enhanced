@@ -19,7 +19,7 @@ class before_footer {
             $pagelayout = $PAGE->pagelayout;
             $path = $PAGE->url->get_path();
 
-            /* ---- Login page: inject Login Issue Report toggle ---- */
+/* ---- Login page: inject Login Issue Report toggle ---- */
             $isLoginPage = $pagelayout === 'login' || strpos($path, '/login/') !== false;
             if ($isLoginPage && !isloggedin()) {
                 $cssPath = $wwwroot . '/local/umat_ai/styles/umat-login-report.css';
@@ -27,6 +27,9 @@ class before_footer {
                 $hook->add_html('<link rel="preconnect" href="https://fonts.gstatic.com">');
                 $hook->add_html('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">');
                 $hook->add_html('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">');
+                /* Load overlay theme CSS so login page matches site design */
+                $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-overlay.css?v=' . filemtime(__DIR__ . '/../../styles/umat-overlay.css') . '">');
+                $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-responsive.css?v=' . filemtime(__DIR__ . '/../../styles/umat-responsive.css') . '">');
                 $hook->add_html('<link rel="stylesheet" href="' . $cssPath . '?v=' . $cssVer . '">');
                 $hook->add_html(\local_umat_ai\overlay_helper::login_report_overlay());
                 $hook->add_html(self::amd_script('local_umat_ai/umat_login_report','init',[]));
