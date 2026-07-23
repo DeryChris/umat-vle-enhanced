@@ -1119,6 +1119,7 @@ if(plSend)plSend.addEventListener('click',function(){if(this.disabled)return;sen
 if(plInput)plInput.addEventListener('keypress',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(plSend&&!plSend.disabled)plSend.click();}});
 
 /* ---- LECTURES: load & display (inside library tab) ---- */
+var _lecData=[];
 function loadLectures(){
   console.log('[UMAT-REC] loadLectures called, courseId=',courseId);
   require(['core/ajax'],function(Ajax){
@@ -1128,7 +1129,8 @@ function loadLectures(){
         console.log('[UMAT-REC] AJAX success', {recordings: r.recordings ? r.recordings.length : 'undefined', raw: JSON.stringify(r).substring(0,300)});
         var grid=document.getElementById('ws-lib-lectures');
         console.log('[UMAT-REC] grid found?',!!grid);
-        if(grid)renderVideoTiles(r.recordings||r||[]);
+        _lecData=r.recordings||r||[];
+        if(grid)renderVideoTiles(_lecData);
       }).fail(function(err){
         console.error('[UMAT-REC] AJAX FAILED', err);
         var grid=document.getElementById('ws-lib-lectures');
@@ -1137,6 +1139,14 @@ function loadLectures(){
   });
 }
 var _lecRefresh=document.getElementById('ws-lib-lec-refresh');if(_lecRefresh)_lecRefresh.addEventListener('click',function(){loadLectures();});
+var _lecSearch=document.getElementById('ws-lib-lec-search');
+if(_lecSearch)_lecSearch.addEventListener('input',function(){
+  var q=this.value.toLowerCase();
+  if(!q){renderVideoTiles(_lecData);return;}
+  renderVideoTiles(_lecData.filter(function(r){
+    return(r.title||'').toLowerCase().indexOf(q)!==-1||(r.description||'').toLowerCase().indexOf(q)!==-1||(r.duration||'').toLowerCase().indexOf(q)!==-1;
+  }));
+});
 
 
 function openVideoPlayer(rec){
@@ -1150,18 +1160,27 @@ function openVideoPlayer(rec){
 /* ---- MY COURSES: render from preloaded data ---- */
 
 /* ---- LIBRARY ---- */
+var _matData=[];
 function loadLibrary(){
   var grid=document.getElementById('ws-lib-grid');
   grid.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading materials' + '?' + '</p></div>';
   require(['core/ajax'],function(Ajax){
     Ajax.call([{methodname:'local_umat_ai_get_course_materials',args:{courseid:courseId}}])[0]
-      .done(function(r){renderLibrary(r.materials||[], courseId);if(typeof updateMaterialAnalysis==='function')updateMaterialAnalysis(courseId);if(typeof updateVideoGenerationStatus==='function')updateVideoGenerationStatus(courseId);})
+      .done(function(r){_matData=r.materials||[];renderLibrary(_matData, courseId);if(typeof updateMaterialAnalysis==='function')updateMaterialAnalysis(courseId);if(typeof updateVideoGenerationStatus==='function')updateVideoGenerationStatus(courseId);})
       .fail(function(err){console.error('[umat] loadLibrary failed:',err&&err.message||err||'unknown');grid.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load materials.</p></div>';});
   });
   /* Also load lecture recordings into the library tab */
   loadLectures();
 }
 var _libRefresh=document.getElementById('ws-lib-refresh');if(_libRefresh)_libRefresh.addEventListener('click',function(){libraryLoaded=false;loadLibrary();libraryLoaded=true;});
+var _matSearch=document.getElementById('ws-lib-mat-search');
+if(_matSearch)_matSearch.addEventListener('input',function(){
+  var q=this.value.toLowerCase();
+  if(!q){renderLibrary(_matData,courseId);return;}
+  renderLibrary(_matData.filter(function(m){
+    return(m.filename||'').toLowerCase().indexOf(q)!==-1||(m.mimetype||'').toLowerCase().indexOf(q)!==-1;
+  }),courseId);
+});
 
 
 function openPdfViewer(url,name){

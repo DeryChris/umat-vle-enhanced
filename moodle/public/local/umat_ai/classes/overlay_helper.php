@@ -426,21 +426,16 @@ JS;
     </div>
 
     <!-- LIBRARY TAB — Lecture Recordings + Course Materials -->
-    <div class="umat-tab-pane" data-tab="library" style="position:relative;overflow:hidden;">
+    <div class="umat-tab-pane" data-tab="library" style="position:relative;overflow-y:auto;">
       <div class="umat-content-hdr">
         <h2>Course Library</h2>
-        <button class="umat-content-hdr-btn" id="ws-lib-refresh" type="button">
-          <span class="material-symbols-outlined">refresh</span>Refresh
-        </button>
+        <input class="umat-lib-search" id="ws-lib-search" type="text" placeholder="Search recordings & materials…" />
       </div>
       <!-- Lecture Recordings section -->
       <div class="umat-lib-section">
         <div class="umat-lib-section-hdr">
           <span class="material-symbols-outlined" style="font-size:18px;color:var(--u-p);">play_circle</span>
           <h3>Lecture Recordings</h3>
-          <button class="umat-lib-section-refresh" id="ws-lib-lec-refresh" type="button" title="Refresh recordings">
-            <span class="material-symbols-outlined">refresh</span>
-          </button>
         </div>
         <div class="umat-video-grid" id="ws-lib-lectures">
           <div class="umat-empty"><span class="material-symbols-outlined">play_circle</span><p>Loading lecture recordings…</p></div>
@@ -1127,7 +1122,7 @@ HTML;
       </div>
 
       <!-- STUDENT ISSUES (LECTURER) -->
-      <div class="umat-tab-pane" id="lec-issues" style="position:relative;overflow:hidden;">
+      <div class="umat-tab-pane" id="lec-issues">
         <div class="umat-content-hdr">
           <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">forum</span> Student Issues</h2>
           <button class="umat-content-hdr-btn" id="lec-issues-refresh" type="button"><span class="material-symbols-outlined">refresh</span></button>
@@ -1482,7 +1477,7 @@ function loadLcpPane(t){
   if(t==='lcp-courses')return loadLcpCourses();
   if(t==='lcp-library')return loadLcpLibraryPane();
   if(t==='lcp-sessions')return loadLcpSessionsPane();
-  if(t==='lcp-issues')return loadLcpIssuesPane();
+  if(t==='lcp-issues'){closePanel();lecOv.classList.add('open');switchPane('lec-issues');updateBodyLock();return;}
 }
 /* Open-full buttons */
 var lcpDashOpen=document.getElementById('lcp-dash-open-btn');if(lcpDashOpen)lcpDashOpen.addEventListener('click',function(){closePanel();lecOv.classList.add('open');switchPane('lec-insights');updateBodyLock();});
