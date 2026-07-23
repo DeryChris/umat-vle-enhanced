@@ -934,7 +934,7 @@ HTML;
     </div>
 
     <!-- CONTENT -->
-    <div class="umat-ov-content">
+    <div class="umat-ov-content" style="width:100%;min-width:0;flex:1;">
       <button class="umat-ov-close-btn" type="button" onclick="document.getElementById('lec-ov').classList.remove('open')" title="Close">
         <span class="material-symbols-outlined">close</span>
       </button>
