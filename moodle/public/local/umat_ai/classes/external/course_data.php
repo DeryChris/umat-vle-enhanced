@@ -195,6 +195,7 @@ class course_data extends \external_api {
             ['mod_folder',   'content'],
             ['course',       'legacy'],
             ['local_umat_ai','materials'],
+            ['local_umat_ai','recordings'],
         ];
 
         foreach ($contextIds as $ctxId) {

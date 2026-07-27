@@ -4,7 +4,7 @@
 .page-wrapper-login {
     position: fixed;
     top: 0; left: 0; bottom: 0; right: 0;
-    overflow: none;
+    overflow: hidden;
     height: 100%;
     margin: 0;
     justify-content: center;
@@ -36,7 +36,7 @@
         width: 100%;
         max-width: 500px;
         max-height: calc(100vh - 80px);
-        overflow: auto;
+        overflow: hidden;
 
         .login-heading {
             font-size: 1.8rem;
@@ -374,7 +374,7 @@
     /* base do fundo (fallback se a imagem não carregar) */
     background: linear-gradient(160deg, #07131c 0%, #0b2a1b 45%, #10243a 100%);
     color: #ecf7ff;
-    overflow: auto; /* garante scroll se o conteúdo for maior que a viewport */
+    overflow: hidden;
 
     /* --- camada 2: auroras em gradientes radiais, com leve movimento --- */
     &::after {
@@ -540,7 +540,7 @@
     /* Fallback do fundo */
     background: linear-gradient(180deg, #05130c 0%, #0c271c 60%, #06150e 100%);
     color: #e8fff1;
-    overflow: auto;
+    overflow: hidden;
 
     /* Camada 1: foto da copa da selva (ajuste o path) */
     &::before {

@@ -19,8 +19,8 @@ class before_footer {
             $pagelayout = $PAGE->pagelayout;
             $path = $PAGE->url->get_path();
 
-/* ---- Login page: inject Login Issue Report toggle ---- */
-            $isLoginPage = $pagelayout === 'login' || strpos($path, '/login/') !== false;
+/* ---- Login page: inject Login Issue Report toggle (main login form only) ---- */
+            $isLoginPage = in_array($path, ['/login/', '/login/index.php']);
             if ($isLoginPage && !isloggedin()) {
                 $cssPath = $wwwroot . '/local/umat_ai/styles/umat-login-report.css';
                 $cssVer  = filemtime(__DIR__ . '/../../styles/umat-login-report.css');

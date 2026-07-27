@@ -124,19 +124,14 @@ define(['core/ajax'], function(Ajax) {
             '  <div class="qgen-config" id="qgen-config-panel">' +
             '    <div class="qgen-config-scroll" id="qgen-config-scroll">' +
             renderSourceSection() +
-            renderQuestionTypeSection() +
-            renderBloomSection() +
-            renderDifficultySection() +
-            renderQuizDetailsSection() +
-            renderScheduleSection() +
-            renderAccessSecuritySection() +
-            renderPlacementSection() +
-            renderAdvancedSection() +
             renderDeliveryMethodSection() +
-            renderDocSettingsSection() +
+            renderQuestionTypeSection() +
+            renderQuestionProfileSection() +
+            renderQuizSettingsSection() +
             renderInstructionsSection() +
-            renderDestinationSection() +
-            renderGenerateButton() +
+            renderDocSettingsSection() +
+            renderMoodleSettingsSection() +
+            renderActionSection() +
             '    </div>' +
             '  </div>' +
             '  <div class="qgen-divider" id="qgen-divider"' +
@@ -207,63 +202,83 @@ define(['core/ajax'], function(Ajax) {
             '</div>';
     }
 
-    function renderBloomSection() {
-        var singleOpts = BLOOM_LEVELS.map(function(l) {
+    function renderQuestionProfileSection() {
+        var bloomSingleOpts = BLOOM_LEVELS.map(function(l) {
             return '<option value="' + l + '">' + l.charAt(0).toUpperCase() + l.slice(1) + '</option>';
         }).join('');
-
-        var mixedRows = BLOOM_LEVELS.map(function(l) {
+        var bloomMixedRows = BLOOM_LEVELS.map(function(l) {
             return '<div class="qgen-dist-row">' +
                 '<label>' + l.charAt(0).toUpperCase() + l.slice(1) + '</label>' +
                 '<input type="number" class="qgen-bloom-mix" value="0" min="0" max="30" data-level="' + l + '">' +
                 '</div>';
         }).join('');
-
-        return '<div class="qgen-card qgen-section">' +
-            '<h3><span class="material-symbols-outlined">psychology</span> Bloom\'s Taxonomy</h3>' +
-            '<div class="qgen-dist-toggle">' +
-            '  <label class="qgen-radio-label"><input type="radio" name="qgen-bloom-mode" value="single" checked> Single level</label>' +
-            '  <label class="qgen-radio-label"><input type="radio" name="qgen-bloom-mode" value="mixed"> Mixed distribution</label>' +
-            '</div>' +
-            '<div id="qgen-bloom-single" class="qgen-dist-single">' +
-            '  <select id="qgen-bloom" class="qgen-select">' + singleOpts + '</select>' +
-            '</div>' +
-            '<div id="qgen-bloom-mixed" class="qgen-dist-mixed" style="display:none;">' + mixedRows + '</div>' +
-            '</div>';
-    }
-
-    function renderDifficultySection() {
-        var singleOpts = DIFF_LEVELS.map(function(l) {
+        var diffSingleOpts = DIFF_LEVELS.map(function(l) {
             return '<option value="' + l + '">' + l.charAt(0).toUpperCase() + l.slice(1) + '</option>';
         }).join('');
-
-        var mixedRows = DIFF_LEVELS.map(function(l) {
+        var diffMixedRows = DIFF_LEVELS.map(function(l) {
             return '<div class="qgen-dist-row">' +
                 '<label>' + l.charAt(0).toUpperCase() + l.slice(1) + '</label>' +
                 '<input type="number" class="qgen-diff-mix" value="0" min="0" max="30" data-level="' + l + '">' +
                 '</div>';
         }).join('');
 
-        return '<div class="qgen-card qgen-section">' +
-            '<h3><span class="material-symbols-outlined">signal_cellular_alt</span> Difficulty</h3>' +
-            '<div class="qgen-dist-toggle">' +
-            '  <label class="qgen-radio-label"><input type="radio" name="qgen-diff-mode" value="single" checked> Single level</label>' +
-            '  <label class="qgen-radio-label"><input type="radio" name="qgen-diff-mode" value="mixed"> Mixed distribution</label>' +
-            '</div>' +
-            '<div id="qgen-diff-single" class="qgen-dist-single">' +
-            '  <select id="qgen-difficulty" class="qgen-select">' + singleOpts + '</select>' +
-            '</div>' +
-            '<div id="qgen-diff-mixed" class="qgen-dist-mixed" style="display:none;">' + mixedRows + '</div>' +
-            '</div>';
-    }
-
-    function renderQuizDetailsSection() {
-        return '<div class="qgen-card qgen-section qgen-section-collapsed" id="qgen-details-section">' +
-            '<h3 class="qgen-section-toggle" id="qgen-details-toggle">' +
-            '  <span class="material-symbols-outlined">tune</span> Quiz Details' +
+        return '<div class="qgen-card qgen-section qgen-section-collapsed" id="qgen-profile-section">' +
+            '<h3 class="qgen-section-toggle">' +
+            '  <span class="material-symbols-outlined">psychology</span> Question Profile' +
+            '  <span id="qgen-profile-summary" class="qgen-profile-summary">Understand \u00b7 Medium</span>' +
             '  <span class="material-symbols-outlined qgen-chevron">expand_more</span>' +
             '</h3>' +
             '<div class="qgen-section-body" style="display:none;">' +
+
+            '<div class="qgen-profile-group">' +
+            '  <div class="qgen-profile-group-hdr">' +
+            '    <span class="material-symbols-outlined">school</span>' +
+            '    <div><strong>Bloom\u2019s Taxonomy</strong><small>What cognitive level should questions target?</small></div>' +
+            '  </div>' +
+            '  <div class="qgen-dist-toggle">' +
+            '    <label class="qgen-radio-label"><input type="radio" name="qgen-bloom-mode" value="single" checked> Single level</label>' +
+            '    <label class="qgen-radio-label"><input type="radio" name="qgen-bloom-mode" value="mixed"> Mixed distribution</label>' +
+            '  </div>' +
+            '  <div id="qgen-bloom-single" class="qgen-dist-single">' +
+            '    <select id="qgen-bloom" class="qgen-select">' + bloomSingleOpts + '</select>' +
+            '  </div>' +
+            '  <div id="qgen-bloom-mixed" class="qgen-dist-mixed" style="display:none;">' + bloomMixedRows + '</div>' +
+            '</div>' +
+
+            '<div class="qgen-profile-divider"></div>' +
+
+            '<div class="qgen-profile-group">' +
+            '  <div class="qgen-profile-group-hdr">' +
+            '    <span class="material-symbols-outlined">signal_cellular_alt</span>' +
+            '    <div><strong>Difficulty</strong><small>How challenging should questions be?</small></div>' +
+            '  </div>' +
+            '  <div class="qgen-dist-toggle">' +
+            '    <label class="qgen-radio-label"><input type="radio" name="qgen-diff-mode" value="single" checked> Single level</label>' +
+            '    <label class="qgen-radio-label"><input type="radio" name="qgen-diff-mode" value="mixed"> Mixed distribution</label>' +
+            '  </div>' +
+            '  <div id="qgen-diff-single" class="qgen-dist-single">' +
+            '    <select id="qgen-difficulty" class="qgen-select">' + diffSingleOpts + '</select>' +
+            '  </div>' +
+            '  <div id="qgen-diff-mixed" class="qgen-dist-mixed" style="display:none;">' + diffMixedRows + '</div>' +
+            '</div>' +
+
+            '</div>' +
+            '</div>';
+    }
+
+    function renderQuizSettingsSection() {
+        return '<div class="qgen-card qgen-section qgen-section-collapsed" id="qgen-quizsettings-section">' +
+            '<h3 class="qgen-section-toggle">' +
+            '  <span class="material-symbols-outlined">tune</span> Quiz Settings' +
+            '  <span class="material-symbols-outlined qgen-chevron">expand_more</span>' +
+            '</h3>' +
+            '<div class="qgen-section-body" style="display:none;">' +
+
+            '<div class="qgen-profile-group">' +
+            '  <div class="qgen-profile-group-hdr">' +
+            '    <span class="material-symbols-outlined">edit_note</span>' +
+            '    <div><strong>Basic</strong><small>Quiz name, marks, and behaviour</small></div>' +
+            '  </div>' +
             '  <div class="qgen-field">' +
             '    <label>Quiz Name</label>' +
             '    <input type="text" id="qgen-name" class="qgen-input" placeholder="Leave blank for auto-name">' +
@@ -293,17 +308,12 @@ define(['core/ajax'], function(Ajax) {
             '  </div>' +
             '  <p class="qgen-hint" style="margin-top:6px;">Time limit and max attempts can also be adjusted in Moodle after import.</p>' +
             '</div>' +
-            '</div>';
-    }
 
-    function renderScheduleSection() {
-        return '<div class="qgen-card qgen-section qgen-section-collapsed qgen-online-only" id="qgen-schedule-section">' +
-            '<h3 class="qgen-section-toggle">' +
-            '  <span class="material-symbols-outlined">schedule</span> Schedule' +
-            '  <span class="material-symbols-outlined qgen-chevron">expand_more</span>' +
-            '</h3>' +
-            '<div class="qgen-section-body" style="display:none;">' +
-            '  <p class="qgen-hint">Control when students can access this quiz. Leave empty for always available.</p>' +
+            '<div class="qgen-profile-group qgen-online-only">' +
+            '  <div class="qgen-profile-group-hdr">' +
+            '    <span class="material-symbols-outlined">schedule</span>' +
+            '    <div><strong>Schedule</strong><small>Control when students can access this quiz</small></div>' +
+            '  </div>' +
             '  <div class="qgen-field-row">' +
             '    <div class="qgen-field">' +
             '      <label>Open Date &amp; Time</label>' +
@@ -315,16 +325,39 @@ define(['core/ajax'], function(Ajax) {
             '    </div>' +
             '  </div>' +
             '</div>' +
+
+            '<div class="qgen-profile-group qgen-online-only">' +
+            '  <div class="qgen-profile-group-hdr">' +
+            '    <span class="material-symbols-outlined">place</span>' +
+            '    <div><strong>Placement</strong><small>Where in the course should this quiz appear?</small></div>' +
+            '  </div>' +
+            '  <div class="qgen-field">' +
+            '    <label>Course Section</label>' +
+            '    <select id="qgen-sectionnum" class="qgen-select"><option value="0">General (top section)</option></select>' +
+            '  </div>' +
+            '  <div class="qgen-field">' +
+            '    <label>Gradebook Category</label>' +
+            '    <select id="qgen-gradecat" class="qgen-select"><option value="0">No category (default)</option></select>' +
+            '  </div>' +
+            '</div>' +
+
+            '</div>' +
             '</div>';
     }
 
-    function renderAccessSecuritySection() {
-        return '<div class="qgen-card qgen-section qgen-section-collapsed qgen-online-only" id="qgen-access-section">' +
+    function renderMoodleSettingsSection() {
+        return '<div class="qgen-card qgen-section qgen-section-collapsed qgen-online-only" id="qgen-moodlesettings-section">' +
             '<h3 class="qgen-section-toggle">' +
-            '  <span class="material-symbols-outlined">lock</span> Access &amp; Security' +
+            '  <span class="material-symbols-outlined">admin_panel_settings</span> Moodle Settings' +
             '  <span class="material-symbols-outlined qgen-chevron">expand_more</span>' +
             '</h3>' +
             '<div class="qgen-section-body" style="display:none;">' +
+
+            '<div class="qgen-profile-group">' +
+            '  <div class="qgen-profile-group-hdr">' +
+            '    <span class="material-symbols-outlined">lock</span>' +
+            '    <div><strong>Access &amp; Security</strong><small>Password and group restrictions</small></div>' +
+            '  </div>' +
             '  <div class="qgen-field">' +
             '    <label>Exam Password <span class="qgen-hint">(leave blank for none)</span></label>' +
             '    <input type="text" id="qgen-password" class="qgen-input" placeholder="Optional password for quiz access">' +
@@ -354,35 +387,12 @@ define(['core/ajax'], function(Ajax) {
             '    <div id="qgen-groups-list" class="qgen-check-list"></div>' +
             '  </div>' +
             '</div>' +
-            '</div>';
-    }
 
-    function renderPlacementSection() {
-        return '<div class="qgen-card qgen-section qgen-section-collapsed qgen-online-only" id="qgen-placement-section">' +
-            '<h3 class="qgen-section-toggle">' +
-            '  <span class="material-symbols-outlined">place</span> Placement' +
-            '  <span class="material-symbols-outlined qgen-chevron">expand_more</span>' +
-            '</h3>' +
-            '<div class="qgen-section-body" style="display:none;">' +
-            '  <div class="qgen-field">' +
-            '    <label>Course Section</label>' +
-            '    <select id="qgen-sectionnum" class="qgen-select"><option value="0">General (top section)</option></select>' +
+            '<div class="qgen-profile-group">' +
+            '  <div class="qgen-profile-group-hdr">' +
+            '    <span class="material-symbols-outlined">settings</span>' +
+            '    <div><strong>Advanced</strong><small>Behaviour, grading, and review options</small></div>' +
             '  </div>' +
-            '  <div class="qgen-field">' +
-            '    <label>Gradebook Category</label>' +
-            '    <select id="qgen-gradecat" class="qgen-select"><option value="0">No category (default)</option></select>' +
-            '  </div>' +
-            '</div>' +
-            '</div>';
-    }
-
-    function renderAdvancedSection() {
-        return '<div class="qgen-card qgen-section qgen-section-collapsed qgen-online-only" id="qgen-advanced-section">' +
-            '<h3 class="qgen-section-toggle">' +
-            '  <span class="material-symbols-outlined">tune</span> Advanced Quiz Settings' +
-            '  <span class="material-symbols-outlined qgen-chevron">expand_more</span>' +
-            '</h3>' +
-            '<div class="qgen-section-body" style="display:none;">' +
             '  <div class="qgen-field-row">' +
             '    <div class="qgen-field">' +
             '      <label>Question Behaviour</label>' +
@@ -428,6 +438,8 @@ define(['core/ajax'], function(Ajax) {
             '    <label class="qgen-check-label"><input type="checkbox" id="qgen-review-feedback" checked> After attempt: feedback</label>' +
             '    <label class="qgen-check-label"><input type="checkbox" id="qgen-review-overall" checked> After attempt: overall feedback</label>' +
             '  </div>' +
+            '</div>' +
+
             '</div>' +
             '</div>';
     }
@@ -554,8 +566,12 @@ define(['core/ajax'], function(Ajax) {
                 '</label>';
         }).join('');
 
-        return '<div class="qgen-card qgen-section">' +
-            '<h3><span class="material-symbols-outlined">record_voice_over</span> AI Instructions</h3>' +
+        return '<div class="qgen-card qgen-section qgen-section-collapsed" id="qgen-instructions-section">' +
+            '<h3 class="qgen-section-toggle">' +
+            '  <span class="material-symbols-outlined">record_voice_over</span> AI Instructions' +
+            '  <span class="material-symbols-outlined qgen-chevron">expand_more</span>' +
+            '</h3>' +
+            '<div class="qgen-section-body" style="display:none;">' +
             '<p class="qgen-section-desc">Guide how the AI constructs questions from the selected material.</p>' +
 
             '<div class="qgen-field">' +
@@ -588,27 +604,47 @@ define(['core/ajax'], function(Ajax) {
             '</div>' +
 
             '<div id="qgen-instr-warnings" class="qgen-instr-warnings" style="display:none;"></div>' +
+            '</div>' +
             '</div>';
     }
 
-    function renderDestinationSection() {
-        return '<div class="qgen-card qgen-section qgen-dest-section">' +
-            '<h3><span class="material-symbols-outlined">flag</span> Destination</h3>' +
-            '<div class="qgen-field">' +
-            '  <label class="qgen-radio-label"><input type="radio" name="qgen-dest" value="new" checked> Create new quiz</label>' +
-            '  <label class="qgen-radio-label"><input type="radio" name="qgen-dest" value="existing"> Add to existing quiz</label>' +
+    function renderActionSection() {
+        return '<div class="qgen-action-bar">' +
+            '<div class="qgen-dest-inline">' +
+            '  <label class="qgen-radio-label"><input type="radio" name="qgen-dest" value="new" checked> New quiz</label>' +
+            '  <label class="qgen-radio-label"><input type="radio" name="qgen-dest" value="existing"> Append to existing</label>' +
             '</div>' +
             '<div id="qgen-append-options" style="display:none;">' +
             '  <select id="qgen-append-job" class="qgen-select"><option value="">Select previous quiz\u2026</option></select>' +
             '</div>' +
+            '<button class="umat-btn-p qgen-generate-btn-main" id="qgen-generate-btn" type="button">' +
+            '<span class="material-symbols-outlined">auto_awesome</span> Generate Quiz' +
+            '</button>' +
+            '<div id="qgen-msg" style="margin-top:8px;font-size:12px;display:none;"></div>' +
             '</div>';
     }
 
-    function renderGenerateButton() {
-        return '<button class="umat-btn-p qgen-generate-btn-main" id="qgen-generate-btn" type="button">' +
-            '<span class="material-symbols-outlined">auto_awesome</span> Generate Quiz' +
-            '</button>' +
-            '<div id="qgen-msg" style="margin-top:8px;font-size:12px;display:none;"></div>';
+    // ── Profile summary badge ──
+    function _updateProfileSummary() {
+        var el = document.getElementById('qgen-profile-summary');
+        if (!el) return;
+        var bloomMode = document.querySelector('input[name="qgen-bloom-mode"]:checked');
+        var bloomVal = 'Understand';
+        if (bloomMode && bloomMode.value === 'single') {
+            var sel = document.getElementById('qgen-bloom');
+            if (sel) bloomVal = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : bloomVal;
+        } else {
+            bloomVal = 'Mixed';
+        }
+        var diffMode = document.querySelector('input[name="qgen-diff-mode"]:checked');
+        var diffVal = 'Medium';
+        if (diffMode && diffMode.value === 'single') {
+            var sel2 = document.getElementById('qgen-difficulty');
+            if (sel2) diffVal = sel2.options[sel2.selectedIndex] ? sel2.options[sel2.selectedIndex].text : diffVal;
+        } else {
+            diffVal = 'Mixed';
+        }
+        el.textContent = bloomVal + ' \u00b7 ' + diffVal;
     }
 
     // ── Event wiring ──
@@ -647,6 +683,7 @@ define(['core/ajax'], function(Ajax) {
             radio.addEventListener('change', function() {
                 document.getElementById('qgen-bloom-single').style.display = this.value === 'single' ? '' : 'none';
                 document.getElementById('qgen-bloom-mixed').style.display = this.value === 'mixed' ? '' : 'none';
+                _updateProfileSummary();
             });
         });
 
@@ -654,41 +691,69 @@ define(['core/ajax'], function(Ajax) {
             radio.addEventListener('change', function() {
                 document.getElementById('qgen-diff-single').style.display = this.value === 'single' ? '' : 'none';
                 document.getElementById('qgen-diff-mixed').style.display = this.value === 'mixed' ? '' : 'none';
+                _updateProfileSummary();
             });
+        });
+
+        var bloomSel = document.getElementById('qgen-bloom');
+        if (bloomSel) bloomSel.addEventListener('change', _updateProfileSummary);
+        var diffSel = document.getElementById('qgen-difficulty');
+        if (diffSel) diffSel.addEventListener('change', _updateProfileSummary);
+        document.querySelectorAll('.qgen-bloom-mix, .qgen-diff-mix').forEach(function(inp) {
+            inp.addEventListener('input', _updateProfileSummary);
         });
 
         document.querySelectorAll('input[name="qgen-delivery"]').forEach(function(radio) {
             radio.addEventListener('change', function() {
                 var docSection = document.getElementById('qgen-docsettings-section');
-                var destSection = document.querySelector('.qgen-dest-section');
                 var showDoc = this.value === 'printed' || this.value === 'both';
-                var showDest = this.value === 'online' || this.value === 'both';
                 var showOnline = this.value === 'online' || this.value === 'both';
                 if (docSection) docSection.style.display = showDoc ? '' : 'none';
-                if (destSection) destSection.style.display = showDest ? '' : 'none';
                 document.querySelectorAll('.qgen-online-only').forEach(function(el) {
                     el.style.display = showOnline ? '' : 'none';
                 });
+                _updateProfileSummary();
             });
         });
 
-        var docToggle = document.getElementById('qgen-docsettings-toggle');
-        if (docToggle) {
-            docToggle.addEventListener('click', function() {
-                var section = document.getElementById('qgen-docsettings-section');
-                var body = section.querySelector('.qgen-section-body');
-                var chevron = this.querySelector('.qgen-chevron');
-                if (body.style.display === 'none') {
-                    body.style.display = '';
-                    section.classList.remove('qgen-section-collapsed');
-                    chevron.textContent = 'expand_less';
-                } else {
-                    body.style.display = 'none';
-                    section.classList.add('qgen-section-collapsed');
-                    chevron.textContent = 'expand_more';
-                }
-            });
+        /* Clickable card toggle: clicking anywhere on a collapsed section card toggles it open/closed.
+           Interactive elements (inputs, selects, buttons, textareas, labels) still work normally. */
+        function _toggleQgenSection(card) {
+            var body = card.querySelector('.qgen-section-body');
+            var chevron = card.querySelector('.qgen-section-toggle .qgen-chevron');
+            if (!body) return;
+            if (body.style.display === 'none') {
+                body.style.display = '';
+                body.classList.remove('qgen-body-collapse');
+                body.classList.add('qgen-body-expand');
+                card.classList.remove('qgen-section-collapsed');
+                if (chevron) chevron.textContent = 'expand_less';
+            } else {
+                body.classList.remove('qgen-body-expand');
+                body.classList.add('qgen-body-collapse');
+                card.classList.add('qgen-section-collapsed');
+                if (chevron) chevron.textContent = 'expand_more';
+                /* Hide after collapse animation completes */
+                setTimeout(function() {
+                    if (body.classList.contains('qgen-body-collapse')) body.style.display = 'none';
+                }, 200);
+            }
         }
+        function _isInteractive(el) {
+            if (!el) return false;
+            var tag = el.tagName;
+            if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return true;
+            if (tag === 'LABEL') return true;
+            if (el.closest && el.closest('input,select,textarea,button,label,a')) return true;
+            return false;
+        }
+        document.querySelectorAll('.qgen-card.qgen-section').forEach(function(card) {
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', function(e) {
+                if (_isInteractive(e.target)) return;
+                _toggleQgenSection(card);
+            });
+        });
 
         document.querySelectorAll('input[name="qgen-dest"]').forEach(function(radio) {
             radio.addEventListener('change', function() {
@@ -710,37 +775,9 @@ define(['core/ajax'], function(Ajax) {
             updateInstrSummary();
         });
 
-        document.getElementById('qgen-details-toggle').addEventListener('click', function() {
-            var section = document.getElementById('qgen-details-section');
-            var body = section.querySelector('.qgen-section-body');
-            var chevron = this.querySelector('.qgen-chevron');
-            if (body.style.display === 'none') {
-                body.style.display = '';
-                section.classList.remove('qgen-section-collapsed');
-                chevron.textContent = 'expand_less';
-            } else {
-                body.style.display = 'none';
-                section.classList.add('qgen-section-collapsed');
-                chevron.textContent = 'expand_more';
-            }
-        });
+        /* Details toggle handled by unified card click above */
 
-        document.querySelectorAll('.qgen-online-only .qgen-section-toggle').forEach(function(toggle) {
-            toggle.addEventListener('click', function() {
-                var section = this.closest('.qgen-section');
-                var body = section.querySelector('.qgen-section-body');
-                var chevron = this.querySelector('.qgen-chevron');
-                if (body.style.display === 'none') {
-                    body.style.display = '';
-                    section.classList.remove('qgen-section-collapsed');
-                    chevron.textContent = 'expand_less';
-                } else {
-                    body.style.display = 'none';
-                    section.classList.add('qgen-section-collapsed');
-                    chevron.textContent = 'expand_more';
-                }
-            });
-        });
+        /* Online-only toggles handled by unified card click above */
 
         var groupmodeEl = document.getElementById('qgen-groupmode');
         if (groupmodeEl) {

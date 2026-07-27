@@ -948,9 +948,6 @@
 .umat-cp-tab,.umat-sb-item,.umat-content-hdr-btn,.umat-ia-btn,.umat-lib-btn,.umat-rev-btn{transition:background .18s var(--u-cb),color .18s var(--u-cb),transform .18s var(--u-cb),border-color .18s var(--u-cb),box-shadow .18s var(--u-cb);}
 .umat-cp-tab:hover,.umat-sb-item:hover,.umat-content-hdr-btn:hover,.umat-ia-btn:hover,.umat-lib-btn:hover,.umat-rev-btn:hover{transform:translateY(-1px);}
 /* ==== STUDENT ISSUES ==== */
-.umat-sb-item[data-sb-tab="report-issue"],.umat-sb-item[data-lp="lec-issues"]{background:linear-gradient(135deg,rgba(0,107,47,.08),rgba(255,204,0,.05));border-left:3px solid rgba(0,107,47,.48);color:var(--u-p);}
-.umat-sb-item[data-sb-tab="report-issue"] .material-symbols-outlined,.umat-sb-item[data-lp="lec-issues"] .material-symbols-outlined{color:var(--u-p);}
-.umat-sb-item[data-sb-tab="report-issue"]:hover,.umat-sb-item[data-lp="lec-issues"]:hover{background:linear-gradient(135deg,rgba(0,107,47,.14),rgba(255,204,0,.08));box-shadow:0 4px 16px rgba(0,107,47,.1);}
 .umat-cp-feature-tab[data-cp-open="report-issue"]{background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(245,158,11,.04));border:1px solid rgba(245,158,11,.2);color:#92400e;}
 .umat-cp-feature-tab[data-cp-open="report-issue"] .material-symbols-outlined{color:#d97706;}
 .umat-cp-feature-tab[data-cp-open="report-issue"]:hover{background:linear-gradient(135deg,rgba(245,158,11,.22),rgba(245,158,11,.1));border-color:rgba(245,158,11,.35);box-shadow:0 4px 14px rgba(245,158,11,.15);}

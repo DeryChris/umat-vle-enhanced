@@ -56,8 +56,8 @@ HTML;
 /* Mobile nav: slide-to-hide + indicator pill */
 document.querySelectorAll('.umat-glass-tabs').forEach(function(nav){var pill=document.createElement('div');pill.className='umat-glass-pill';nav.appendChild(pill);function mv(){var a=nav.querySelector('.umat-glass-tab.active');if(!a)return;var nr=nav.getBoundingClientRect(),tr=a.getBoundingClientRect();pill.style.left=(tr.left-nr.left)+'px';pill.style.width=tr.width+'px';}mv();nav.addEventListener('click',function(e){if(e.target.closest('.umat-glass-tab'))setTimeout(mv,30);});window.addEventListener('resize',mv);});
 /* Thumbnail loader */
-window.loadYtThumbnails=window.loadYtThumbnails||function(g){if(!g)return;g.querySelectorAll('.yt-tile[data-url]').forEach(function(tile){var th=tile.querySelector('.yt-thumb');if(!th||th._td)return;th._td=1;var url=tile.dataset.url||'',mime=(tile.dataset.mime||'').toLowerCase();if(!url)return;if(mime.includes('image')){var img=document.createElement('img');img.className='yt-thumb-img';img.loading='lazy';img.src=url;th.appendChild(img);}else if(mime.includes('video')){var v=document.createElement('video');v.src=url;v.preload='metadata';v.muted=true;v.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:12px;';v.addEventListener('loadedmetadata',function(){v.currentTime=Math.min(2,v.duration*0.1);});v.addEventListener('seeked',function(){th.appendChild(v);});v.load();}else if(mime.includes('pdf')){var lo=document.createElement('div');lo.className='yt-thumb-loading';th.appendChild(lo);(function(){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';s.onload=function(){window.pdfjsLib&&(window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',pdfjsLib.getDocument(url).promise.then(function(p){return p.getPage(1);}).then(function(pg){var vp=pg.getViewport({scale:1}),sc=Math.min(th.offsetWidth/vp.width,th.offsetHeight/vp.height)||1,vp2=pg.getViewport({scale:sc}),c=document.createElement('canvas');c.className='yt-thumb-canvas';c.width=vp2.width;c.height=vp2.height;lo.remove();th.appendChild(c);pg.render({canvasContext:c.getContext('2d'),viewport:vp2});}).catch(function(){lo.remove();}));};document.head.appendChild(s);})();}else if(mime.includes('word')||mime.includes('document')||mime.includes('presentation')||mime.includes('powerpoint')||mime.includes('spreadsheet')||mime.includes('excel')){var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';for(var i=0;i<6;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl);}th.appendChild(dv);}});};
-new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.nodeType!==1)return;if(n.classList&&n.classList.contains('yt-grid'))window.loadYtThumbnails(n);var gs=n.querySelectorAll&&n.querySelectorAll('.yt-grid');if(gs&&gs.length)gs.forEach(function(g){window.loadYtThumbnails(g);});});});}).observe(document.body,{childList:true,subtree:true});
+window.loadYtThumbnails=window.loadYtThumbnails||function(g){if(!g)return;g.querySelectorAll('.yt-tile[data-url]').forEach(function(tile){var th=tile.querySelector('.yt-thumb');if(!th||th._td)return;th._td=1;var url=tile.dataset.url||'',mime=(tile.dataset.mime||'').toLowerCase();if(!url)return;function hi(){var ic=th.querySelector('.yt-thumb-icon');if(ic)ic.style.display='none';}if(mime.includes('image')){var img=document.createElement('img');img.className='yt-thumb-img';img.loading='lazy';img.src=url;th.appendChild(img);hi();}else if(mime.includes('video')){var v=document.createElement('video');v.src=url;v.preload='metadata';v.muted=true;v.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:12px;';v.addEventListener('loadedmetadata',function(){v.currentTime=Math.min(2,v.duration*0.1);});v.addEventListener('seeked',function(){hi();th.appendChild(v);});v.load();}else if(mime.includes('pdf')){var lo=document.createElement('div');lo.className='yt-thumb-loading';th.appendChild(lo);hi();(function(){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';s.onload=function(){window.pdfjsLib&&(window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',pdfjsLib.getDocument(url).promise.then(function(p){return p.getPage(1);}).then(function(pg){var vp=pg.getViewport({scale:1}),sc=Math.min(th.offsetWidth/vp.width,th.offsetHeight/vp.height)||1,vp2=pg.getViewport({scale:sc}),c=document.createElement('canvas');c.className='yt-thumb-canvas';c.width=vp2.width;c.height=vp2.height;lo.remove();th.appendChild(c);pg.render({canvasContext:c.getContext('2d'),viewport:vp2});}).catch(function(){lo.remove();}));};document.head.appendChild(s);})();}else if(mime.includes('word')||mime.includes('document')||mime.includes('presentation')||mime.includes('powerpoint')||mime.includes('spreadsheet')||mime.includes('excel')){var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';for(var i=0;i<6;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl);}th.appendChild(dv);hi();}else if(mime.includes('audio')){var aw=document.createElement('div');aw.className='yt-thumb-audio-wav';for(var i=0;i<12;i++){var bar=document.createElement('span');aw.appendChild(bar);}th.appendChild(aw);hi();}});};
+new MutationObserver(function(ms){ms.forEach(function(m){if(m.target.classList&&m.target.classList.contains('yt-grid'))window.loadYtThumbnails(m.target);m.addedNodes.forEach(function(n){if(n.nodeType!==1)return;if(n.classList&&n.classList.contains('yt-grid'))window.loadYtThumbnails(n);var gs=n.querySelectorAll&&n.querySelectorAll('.yt-grid');if(gs&&gs.length)gs.forEach(function(g){window.loadYtThumbnails(g);});});});}).observe(document.body,{childList:true,subtree:true});
 /* AJAX cache (5-min TTL for analytics/struggle) */
 if(typeof ajax==='function'&&!window._ajaxCached){window._ajaxCached=1;var _ac={},_at={};window._origAjax=ajax;window.ajax=function(m,a,d,f){if(m.includes('analytics')||m.includes('struggle')){var k=m+':'+JSON.stringify(a),n=Date.now();if(_ac[k]&&n-_at[k]<300000){setTimeout(function(){d(_ac[k]);},0);return;}_origAjax(m,a,function(r){_ac[k]=r;_at[k]=Date.now();d(r);},f);}else _origAjax(m,a,d,f);};}
 /* Draggable FABs — separate touch/mouse handlers; drag starts after 6px threshold */
@@ -2833,6 +2833,7 @@ HTML;
             ['id' => 'hub-courses',  'icon' => 'menu_book',     'label' => 'Courses',  'active' => false],
             ['id' => 'hub-library',  'icon' => 'local_library', 'label' => 'Resource Materials', 'active' => false],
             ['id' => 'hub-sessions', 'icon' => 'history',       'label' => 'Sessions', 'active' => false],
+            ['id' => 'hub-issues',   'icon' => 'forum',         'label' => 'Issues',   'active' => false, 'badge' => 'responses'],
         ];
         $hubMobTabs = self::glassmorph_tab_bar($hubGlassTabs, 'hp', 'hub-glass-tabs');
 
@@ -2868,6 +2869,7 @@ HTML;
         <button class="umat-sb-item" data-hp="hub-courses" type="button" title="My Courses"><span class="material-symbols-outlined">menu_book</span><span class="umat-sb-item-lbl">My Courses</span></button>
         <button class="umat-sb-item" data-hp="hub-library" type="button" title="Resource Materials"><span class="material-symbols-outlined">local_library</span><span class="umat-sb-item-lbl">Resource Materials</span></button>
         <button class="umat-sb-item" data-hp="hub-sessions" type="button" title="Sessions"><span class="material-symbols-outlined">history</span><span class="umat-sb-item-lbl">Sessions</span></button>
+        <button class="umat-sb-item" data-hp="hub-issues" type="button" title="Student Issues"><span class="material-symbols-outlined">forum</span><span class="umat-sb-item-lbl">Student Issues</span><span class="umat-sb-badge" id="sb-badge-hub-responses" style="display:none;margin-left:auto;background:var(--u-ter);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;line-height:14px;min-width:16px;text-align:center;"></span></button>
       </nav>
       <div class="umat-sb-divider"></div>
       <button class="umat-sb-new" id="hub-new-sess" type="button" title="New Session">
@@ -3080,6 +3082,70 @@ HTML;
         </div>
       </div>
 
+      <!-- STUDENT ISSUES -->
+      <div class="umat-tab-pane" id="hub-issues" style="position:relative;overflow:hidden;">
+        <div class="umat-content-hdr">
+          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">forum</span> Student Issues</h2>
+          <select id="hub-issue-course-sel" style="padding:5px 10px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:12px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sfl);max-width:min(170px,40vw);">
+            <option value="0">Select a course</option>
+          </select>
+          <button class="umat-sb-new" id="hub-issue-new-btn" type="button" style="position:relative;margin:0;">
+            <span class="material-symbols-outlined">add</span>
+            <span>Report an Issue</span>
+          </button>
+        </div>
+        <div class="umat-issue-app" id="hub-issue-app">
+          <section class="umat-issue-view active" id="hub-issue-list-view" aria-label="Issue conversations">
+            <div class="umat-issue-list-head">
+              <div><strong>Conversations</strong><span>Private messages to your lecturers</span></div>
+              <button class="umat-icon-btn" id="hub-issue-refresh" type="button" aria-label="Refresh conversations"><span class="material-symbols-outlined">refresh</span></button>
+            </div>
+            <div class="umat-issue-list" id="hub-issue-list">
+              <div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>Select a course to load conversations.</p></div>
+            </div>
+          </section>
+          <section class="umat-issue-view" id="hub-issue-new-view" aria-label="Report a new issue">
+            <div class="umat-issue-viewbar">
+              <button class="umat-icon-btn" id="hub-issue-new-back" type="button" aria-label="Back to conversations"><span class="material-symbols-outlined">arrow_back</span></button>
+              <div><strong>Report a New Issue</strong><span>Your message is private between you and the course lecturer.</span></div>
+            </div>
+            <form class="umat-issue-form" id="hub-issue-form">
+              <label>Issue title<input type="text" id="hub-issue-title" maxlength="255" required placeholder="Briefly describe what you need help with"></label>
+              <label>Category<select id="hub-issue-cat" required>
+                <option value="course_material">Course material</option><option value="assignment">Assignment</option>
+                <option value="quiz_examination">Quiz or examination</option><option value="grade_feedback">Grade or feedback</option>
+                <option value="live_class_recording">Live class or recording</option><option value="technical_problem">Technical problem</option>
+                <option value="access_permission">Access or permission</option><option value="other">Other</option>
+              </select></label>
+              <label>Description<textarea id="hub-issue-desc" rows="6" maxlength="10000" required placeholder="Describe the issue and what you have already tried"></textarea></label>
+              <label class="umat-issue-file-label"><span class="material-symbols-outlined">attach_file</span><span>Optional attachment</span><input type="file" id="hub-issue-file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp3,.mp4,.wav"></label>
+              <div class="umat-issue-form-msg" id="hub-issue-form-msg" role="status" aria-live="polite"></div>
+              <div class="umat-issue-form-actions">
+                <button class="umat-issue-secondary" id="hub-issue-new-cancel" type="button">Cancel</button>
+                <button class="umat-btn-p" id="hub-issue-submit" type="submit"><span class="material-symbols-outlined">send</span>Send to Lecturer</button>
+              </div>
+            </form>
+          </section>
+          <section class="umat-issue-view" id="hub-issue-thread-view" aria-label="Issue conversation">
+            <div class="umat-issue-thread-head">
+              <button class="umat-icon-btn" id="hub-issue-thread-back" type="button" aria-label="Back to conversations"><span class="material-symbols-outlined">arrow_back</span></button>
+              <div class="umat-issue-thread-title">
+                <strong id="hub-issue-thread-title"></strong>
+                <span id="hub-issue-thread-meta"></span>
+              </div>
+            </div>
+            <div class="umat-issue-messages" id="hub-issue-messages" aria-live="polite"></div>
+            <div class="umat-issue-send-error" id="hub-issue-send-error" role="alert"></div>
+            <div class="umat-issue-composer">
+              <label class="umat-issue-attach-btn" for="hub-issue-reply-file" title="Attach a file"><span class="material-symbols-outlined">attach_file</span><span class="sr-only">Attach</span></label>
+              <input type="file" id="hub-issue-reply-file" hidden accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp3,.mp4,.wav">
+              <textarea id="hub-issue-reply" rows="1" maxlength="10000" placeholder="Type your message..."></textarea>
+              <button class="umat-issue-send-btn" id="hub-issue-send" type="button"><span class="material-symbols-outlined">send</span><span class="sr-only">Send</span></button>
+            </div>
+          </section>
+        </div>
+      </div>
+
     </div><!-- /content -->
   </div><!-- /ov-body -->
 
@@ -3162,6 +3228,121 @@ function loadPane(name){
   if(name==='hub-sessions')loadSessions();
   if(name==='hub-lectures')populateLecCourseSel();
   if(name==='hub-library')populateLibCourseSel();
+  if(name==='hub-issues')initHubIssues();
+}
+
+/* ---- Hub Student Issues ---- */
+var hubIssueCID=0, hubIssueConversations=[], hubIssueConversationId=0, hubIssueCreateClientId='', hubIssueFailedSend=null, hubIssueReadObserver=null, hubIssuePolling=false;
+var hubIssueCategoryLabels={course_material:'Course material',assignment:'Assignment',quiz_examination:'Quiz or examination',grade_feedback:'Grade or feedback',live_class_recording:'Live class or recording',technical_problem:'Technical problem',access_permission:'Access or permission',other:'Other'};
+
+function hubIssueClientId(){return 'h'+Math.random().toString(36).substr(2,12);}
+function hubIssueView(name){['list','new','thread'].forEach(function(v){var el=document.getElementById('hub-issue-'+v+'-view');if(el)el.classList.toggle('active',v===name);});}
+function hubIssueReceipt(receipt){if(receipt==='viewed')return '<span class="umat-issue-mini-receipt viewed" title="Viewed">&#10003;&#10003;</span>';return receipt==='delivered'?'<span class="umat-issue-mini-receipt" title="Delivered">&#10003;&#10003;</span>':'<span class="umat-issue-mini-receipt" title="Sent">&#10003;</span>';}
+function hubIssueInitials(name){return (name||'Course').split(/\s+/).slice(0,2).map(function(p){return p.charAt(0);}).join('').toUpperCase();}
+function hubIssueRelTime(ts){if(!ts)return '';var d=new Date(ts*1000),n=new Date(),op={hour:'numeric',minute:'2-digit'};if(d.toDateString()===n.toDateString())return d.toLocaleTimeString([],op);return d.toLocaleDateString([],{month:'short',day:'numeric'})+' '+d.toLocaleTimeString([],op);}
+
+function initHubIssues(){
+  var sel=document.getElementById('hub-issue-course-sel');if(!sel)return;
+  sel.innerHTML='<option value="0">Select a course</option>'+(UD.courses||[]).map(function(c){return '<option value="'+c.id+'">'+esc(c.shortname||c.fullname)+'</option>';}).join('');
+  sel.addEventListener('change',function(){hubIssueCID=parseInt(this.value)||0;if(hubIssueCID)refreshHubIssues(false);else document.getElementById('hub-issue-list').innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>Select a course to load conversations.</p></div>';});
+  var newBtn=document.getElementById('hub-issue-new-btn');if(newBtn)newBtn.addEventListener('click',function(){hubIssueCreateClientId=hubIssueCreateClientId||hubIssueClientId();hubIssueView('new');document.getElementById('hub-issue-title').focus();});
+  var back=document.getElementById('hub-issue-new-back');if(back)back.addEventListener('click',function(){hubIssueView('list');});
+  var cancel=document.getElementById('hub-issue-new-cancel');if(cancel)cancel.addEventListener('click',function(){hubIssueView('list');});
+  var threadBack=document.getElementById('hub-issue-thread-back');if(threadBack)threadBack.addEventListener('click',function(){hubIssueConversationId=0;hubIssueView('list');refreshHubIssues(false);});
+  var refresh=document.getElementById('hub-issue-refresh');if(refresh)refresh.addEventListener('click',function(){refreshHubIssues(false);});
+  var form=document.getElementById('hub-issue-form');if(form)form.addEventListener('submit',createHubIssue);
+  var reply=document.getElementById('hub-issue-reply');if(reply)reply.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendHubIssueMsg();}});
+  var send=document.getElementById('hub-issue-send');if(send)send.addEventListener('click',sendHubIssueMsg);
+  var retry=document.getElementById('hub-issue-send-error');if(retry)retry.addEventListener('click',function(e){if(e.target.closest('[data-issue-retry]')&&hubIssueFailedSend)sendHubIssueMsg(hubIssueFailedSend);});
+  if(UD.courses&&UD.courses.length===1){sel.value=UD.courses[0].id;sel.dispatchEvent(new Event('change'));}
+}
+
+function refreshHubIssues(quiet){
+  if(!hubIssueCID||hubIssuePolling)return;
+  hubIssuePolling=true;
+  var list=document.getElementById('hub-issue-list');
+  if(list&&!quiet)list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading conversations...</p></div>';
+  ajax('local_umat_ai_list_issue_conversations',{inbox:'student',courseid:hubIssueCID,category:'',query:''},function(r){
+    hubIssuePolling=false;hubIssueConversations=r.conversations||[];renderHubIssueList();hubUpdateBadge(r.totalunread||0);
+    if(hubIssueConversationId&&document.getElementById('hub-issue-thread-view').classList.contains('active'))loadHubIssueMsgs(true);
+  },function(){
+    hubIssuePolling=false;if(list&&!quiet)list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load conversations.</p><button class="umat-chip" id="hub-issue-list-retry" type="button">Retry</button></div>';
+    var retry=document.getElementById('hub-issue-list-retry');if(retry)retry.addEventListener('click',function(){refreshHubIssues(false);});
+  });
+}
+function renderHubIssueList(){
+  var list=document.getElementById('hub-issue-list');if(!list)return;
+  if(!hubIssueConversations.length){list.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>No issues reported for this course.</p></div>';return;}
+  list.innerHTML=hubIssueConversations.map(function(c){
+    return '<button class="umat-issue-row '+(c.unreadcount?'unread':'')+'" data-cid="'+c.id+'" type="button">'+
+      '<span class="umat-issue-avatar">'+esc(hubIssueInitials(c.courseshortname||c.coursename))+'</span>'+
+      '<span class="umat-issue-row-main"><span class="umat-issue-row-title"><strong>'+esc(c.title)+'</strong><span class="umat-issue-category">'+esc(hubIssueCategoryLabels[c.category]||c.category)+'</span></span>'+
+      '<span class="umat-issue-preview">'+esc(c.lastmessage||'No messages yet')+'</span>'+
+      '<span class="umat-issue-row-sub">'+esc(c.coursename)+'</span></span>'+
+      '<span class="umat-issue-row-side"><time>'+esc(hubIssueRelTime(c.lastmessagetime))+'</time>'+
+      (c.unreadcount?'<span class="umat-issue-unread">'+(c.unreadcount>99?'99+':c.unreadcount)+'</span>':hubIssueReceipt(c.latestsentreceipt))+'</span></button>';
+  }).join('');
+  list.querySelectorAll('[data-cid]').forEach(function(row){row.addEventListener('click',function(){openHubIssue(parseInt(row.dataset.cid));});});
+}
+function openHubIssue(id){
+  hubIssueConversationId=id;hubIssueView('thread');loadHubIssueMsgs(false);
+}
+function loadHubIssueMsgs(ps){
+  if(!hubIssueConversationId)return;var exp=hubIssueConversationId,box=document.getElementById('hub-issue-messages');if(!box)return;
+  var nb=box.scrollHeight-box.scrollTop-box.clientHeight<90,ot=box.scrollTop;
+  if(!ps)box.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading conversation...</p></div>';
+  ajax('local_umat_ai_get_issue_messages',{conversationid:exp},function(r){
+    if(exp!==hubIssueConversationId)return;
+    var c=r.conversation||{};var td=document.getElementById('hub-issue-thread-title');if(td)td.textContent=c.title||'';
+    var tm=document.getElementById('hub-issue-thread-meta');if(tm)tm.textContent=(hubIssueCategoryLabels[c.category]||c.category)+' \u00b7 '+(c.coursename||'');
+    renderHubIssueMsgs(r.messages||[]);if(!ps||nb)box.scrollTop=box.scrollHeight;else box.scrollTop=ot;
+  },function(){if(exp!==hubIssueConversationId)return;box.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load conversation.</p></div>';});
+}
+function renderHubIssueMsgs(msgs){
+  var box=document.getElementById('hub-issue-messages');if(!box)return;
+  if(!msgs.length){box.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>No messages in this conversation.</p></div>';return;}
+  box.innerHTML=msgs.map(function(m){
+    var atts=(m.attachments||[]).map(function(a){return '<a class="umat-issue-attachment" href="'+esc(a.url)+'" target="_blank"><span class="material-symbols-outlined">description</span><span>'+esc(a.filename)+'</span></a>';}).join('');
+    var rc=m.ismine?'<span class="umat-issue-receipt '+(m.receipt==='viewed'?'viewed':'')+'">'+(m.receipt==='sent'?'&#10003;':'&#10003;&#10003;')+'</span>':'';
+    return '<article class="umat-issue-message '+(m.ismine?'mine':'')+'" data-mid="'+m.id+'" data-other="'+(m.ismine?'0':'1')+'">'+
+      '<span class="umat-issue-sender">'+esc(m.ismine?'You':m.sendername)+'</span>'+
+      '<div class="umat-issue-bubble"><div class="umat-issue-body">'+esc(m.body)+'</div>'+atts+'<div class="umat-issue-message-meta"><time>'+esc(hubIssueRelTime(m.timecreated))+'</time>'+rc+'</div></div></article>';
+  }).join('');observeHubIssueMsgs();
+}
+function observeHubIssueMsgs(){
+  if(hubIssueReadObserver)hubIssueReadObserver.disconnect();var root=document.getElementById('hub-issue-messages');
+  if(!root||!window.IntersectionObserver)return;var p={},t=null;
+  hubIssueReadObserver=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting&&e.intersectionRatio>=.35){var el=e.target;if(el.dataset.other==='1'){p[el.dataset.mid]=true;el.dataset.viewed='1';hubIssueReadObserver.unobserve(el);}}});if(Object.keys(p).length&&!t){t=setTimeout(function(){var ids=Object.keys(p).map(Number);p={};t=null;ajax('local_umat_ai_mark_issue_messages_viewed',{conversationid:hubIssueConversationId,messageids:ids},function(){refreshHubIssues(true);},function(){});},250);}},{root:root,threshold:[.35]});
+  root.querySelectorAll('[data-other="1"]').forEach(function(el){hubIssueReadObserver.observe(el);});
+}
+function createHubIssue(e){
+  e.preventDefault();var title=document.getElementById('hub-issue-title').value.trim();var cat=document.getElementById('hub-issue-cat').value;
+  var desc=document.getElementById('hub-issue-desc').value.trim();var file=document.getElementById('hub-issue-file').files[0]||null;
+  var msg=document.getElementById('hub-issue-form-msg');var btn=document.getElementById('hub-issue-submit');
+  if(!title||desc.length<3){msg.textContent='Enter a title and a clear description.';return;}
+  if(!hubIssueCID){msg.textContent='Please select a course first.';return;}
+  hubIssueCreateClientId=hubIssueCreateClientId||hubIssueClientId();btn.disabled=true;btn.setAttribute('aria-busy','true');
+  msg.textContent='Sending...';ajax('local_umat_ai_create_issue_conversation',{courseid:hubIssueCID,title:title,category:cat,description:desc,clientid:hubIssueCreateClientId},function(r){
+    var done=function(){btn.disabled=false;btn.removeAttribute('aria-busy');msg.textContent='Sent!';msg.classList.add('success');hubIssueConversationId=r.conversationid;hubIssueCreateClientId='';document.getElementById('hub-issue-form').reset();setTimeout(function(){openHubIssue(r.conversationid);},350);refreshHubIssues(true);};
+    if(file){var fd=new FormData();fd.append('sesskey',moodleSesskey);fd.append('messageid',r.messageid);fd.append('attachment',file);fetch(M.cfg.wwwroot+'/local/umat_ai/issue_attachment.php',{method:'POST',body:fd,credentials:'same-origin'}).then(function(resp){return resp.json();}).then(function(d){if(d.success)done();else{done();}}).catch(function(){done();});}else done();
+  },function(err){btn.disabled=false;btn.removeAttribute('aria-busy');msg.textContent=(err&&err.message)||'Failed to send.';});
+}
+function sendHubIssueMsg(retry){
+  if(!hubIssueConversationId)return;
+  var input=document.getElementById('hub-issue-reply'),fileInput=document.getElementById('hub-issue-reply-file');
+  var item=retry||{body:input.value.trim(),file:fileInput.files[0]||null,clientid:hubIssueClientId()};if(!item.body)return;
+  var btn=document.getElementById('hub-issue-send');btn.disabled=true;btn.setAttribute('aria-busy','true');
+  var existing=document.getElementById('issue-temp-'+item.clientid);if(existing)existing.remove();
+  var box=document.getElementById('hub-issue-messages');if(box){var pe=document.createElement('article');pe.className='umat-issue-message mine';pe.id='issue-temp-'+item.clientid;pe.innerHTML='<span class="umat-issue-sender">You</span><div class="umat-issue-bubble"><div class="umat-issue-body">'+esc(item.body)+'</div><div class="umat-issue-message-meta"><span>Sending...</span></div></div>';box.appendChild(pe);box.scrollTop=box.scrollHeight;}
+  ajax('local_umat_ai_send_issue_message',{conversationid:hubIssueConversationId,body:item.body,clientid:item.clientid},function(r){
+    var temp=document.getElementById('issue-temp-'+item.clientid);if(temp){var meta=temp.querySelector('.umat-issue-message-meta');if(meta)meta.innerHTML='<time>'+esc(hubIssueRelTime(r.message.timecreated))+'</time><span class="umat-issue-receipt">&#10003;</span>';}
+    var done=function(){btn.disabled=false;btn.removeAttribute('aria-busy');hubIssueFailedSend=null;if(input.value.trim()===item.body)input.value='';if(fileInput)fileInput.value='';setTimeout(function(){loadHubIssueMsgs(true);refreshHubIssues(true);},350);};
+    if(item.file){var fd=new FormData();fd.append('sesskey',moodleSesskey);fd.append('messageid',r.message.id);fd.append('attachment',item.file);fetch(M.cfg.wwwroot+'/local/umat_ai/issue_attachment.php',{method:'POST',body:fd,credentials:'same-origin'}).then(function(resp){return resp.json();}).then(function(d){done();}).catch(function(){done();});}else done();
+  },function(err){btn.disabled=false;btn.removeAttribute('aria-busy');hubIssueFailedSend=item;var temp=document.getElementById('issue-temp-'+item.clientid);if(temp){temp.classList.add('failed');temp.querySelector('.umat-issue-message-meta').innerHTML='<span>Not sent.</span>';}});
+}
+function hubUpdateBadge(unread){
+  var badges=document.querySelectorAll('#sb-badge-hub-responses, #gtb-responses');
+  badges.forEach(function(b){b.style.display=unread?'':'none';b.textContent=unread>99?'99+':unread;});
 }
 
 /* Home */
@@ -3202,7 +3383,7 @@ function initHome(){
   }
   /* Populate course selects */
   if(UD.courses&&UD.courses.length){
-    var sels=['hub-course-sel','hub-lec-course-sel','hub-lib-course-sel'];
+    var sels=['hub-course-sel','hub-lec-course-sel','hub-lib-course-sel','hub-issue-course-sel'];
     sels.forEach(function(sid){
       var sel=document.getElementById(sid);if(!sel)return;
       sel.innerHTML='<option value="0">All Courses</option>'+
