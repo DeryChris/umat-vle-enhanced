@@ -960,7 +960,7 @@ HTML;
       <div id="lcp-courses-list" class="lcp-pane-list" style="padding:8px 14px;"><div class="lcp-pane-loading">Loading…</div></div>
     </div>
     <!-- COMPACT RESOURCE MATERIALS PANE -->
-    <div class="umat-cp-pane" id="lcp-library" style="overflow:hidden;display:flex;flex-direction:column;">
+    <div class="umat-cp-pane" id="lcp-library">
       <div class="lcp-pane-hdr">
         <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">local_library</span>
         <strong style="font-size:12px;">Resources</strong>
