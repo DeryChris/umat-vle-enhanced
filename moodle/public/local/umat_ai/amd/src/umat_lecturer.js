@@ -243,31 +243,16 @@ var expand=document.getElementById('lec-expand');
 var panelDataLoaded=false;
 function updateBodyLock(){document.body.classList.toggle('umat-body-lock',!(!document.querySelector('.umat-ov.open,.umat-cp-ov.open')));}
 
-function openPanel(){if(window.innerWidth<640){cpOv.classList.remove('open');lecOv.classList.add('open');if(!anLoaded[CID||lecAnalyticsCourseId]){loadAnalytics(CID||lecAnalyticsCourseId);}}else{cpOv.classList.add('open');}fab.setAttribute('aria-expanded','true');if(!panelDataLoaded){try{loadPanelData();panelDataLoaded=true;}catch(e){console.error('[umat] loadPanelData error:',e);}}updateBodyLock();}
-function closePanel(){cpOv.classList.remove('open');fab.setAttribute('aria-expanded','false');updateBodyLock();}
-function openDash(){closePanel();lecOv.classList.add('open');if(!anLoaded[CID||lecAnalyticsCourseId]){loadAnalytics(CID||lecAnalyticsCourseId);}updateBodyLock();}
-function closeDash(){lecOv.classList.remove('open');openPanel();}
+function openPanel(){window.openPanel&&window.openPanel();}
+function closePanel(){window.closePanel&&window.closePanel();}
+function openDash(){window.openDash&&window.openDash();}
+function closeDash(){window.closeDash&&window.closeDash();}
 
-if(fab)fab.addEventListener('click',openPanel);
-if(cpClose)cpClose.addEventListener('click',closePanel);
-if(cpOv)cpOv.addEventListener('click',function(e){if(e.target===cpOv)closePanel();});
-if(expand)expand.addEventListener('click',openDash);
-if(lecOv)lecOv.addEventListener('click',function(e){if(e.target===lecOv)closeDash();});
-var dashBtn=document.getElementById('lcp-dash-btn');if(dashBtn)dashBtn.addEventListener('click',openDash);
-var openDashBtn=document.getElementById('lcp-open-dash');if(openDashBtn)openDashBtn.addEventListener('click',openDash);
+/* NOTE: FAB, close, expand button handlers are owned by the IIFE — do NOT bind duplicates here */
 
-/* Compact panel tabs */
-function showLcpPane(t){
-  document.querySelectorAll('[data-lcp-tab]').forEach(function(x){x.classList.toggle('active',x.dataset.lcpTab===t);});
-  document.querySelectorAll('#lec-cp [data-lcp-pane]').forEach(function(x){x.classList.toggle('active',x.dataset.lcpPane===t);});
-  document.querySelectorAll('#lec-cp .umat-cp-pane').forEach(function(x){x.classList.toggle('active',x.id===t);});
-}
-document.querySelectorAll('[data-lcp-tab]').forEach(function(b){
-  b.addEventListener('click',function(){showLcpPane(b.dataset.lcpTab);});
-});
-document.querySelectorAll('#lec-cp [data-lcp-pane]').forEach(function(b){
-  b.addEventListener('click',function(){showLcpPane(b.dataset.lcpPane);});
-});
+/* Compact panel tabs — delegate to IIFE's showLcpPane (has loadLcpPane + lcpPaneLoaded) */
+function showLcpPane(t){window.showLcpPane&&window.showLcpPane(t);}
+/* Only bind open-full / feature-tab handlers here; data-lcp-tab and data-lcp-pane clicks are owned by the IIFE */
 document.querySelectorAll('#lec-cp [data-lcp-open]').forEach(function(b){
   b.addEventListener('click',function(){renderLcpFeature(b.dataset.lcpOpen);});
 });
@@ -387,27 +372,15 @@ function renderLecCourseGrid(gridId, clickAction){
   });
 }
 
-/* Sidebar & mobile tab pane switching */
-function switchPane(name){
-  document.querySelectorAll('#lec-ov .umat-tab-pane').forEach(function(p){p.classList.remove('active');});
-  document.querySelectorAll('#lec-sb [data-lp], #lec-glass-tabs [data-lp]').forEach(function(b){b.classList.toggle('active',b.dataset.lp===name);});
-  var pane=document.getElementById(name);if(pane)pane.classList.add('active');
-  if(!lecLoaded[name]){lecLoaded[name]=true;loadPaneData(name);}
-}
-window.switchPane=switchPane;
+/* Sidebar & mobile tab pane switching — delegate to IIFE's switchPane (has FAB, insights, sessions logic) */
+function switchPane(name){window.switchPane&&window.switchPane(name);}
 window.initLecturerIssues=initLecturerIssues;
 window.renderLcpFeature=renderLcpFeature;
 /* Handle data-lp clicks from compact panel -> open full overlay */
 document.querySelectorAll('#lec-cp [data-lp^="lec-"]').forEach(function(b){
   b.addEventListener('click',function(){closePanel();openDash();switchPane(b.dataset.lp);});
 });
-document.querySelectorAll('#lec-sb [data-lp], #lec-glass-tabs [data-lp]').forEach(function(b){
-  b.addEventListener('click',function(){switchPane(b.dataset.lp);});
-});
-document.addEventListener('click',function(e){
-  var btn=e.target.closest('[data-lp]');
-  if(btn && btn.closest('#lec-home')){switchPane(btn.dataset.lp);}
-});
+/* NOTE: sidebar and glass-tab data-lp clicks are owned by the IIFE — do NOT bind duplicate handlers here */
 
 /* Home init */
 function initHome(){
