@@ -56,7 +56,7 @@ HTML;
 /* Mobile nav: slide-to-hide + indicator pill */
 document.querySelectorAll('.umat-glass-tabs').forEach(function(nav){var pill=document.createElement('div');pill.className='umat-glass-pill';nav.appendChild(pill);function mv(){var a=nav.querySelector('.umat-glass-tab.active');if(!a)return;var nr=nav.getBoundingClientRect(),tr=a.getBoundingClientRect();pill.style.left=(tr.left-nr.left)+'px';pill.style.width=tr.width+'px';}mv();nav.addEventListener('click',function(e){if(e.target.closest('.umat-glass-tab'))setTimeout(mv,30);});window.addEventListener('resize',mv);});
 /* Thumbnail loader */
-window.loadYtThumbnails=window.loadYtThumbnails||function(g){if(!g)return;g.querySelectorAll('.yt-tile[data-url]').forEach(function(tile){var th=tile.querySelector('.yt-thumb');if(!th||th._td)return;th._td=1;var url=tile.dataset.url||'',mime=(tile.dataset.mime||'').toLowerCase();if(!url)return;function hi(){var ic=th.querySelector('.yt-thumb-icon');if(ic)ic.style.display='none';}if(mime.includes('image')){var img=document.createElement('img');img.className='yt-thumb-img';img.loading='lazy';img.src=url;th.appendChild(img);hi();}else if(mime.includes('video')){var v=document.createElement('video');v.src=url;v.preload='metadata';v.muted=true;v.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:12px;';v.addEventListener('loadedmetadata',function(){v.currentTime=Math.min(2,v.duration*0.1);});v.addEventListener('seeked',function(){hi();th.appendChild(v);});v.load();}else if(mime.includes('pdf')){var lo=document.createElement('div');lo.className='yt-thumb-loading';th.appendChild(lo);hi();(function(){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';s.onload=function(){window.pdfjsLib&&(window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',pdfjsLib.getDocument(url).promise.then(function(p){return p.getPage(1);}).then(function(pg){var vp=pg.getViewport({scale:1}),sc=Math.min(th.offsetWidth/vp.width,th.offsetHeight/vp.height)||1,vp2=pg.getViewport({scale:sc}),c=document.createElement('canvas');c.className='yt-thumb-canvas';c.width=vp2.width;c.height=vp2.height;lo.remove();th.appendChild(c);pg.render({canvasContext:c.getContext('2d'),viewport:vp2});}).catch(function(){lo.remove();}));};document.head.appendChild(s);})();}else if(mime.includes('word')||mime.includes('document')||mime.includes('presentation')||mime.includes('powerpoint')||mime.includes('spreadsheet')||mime.includes('excel')){var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';for(var i=0;i<6;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl);}th.appendChild(dv);hi();}else if(mime.includes('audio')){var aw=document.createElement('div');aw.className='yt-thumb-audio-wav';for(var i=0;i<12;i++){var bar=document.createElement('span');aw.appendChild(bar);}th.appendChild(aw);hi();}});};
+window.loadYtThumbnails=window.loadYtThumbnails||function(g){if(!g)return;g.querySelectorAll('.yt-tile[data-url]').forEach(function(tile){var th=tile.querySelector('.yt-thumb');if(!th||th._td)return;th._td=1;var url=tile.dataset.url||'',mime=(tile.dataset.mime||'').toLowerCase();if(!url)return;function hi(){var ic=th.querySelector('.yt-thumb-icon');if(ic)ic.style.display='none';}if(mime.includes('image')){var img=document.createElement('img');img.className='yt-thumb-img';img.loading='lazy';img.src=url;th.appendChild(img);hi();}else if(mime.includes('video')){var v=document.createElement('video');v.src=url;v.preload='metadata';v.muted=true;v.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:12px;';v.addEventListener('loadedmetadata',function(){v.currentTime=Math.min(2,v.duration*0.1);});v.addEventListener('seeked',function(){hi();th.appendChild(v);});v.load();}else if(mime.includes('pdf')){var lo=document.createElement('div');lo.className='yt-thumb-loading';th.appendChild(lo);hi();(function(){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';s.onload=function(){window.pdfjsLib&&(window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',pdfjsLib.getDocument(url).promise.then(function(p){return p.getPage(1);}).then(function(pg){var vp=pg.getViewport({scale:1}),sc=Math.min(th.offsetWidth/vp.width,th.offsetHeight/vp.height)||1,vp2=pg.getViewport({scale:sc}),c=document.createElement('canvas');c.className='yt-thumb-canvas';c.width=vp2.width;c.height=vp2.height;lo.remove();th.appendChild(c);pg.render({canvasContext:c.getContext('2d'),viewport:vp2});}).catch(function(){lo.remove();}));};document.head.appendChild(s);})();}else if(mime.includes('presentation')||mime.includes('powerpoint')){var a1=document.createElement('a');a1.href=url;var b1=a1.origin+a1.pathname.substring(0,a1.pathname.indexOf('/pluginfile.php'));var i1=document.createElement('img');i1.className='yt-thumb-img';i1.loading='lazy';i1.onerror=function(){try{th.removeChild(i1)}catch(e){};var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';for(var i=0;i<4;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl)}th.appendChild(dv)};i1.src=b1+'/local/umat_ai/pptx_render.php?action=slide&url='+encodeURIComponent(url)+'&slide=1';th.appendChild(i1);hi();}else if(mime.includes('word')||mime.includes('document')||mime.includes('spreadsheet')||mime.includes('excel')){var lo2=document.createElement('div');lo2.className='yt-thumb-loading';th.appendChild(lo2);hi();var a2=document.createElement('a');a2.href=url;var b2=a2.origin+a2.pathname.substring(0,a2.pathname.indexOf('/pluginfile.php'));var t2=mime.includes('spreadsheet')||mime.includes('excel')?'xlsx':'docx';fetch(b2+'/local/umat_ai/doc_preview.php?url='+encodeURIComponent(url)+'&type='+t2).then(function(r){return r.json();}).then(function(d){lo2.remove();var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';if(d.lines&&d.lines.length){d.lines.slice(0,7).forEach(function(l){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';var txt=typeof l==='string'?l:(Array.isArray(l)?l.filter(Boolean).join(' | '):'');dl.textContent=txt.substring(0,65)||'\u00a0';dv.appendChild(dl);});}else{for(var i=0;i<4;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl);}}th.appendChild(dv);}).catch(function(){lo2.remove();var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';for(var i=0;i<4;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl);}th.appendChild(dv);});}else if(mime.includes('audio')){var aw=document.createElement('div');aw.className='yt-thumb-audio-wav';for(var i=0;i<12;i++){var bar=document.createElement('span');aw.appendChild(bar);}th.appendChild(aw);hi();}});};
 new MutationObserver(function(ms){ms.forEach(function(m){if(m.target.classList&&m.target.classList.contains('yt-grid'))window.loadYtThumbnails(m.target);m.addedNodes.forEach(function(n){if(n.nodeType!==1)return;if(n.classList&&n.classList.contains('yt-grid'))window.loadYtThumbnails(n);var gs=n.querySelectorAll&&n.querySelectorAll('.yt-grid');if(gs&&gs.length)gs.forEach(function(g){window.loadYtThumbnails(g);});});});}).observe(document.body,{childList:true,subtree:true});
 /* AJAX cache (5-min TTL for analytics/struggle) */
 if(typeof ajax==='function'&&!window._ajaxCached){window._ajaxCached=1;var _ac={},_at={};window._origAjax=ajax;window.ajax=function(m,a,d,f){if(m.includes('analytics')||m.includes('struggle')){var k=m+':'+JSON.stringify(a),n=Date.now();if(_ac[k]&&n-_at[k]<300000){setTimeout(function(){d(_ac[k]);},0);return;}_origAjax(m,a,function(r){_ac[k]=r;_at[k]=Date.now();d(r);},f);}else _origAjax(m,a,d,f);};}
@@ -722,37 +722,67 @@ HTML;
       <button class="umat-cp-feature-tab" data-lcp-pane="lcp-issues" type="button"><span class="material-symbols-outlined">flag</span><span>Issues</span></button>
     </div>
     <div class="umat-cp-pane active" id="lcp-insights" style="overflow-y:auto;">
-      <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:9px;" id="lcp-kpi-grid">
-        <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:12px;">
-          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(0,107,47,.1);color:var(--u-p);display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">group</span></div>
-          <div style="font-size:10px;color:var(--u-ol);">Active Students</div>
-          <div style="font-size:18px;font-weight:800;" id="lcp-k-active">—</div>
-          <span style="font-size:9px;background:#dcfce7;color:#065f46;padding:2px 6px;border-radius:999px;font-weight:700;" id="lcp-k-active-b">Loading</span>
+      <!-- Stat cards row (home) -->
+      <div class="lcp-insight-stats">
+        <div class="lcp-is-card lcp-is-students">
+          <div class="lcp-is-icon"><span class="material-symbols-outlined">group</span></div>
+          <div class="lcp-is-body">
+            <div class="lcp-is-val" id="lcp-k-active">—</div>
+            <div class="lcp-is-lbl">Active Students</div>
+            <div class="lcp-is-sub"><span id="lcp-k-active-b">—</span></div>
+          </div>
         </div>
-        <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:12px;">
-          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(245,158,11,.1);color:#d97706;display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">forum</span></div>
-          <div style="font-size:10px;color:var(--u-ol);">AI Interactions</div>
-          <div style="font-size:18px;font-weight:800;" id="lcp-k-int">—</div>
-          <span style="font-size:9px;background:var(--u-secc);color:var(--u-sec);padding:2px 6px;border-radius:999px;font-weight:700;">30 days</span>
+        <div class="lcp-is-card lcp-is-interactions">
+          <div class="lcp-is-icon"><span class="material-symbols-outlined">forum</span></div>
+          <div class="lcp-is-body">
+            <div class="lcp-is-val" id="lcp-k-int">—</div>
+            <div class="lcp-is-lbl">AI Interactions</div>
+            <div class="lcp-is-sub">30 days</div>
+          </div>
         </div>
-        <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:12px;">
-          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(165,48,77,.1);color:var(--u-ter);display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">psychology_alt</span></div>
-          <div style="font-size:10px;color:var(--u-ol);">Struggle Index</div>
-          <div style="font-size:14px;font-weight:800;" id="lcp-k-str">—</div>
-          <span style="font-size:9px;background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:999px;font-weight:700;">High</span>
+        <div class="lcp-is-card lcp-is-struggle">
+          <div class="lcp-is-icon"><span class="material-symbols-outlined">psychology_alt</span></div>
+          <div class="lcp-is-body">
+            <div class="lcp-is-val" id="lcp-k-str" style="font-size:14px;">—</div>
+            <div class="lcp-is-lbl">Struggle Index</div>
+            <div class="lcp-is-sub" id="lcp-k-str-sub">—</div>
+          </div>
         </div>
-        
+        <div class="lcp-is-card lcp-is-engagement">
+          <div class="lcp-is-icon"><span class="material-symbols-outlined">monitoring</span></div>
+          <div class="lcp-is-body">
+            <div class="lcp-is-val" id="lcp-k-engagement">—</div>
+            <div class="lcp-is-lbl">Engagement</div>
+            <div class="lcp-is-sub" id="lcp-k-engagement-sub">—</div>
+          </div>
+        </div>
       </div>
-      <div style="padding:0 14px 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--u-ol);">AI Insights</div>
-      <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:8px;">
-        <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-left:3px solid var(--u-ter);border-radius:var(--u-r12);padding:12px;">
-          <div style="font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span class="material-symbols-outlined" style="font-size:16px;color:var(--u-ter);">warning</span><span id="lcp-gap-title">Analysing learning gaps…</span></div>
-          <div style="font-size:11px;color:var(--u-onsv);margin-bottom:8px;" id="lcp-gap-desc">Scanning question patterns…</div>
-          <button class="umat-chip" id="lcp-open-dash" type="button">Open Full Dashboard</button>
+
+      <!-- AI Insight card -->
+      <div class="lcp-insight-banner" id="lcp-insight-banner-home">
+        <span class="material-symbols-outlined">auto_awesome</span>
+        <div class="lcp-insight-banner-text">
+          <div id="lcp-gap-title" style="font-weight:600;">Analysing learning gaps…</div>
+          <div id="lcp-gap-desc" style="font-size:11px;color:var(--u-onsv);margin-top:3px;">Scanning question patterns…</div>
         </div>
       </div>
-      <div style="padding:10px 14px;border-top:1px solid var(--u-olv);display:flex;flex-direction:column;gap:7px;">
-        <button class="umat-btn-p" id="lcp-dash-btn" type="button" style="justify-content:center;"><span class="material-symbols-outlined">dashboard</span>Open Analytics Dashboard</button>
+
+      <!-- Top questions mini-list -->
+      <div class="lcp-insight-section">
+        <div class="lcp-insight-section-hdr">
+          <span class="material-symbols-outlined">question_answer</span>
+          <span>Top Questions</span>
+          <span class="lcp-insight-count" id="lcp-q-count">0</span>
+        </div>
+        <div id="lcp-q-list" class="lcp-insight-list">
+          <div class="lcp-pane-loading">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="lcp-insight-actions">
+        <button class="umat-btn-p" id="lcp-dash-btn" type="button"><span class="material-symbols-outlined">dashboard</span>Full Dashboard</button>
+        <button class="umat-chip" id="lcp-open-dash" type="button"><span class="material-symbols-outlined">open_in_full</span>Analytics Overview</button>
       </div>
     </div>
     <div class="umat-cp-pane" id="lcp-questions" style="overflow-y:auto;">
@@ -809,28 +839,91 @@ HTML;
     </div>
     <!-- COMPACT INSIGHTS DASHBOARD PANE -->
     <div class="umat-cp-pane" id="lcp-insights-dash" style="overflow-y:auto;">
+      <!-- Header -->
       <div class="lcp-pane-hdr">
         <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">psychology</span>
-        <strong style="font-size:12px;">Struggle Overview</strong>
-        <button class="lcp-pane-expand" id="lcp-dash-open-btn" type="button" title="Open full dashboard"><span class="material-symbols-outlined">open_in_full</span></button>
+        <strong style="font-size:12px;">Course Insights</strong>
+        <button class="lcp-pane-expand" id="lcp-dash-open-btn" type="button" title="Open full dashboard">
+          <span class="material-symbols-outlined">open_in_full</span>
+        </button>
       </div>
-      <div class="lcp-dash-tiles" id="lcp-dash-tiles">
-        <div class="lcp-dash-tile"><div class="lcp-dash-tile-val" id="lcp-d-students">—</div><div class="lcp-dash-tile-lbl">Students</div></div>
-        <div class="lcp-dash-tile"><div class="lcp-dash-tile-val" id="lcp-d-risk" style="color:var(--u-ter);">—</div><div class="lcp-dash-tile-lbl">At Risk</div></div>
-        <div class="lcp-dash-tile"><div class="lcp-dash-tile-val" id="lcp-d-questions">—</div><div class="lcp-dash-tile-lbl">Questions</div></div>
-        <div class="lcp-dash-tile"><div class="lcp-dash-tile-val" id="lcp-d-score">—</div><div class="lcp-dash-tile-lbl">Avg Score</div></div>
+
+      <!-- Stat cards row -->
+      <div class="lcp-insight-stats" id="lcp-insight-stats">
+        <div class="lcp-is-card lcp-is-students">
+          <div class="lcp-is-icon"><span class="material-symbols-outlined">groups</span></div>
+          <div class="lcp-is-body">
+            <div class="lcp-is-val" id="lcp-d-students">—</div>
+            <div class="lcp-is-lbl">Students</div>
+            <div class="lcp-is-sub" id="lcp-d-students-active">— active</div>
+          </div>
+        </div>
+        <div class="lcp-is-card lcp-is-risk">
+          <div class="lcp-is-icon"><span class="material-symbols-outlined">warning</span></div>
+          <div class="lcp-is-body">
+            <div class="lcp-is-val" id="lcp-d-risk">—</div>
+            <div class="lcp-is-lbl">At Risk</div>
+            <div class="lcp-is-sub" id="lcp-d-risk-pct">—%</div>
+          </div>
+        </div>
+        <div class="lcp-is-card lcp-is-questions">
+          <div class="lcp-is-icon"><span class="material-symbols-outlined">question_answer</span></div>
+          <div class="lcp-is-body">
+            <div class="lcp-is-val" id="lcp-d-questions">—</div>
+            <div class="lcp-is-lbl">Questions</div>
+            <div class="lcp-is-sub" id="lcp-d-questions-avg">— avg</div>
+          </div>
+        </div>
+        <div class="lcp-is-card lcp-is-score">
+          <div class="lcp-is-icon"><span class="material-symbols-outlined">trending_up</span></div>
+          <div class="lcp-is-body">
+            <div class="lcp-is-val" id="lcp-d-score">—</div>
+            <div class="lcp-is-lbl">Engagement</div>
+            <div class="lcp-is-sub" id="lcp-d-score-trend">—</div>
+          </div>
+        </div>
       </div>
-      <div class="lcp-pane-section">
-        <div class="lcp-pane-section-title">Top Struggling Topics</div>
-        <div id="lcp-d-topics" class="lcp-pane-list"><div class="lcp-pane-loading">Loading…</div></div>
+
+      <!-- AI Insight banner -->
+      <div class="lcp-insight-banner" id="lcp-insight-banner" style="display:none;">
+        <span class="material-symbols-outlined">auto_awesome</span>
+        <div class="lcp-insight-banner-text" id="lcp-insight-banner-text"></div>
       </div>
-      <div class="lcp-pane-section">
-        <div class="lcp-pane-section-title">At-Risk Students</div>
-        <div id="lcp-d-students-list" class="lcp-pane-list"><div class="lcp-pane-loading">Loading…</div></div>
+
+      <!-- Topics section -->
+      <div class="lcp-insight-section">
+        <div class="lcp-insight-section-hdr">
+          <span class="material-symbols-outlined">heatmap</span>
+          <span>Struggling Topics</span>
+          <span class="lcp-insight-count" id="lcp-d-topics-count">0</span>
+        </div>
+        <div id="lcp-d-topics" class="lcp-insight-list">
+          <div class="lcp-pane-loading">Loading…</div>
+        </div>
       </div>
-      <div class="lcp-pane-section">
-        <div class="lcp-pane-section-title">Recent Questions</div>
-        <div id="lcp-d-questions-list" class="lcp-pane-list"><div class="lcp-pane-loading">Loading…</div></div>
+
+      <!-- At-risk students section -->
+      <div class="lcp-insight-section">
+        <div class="lcp-insight-section-hdr">
+          <span class="material-symbols-outlined">person_off</span>
+          <span>At-Risk Students</span>
+          <span class="lcp-insight-count" id="lcp-d-students-count">0</span>
+        </div>
+        <div id="lcp-d-students-list" class="lcp-insight-list">
+          <div class="lcp-pane-loading">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Recent questions section -->
+      <div class="lcp-insight-section">
+        <div class="lcp-insight-section-hdr">
+          <span class="material-symbols-outlined">forum</span>
+          <span>Recent Questions</span>
+          <span class="lcp-insight-count" id="lcp-d-questions-count">0</span>
+        </div>
+        <div id="lcp-d-questions-list" class="lcp-insight-list">
+          <div class="lcp-pane-loading">Loading…</div>
+        </div>
       </div>
     </div>
     <!-- COMPACT QUIZ GENERATOR PANE -->
@@ -867,13 +960,51 @@ HTML;
       <div id="lcp-courses-list" class="lcp-pane-list" style="padding:8px 14px;"><div class="lcp-pane-loading">Loading…</div></div>
     </div>
     <!-- COMPACT RESOURCE MATERIALS PANE -->
-    <div class="umat-cp-pane" id="lcp-library" style="overflow-y:auto;">
+    <div class="umat-cp-pane" id="lcp-library" style="overflow:hidden;display:flex;flex-direction:column;">
       <div class="lcp-pane-hdr">
         <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">local_library</span>
-        <strong style="font-size:12px;">Resource Materials</strong>
+        <strong style="font-size:12px;">Resources</strong>
+        <?php if($enableRb): ?>
+        <div class="lcp-res-toggle" id="lcp-res-toggle">
+          <button class="lcp-res-pill active" data-lcp-libview="course" type="button">Course</button>
+          <button class="lcp-res-pill" data-lcp-libview="private" type="button">Private Bank</button>
+        </div>
+        <?php endif; ?>
         <button class="lcp-pane-expand" id="lcp-lib-open-btn" type="button" title="Open full library"><span class="material-symbols-outlined">open_in_full</span></button>
       </div>
-      <div id="lcp-lib-body" class="lcp-pane-list" style="padding:8px 14px;"><div class="lcp-pane-loading">Loading…</div></div>
+      <!-- Course Materials view -->
+      <div id="lcp-lib-course" class="lcp-lib-view active" style="flex:1;overflow-y:auto;">
+        <div id="lcp-lib-body" class="lcp-pane-list" style="padding:8px 14px;"><div class="lcp-pane-loading">Loading…</div></div>
+      </div>
+      <?php if($enableRb): ?>
+      <!-- Private Bank view -->
+      <div id="lcp-lib-private" class="lcp-lib-view" style="flex:1;overflow:hidden;display:none;flex-direction:column;">
+        <!-- RB compact toolbar -->
+        <div class="lcp-rb-toolbar">
+          <button class="lcp-rb-icon-btn" id="lcp-rb-upload" type="button" title="Upload file">
+            <span class="material-symbols-outlined">upload_file</span>
+          </button>
+          <button class="lcp-rb-icon-btn" id="lcp-rb-folder" type="button" title="New folder">
+            <span class="material-symbols-outlined">create_new_folder</span>
+          </button>
+          <div style="flex:1;"></div>
+          <button class="lcp-rb-icon-btn lcp-rb-del" id="lcp-rb-del" type="button" title="Delete selected" style="display:none;">
+            <span class="material-symbols-outlined">delete</span>
+          </button>
+          <button class="lcp-rb-icon-btn lcp-rb-push" id="lcp-rb-push" type="button" title="Push to course" style="display:none;">
+            <span class="material-symbols-outlined">publish</span>
+          </button>
+        </div>
+        <!-- Breadcrumb -->
+        <div class="lcp-rb-bread" id="lcp-rb-bread">
+          <span class="lcp-rb-bread-root" data-lcp-rb-root="1">My Resources</span>
+        </div>
+        <!-- File list -->
+        <div id="lcp-rb-list" class="lcp-rb-list" style="flex:1;overflow-y:auto;">
+          <div class="lcp-pane-loading">Loading…</div>
+        </div>
+      </div>
+      <?php endif; ?>
     </div>
     <!-- COMPACT SESSIONS PANE -->
     <div class="umat-cp-pane" id="lcp-sessions" style="overflow-y:auto;">
@@ -1278,7 +1409,7 @@ if(typeof loadAnalytics!=='function'){
       if(csLabel)csLabel.textContent='All Courses';
       if(label)label.textContent='';
       var courses=UD&&UD.courses||[];
-      if(!courses.length){document.getElementById('ov-an-kpis').innerHTML='<div class="ov-loading">No courses assigned.</div>';return;}
+      if(!courses.length){var kpiEl=document.getElementById('ov-an-kpis');if(kpiEl)kpiEl.innerHTML='<div class="ov-loading">No courses assigned.</div>';return;}
       var agg={active_students:0,enrolled_students:0,total_interactions:0,questions_per_session:[],daily_counts:{},per_course:[],all_questions:[],high_total:0,risk_total:0,track_total:0},done=0;
       courses.forEach(function(c){
         ajax('local_umat_ai_get_analytics',{courseid:c.id,days:30},function(d){
@@ -1580,49 +1711,274 @@ function loadLcpCourses(){
     el.addEventListener('click',function(){CID=parseInt(el.dataset.cid)||CID;CN=el.dataset.name||CN;lcpPaneLoaded={};closePanel();lecOv.classList.add('open');switchPane('lec-insights');updateBodyLock();});
   });
 }
+/* ── CP Resources: Course + Private Bank ── */
 function loadLcpLibraryPane(){
   var body=document.getElementById('lcp-lib-body');var courses=(UD&&UD.courses)||[];
+  var toggle=document.getElementById('lcp-res-toggle');
+  var courseView=document.getElementById('lcp-lib-course');
+  var privateView=document.getElementById('lcp-lib-private');
+  /* Helpers */
   function _lcpMime(mt){
-    if(!mt)return 'Course material';var m=mt.toLowerCase();
-    if(m.indexOf('pdf')!==-1)return 'PDF Document';if(m.indexOf('powerpoint')!==-1||m.indexOf('presentationml')!==-1)return 'PowerPoint Presentation';
-    if(m.indexOf('wordprocessingml')!==-1||m.indexOf('msword')!==-1)return 'Word Document';if(m.indexOf('spreadsheetml')!==-1||m.indexOf('excel')!==-1)return 'Spreadsheet';
-    if(m.indexOf('video/')!==-1)return 'Video';if(m.indexOf('audio/')!==-1)return 'Audio';if(m.indexOf('image/')!==-1)return 'Image';
-    var parts=m.split('/');return (parts[parts.length-1]||mt).replace(/[\.\-]/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}).substring(0,30);
+    if(!mt)return 'Document';var m=mt.toLowerCase();
+    if(m.indexOf('pdf')!==-1)return 'PDF';if(m.indexOf('powerpoint')!==-1||m.indexOf('presentationml')!==-1)return 'Presentation';
+    if(m.indexOf('wordprocessingml')!==-1||m.indexOf('msword')!==-1)return 'Document';if(m.indexOf('spreadsheetml')!==-1||m.indexOf('excel')!==-1)return 'Spreadsheet';
+    if(m.indexOf('video/')!==-1)return 'Video';if(m.indexOf('audio/')!==-1)return 'Audio';if(m.indexOf('image')!==-1)return 'Image';
+    var parts=m.split('/');return (parts[parts.length-1]||mt).split('/').pop().split('.').pop().toUpperCase().substring(0,12)||'File';
   }
   function _lcpIcon(mt){
     var m=(mt||'').toLowerCase();if(m.indexOf('pdf')!==-1)return 'picture_as_pdf';if(m.indexOf('video')!==-1)return 'play_circle';if(m.indexOf('audio')!==-1)return 'headphones';if(m.indexOf('image')!==-1)return 'image';if(m.indexOf('powerpoint')!==-1||m.indexOf('presentation')!==-1)return 'slideshow';if(m.indexOf('word')!==-1||m.indexOf('document')!==-1)return 'description';if(m.indexOf('sheet')!==-1||m.indexOf('excel')!==-1)return 'table_chart';return 'description';
   }
-  function _fmtSize(bytes){if(!bytes||isNaN(bytes))return '';if(bytes<1024)return bytes+' B';if(bytes<1048576)return (bytes/1024).toFixed(1)+' KB';return (bytes/1048576).toFixed(1)+' MB';}
+  function _fmtSize(b){if(!b||isNaN(b))return '';if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(1)+' KB';return (b/1048576).toFixed(1)+' MB';}
+  function _timeAgo(ts){var d=Date.now()/1000-ts;if(d<60)return 'just now';if(d<3600)return Math.floor(d/60)+'m ago';if(d<86400)return Math.floor(d/3600)+'h ago';return Math.floor(d/86400)+'d ago';}
+
+  /* ── Toggle wiring ── */
+  if(toggle){
+    toggle.querySelectorAll('.lcp-res-pill').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        toggle.querySelectorAll('.lcp-res-pill').forEach(function(b){b.classList.remove('active');});
+        btn.classList.add('active');
+        var view=btn.dataset.lcpLibview;
+        if(view==='course'){
+          courseView.style.display='';courseView.style.flex='1';
+          if(privateView){privateView.style.display='none';}
+        } else {
+          courseView.style.display='none';
+          if(privateView){privateView.style.display='';privateView.style.flex='1';lcpRbLoad(null);}
+        }
+      });
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════
+     COURSE MATERIALS VIEW
+     ══════════════════════════════════════════════════════ */
   function showCourses(){
-    body.innerHTML=courses.length?courses.slice(0,8).map(function(c,i){
-      var colors=['#006B2F','#d97706','#7c3aed','#dc2626','#0891b2','#059669'];
+    var colors=['#006B2F','#d97706','#7c3aed','#dc2626','#0891b2','#059669','#c026d3','#2563eb'];
+    if(!courses.length){body.innerHTML='<div class="lcp-pane-empty"><span class="material-symbols-outlined" style="font-size:28px;color:var(--u-ol);opacity:.4;">folder_off</span><p>No courses available.</p></div>';return;}
+    body.innerHTML=courses.slice(0,8).map(function(c,i){
       var clr=colors[i%colors.length];var initials=(c.shortname||'').substring(0,2).toUpperCase();
-      return '<div class="lcp-pane-row lcp-pane-clickable" data-cid="'+c.id+'" style="cursor:pointer;display:flex;gap:8px;align-items:center;padding:8px;border:1px solid var(--u-olv);border-radius:var(--u-r10);margin-bottom:4px;">'+
-        '<div style="width:28px;height:28px;border-radius:var(--u-r6);background:'+clr+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;">'+esc(initials)+'</div>'+
-        '<div style="min-width:0;flex:1;"><div style="font-size:12px;font-weight:600;color:var(--u-ons);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(c.shortname||c.fullname)+'</div><div style="font-size:10px;color:var(--u-ol);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(c.fullname||'')+'</div></div>'+
-        '<span class="material-symbols-outlined" style="font-size:16px;color:var(--u-ol);">chevron_right</span>'+
+      return '<div class="lcp-res-card" data-cid="'+c.id+'">'+
+        '<div class="lcp-res-card-ico" style="background:'+clr+';">'+esc(initials)+'</div>'+
+        '<div class="lcp-res-card-info"><div class="lcp-res-card-name">'+esc(c.shortname||c.fullname)+'</div>'+
+        '<div class="lcp-res-card-sub">'+esc(c.fullname||'')+'</div></div>'+
+        '<span class="material-symbols-outlined lcp-res-card-chev">chevron_right</span>'+
       '</div>';
-    }).join(''):'<div class="lcp-pane-empty">No courses available.</div>';
-    body.querySelectorAll('.lcp-pane-clickable').forEach(function(el){
+    }).join('');
+    body.querySelectorAll('.lcp-res-card').forEach(function(el){
       el.addEventListener('click',function(){
-        var cid=parseInt(el.dataset.cid);body.innerHTML='<div class="lcp-pane-loading" style="display:flex;align-items:center;gap:6px;"><button class="lcp-lib-back" type="button" style="background:none;border:none;cursor:pointer;padding:2px;"><span class="material-symbols-outlined" style="font-size:16px;">arrow_back</span></button>Loading materials…</div>';
-        var backBtn=body.querySelector('.lcp-lib-back');if(backBtn)backBtn.addEventListener('click',function(){showCourses();});
+        var cid=parseInt(el.dataset.cid);
+        body.innerHTML='<div class="lcp-pane-loading"><span class="material-symbols-outlined" style="font-size:18px;animation:lcpSpin 1s linear infinite;">refresh</span>Loading…</div>';
         ajax('local_umat_ai_get_course_materials',{courseid:cid},function(r){
           var mats=r.materials||[];
-          var header='<div style="display:flex;align-items:center;gap:6px;padding:4px 0 8px;"><button class="lcp-lib-back" type="button" style="background:none;border:none;cursor:pointer;padding:2px;"><span class="material-symbols-outlined" style="font-size:16px;">arrow_back</span></button><span style="font-size:12px;font-weight:700;color:var(--u-ons);">'+mats.length+' Materials</span></div>';
-          body.innerHTML=header+(mats.length?mats.map(function(m){
-            return '<div class="lcp-pane-row" style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--u-olv);">'+
-              '<span class="material-symbols-outlined" style="font-size:18px;color:var(--u-p);">'+_lcpIcon(m.mimetype||m.type)+'</span>'+
-              '<div style="min-width:0;flex:1;"><div style="font-size:12px;font-weight:600;color:var(--u-ons);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(m.filename||m.name||'Material')+'</div>'+
-              '<div style="font-size:10px;color:var(--u-ol);display:flex;gap:8px;">'+_lcpMime(m.mimetype||m.type)+(m.filesize?' · '+_fmtSize(m.filesize):'')+'</div></div>'+
-            '</div>';
-          }).join(''):'<div class="lcp-pane-empty">No materials for this course.</div>');
-          body.querySelector('.lcp-lib-back').addEventListener('click',function(){showCourses();});
-        },function(){body.innerHTML='<div class="lcp-pane-empty">Could not load materials.</div>';});
+          body.innerHTML='<div class="lcp-res-back-row"><button class="lcp-res-back" type="button"><span class="material-symbols-outlined">arrow_back</span></button><span class="lcp-res-back-title">'+mats.length+' Material'+(mats.length!==1?'s':'')+'</span></div>'+
+            (mats.length?mats.map(function(m){
+              var mime=m.mimetype||m.type||'';var icon=_lcpIcon(mime);var label=_lcpMime(mime);var ext=(m.filename||'').split('.').pop().toUpperCase().substring(0,6);
+              return '<div class="lcp-res-mat-row">'+
+                '<div class="lcp-res-mat-ico"><span class="material-symbols-outlined">'+icon+'</span>'+(ext&&ext.length<6?'<span class="lcp-res-mat-ext">'+ext+'</span>':'')+'</div>'+
+                '<div class="lcp-res-mat-info"><div class="lcp-res-mat-name">'+esc(m.filename||m.name||'Material')+'</div>'+
+                '<div class="lcp-res-mat-meta">'+label+(m.filesize?' · '+_fmtSize(m.filesize):'')+'</div></div>'+
+              '</div>';
+            }).join(''):'<div class="lcp-pane-empty"><span class="material-symbols-outlined" style="font-size:24px;opacity:.4;">folder_open</span><p>No materials yet.</p></div>');
+          body.querySelector('.lcp-res-back').addEventListener('click',function(){showCourses();});
+        },function(){body.innerHTML='<div class="lcp-pane-empty"><span class="material-symbols-outlined" style="font-size:24px;color:var(--u-ter);">error</span><p>Could not load materials.</p></div>';});
       });
     });
   }
   showCourses();
+
+  /* ══════════════════════════════════════════════════════
+     PRIVATE BANK — compact file manager
+     ══════════════════════════════════════════════════════ */
+  if(!privateView)return;  /* RB not enabled */
+  var _rbTrail=[],_rbSelected={},_rbCurFolder=null;
+  var rbList=document.getElementById('lcp-rb-list');
+  var rbBread=document.getElementById('lcp-rb-bread');
+  var rbDelBtn=document.getElementById('lcp-rb-del');
+  var rbPushBtn=document.getElementById('lcp-rb-push');
+
+  function _rbAjax(m,a,d,f){ajax('local_umat_ai_resource_bank_'+m,a,function(r){if(d)d(r);},function(e){if(f)f(e);else console.error('[lcp-rb]',m,e);});}
+
+  /* Breadcrumb */
+  function _rbRenderBread(){
+    if(!rbBread)return;
+    var h='<span class="lcp-rb-bread-root" data-lcp-rb-root="1">My Resources</span>';
+    _rbTrail.forEach(function(t){h+='<span class="lcp-rb-bread-sep">/</span><span class="lcp-rb-bread-folder" data-lcp-rb-folder="'+t.id+'">'+esc(t.name)+'</span>';});
+    rbBread.innerHTML=h;
+    rbBread.querySelector('[data-lcp-rb-root]').addEventListener('click',function(){_rbTrail=[];lcpRbLoad(null);});
+    rbBread.querySelectorAll('[data-lcp-rb-folder]').forEach(function(s){
+      s.addEventListener('click',function(){
+        var fid=parseInt(this.dataset.lcpRbFolder);
+        var idx=_rbTrail.findIndex(function(t){return t.id===fid;});
+        if(idx>=0)_rbTrail=_rbTrail.slice(0,idx);
+        lcpRbLoad(fid);
+      });
+    });
+  }
+
+  /* Load folder contents */
+  function lcpRbLoad(parentId){
+    _rbCurFolder=parentId;_rbSelected={};_rbUpdateBatchBtns();_rbRenderBread();
+    rbList.innerHTML='<div class="lcp-pane-loading"><span class="material-symbols-outlined" style="font-size:18px;animation:lcpSpin 1s linear infinite;">refresh</span>Loading…</div>';
+    _rbAjax('list',{parentid:parentId||0},function(r){
+      var items=r.items||[];
+      if(!items.length){
+        rbList.innerHTML='<div class="lcp-pane-empty"><span class="material-symbols-outlined" style="font-size:28px;opacity:.3;">folder_off</span><p>This folder is empty.</p><p style="font-size:10px;margin-top:4px;opacity:.6;">Upload files or create a folder.</p></div>';
+        return;
+      }
+      /* Sort: folders first, then by name */
+      items.sort(function(a,b){if(a.isfolder&&!b.isfolder)return -1;if(!a.isfolder&&b.isfolder)return 1;return (a.name||'').localeCompare(b.name||'');});
+      rbList.innerHTML=items.map(function(it){
+        var icon=it.isfolder?'folder':(_lcpIcon(it.mimetype||''));
+        var ext=it.isfolder?'':((it.name||'').split('.').pop().toUpperCase().substring(0,5));
+        var sizeLabel=it.isfolder?(it.itemcount||''):_fmtSize(it.filesize);
+        var timeLabel=_timeAgo(it.timecreated);
+        return '<div class="lcp-rb-row" data-rb-id="'+it.id+'" data-rb-folder="'+(it.isfolder?1:0)+'" data-rb-name="'+esc(it.name)+'" data-rb-fileurl="'+esc(it.fileurl||'')+'" data-rb-mime="'+esc(it.mimetype||'')+'">'+
+          '<div class="lcp-rb-row-ico '+(it.isfolder?'lcp-rb-row-ico-folder':'lcp-rb-row-ico-file')+'">'+
+            '<span class="material-symbols-outlined">'+icon+'</span>'+
+            (ext?'<span class="lcp-rb-row-ext">'+ext+'</span>':'')+
+          '</div>'+
+          '<div class="lcp-rb-row-info"><div class="lcp-rb-row-name">'+esc(it.name)+'</div>'+
+          '<div class="lcp-rb-row-meta">'+(it.isfolder?(sizeLabel?'Folder · '+sizeLabel+' items':'Folder'):(sizeLabel?' · '+sizeLabel:'')+(timeLabel?' · '+timeLabel:''))+'</div></div>'+
+          '<span class="material-symbols-outlined lcp-rb-row-more" data-rb-id="'+it.id+'" data-rb-name="'+esc(it.name)+'" data-rb-folder="'+(it.isfolder?1:0)+'">more_vert</span>'+
+        '</div>';
+      }).join('');
+      /* Row click: open folder or download file */
+      rbList.querySelectorAll('.lcp-rb-row').forEach(function(el){
+        el.addEventListener('click',function(e){
+          if(e.target.closest('.lcp-rb-row-more'))return;
+          var id=parseInt(this.dataset.rbId);
+          if(this.dataset.rbFolder==='1'){
+            _rbTrail.push({id:id,name:this.dataset.rbName});
+            lcpRbLoad(id);
+          } else {
+            var url=this.dataset.rbFileurl;var name=this.dataset.rbName;var mime=this.dataset.rbMime||'';
+            if(url&&window.umatMaterialViewer){
+              var vt='pdf';if(mime.indexOf('video')!==-1)vt='video';else if(mime.indexOf('image')!==-1)vt='image';else if(mime.indexOf('audio')!==-1)vt='audio';
+              window.umatMaterialViewer.open(vt,{url:url,name:name,downloadUrl:url});
+            } else if(url){window.open(url,'_blank');}
+          }
+        });
+      });
+      /* More-vert → context menu */
+      rbList.querySelectorAll('.lcp-rb-row-more').forEach(function(btn){
+        btn.addEventListener('click',function(e){
+          e.stopPropagation();
+          var id=parseInt(this.dataset.rbId);var name=this.dataset.rbName;var isFolder=this.dataset.rbFolder==='1';
+          _rbShowCtx(e,id,name,isFolder);
+        });
+      });
+    });
+  }
+
+  /* Context menu */
+  function _rbShowCtx(e,id,name,isFolder){
+    var old=document.querySelector('.lcp-rb-ctx');if(old)old.remove();
+    var menu=document.createElement('div');
+    menu.className='lcp-rb-ctx';
+    menu.innerHTML='<div class="lcp-rb-ctx-item" data-act="rename"><span class="material-symbols-outlined">edit</span>Rename</div>'+
+      '<div class="lcp-rb-ctx-item lcp-rb-ctx-danger" data-act="delete"><span class="material-symbols-outlined">delete</span>Delete</div>'+
+      (!isFolder?'<div class="lcp-rb-ctx-item" data-act="push"><span class="material-symbols-outlined">publish</span>Push to Course</div>':'');
+    menu.style.left=Math.min(e.clientX||e.pageX||200,document.documentElement.clientWidth-160)+'px';
+    menu.style.top=Math.min(e.clientY||e.pageY||200,document.documentElement.clientHeight-80)+'px';
+    document.body.appendChild(menu);
+    menu.querySelectorAll('.lcp-rb-ctx-item').forEach(function(item){
+      item.addEventListener('click',function(){
+        var act=item.dataset.act;menu.remove();
+        if(act==='rename')_rbPromptRename(id,name);
+        else if(act==='delete')_rbConfirmDelete(id,name);
+        else if(act==='push')_rbConfirmPush([id]);
+      });
+    });
+    setTimeout(function(){
+      document.addEventListener('click',function _close(ev){if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('click',_close);}});
+    },0);
+  }
+
+  /* Batch selection update */
+  function _rbUpdateBatchBtns(){
+    var count=Object.keys(_rbSelected).length;
+    if(rbDelBtn){rbDelBtn.style.display=count>0?'':'none';}
+    if(rbPushBtn){rbPushBtn.style.display=count>0?'':'none';}
+  }
+
+  /* Rename prompt — use simple inline prompt */
+  function _rbPromptRename(id,name){
+    var newName=prompt('Rename:',name);
+    if(!newName||newName===name)return;
+    _rbAjax('rename',{itemid:id,name:newName},function(){lcpRbLoad(_rbCurFolder);});
+  }
+
+  /* Delete confirm */
+  function _rbConfirmDelete(id,name){
+    if(!confirm('Delete "'+name+'"? This cannot be undone.'))return;
+    _rbAjax('delete',{itemids:[id]},function(){lcpRbLoad(_rbCurFolder);});
+  }
+
+  /* Push to course — prompt with course list */
+  function _rbConfirmPush(ids){
+    if(!ids||!ids.length)return;
+    var cs=(UD&&UD.courses)||[];
+    if(!cs.length){alert('No courses available.');return;}
+    var names=cs.map(function(c,i){return (i+1)+'. '+c.fullname;}).join('\n');
+    var choice=prompt('Push to which course? Enter number:\n\n'+names);
+    if(!choice)return;
+    var idx=parseInt(choice)-1;
+    if(idx<0||idx>=cs.length){alert('Invalid selection.');return;}
+    var cid=cs[idx].id;
+    _rbAjax('push',{itemids:ids,courseid:cid},function(){
+      alert('Pushed to '+cs[idx].fullname);
+      _rbSelected={};_rbUpdateBatchBtns();
+    });
+  }
+
+  /* ── Upload (simple file input) ── */
+  var lcpRbUpBtn=document.getElementById('lcp-rb-upload');
+  if(lcpRbUpBtn){
+    lcpRbUpBtn.addEventListener('click',function(){
+      var fi=document.createElement('input');fi.type='file';fi.multiple=true;fi.style.display='none';
+      fi.addEventListener('change',function(){
+        if(!this.files.length)return;
+        var files=Array.from(this.files);var total=files.length,done=0;
+        rbList.innerHTML='<div class="lcp-pane-loading"><span class="material-symbols-outlined" style="font-size:18px;animation:lcpSpin 1s linear infinite;">cloud_upload</span>Uploading…</div>';
+        files.forEach(function(file){
+          var fd=new FormData();fd.append('file',file);fd.append('parentid',_rbCurFolder||0);fd.append('sesskey',moodleSesskey);
+          var xhr=new XMLHttpRequest();
+          xhr.onload=function(){done++;if(done>=total){lcpRbLoad(_rbCurFolder);}};
+          xhr.onerror=function(){done++;if(done>=total){lcpRbLoad(_rbCurFolder);}};
+          xhr.send(fd);
+        });
+        document.body.removeChild(fi);
+      });
+      document.body.appendChild(fi);fi.click();
+    });
+  }
+
+  /* ── New folder ── */
+  var lcpRbFolderBtn=document.getElementById('lcp-rb-folder');
+  if(lcpRbFolderBtn){
+    lcpRbFolderBtn.addEventListener('click',function(){
+      var name=prompt('Folder name:');
+      if(!name)return;
+      _rbAjax('create_folder',{parentid:_rbCurFolder||0,name:name},function(){lcpRbLoad(_rbCurFolder);});
+    });
+  }
+
+  /* ── Batch delete ── */
+  if(rbDelBtn){
+    rbDelBtn.addEventListener('click',function(){
+      var ids=Object.keys(_rbSelected).map(Number);
+      if(!ids.length||!confirm('Delete '+ids.length+' item(s)? This cannot be undone.'))return;
+      _rbAjax('delete',{itemids:ids},function(){lcpRbLoad(_rbCurFolder);});
+    });
+  }
+  /* ── Batch push ── */
+  if(rbPushBtn){
+    rbPushBtn.addEventListener('click',function(){
+      var ids=Object.keys(_rbSelected).map(Number);_rbConfirmPush(ids);
+    });
+  }
+  /* Expose for external access */
+  window._lcpRbLoad=lcpRbLoad;
 }
 function loadLcpSessionsPane(){
   var body=document.getElementById('lcp-sess-body');
@@ -1731,7 +2087,15 @@ document.addEventListener('click',function(e){
 /* Home init */
 function initHome(){
   console.log('[umat] initHome CID=',CID);
-  if(!CID){console.warn('[umat] initHome: no CID');return;}
+  if(!CID || CID === undefined || CID === null){
+    /* Show generic message for all-courses mode */
+    var fEl=document.getElementById('lec-met-friction');
+    var eEl=document.getElementById('lec-met-engagement');
+    if(fEl)fEl.textContent='Select a course';
+    if(eEl)eEl.textContent='—';
+    console.warn('[umat] initHome: no specific course selected');
+    return;
+  }
   var d=new Date(),dEl=document.getElementById('lec-home-date');
   if(dEl)dEl.textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   /* Use panel data if already loaded */
@@ -1774,7 +2138,7 @@ window.loadPaneData=loadPaneData;
 function loadPanelData(){
   if(!CID){
     var gl=document.getElementById('lcp-gap-title');if(gl)gl.textContent='All Courses Mode';
-    var gd=document.getElementById('lcp-gap-desc');if(gd)gd.textContent='Select a course from Courses, Analytics, or Struggle tabs to view per-course data.';
+    var gd=document.getElementById('lcp-gap-desc');if(gd)gd.textContent='Select a course to view per-course data.';
     var db=document.getElementById('lcp-open-dash');if(db)db.textContent='Open Dashboard Overview';
     return;
   }
@@ -1783,7 +2147,7 @@ function loadPanelData(){
     s('lcp-k-active',d.active_students+'/'+d.enrolled_students);
     s('lcp-k-active-b',Math.round(d.active_students/Math.max(d.enrolled_students,1)*100)+'% active');
     s('lcp-k-int',d.total_interactions.toLocaleString());
-    s('lcp-k-str',d.struggle_index);
+    s('lcp-k-str',d.struggle_index||'N/A');
     if(d.struggle_index!=='N/A'){
       s('lcp-gap-title','Learning Gap: '+d.struggle_index);
       s('lcp-gap-desc','Students ask the most questions in '+d.struggle_index+'. Consider a targeted review session.');
@@ -1791,15 +2155,152 @@ function loadPanelData(){
     var ms=document.getElementById('lec-met-active');if(ms)ms.textContent=d.active_students+'/'+d.enrolled_students;
     /* Top questions */
     var ql=document.getElementById('lcp-q-list');
+    var qc=document.getElementById('lcp-q-count');
     if(ql&&d.top_questions&&d.top_questions.length){
-      ql.innerHTML=d.top_questions.slice(0,5).map(function(q){
+      if(qc)qc.textContent=d.top_questions.length;
+      ql.innerHTML=d.top_questions.slice(0,5).map(function(q,i){
         var displayText=(q.text||'').replace(/^\[Referencing:\s*[^\]]+\]\s*/i,'');
-        return '<div style="padding:8px;background:var(--u-sf);border:1px solid var(--u-olv);border-radius:var(--u-r8);">'+
-          '<div style="font-size:12px;color:var(--u-ons);margin-bottom:3px;">'+esc(displayText)+'</div>'+
-          '<div style="font-size:10px;color:var(--u-ol);"><b style="color:var(--u-p);">'+q.ask_count+'</b> students asked</div></div>';
+        if(displayText.length>80)displayText=displayText.substring(0,80)+'…';
+        return '<div class="lcp-iq-row">'+
+          '<div class="lcp-iq-rank">'+(i+1)+'</div>'+
+          '<div class="lcp-iq-body">'+
+          '<div class="lcp-iq-text">'+esc(displayText)+'</div>'+
+          '<div class="lcp-iq-meta"><span class="lcp-iq-count">'+q.ask_count+' students</span></div>'+
+          '</div></div>';
       }).join('');
+    } else if(ql) {
+      if(qc)qc.textContent='0';
+      ql.innerHTML='<div class="umat-empty-sm">No questions yet.</div>';
     }
   },function(){});
+  loadInsightsDashData();
+}
+
+/* Load insights dash pane (topics, students, questions) */
+function loadInsightsDashData(){
+  if(!CID){return;}
+  ajax('local_umat_ai_get_struggle_insights',{courseid:CID,days:60},function(r){
+    var topics=r.struggle_areas||r.topic_matrix||[];
+    var students=r.student_narratives||r.at_risk_students||[];
+    var questions=r.common_questions||[];
+    var summary=r.summary||{};
+
+    /* Stat cards */
+    var totalStudents=summary.total_students||0;
+    var totalQ=summary.total_questions||0;
+    var atRisk=students.filter(function(s){return s.risk_level==='high'||s.risk_level==='medium';}).length;
+    var pct=totalStudents?Math.round(atRisk/totalStudents*100):0;
+    var s=function(id,v){var e=document.getElementById(id);if(e)e.textContent=v;};
+    s('lcp-d-students',totalStudents);
+    s('lcp-d-students-active',summary.active_students?summary.active_students+' active':'');
+    s('lcp-d-risk',atRisk);
+    s('lcp-d-risk-pct',pct+'%');
+    s('lcp-d-questions',totalQ);
+    s('lcp-d-questions-avg',summary.avg_per_student||'— avg');
+    var eng=summary.engagement_score||summary.engagement||'—';
+    s('lcp-d-score',typeof eng==='number'?eng+'%':eng);
+    s('lcp-d-score-trend',summary.engagement_trend||'');
+
+    /* AI Insight banner */
+    var bannerEl=document.getElementById('lcp-insight-banner');
+    var bannerText=document.getElementById('lcp-insight-banner-text');
+    var insight=summary.summary_insight||r.summary_insight||'';
+    if(bannerEl&&bannerText&&insight){
+      bannerEl.style.display='flex';
+      bannerText.textContent=insight;
+    } else if(bannerEl){
+      bannerEl.style.display='none';
+    }
+
+    /* Topics */
+    var tc=document.getElementById('lcp-d-topics-count');
+    var tl=document.getElementById('lcp-d-topics');
+    if(tl){
+      if(topics.length){
+        if(tc)tc.textContent=topics.length;
+        tl.innerHTML=topics.slice(0,6).map(function(t){
+          var name=t.topic||t.topic_name||'Untitled';
+          var score=t.struggle_score||0;
+          var sev=t.severity||'watch';
+          var st=t.student_count||0;
+          var color=sev==='critical'?'var(--u-ter)':(sev==='attention'?'#f59e0b':'var(--u-p)');
+          var icon=sev==='critical'?'error':(sev==='attention'?'warning':'info');
+          return '<div class="lcp-it-row" title="'+esc(t.suggestion||'')+'">'+
+            '<div class="lcp-it-icon" style="color:'+color+'"><span class="material-symbols-outlined">'+icon+'</span></div>'+
+            '<div class="lcp-it-body">'+
+            '<div class="lcp-it-name">'+esc(name)+'</div>'+
+            '<div class="lcp-it-track"><div class="lcp-it-fill" style="width:'+score+'%;background:'+color+'"></div></div>'+
+            '<div class="lcp-it-meta"><span>'+st+' students</span><span style="color:'+color+';font-weight:700;">'+score+'%</span></div>'+
+            '</div></div>';
+        }).join('');
+      } else {
+        if(tc)tc.textContent='0';
+        tl.innerHTML='<div class="umat-empty-sm">No topics yet.</div>';
+      }
+    }
+
+    /* Students */
+    var sc=document.getElementById('lcp-d-students-count');
+    var sl=document.getElementById('lcp-d-students-list');
+    if(sl){
+      if(students.length){
+        if(sc)sc.textContent=students.length;
+        sl.innerHTML=students.slice(0,8).map(function(s){
+          var risk=s.risk_level||'low';
+          var color=risk==='high'?'var(--u-ter)':(risk==='medium'?'#f59e0b':'var(--u-sec)');
+          var lbl=risk==='high'?'High':(risk==='medium'?'Med':'Low');
+          var topics=(s.struggle_topics||[]).slice(0,2).join(', ');
+          var qs=s.question_count||0;
+          var active=s.last_active||'';
+          return '<div class="lcp-is-row">'+
+            '<img class="umat-avatar-xs" src="'+esc(s.profileimageurl||'')+'" alt="" onerror="this.style.display=\'none\'">'+
+            '<div class="lcp-is-row-body">'+
+            '<div class="lcp-is-row-name">'+esc(s.fullname)+'</div>'+
+            '<div class="lcp-is-row-meta">'+(topics?esc(topics):'')+'</div>'+
+            '</div>'+
+            '<div class="lcp-is-row-right">'+
+            '<span class="lcp-is-row-risk" style="background:'+color+';">'+lbl+'</span>'+
+            '<span class="lcp-is-row-qs">'+qs+' Q</span>'+
+            '</div></div>';
+        }).join('');
+      } else {
+        if(sc)sc.textContent='0';
+        sl.innerHTML='<div class="umat-empty-sm">No at-risk students.</div>';
+      }
+    }
+
+    /* Questions */
+    var qc2=document.getElementById('lcp-d-questions-count');
+    var ql2=document.getElementById('lcp-d-questions-list');
+    if(ql2){
+      if(questions.length){
+        if(qc2)qc2.textContent=questions.length;
+        ql2.innerHTML=questions.slice(0,6).map(function(q,i){
+          var text=(q.text||q.question||'');
+          if(text.length>70)text=text.substring(0,70)+'…';
+          var cnt=q.ask_count||q.count||0;
+          var sn=q.student_count||q.unique_students||0;
+          var label=cnt?cnt+'x':(sn?sn+' students':'');
+          return '<div class="lcp-iq-row">'+
+            '<div class="lcp-iq-rank">'+(i+1)+'</div>'+
+            '<div class="lcp-iq-body">'+
+            '<div class="lcp-iq-text">'+esc(text)+'</div>'+
+            '<div class="lcp-iq-meta'+(label?'':' no-label')+'">'+
+            (label?'<span class="lcp-iq-count">'+label+'</span>':'')+
+            '</div></div></div>';
+        }).join('');
+      } else {
+        if(qc2)qc2.textContent='0';
+        ql2.innerHTML='<div class="umat-empty-sm">No questions yet.</div>';
+      }
+    }
+  },function(){
+    /* Error: show empty states */
+    ['lcp-d-topics','lcp-d-students-list','lcp-d-questions-list'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el)el.innerHTML='<div class="umat-empty-sm">Could not load data.</div>';
+    });
+  });
 }
 
 /* Analytics load & render */
@@ -1875,21 +2376,24 @@ function loadInsightsLegacy(cid){
 /* ── Render Analytics Overview (all courses) ── */
 function renderAnalyticsOverview(agg){
   if(!agg||!agg.per_course||!agg.per_course.length){
-    document.getElementById('ov-an-kpis').innerHTML='<div class="ov-placeholder"><span class="material-symbols-outlined">info</span><p>No analytics data available yet.</p></div>';
+    var kpiEl=document.getElementById('ov-an-kpis');
+    if(kpiEl)kpiEl.innerHTML='<div class="ov-placeholder"><span class="material-symbols-outlined">info</span><p>No analytics data available yet.</p></div>';
     return;
   }
   var active=agg.active_students,enrolled=agg.enrolled_students,totalInt=agg.total_interactions;
   var avgDepth=(agg.questions_per_session.length?agg.questions_per_session.reduce(function(a,b){return a+b;})/agg.questions_per_session.length:0).toFixed(1);
   var pct=Math.round(active/Math.max(enrolled,1)*100);
   /* KPI cards */
-  document.getElementById('ov-an-kpis').innerHTML=
+  var kpiEl=document.getElementById('ov-an-kpis');
+  if(kpiEl)kpiEl.innerHTML=
     '<div class="ov-kpi"><div class="ov-kpi-icon ak-g"><span class="material-symbols-outlined">group</span></div><div class="ov-kpi-val">'+active+' <span class="ov-kpi-sub">/ '+enrolled+'</span></div><div class="ov-kpi-lbl">Active Students <span class="ov-kpi-pct">'+pct+'%</span></div></div>'+
     '<div class="ov-kpi"><div class="ov-kpi-icon ak-s"><span class="material-symbols-outlined">timer</span></div><div class="ov-kpi-val">'+avgDepth+' <span class="ov-kpi-sub">Q</span></div><div class="ov-kpi-lbl">Avg Session Depth</div></div>'+
     '<div class="ov-kpi"><div class="ov-kpi-icon ak-r"><span class="material-symbols-outlined">psychology_alt</span></div><div class="ov-kpi-val">'+agg.per_course.length+' <span class="ov-kpi-sub">courses</span></div><div class="ov-kpi-lbl">Courses Tracked</div></div>'+
     '<div class="ov-kpi"><div class="ov-kpi-icon ak-w"><span class="material-symbols-outlined">forum</span></div><div class="ov-kpi-val">'+totalInt.toLocaleString()+'</div><div class="ov-kpi-lbl">Total Interactions</div></div>';
   /* Course comparison bars */
   var maxActive=Math.max.apply(null,agg.per_course.map(function(c){return c.active;}));
-  document.getElementById('ov-an-bars').innerHTML=agg.per_course.sort(function(a,b){return b.active-a.active;}).map(function(c){
+  var barsEl=document.getElementById('ov-an-bars');
+  if(barsEl)barsEl.innerHTML=agg.per_course.sort(function(a,b){return b.active-a.active;}).map(function(c){
     var w=maxActive?Math.round(c.active/maxActive*100):0;
     return '<div class="ov-bar-row"><div class="ov-bar-label"><span class="ov-bar-course">'+esc(c.name)+'</span><span class="ov-bar-val">'+c.active+'/'+c.enrolled+'</span></div><div class="ov-bar-track"><div class="ov-bar-fill ov-bar-an" style="width:'+w+'%"></div></div></div>';
   }).join('');
@@ -1900,7 +2404,8 @@ function renderAnalyticsOverview(agg){
     '<div class="ov-donut-legend"><div class="ov-donut-legend-item"><span class="ov-dot" style="background:var(--u-p)"></span>High Performers <strong>'+h+'</strong></div>'+
     '<div class="ov-donut-legend-item"><span class="ov-dot" style="background:var(--u-warn, #f59e0b)"></span>On Track <strong>'+tk+'</strong></div>'+
     '<div class="ov-donut-legend-item"><span class="ov-dot" style="background:var(--u-ter)"></span>At Risk <strong>'+rk+'</strong></div></div>';
-  document.getElementById('ov-an-donut').innerHTML=donut;
+  var donutEl=document.getElementById('ov-an-donut');
+  if(donutEl)donutEl.innerHTML=donut;
   /* Daily trend chart */
   var days=Object.keys(agg.daily_counts).sort();var maxV=Math.max.apply(null,days.map(function(d){return agg.daily_counts[d];}))||1;
   drawOverviewChart('ov-an-chart','ov-an-chart-labels',days.map(function(d){return{label:d,count:agg.daily_counts[d]};}),maxV);
