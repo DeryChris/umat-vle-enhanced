@@ -2,7 +2,11 @@
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/filelib.php');
 
-$url = required_param('url', PARAM_URL);
+$url = required_param('url', PARAM_RAW_TRIMMED);
+if (!preg_match('#^https?://#', $url)) {
+    http_response_code(400);
+    die('Invalid URL');
+}
 
 $parts = parse_url($url);
 $path = $parts['path'] ?? '';

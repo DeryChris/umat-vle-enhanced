@@ -344,7 +344,7 @@ function loadLibrary(cid){
         var url=tile.dataset.url;
         var name=tile.dataset.name;
         if(window.umatMaterialViewer){
-          var type=mime.indexOf('video')>=0?'video':mime.indexOf('pdf')>=0?'pdf':mime.indexOf('image')>=0?'image':mime.indexOf('audio')>=0?'audio':'other';
+          var type=mime.indexOf('video')>=0?'video':mime.indexOf('pdf')>=0?'pdf':mime.indexOf('image')>=0?'image':mime.indexOf('audio')>=0?'audio':mime.indexOf('wordprocessingml.document')>=0||mime.indexOf('msword')>=0?'docx':mime.indexOf('spreadsheetml.sheet')>=0||mime.indexOf('excel')>=0?'xlsx':mime.indexOf('presentationml.presentation')>=0||mime.indexOf('powerpoint')>=0?'pptx':'other';
           window.umatMaterialViewer.open(type,{url:url,name:name,downloadUrl:url,mime:mime});
         }else{window.open(url,'_blank');}
       });

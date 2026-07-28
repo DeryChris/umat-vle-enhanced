@@ -8,6 +8,7 @@ define([], function () {
     var typeCleanups = {};
 
     var loadedScripts = {};
+    var loadedModules = {};
 
     function loadScript(url) {
         if (loadedScripts[url]) return loadedScripts[url];
@@ -19,6 +20,16 @@ define([], function () {
             document.head.appendChild(s);
         });
         loadedScripts[url] = p;
+        return p;
+    }
+
+    function loadESModule(url) {
+        if (loadedModules[url]) return loadedModules[url];
+        var p = import(url).then(function (m) { return m; }).catch(function (err) {
+            delete loadedModules[url];
+            throw err;
+        });
+        loadedModules[url] = p;
         return p;
     }
 
@@ -435,7 +446,7 @@ define([], function () {
     }
 
     // ═══════════════════════════════════════════
-    //  DOCX VIEWER
+    //  DOCX VIEWER  (silurus/ooxml WASM + mammoth fallback)
     // ═══════════════════════════════════════════
 
     function viewDocx(container, opts) {
@@ -446,42 +457,95 @@ define([], function () {
         }
         showLoading(container, 'Loading document\u2026');
 
-        var CDN_MAMMOTH = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+        // Track cleanup
+        var docViewer = null;
+        var docCanvas = null;
+        var mammothFallback = false;
 
-        function doConvert() {
-            showLoading(container, 'Processing document\u2026');
-            fetch(url).then(function (r) {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.arrayBuffer();
-            }).then(function (buf) {
-                return mammoth.convertToHtml({ arrayBuffer: buf });
-            }).then(function (result) {
-                container.innerHTML =
-                    '<div class="umat-vw-docx-body">' +
-                        result.value +
-                    '</div>';
-                var msgs = result.messages || [];
-                var warnings = msgs.filter(function (m) { return m.type === 'warning'; });
-                if (warnings.length) {
-                    var wbar = document.createElement('div');
-                    wbar.className = 'umat-vw-docx-warn';
-                    wbar.innerHTML = '<span class="material-symbols-outlined">warning</span> ' +
-                        esc(warnings.length + ' conversion warning(s) — some formatting may differ');
-                    container.querySelector('.umat-vw-docx-body').parentNode.insertBefore(wbar, container.querySelector('.umat-vw-docx-body'));
-                }
-                document.getElementById('umat-vw-meta').textContent = '';
+        typeCleanups['docx'] = function () {
+            if (docViewer && docViewer.destroy) { try { docViewer.destroy(); } catch (e) {} }
+            docViewer = null; docCanvas = null;
+        };
+
+        function trySilurus() {
+            showLoading(container, 'Rendering with WASM engine\u2026');
+            container.style.padding = '0';
+            container.style.overflow = 'hidden';
+
+            loadESModule(SILURUS_CDN).then(function (mod) {
+                // Create a full-size canvas
+                var canvas = document.createElement('canvas');
+                canvas.className = 'umat-vw-docx-canvas';
+                canvas.style.cssText = 'width:100%;height:100%;display:block;';
+                container.innerHTML = '';
+                container.appendChild(canvas);
+                docCanvas = canvas;
+
+                // Fetch the file
+                return fetch(url).then(function (r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.arrayBuffer();
+                }).then(function (buf) {
+                    var viewer = new mod.docx.DocxViewer(canvas, {
+                        wasmUrl: SILURUS_WASM,
+                        mode: 'main',
+                    });
+                    docViewer = viewer;
+                    return viewer.load(buf);
+                }).then(function () {
+                    document.getElementById('umat-vw-meta').textContent = '';
+                });
             }).catch(function (err) {
-                showError(container, 'Could not render this document.', err.message, doConvert);
+                // Silurus failed, fall back to mammoth
+                console.warn('[umat] silurus/ooxml failed, falling back to mammoth:', err.message);
+                tryFallbackMammoth();
             });
         }
 
-        if (window.mammoth) {
-            doConvert();
-        } else {
-            loadScript(CDN_MAMMOTH).then(doConvert).catch(function () {
-                showError(container, 'Failed to load the document viewer library.', 'Check your internet connection or download the file instead.');
-            });
+        function tryFallbackMammoth() {
+            mammothFallback = true;
+            container.style.padding = '';
+            container.style.overflow = '';
+            showLoading(container, 'Processing document\u2026');
+
+            function doConvert() {
+                showLoading(container, 'Processing document\u2026');
+                fetch(url).then(function (r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.arrayBuffer();
+                }).then(function (buf) {
+                    return mammoth.convertToHtml({ arrayBuffer: buf });
+                }).then(function (result) {
+                    container.innerHTML =
+                        '<div class="umat-vw-docx-body">' +
+                            result.value +
+                        '</div>';
+                    var msgs = result.messages || [];
+                    var warnings = msgs.filter(function (m) { return m.type === 'warning'; });
+                    if (warnings.length) {
+                        var wbar = document.createElement('div');
+                        wbar.className = 'umat-vw-docx-warn';
+                        wbar.innerHTML = '<span class="material-symbols-outlined">warning</span> ' +
+                            esc(warnings.length + ' conversion warning(s) \u2014 some formatting may differ');
+                        container.querySelector('.umat-vw-docx-body').parentNode.insertBefore(wbar, container.querySelector('.umat-vw-docx-body'));
+                    }
+                    document.getElementById('umat-vw-meta').textContent = '';
+                }).catch(function (err) {
+                    showError(container, 'Could not render this document.', err.message, doConvert);
+                });
+            }
+
+            if (window.mammoth) {
+                doConvert();
+            } else {
+                loadScript(MAMMOTH_CDN).then(doConvert).catch(function () {
+                    showError(container, 'Failed to load the document viewer library.', 'Check your internet connection or download the file instead.');
+                });
+            }
         }
+
+        // Start with silurus WASM; if it fails, mammoth fallback kicks in
+        trySilurus();
     }
 
     // ═══════════════════════════════════════════
@@ -772,7 +836,7 @@ define([], function () {
     }
 
     // ═══════════════════════════════════════════
-    //  PPTX VIEWER
+    //  PPTX VIEWER  (silurus/ooxml WASM + PHP server-side fallback)
     // ═══════════════════════════════════════════
 
     function viewPptx(container, opts) {
@@ -782,14 +846,58 @@ define([], function () {
             return;
         }
         showLoading(container, 'Loading presentation\u2026');
-        var slides = [];
-        var currentSlide = 1;
-        var fullscreenActive = false;
-        var pptMode = '';
-        var slideW = 960;
-        var slideH = 540;
-        var imgBase = '';
 
+        var pptxViewer = null;
+        var pptxCanvas = null;
+        var useFallback = false;
+        var fallbackState = { slides: [], currentSlide: 1, fullscreenActive: false, pptMode: '', slideW: 960, slideH: 540 };
+
+        typeCleanups['pptx'] = function () {
+            if (pptxViewer && pptxViewer.destroy) { try { pptxViewer.destroy(); } catch (e) {} }
+            pptxViewer = null; pptxCanvas = null;
+            // Clean up fallback keyboard handler if active
+            if (fallbackState._navHandler) {
+                document.removeEventListener('keydown', fallbackState._navHandler);
+                fallbackState._navHandler = null;
+            }
+        };
+
+        function trySilurus() {
+            showLoading(container, 'Rendering with WASM engine\u2026');
+            container.style.padding = '0';
+            container.style.overflow = 'hidden';
+
+            loadESModule(SILURUS_CDN).then(function (mod) {
+                var canvas = document.createElement('canvas');
+                canvas.className = 'umat-vw-pptx-canvas';
+                canvas.style.cssText = 'width:100%;height:100%;display:block;';
+                container.innerHTML = '';
+                container.appendChild(canvas);
+                pptxCanvas = canvas;
+
+                return fetch(url).then(function (r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.arrayBuffer();
+                }).then(function (buf) {
+                    var viewer = new mod.pptx.PptxViewer(canvas, {
+                        wasmUrl: SILURUS_WASM,
+                        mode: 'main',
+                    });
+                    pptxViewer = viewer;
+                    return viewer.load(buf);
+                }).then(function () {
+                    // Get slide count from the viewer
+                    // (silurus doesn't expose slide count directly on viewer, but we can try)
+                    document.getElementById('umat-vw-meta').textContent = opts.size ? formatBytes(opts.size) : '';
+                });
+            }).catch(function (err) {
+                console.warn('[umat] silurus/ooxml PPTX failed, falling back to server-side:', err.message);
+                useFallback = true;
+                fallbackPptxRender();
+            });
+        }
+
+        // ─── Server-side fallback (existing PHP renderer) ───
         function buildApiUrl() {
             var a = document.createElement('a');
             a.href = url;
@@ -799,8 +907,12 @@ define([], function () {
             return a.origin + root + '/local/umat_ai/pptx_render.php?action=slides&url=' + encodeURIComponent(url);
         }
 
-        function fetchSlides() {
+        function fallbackPptxRender() {
+            container.style.padding = '';
+            container.style.overflow = '';
             showLoading(container, 'Rendering slides\u2026');
+            var fs = fallbackState;
+
             fetch(buildApiUrl())
                 .then(function (r) {
                     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -808,275 +920,183 @@ define([], function () {
                 })
                 .then(function (data) {
                     if (data.error) { showError(container, data.error); return; }
-                    slides = data.slides || [];
-                    if (!slides.length) {
-                        showError(container, 'No slides found in this presentation.');
+                    fs.slides = data.slides || [];
+                    if (!fs.slides.length) {
+                        showError(container, 'No slides found.');
                         return;
                     }
-                    pptMode = data.mode || 'images';
-                    if (pptMode === 'html') {
-                        slideW = data.width || 960;
-                        slideH = data.height || 540;
-                        imgBase = data.imgBase || '';
+                    fs.pptMode = data.mode || 'images';
+                    if (fs.pptMode === 'html') {
+                        fs.slideW = data.width || 960;
+                        fs.slideH = data.height || 540;
                     }
                     document.getElementById('umat-vw-meta').textContent = data.total + ' slides' +
                         (opts.size ? ' \u00b7 ' + formatBytes(opts.size) : '');
-                    renderLayout();
+                    renderFallbackLayout(data);
                 })
                 .catch(function (err) {
-                    showError(container, 'Could not load presentation.', err.message, fetchSlides);
+                    showError(container, 'Could not load presentation.', err.message, fallbackPptxRender);
                 });
         }
 
-        var pptNavHandler = null;
+        function renderFallbackLayout(data) {
+            var fs = fallbackState;
+            var slides = fs.slides;
+            var mode = fs.pptMode;
+            var imgBase = data.imgBase || '';
+            var html = mode === 'html' ?
+                '<div class="umat-vw-pptx-sidebar" id="umat-vw-pptx-sidebar"></div>' +
+                '<div class="umat-vw-pptx-main">' +
+                    '<div class="umat-vw-pptx-stage" id="umat-vw-pptx-stage">' +
+                        '<div class="umat-vw-pptx-slide-wrap" id="umat-vw-pptx-slide-wrap"></div>' +
+                        '<button class="umat-vw-pptx-nav umat-vw-pptx-prev" id="umat-vw-pptx-prev"><span class="material-symbols-outlined">chevron_left</span></button>' +
+                        '<button class="umat-vw-pptx-nav umat-vw-pptx-next" id="umat-vw-pptx-next"><span class="material-symbols-outlined">chevron_right</span></button>' +
+                    '</div>' +
+                    '<div class="umat-vw-pptx-footer">' +
+                        '<span id="umat-vw-pptx-counter">1 / ' + slides.length + '</span>' +
+                        '<button class="umat-vw-pptx-fs-btn" id="umat-vw-pptx-fs"><span class="material-symbols-outlined">fullscreen</span> Fullscreen</button>' +
+                    '</div>' +
+                '</div>' :
+                '<div class="umat-vw-pptx-sidebar" id="umat-vw-pptx-sidebar"></div>' +
+                '<div class="umat-vw-pptx-main">' +
+                    '<div class="umat-vw-pptx-stage" id="umat-vw-pptx-stage">' +
+                        '<img id="umat-vw-pptx-img" src="" alt="Slide">' +
+                        '<button class="umat-vw-pptx-nav umat-vw-pptx-prev" id="umat-vw-pptx-prev"><span class="material-symbols-outlined">chevron_left</span></button>' +
+                        '<button class="umat-vw-pptx-nav umat-vw-pptx-next" id="umat-vw-pptx-next"><span class="material-symbols-outlined">chevron_right</span></button>' +
+                    '</div>' +
+                    '<div class="umat-vw-pptx-footer">' +
+                        '<span id="umat-vw-pptx-counter">1 / ' + slides.length + '</span>' +
+                        '<button class="umat-vw-pptx-fs-btn" id="umat-vw-pptx-fs"><span class="material-symbols-outlined">fullscreen</span> Fullscreen</button>' +
+                    '</div>' +
+                '</div>';
 
-        typeCleanups['pptx'] = function () {
-            if (pptNavHandler) document.removeEventListener('keydown', pptNavHandler);
-            pptNavHandler = null;
-            var main = document.getElementById('umat-vw-pptx-main');
-            if (main) main.removeEventListener('click', fsClick);
-        };
+            container.innerHTML = '<div class="umat-vw-pptx">' + html + '</div>';
 
-        function buildSlideHtml(slide) {
-            var bg = slide.bg || '#ffffff';
-            var html = '<div class="umat-vw-pptx-slide" style="width:' + slideW + 'px;height:' + slideH + 'px;background:' + bg + ';position:relative;overflow:hidden;">';
-            (slide.elements || []).forEach(function (el) {
-                var style = 'position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;';
-                if (el.type === 'text') {
-                    style += 'width:' + el.w + 'px;height:' + el.h + 'px;overflow:hidden;word-wrap:break-word;';
-                    html += '<div style="' + style + '">';
-                    (el.lines || []).forEach(function (line) {
-                        html += '<div style="white-space:pre-wrap;">';
-                        line.forEach(function (run) {
-                            var rs = 'font-size:' + run.size + 'px;color:' + run.color + ';font-family:' + esc(run.font || 'Calibri') + ';';
-                            if (run.bold) rs += 'font-weight:bold;';
-                            if (run.italic) rs += 'font-style:italic;';
-                            html += '<span style="' + rs + '">' + esc(run.text || '') + '</span>';
-                        });
-                        html += '</div>';
-                    });
-                    html += '</div>';
-                } else if (el.type === 'image') {
-                    var src = imgBase + el.img + '&ext=' + el.ext;
-                    style += 'width:' + el.w + 'px;height:' + el.h + 'px;';
-                    html += '<img style="' + style + '" src="' + esc(src) + '" alt="">';
-                }
-            });
-            html += '</div>';
-            return html;
-        }
-
-        function buildThumbHtml(slide) {
-            var thumbW = 148;
-            var scale = thumbW / slideW;
-            var th = Math.round(slideH * scale);
-            var bg = slide.bg || '#ffffff';
-            var html = '<div class="umat-vw-pptx-thumb-slide" style="width:' + thumbW + 'px;height:' + th + 'px;background:' + bg + ';position:relative;overflow:hidden;">';
-            (slide.elements || []).forEach(function (el) {
-                var style = 'position:absolute;left:' + Math.round(el.x * scale) + 'px;top:' + Math.round(el.y * scale) + 'px;';
-                if (el.type === 'text') {
-                    style += 'width:' + Math.round(el.w * scale) + 'px;height:' + Math.round(el.h * scale) + 'px;overflow:hidden;word-wrap:break-word;';
-                    html += '<div style="' + style + '">';
-                    (el.lines || []).forEach(function (line) {
-                        html += '<div style="white-space:pre-wrap;font-size:' + Math.round(line[0].size * scale * 0.6) + 'px;color:' + line[0].color + ';">';
-                        line.forEach(function (run) {
-                            html += esc(run.text || '');
-                        });
-                        html += '</div>';
-                    });
-                    html += '</div>';
-                } else if (el.type === 'image') {
-                    var src = imgBase + el.img + '&ext=' + el.ext;
-                    style += 'width:' + Math.round(el.w * scale) + 'px;height:' + Math.round(el.h * scale) + 'px;';
-                    html += '<img style="' + style + '" src="' + esc(src) + '" alt="" loading="lazy">';
-                }
-            });
-            html += '</div>';
-            return html;
-        }
-
-        function renderLayout() {
-            if (pptMode === 'html') {
-                container.innerHTML =
-                    '<div class="umat-vw-pptx">' +
-                        '<div class="umat-vw-pptx-sidebar" id="umat-vw-pptx-sidebar"></div>' +
-                        '<div class="umat-vw-pptx-main">' +
-                            '<div class="umat-vw-pptx-stage" id="umat-vw-pptx-stage">' +
-                                '<div class="umat-vw-pptx-slide-wrap" id="umat-vw-pptx-slide-wrap"></div>' +
-                                '<button class="umat-vw-pptx-nav umat-vw-pptx-prev" id="umat-vw-pptx-prev"><span class="material-symbols-outlined">chevron_left</span></button>' +
-                                '<button class="umat-vw-pptx-nav umat-vw-pptx-next" id="umat-vw-pptx-next"><span class="material-symbols-outlined">chevron_right</span></button>' +
-                            '</div>' +
-                            '<div class="umat-vw-pptx-footer">' +
-                                '<span id="umat-vw-pptx-counter">1 / ' + slides.length + '</span>' +
-                                '<button class="umat-vw-pptx-fs-btn" id="umat-vw-pptx-fs"><span class="material-symbols-outlined">fullscreen</span> Fullscreen</button>' +
-                            '</div>' +
-                        '</div>' +
-                    '</div>';
-            } else {
-                container.innerHTML =
-                    '<div class="umat-vw-pptx">' +
-                        '<div class="umat-vw-pptx-sidebar" id="umat-vw-pptx-sidebar"></div>' +
-                        '<div class="umat-vw-pptx-main">' +
-                            '<div class="umat-vw-pptx-stage" id="umat-vw-pptx-stage">' +
-                                '<img id="umat-vw-pptx-img" src="" alt="Slide">' +
-                                '<button class="umat-vw-pptx-nav umat-vw-pptx-prev" id="umat-vw-pptx-prev"><span class="material-symbols-outlined">chevron_left</span></button>' +
-                                '<button class="umat-vw-pptx-nav umat-vw-pptx-next" id="umat-vw-pptx-next"><span class="material-symbols-outlined">chevron_right</span></button>' +
-                            '</div>' +
-                            '<div class="umat-vw-pptx-footer">' +
-                                '<span id="umat-vw-pptx-counter">1 / ' + slides.length + '</span>' +
-                                '<button class="umat-vw-pptx-fs-btn" id="umat-vw-pptx-fs"><span class="material-symbols-outlined">fullscreen</span> Fullscreen</button>' +
-                            '</div>' +
-                        '</div>' +
-                    '</div>';
+            // Render thumbnails
+            var sb = document.getElementById('umat-vw-pptx-sidebar');
+            if (sb) {
+                sb.innerHTML = slides.map(function (s, i) {
+                    var idx = i + 1;
+                    var thumbSrc = mode === 'html' ? '' : (s.src ? s.src.replace('action=slides', 'action=slide') : '');
+                    var thumbHtml = mode === 'html' ?
+                        '<div class="umat-vw-pptx-thumb-slide" style="width:148px;height:' + Math.round(148 * fs.slideH / fs.slideW) + 'px;background:' + (s.bg || '#fff') + ';position:relative;overflow:hidden;">' +
+                            (s.elements || []).slice(0, 5).map(function (el) {
+                                if (el.type === 'image') {
+                                    return '<img style="position:absolute;left:' + Math.round(el.x * 148 / fs.slideW) + 'px;top:' + Math.round(el.y * 148 / fs.slideW) + 'px;width:' + Math.round(el.w * 148 / fs.slideW) + 'px;height:' + Math.round(el.h * 148 / fs.slideW) + 'px;" src="' + esc(imgBase + el.img + '&ext=' + el.ext) + '" alt="" loading="lazy">';
+                                }
+                                return '';
+                            }).join('') +
+                        '</div>' :
+                        '<img src="' + esc(thumbSrc) + '" alt="Slide ' + idx + '" loading="lazy">';
+                    return '<div class="umat-vw-pptx-thumb" data-slide="' + idx + '">' + thumbHtml + '<span class="umat-vw-pptx-thumb-num">' + idx + '</span></div>';
+                }).join('');
+                sb.addEventListener('click', function (e) {
+                    var thumb = e.target.closest('.umat-vw-pptx-thumb');
+                    if (thumb) goToSlideFallback(parseInt(thumb.dataset.slide), data);
+                });
             }
 
-            renderThumbnails();
-            goToSlide(1);
-
             document.getElementById('umat-vw-pptx-prev').addEventListener('click', function () {
-                if (currentSlide > 1) goToSlide(currentSlide - 1);
+                if (fs.currentSlide > 1) goToSlideFallback(fs.currentSlide - 1, data);
             });
             document.getElementById('umat-vw-pptx-next').addEventListener('click', function () {
-                if (currentSlide < slides.length) goToSlide(currentSlide + 1);
+                if (fs.currentSlide < slides.length) goToSlideFallback(fs.currentSlide + 1, data);
             });
-            document.getElementById('umat-vw-pptx-fs').addEventListener('click', toggleFullscreen);
-
-            pptNavHandler = function (e) {
-                if (!viewerEl || !viewerEl.classList.contains('open') || activeType !== 'pptx') return;
-                if (fullscreenActive && e.key === 'Escape') { exitFullscreen(); return; }
-                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    if (currentSlide < slides.length) goToSlide(currentSlide + 1);
-                }
-                if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    if (currentSlide > 1) goToSlide(currentSlide - 1);
-                }
-            };
-            document.addEventListener('keydown', pptNavHandler);
-
-            var existingKbd = kbdHandler;
-            kbdHandler = function (e) {
-                if (!viewerEl || !viewerEl.classList.contains('open')) return;
-                if (activeType === 'pptx' && fullscreenActive && e.key === 'Escape') {
-                    e.preventDefault();
-                    exitFullscreen();
-                    return;
-                }
-                if (e.key === 'Escape') { closeViewer(); return; }
-                if (existingKbd) existingKbd(e);
-            };
-        }
-
-        function renderThumbnails() {
-            var sb = document.getElementById('umat-vw-pptx-sidebar');
-            sb.innerHTML = slides.map(function (s, i) {
-                var idx = i + 1;
-                var thumbHtml = pptMode === 'html' ? buildThumbHtml(s) : '<img src="' + esc(s.src ? s.src.replace('action=slides', 'action=slide') : '') + '" alt="Slide ' + idx + '" loading="lazy">';
-                return '<div class="umat-vw-pptx-thumb" data-slide="' + idx + '">' +
-                    thumbHtml +
-                    '<span class="umat-vw-pptx-thumb-num">' + idx + '</span>' +
-                '</div>';
-            }).join('');
-            sb.addEventListener('click', function (e) {
-                var thumb = e.target.closest('.umat-vw-pptx-thumb');
-                if (thumb) goToSlide(parseInt(thumb.dataset.slide));
+            document.getElementById('umat-vw-pptx-fs').addEventListener('click', function () {
+                var main = document.getElementById('umat-vw-pptx-main');
+                if (!main) return;
+                var isFs = main.classList.toggle('umat-vw-pptx-fs');
+                document.getElementById('umat-vw-pptx-sidebar').style.display = isFs ? 'none' : '';
+                this.innerHTML = isFs ?
+                    '<span class="material-symbols-outlined">fullscreen_exit</span> Exit' :
+                    '<span class="material-symbols-outlined">fullscreen</span> Fullscreen';
             });
+
+            // Nav handler
+            if (fs._navHandler) document.removeEventListener('keydown', fs._navHandler);
+            fs._navHandler = function (e) {
+                if (!viewerEl || !viewerEl.classList.contains('open') || activeType !== 'pptx' || !useFallback) return;
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); if (fs.currentSlide < slides.length) goToSlideFallback(fs.currentSlide + 1, data); }
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); if (fs.currentSlide > 1) goToSlideFallback(fs.currentSlide - 1, data); }
+            };
+            document.addEventListener('keydown', fs._navHandler);
+
+            goToSlideFallback(1, data);
         }
 
-        function scaleSlide() {
-            var wrap = document.getElementById('umat-vw-pptx-slide-wrap');
-            var slide = document.getElementById('umat-vw-pptx-slide');
-            if (!wrap || !slide) return;
-            var stage = document.getElementById('umat-vw-pptx-stage');
-            var maxW = (stage ? stage.clientWidth : wrap.clientWidth) - 40;
-            var maxH = (stage ? stage.clientHeight : window.innerHeight * 0.7) - 40;
-            var scale = Math.min(maxW / slideW, maxH / slideH, 2);
-            slide.style.transform = 'scale(' + scale + ')';
-            slide.style.transformOrigin = 'top left';
-            wrap.style.width = Math.round(slideW * scale) + 'px';
-            wrap.style.height = Math.round(slideH * scale) + 'px';
-        }
-
-        function goToSlide(idx) {
-            currentSlide = idx;
-            var slide = slides[idx - 1];
+        function goToSlideFallback(idx, data) {
+            var fs = fallbackState;
+            fs.currentSlide = idx;
+            var slide = fs.slides[idx - 1];
             if (!slide) return;
 
-            if (pptMode === 'html') {
+            if (fs.pptMode === 'html') {
                 var wrap = document.getElementById('umat-vw-pptx-slide-wrap');
                 if (wrap) {
-                    wrap.innerHTML = buildSlideHtml(slide);
-                    scaleSlide();
+                    var bg = slide.bg || '#ffffff';
+                    var elems = (slide.elements || []).map(function (el) {
+                        if (el.type === 'text') {
+                            return '<div style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + el.w + 'px;height:' + el.h + 'px;overflow:hidden;word-wrap:break-word;">' +
+                                (el.lines || []).map(function (line) {
+                                    return '<div style="white-space:pre-wrap;">' +
+                                        line.map(function (run) {
+                                            return '<span style="font-size:' + run.size + 'px;color:' + run.color + ';font-family:' + esc(run.font || 'Calibri') + ';' +
+                                                (run.bold ? 'font-weight:bold;' : '') + (run.italic ? 'font-style:italic;' : '') + '">' + esc(run.text || '') + '</span>';
+                                        }).join('') +
+                                    '</div>';
+                                }).join('') +
+                            '</div>';
+                        } else if (el.type === 'image') {
+                            return '<img style="position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + el.w + 'px;height:' + el.h + 'px;" src="' + esc((data.imgBase || '') + el.img + '&ext=' + el.ext) + '" alt="">';
+                        }
+                        return '';
+                    }).join('');
+                    wrap.innerHTML = '<div class="umat-vw-pptx-slide" style="width:' + fs.slideW + 'px;height:' + fs.slideH + 'px;background:' + bg + ';position:relative;overflow:hidden;">' + elems + '</div>';
+                    // Scale
+                    var stage = document.getElementById('umat-vw-pptx-stage');
+                    var maxW = (stage ? stage.clientWidth : wrap.clientWidth) - 40;
+                    var maxH = (stage ? stage.clientHeight : window.innerHeight * 0.7) - 40;
+                    var scale = Math.min(maxW / fs.slideW, maxH / fs.slideH, 2);
+                    var slideEl = wrap.querySelector('.umat-vw-pptx-slide');
+                    if (slideEl) {
+                        slideEl.style.transform = 'scale(' + scale + ')';
+                        slideEl.style.transformOrigin = 'top left';
+                    }
+                    wrap.style.width = Math.round(fs.slideW * scale) + 'px';
+                    wrap.style.height = Math.round(fs.slideH * scale) + 'px';
                 }
             } else {
                 var img = document.getElementById('umat-vw-pptx-img');
                 if (img) {
-                    var src = slide.src ? slide.src.replace('action=slides', 'action=slide') : '';
-                    img.src = src;
+                    img.src = slide.src ? slide.src.replace('action=slides', 'action=slide') : '';
                 }
             }
 
             var counter = document.getElementById('umat-vw-pptx-counter');
-            if (counter) counter.textContent = idx + ' / ' + slides.length;
+            if (counter) counter.textContent = idx + ' / ' + fs.slides.length;
 
-            container.querySelectorAll('.umat-vw-pptx-thumb').forEach(function (t) {
+            (container.querySelectorAll('.umat-vw-pptx-thumb') || []).forEach(function (t) {
                 t.classList.toggle('active', parseInt(t.dataset.slide) === idx);
-                if (parseInt(t.dataset.slide) === idx) {
-                    t.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                }
+                if (parseInt(t.dataset.slide) === idx) t.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
             });
 
             var prev = document.getElementById('umat-vw-pptx-prev');
             var next = document.getElementById('umat-vw-pptx-next');
             if (prev) prev.style.display = idx > 1 ? '' : 'none';
-            if (next) next.style.display = idx < slides.length ? '' : 'none';
+            if (next) next.style.display = idx < fs.slides.length ? '' : 'none';
         }
 
-        function toggleFullscreen() {
-            if (fullscreenActive) { exitFullscreen(); return; }
-            enterFullscreen();
-        }
-
-        function enterFullscreen() {
-            fullscreenActive = true;
-            var main = document.getElementById('umat-vw-pptx-main');
-            if (!main) return;
-            main.classList.add('umat-vw-pptx-fs');
-            document.getElementById('umat-vw-pptx-fs').innerHTML = '<span class="material-symbols-outlined">fullscreen_exit</span> Exit';
-            document.getElementById('umat-vw-pptx-sidebar').style.display = 'none';
-            main.addEventListener('click', fsClick);
-            if (pptMode === 'html') setTimeout(scaleSlide, 50);
-        }
-
-        function exitFullscreen() {
-            fullscreenActive = false;
-            var main = document.getElementById('umat-vw-pptx-main');
-            if (!main) return;
-            main.classList.remove('umat-vw-pptx-fs');
-            document.getElementById('umat-vw-pptx-fs').innerHTML = '<span class="material-symbols-outlined">fullscreen</span> Fullscreen';
-            document.getElementById('umat-vw-pptx-sidebar').style.display = '';
-            main.removeEventListener('click', fsClick);
-            if (pptMode === 'html') setTimeout(scaleSlide, 50);
-        }
-
-        function fsClick(e) {
-            var rect = this.getBoundingClientRect();
-            var x = e.clientX - rect.left;
-            if (x < rect.width / 2) {
-                if (currentSlide > 1) goToSlide(currentSlide - 1);
-            } else {
-                if (currentSlide < slides.length) goToSlide(currentSlide + 1);
-            }
-        }
-
-        fetchSlides();
+        // Start with silurus WASM; fall back to PHP if it fails
+        trySilurus();
     }
 
     // ═══════════════════════════════════════════
     //  CODE / TEXT VIEWER (Prism.js)
     // ═══════════════════════════════════════════
 
+    var SILURUS_CDN = 'https://cdn.jsdelivr.net/npm/@silurus/ooxml@0.74.2/+esm';
+    var SILURUS_WASM = 'https://cdn.jsdelivr.net/npm/@silurus/ooxml@0.74.2/dist/'; // WASM files are in dist/
+    var MAMMOTH_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
     var PRISM_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0';
     var EXT_LANG = {
         php: 'php', py: 'python', js: 'javascript', ts: 'typescript',
