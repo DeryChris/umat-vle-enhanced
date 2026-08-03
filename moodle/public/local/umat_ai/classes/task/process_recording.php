@@ -83,10 +83,10 @@ class process_recording extends \core\task\scheduled_task {
 
             // Store the URL (BBB playback or local) and submit to AI service.
             $DB->update_record('umat_ai_sessions', (object)[
-                'id'           => $session->id,
-                'recording_url' => $storeurl,
-                'status'        => 'pending',
-                'timemodified'  => time(),
+                'id'             => $session->id,
+                'recording_url'  => $storeurl,
+                'status'         => 'transcribing',
+                'timemodified'   => time(),
             ]);
             mtrace("Recording URL obtained for session: {$session->sessionid}");
 
@@ -95,13 +95,12 @@ class process_recording extends \core\task\scheduled_task {
             $this->submit_to_ai_service($session, $aiserviceurl, $token);
         } else {
             // Recording not available yet — increment retry count or mark failed.
-            $retries = (int)($session->timemodified > 0 ? $session->timemodified : $session->timecreated);
-            $elapsed  = time() - $retries;
+            $elapsed = time() - $session->timecreated;
 
             if ($elapsed >= self::RECORDING_WAIT_INTERVAL * self::MAX_RETRIES) {
                 $DB->update_record('umat_ai_sessions', (object)[
                     'id'           => $session->id,
-                    'status'       => 'error',
+                    'status'       => 'failed',
                     'timemodified' => time(),
                 ]);
                 mtrace("Recording unavailable after max retries: {$session->sessionid}");
@@ -153,17 +152,17 @@ class process_recording extends \core\task\scheduled_task {
 
         if (!empty($result['job_id'])) {
             $DB->update_record('umat_ai_sessions', (object)[
-                'id'           => $session->id,
-                'status'       => 'processing',
-                'timemodified' => time(),
+                'id'             => $session->id,
+                'status'         => 'transcribing',
+                'timemodified'   => time(),
             ]);
             mtrace("Job submitted: " . $result['job_id']);
         } else {
             mtrace("ERROR: Failed to submit session " . $session->sessionid);
             $DB->update_record('umat_ai_sessions', (object)[
-                'id'           => $session->id,
-                'status'       => 'error',
-                'timemodified'  => time(),
+                'id'             => $session->id,
+                'status'         => 'failed',
+                'timemodified'   => time(),
             ]);
         }
     }

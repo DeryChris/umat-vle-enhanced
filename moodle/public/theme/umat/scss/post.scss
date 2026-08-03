@@ -63,3 +63,164 @@
 @import 'foundation';
 @import 'navigation';
 @import 'ai-components';
+
+// ============================================================
+// Mobile Responsive Utilities
+// ============================================================
+
+// Touch-friendly minimum tap targets
+.umat-touch-target {
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+.umat-touch-row {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+}
+
+// Mobile-optimized text sizes (minimum readable)
+.umat-text-sm {
+    font-size: 13px;
+    @media (max-width: 480px) {
+        font-size: 12px;
+    }
+}
+
+.umat-text-md {
+    font-size: 14px;
+}
+
+.umat-text-label {
+    font-size: 12px;
+    color: var(--u-ol);
+    @media (max-width: 480px) {
+        font-size: 11px;
+    }
+}
+
+.umat-text-meta {
+    font-size: 11px;
+    @media (max-width: 480px) {
+        font-size: 11px;
+    }
+}
+
+// Form element mobile sizing
+.umat-mobile-form {
+    select, input, textarea, button {
+        font-size: 16px !important; // Prevents iOS zoom on focus
+    }
+}
+
+// Report form
+.umat-rpt-form {
+    margin-bottom: 8px;
+
+    select, input, textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--u-olv);
+        border-radius: var(--u-r8);
+        font-size: 14px;
+        background: var(--u-bg);
+        color: var(--u-ons);
+        font-family: inherit;
+        box-sizing: border-box;
+        // Prevent iOS zoom
+        @media (max-width: 480px) {
+            font-size: 16px;
+        }
+    }
+
+    textarea {
+        resize: vertical;
+    }
+}
+
+.umat-rpt-msg {
+    margin-top: 4px;
+    font-size: 13px;
+}
+
+// Quiz answer section
+.umat-quiz-answer {
+    font-size: 14px;
+    color: var(--u-onsv);
+    margin-top: 4px;
+}
+
+.umat-quiz-feedback {
+    font-size: 13px;
+    color: var(--u-onsv);
+    margin-top: 4px;
+    padding: 10px 12px;
+    background: var(--u-sflo);
+    border-radius: 6px;
+}
+
+// Session timestamp
+.umat-session-ts {
+    font-size: 12px;
+    color: var(--u-ol);
+    @media (max-width: 480px) {
+        font-size: 11px;
+    }
+}
+
+// Status badges
+.umat-status-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+// Material extension label
+.umat-ext-label {
+    font-size: 10px;
+    background: var(--u-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--u-ol);
+    font-weight: 600;
+    @media (max-width: 480px) {
+        font-size: 9px;
+    }
+}
+
+// Clickable pane row (touch-friendly)
+.lcp-pane-clickable {
+    cursor: pointer;
+    min-height: 44px;
+    touch-action: manipulation;
+}
+
+// Course alert chips row
+.umat-course-alert-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    .umat-chip {
+        min-height: 44px;
+        padding: 10px 16px;
+        font-size: 14px;
+        touch-action: manipulation;
+    }
+}
+
+// Heatmap cell labels
+.umat-heatmap-label {
+    font-size: 10px;
+    color: var(--u-ol);
+    text-align: center;
+    padding-bottom: 4px;
+    @media (max-width: 480px) {
+        font-size: 9px;
+    }
+}

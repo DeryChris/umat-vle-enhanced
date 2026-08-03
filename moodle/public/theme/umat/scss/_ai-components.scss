@@ -5,8 +5,8 @@
 // ---- AI FAB (Floating Action Button) ----
 .umat-fab {
     position: fixed;
-    bottom: 80px;       // above bottomnav
-    right: 24px;
+    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    right: max(24px, env(safe-area-inset-right, 0px));
     z-index: 50;
     width: 56px;
     height: 56px;
@@ -67,7 +67,7 @@
     .umat-ai-panel {
         position: relative;
         width: min(400px, 95vw);
-        max-height: 75vh;
+        max-height: calc(75vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
         background-color: $surface-container-lowest;
         border-radius: $rounded-xl;
         box-shadow: $shadow-3;
@@ -75,6 +75,15 @@
         flex-direction: column;
         overflow: hidden;
         margin: $space-16;
+        margin-bottom: calc(#{$space-16} + env(safe-area-inset-bottom, 0px));
+        @media (max-width: 480px) {
+            margin: 0;
+            margin-bottom: calc(0px + env(safe-area-inset-bottom, 0px));
+            border-radius: $rounded-xl $rounded-xl 0 0;
+            max-height: calc(85vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+            max-width: 100vw;
+            width: 100vw;
+        }
     }
 
     // Panel header with gradient

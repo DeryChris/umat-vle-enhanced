@@ -89,28 +89,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_FILES['material'])) {
                 'X-Request-Id: ' . local_umat_ai_request_id(),
             ]);
 
-            $payload = [
-                'course_id'    => (string)$courseid,
-                'material_id'  => (string)$stored->get_id(),
-                'filename'     => $filename,
-                'file'         => new \CURLFile($tempPath, mime_content_type($tempPath), $filename),
-            ];
-
-            $response = $client->post($config['url'] . '/api/v1/materials/index', $payload);
-            $result = json_decode($response, true);
-
-            error_log("Material indexing response: " . $response);
-
-            if (!empty($result['success'])) {
-                $record->is_indexed = 1;
-                $DB->update_record('umat_ai_materials', $record);
-                $message = "File uploaded and indexed successfully! " . ($result['message'] ?? '');
+            // Server-side extension validation before sending to AI service.
+            $allowed = ['.pdf','.txt','.md','.markdown','.doc','.docx','.ppt','.pptx',
+                        '.xlsx','.csv','.py','.js','.ts','.jsx','.tsx','.php','.rb',
+                        '.go','.rs','.java','.kt','.swift','.c','.cpp','.h','.hpp',
+                        '.cs','.sql','.sh','.bash','.ps1','.bat','.pl','.lua','.r',
+                        '.html','.htm','.css','.scss','.less','.json','.xml',
+                        '.yaml','.yml','.toml','.ini','.cfg',
+                        '.mp3','.wav','.ogg','.flac','.m4a',
+                        '.mp4','.webm','.mov','.avi','.mkv'];
+            $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+            if ($ext !== '' && !in_array('.' . $ext, $allowed)) {
+                $message = "File type .{$ext} is not supported for AI indexing. Supported: " . implode(', ', $allowed);
+                unlink($tempPath);
             } else {
-                $message = "File uploaded but indexing failed. Debug: " . substr($response, 0, 200);
-            }
+                $payload = [
+                    'course_id'    => (string)$courseid,
+                    'material_id'  => (string)$stored->get_id(),
+                    'filename'     => $filename,
+                    'file'         => new \CURLFile($tempPath, mime_content_type($tempPath), $filename),
+                ];
 
-            // Clean up temp file
-            unlink($tempPath);
+                $response = $client->post($config['url'] . '/api/v1/materials/index', $payload);
+                $result = json_decode($response, true);
+
+                error_log("Material indexing response: " . $response);
+
+                if (!empty($result['success'])) {
+                    $record->is_indexed = 1;
+                    $DB->update_record('umat_ai_materials', $record);
+                    $message = "File uploaded and indexed successfully! " . ($result['message'] ?? '');
+                } else {
+                    $message = "File uploaded but indexing failed. Debug: " . substr($response, 0, 200);
+                }
+
+                unlink($tempPath);
+            }
         }
     } else {
         $error = "Upload error: " . $file['error'];
@@ -137,8 +151,8 @@ echo $OUTPUT->header();
 
 <form method="post" enctype="multipart/form-data" class="mb-4">
     <div class="mb-3">
-        <label for="material" class="form-label">Select File (PDF, DOCX, PPTX, TXT, MP4, AVI, etc.)</label>
-        <input type="file" name="material" id="material" class="form-control" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.mp4,.avi,.mov,.mkv,.webm,.png,.jpg,.jpeg,.gif,.bmp" required>
+        <label for="material" class="form-label">Select File (PDF, DOCX, PPTX, TXT, CSV, XLSX, MP4, HTML, etc.)</label>
+        <input type="file" name="material" id="material" class="form-control" accept=".pdf,.txt,.md,.doc,.docx,.ppt,.pptx,.xlsx,.csv,.mp3,.wav,.mp4,.webm,.mov,.avi,.mkv,.html,.htm,.css,.json,.xml,.yaml" required>
     </div>
     <button type="submit" class="btn btn-primary">Upload and Index</button>
 </form>

@@ -90,6 +90,7 @@ JS;
         $approveUrl = $wwwroot . '/local/umat_ai/approve.php?courseid=' . $courseid;
         $streamUrl = json_encode('/local/umat_ai/chat_stream.php');
         $moodleSesskey = json_encode(sesskey());
+        $jsUD        = $userData;
 
         $tabs = [
             ['id' => 'home',      'icon' => 'home',          'label' => 'Home',      'active' => true],
@@ -224,38 +225,38 @@ JS;
     <!-- COMPACT STUDENT LIBRARY PANE -->
     <div class="umat-cp-pane" id="cp-library" style="overflow-y:auto;">
       <div class="lcp-pane-hdr">
-        <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">play_circle</span>
+        <span class="material-symbols-outlined umat-fs-16 umat-c-p">play_circle</span>
         <strong style="font-size:12px;">Lectures & Materials</strong>
         <button class="lcp-pane-expand" id="cp-lib-open-btn" type="button" title="Open full library"><span class="material-symbols-outlined">open_in_full</span></button>
       </div>
-      <div id="cp-lib-body" class="lcp-pane-list" style="padding:8px 14px;"><div class="lcp-pane-loading">Loading…</div></div>
+      <div id="cp-lib-body" class="lcp-pane-list umat-p-8-14"><div class="lcp-pane-loading">Loading…</div></div>
     </div>
     <!-- COMPACT STUDENT COURSES PANE -->
     <div class="umat-cp-pane" id="cp-courses" style="overflow-y:auto;">
       <div class="lcp-pane-hdr">
-        <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">menu_book</span>
+        <span class="material-symbols-outlined" umat-fs-16 umat-c-p>menu_book</span>
         <strong style="font-size:12px;">My Courses</strong>
         <button class="lcp-pane-expand" id="cp-courses-open-btn" type="button" title="Open full courses"><span class="material-symbols-outlined">open_in_full</span></button>
       </div>
-      <div id="cp-courses-list" class="lcp-pane-list" style="padding:8px 14px;"><div class="lcp-pane-loading">Loading…</div></div>
+      <div id="cp-courses-list" class="lcp-pane-list umat-p-8-14"><div class="lcp-pane-loading">Loading…</div></div>
     </div>
     <!-- COMPACT STUDENT SESSIONS PANE -->
     <div class="umat-cp-pane" id="cp-sessions" style="overflow-y:auto;">
       <div class="lcp-pane-hdr">
-        <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">chat_bubble</span>
+        <span class="material-symbols-outlined" umat-fs-16 umat-c-p>chat_bubble</span>
         <strong style="font-size:12px;">Sessions</strong>
         <button class="lcp-pane-expand" id="cp-sess-open-btn" type="button" title="Open full sessions"><span class="material-symbols-outlined">open_in_full</span></button>
       </div>
-      <div id="cp-sess-body" class="lcp-pane-list" style="padding:8px 14px;"><div class="lcp-pane-loading">Loading…</div></div>
+      <div id="cp-sess-body" class="lcp-pane-list umat-p-8-14"><div class="lcp-pane-loading">Loading…</div></div>
     </div>
     <!-- COMPACT STUDENT REPORT PANE -->
     <div class="umat-cp-pane" id="cp-report" style="overflow-y:auto;">
       <div class="lcp-pane-hdr">
-        <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">flag</span>
+        <span class="material-symbols-outlined" umat-fs-16 umat-c-p>flag</span>
         <strong style="font-size:12px;">Report Issue</strong>
         <button class="lcp-pane-expand" id="cp-report-open-btn" type="button" title="Open full report"><span class="material-symbols-outlined">open_in_full</span></button>
       </div>
-      <div id="cp-report-body" style="padding:8px 14px;"><div class="lcp-pane-loading">Loading…</div></div>
+      <div id="cp-report-body" class="umat-p-8-14"><div class="lcp-pane-loading">Loading…</div></div>
     </div>
     <div class="umat-cp-pane" id="cp-feature">
       <div class="umat-cp-feature-head"><span class="material-symbols-outlined" id="cp-feature-icon">home</span><div><strong id="cp-feature-title">Home</strong><small id="cp-feature-sub">Quick view</small></div></div>
@@ -428,7 +429,7 @@ JS;
     <!-- LIBRARY TAB — Lecture Recordings + Course Materials -->
     <div class="umat-tab-pane" data-tab="library" style="position:relative;overflow-y:auto;">
       <div class="umat-content-hdr">
-        <h2>Course Library</h2>
+        <h2>Resource Materials</h2>
         <input class="umat-lib-search" id="ws-lib-search" type="text" placeholder="Search recordings & materials…" />
       </div>
       <!-- Lecture Recordings section -->
@@ -441,11 +442,11 @@ JS;
           <div class="umat-empty"><span class="material-symbols-outlined">play_circle</span><p>Loading lecture recordings…</p></div>
         </div>
       </div>
-      <!-- Course Materials section -->
+      <!-- Lecture Materials section -->
       <div class="umat-lib-section">
         <div class="umat-lib-section-hdr">
           <span class="material-symbols-outlined" style="font-size:18px;color:var(--u-p);">local_library</span>
-          <h3>Course Materials</h3>
+          <h3>Lecture Materials</h3>
         </div>
         <div class="umat-lib-grid" id="ws-lib-grid">
           <div class="umat-empty"><span class="material-symbols-outlined">local_library</span><p>Loading course materials…</p></div>
@@ -528,7 +529,9 @@ JS;
 
 {$sharedJs}
 
-<script>/* Student overlay JS moved to amd/src/umat_student.js */</script>
+<script>
+(function(){var f=document.getElementById('umat-stu-fab');if(!f)return;var L=false;var o=document.getElementById('stu-cp-ov');f.addEventListener('click',function(){if(o&&window.innerWidth>=640)o.classList.add('open');if(L)return;L=true;require(['local_umat_ai/umat_student'],function(m){m.init({courseId:{$jsCid},courseName:{$jsName},userData:{$jsUD},streamUrl:{$streamUrl},moodleSesskey:{$moodleSesskey}});});});})();
+</script>
 HTML;
     }
 
@@ -556,7 +559,7 @@ HTML;
           <!-- Toolbar -->
           <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--u-olv);flex-wrap:wrap;">
             <span style="font-size:12px;font-weight:600;color:var(--u-ons);margin-right:4px;">Private Resources</span>
-            <button type="button" class="rb-action-btn" id="rb-upload-btn" title="Upload files" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--u-p);border-radius:var(--u-rp);font-size:11px;font-weight:600;color:var(--u-p);background:var(--u-sflo);cursor:pointer;font-family:inherit;">
+            <button type="button" class="rb-action-btn umat-btn-xs-p" id="rb-upload-btn" title="Upload files">
               <span class="material-symbols-outlined" style="font-size:14px;">upload</span>Upload
             </button>
             <button type="button" class="rb-action-btn" id="rb-new-folder-btn" title="Create folder" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:11px;font-weight:500;color:var(--u-ons);background:var(--u-sflo);cursor:pointer;font-family:inherit;">
@@ -591,7 +594,7 @@ HTML;
             <div class="umat-cs-search"><input type="text" id="rb-push-search" placeholder="Filter courses…"></div>
             <div class="umat-cs-list" id="rb-push-list"></div>
             <div style="padding:12px 16px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--u-olv);">
-              <button type="button" id="rb-push-cancel" style="padding:6px 14px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;background:var(--u-sflo);color:var(--u-ons);cursor:pointer;font-family:inherit;">Cancel</button>
+              <button type="button" id="rb-push-cancel" class="umat-btn-sm">Cancel</button>
               <button type="button" id="rb-push-confirm" disabled style="padding:6px 14px;border:none;border-radius:var(--u-r8);font-size:12px;font-weight:600;background:var(--u-p);color:#fff;cursor:pointer;font-family:inherit;opacity:.5;">Push Selected</button>
             </div>
           </div>
@@ -620,7 +623,7 @@ HTML;
               </div>
               <div id="rb-upload-result" style="display:none;margin-top:12px;padding:10px;border-radius:var(--u-r8);font-size:12px;"></div>
               <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
-                <button type="button" id="rb-upload-cancel" style="padding:6px 14px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;background:var(--u-sflo);color:var(--u-ons);cursor:pointer;font-family:inherit;">Cancel</button>
+                <button type="button" id="rb-upload-cancel" class="umat-btn-sm">Cancel</button>
               </div>
             </div>
           </div>
@@ -636,8 +639,8 @@ HTML;
               <label style="font-size:11px;font-weight:600;color:var(--u-ol);display:block;margin-bottom:4px;">Folder Name</label>
               <input type="text" id="rb-folder-name" placeholder="Enter folder name…" style="width:100%;padding:8px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r6);font-size:13px;background:var(--u-bg);color:var(--u-ons);outline:none;font-family:inherit;box-sizing:border-box;">
               <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
-                <button type="button" id="rb-folder-cancel" style="padding:6px 14px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;background:var(--u-sflo);color:var(--u-ons);cursor:pointer;font-family:inherit;">Cancel</button>
-                <button type="button" id="rb-folder-submit" style="padding:6px 14px;border:none;border-radius:var(--u-r8);font-size:12px;font-weight:600;background:var(--u-p);color:#fff;cursor:pointer;font-family:inherit;">Create</button>
+                <button type="button" id="rb-folder-cancel" class="umat-btn-sm">Cancel</button>
+                <button type="button" id="rb-folder-submit" class="umat-btn-p">Create</button>
               </div>
             </div>
           </div>
@@ -653,8 +656,8 @@ HTML;
               <label style="font-size:11px;font-weight:600;color:var(--u-ol);display:block;margin-bottom:4px;">New Name</label>
               <input type="text" id="rb-rename-name" placeholder="Enter new name…" style="width:100%;padding:8px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r6);font-size:13px;background:var(--u-bg);color:var(--u-ons);outline:none;font-family:inherit;box-sizing:border-box;">
               <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
-                <button type="button" id="rb-rename-cancel" style="padding:6px 14px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;background:var(--u-sflo);color:var(--u-ons);cursor:pointer;font-family:inherit;">Cancel</button>
-                <button type="button" id="rb-rename-submit" style="padding:6px 14px;border:none;border-radius:var(--u-r8);font-size:12px;font-weight:600;background:var(--u-p);color:#fff;cursor:pointer;font-family:inherit;">Rename</button>
+                <button type="button" id="rb-rename-cancel" class="umat-btn-sm">Cancel</button>
+                <button type="button" id="rb-rename-submit" class="umat-btn-p">Rename</button>
               </div>
             </div>
           </div>
@@ -723,21 +726,21 @@ HTML;
     </div>
     <div class="umat-cp-pane active" id="lcp-insights" style="overflow-y:auto;">
       <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:9px;" id="lcp-kpi-grid">
-        <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:12px;">
-          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(0,107,47,.1);color:var(--u-p);display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">group</span></div>
-          <div style="font-size:10px;color:var(--u-ol);">Active Students</div>
-          <div style="font-size:18px;font-weight:800;" id="lcp-k-active">—</div>
+        <div class="umat-card-sflo">
+          <div class="umat-kpi-icon umat-kpi-icon-p"><span class="material-symbols-outlined" umat-fs-15>group</span></div>
+          <div class="umat-fs-10 umat-c-ol">Active Students</div>
+          <div class="umat-fs-18 umat-fw-8" id="lcp-k-active">—</div>
           <span style="font-size:9px;background:#dcfce7;color:#065f46;padding:2px 6px;border-radius:999px;font-weight:700;" id="lcp-k-active-b">Loading</span>
         </div>
-        <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:12px;">
-          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(245,158,11,.1);color:#d97706;display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">forum</span></div>
-          <div style="font-size:10px;color:var(--u-ol);">AI Interactions</div>
-          <div style="font-size:18px;font-weight:800;" id="lcp-k-int">—</div>
+        <div class="umat-card-sflo">
+          <div class="umat-kpi-icon umat-kpi-icon-o"><span class="material-symbols-outlined" umat-fs-15>forum</span></div>
+          <div class="umat-fs-10 umat-c-ol">AI Interactions</div>
+          <div class="umat-fs-18 umat-fw-8" id="lcp-k-int">—</div>
           <span style="font-size:9px;background:var(--u-secc);color:var(--u-sec);padding:2px 6px;border-radius:999px;font-weight:700;">30 days</span>
         </div>
-        <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:12px;">
-          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(165,48,77,.1);color:var(--u-ter);display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">psychology_alt</span></div>
-          <div style="font-size:10px;color:var(--u-ol);">Struggle Index</div>
+        <div class="umat-card-sflo">
+          <div class="umat-kpi-icon umat-kpi-icon-r"><span class="material-symbols-outlined" umat-fs-15>psychology_alt</span></div>
+          <div class="umat-fs-10 umat-c-ol">Struggle Index</div>
           <div style="font-size:14px;font-weight:800;" id="lcp-k-str">—</div>
           <span style="font-size:9px;background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:999px;font-weight:700;">High</span>
         </div>
@@ -756,7 +759,7 @@ HTML;
       </div>
     </div>
     <div class="umat-cp-pane" id="lcp-questions" style="overflow-y:auto;">
-      <div style="padding:12px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--u-ol);">Top Student Questions</div>
+      <div class="umat-p-12-14 umat-fs-11 umat-fw-7 umat-ttu umat-c-ol">Top Student Questions</div>
       <div id="lcp-q-list" style="padding:0 14px 14px;display:flex;flex-direction:column;gap:6px;">
         <div style="text-align:center;padding:20px;color:var(--u-ol);font-size:13px;">Loading…</div>
       </div>
@@ -810,7 +813,7 @@ HTML;
     <!-- COMPACT INSIGHTS DASHBOARD PANE -->
     <div class="umat-cp-pane" id="lcp-insights-dash" style="overflow-y:auto;">
       <div class="lcp-pane-hdr">
-        <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">psychology</span>
+        <span class="material-symbols-outlined" umat-fs-16 umat-c-p>psychology</span>
         <strong style="font-size:12px;">Struggle Overview</strong>
         <button class="lcp-pane-expand" id="lcp-dash-open-btn" type="button" title="Open full dashboard"><span class="material-symbols-outlined">open_in_full</span></button>
       </div>
@@ -836,7 +839,7 @@ HTML;
     <!-- COMPACT QUIZ GENERATOR PANE -->
     <div class="umat-cp-pane" id="lcp-quizgen" style="overflow-y:auto;">
       <div class="lcp-pane-hdr">
-        <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">quiz</span>
+        <span class="material-symbols-outlined" umat-fs-16 umat-c-p>quiz</span>
         <strong style="font-size:12px;">Quiz Generator</strong>
         <button class="lcp-pane-expand" id="lcp-qgen-open-btn" type="button" title="Open full generator"><span class="material-symbols-outlined">open_in_full</span></button>
       </div>
@@ -861,37 +864,37 @@ HTML;
     <!-- COMPACT COURSES PANE -->
     <div class="umat-cp-pane" id="lcp-courses" style="overflow-y:auto;">
       <div class="lcp-pane-hdr">
-        <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">menu_book</span>
+        <span class="material-symbols-outlined" umat-fs-16 umat-c-p>menu_book</span>
         <strong style="font-size:12px;">My Courses</strong>
       </div>
-      <div id="lcp-courses-list" class="lcp-pane-list" style="padding:8px 14px;"><div class="lcp-pane-loading">Loading…</div></div>
+      <div id="lcp-courses-list" class="lcp-pane-list" umat-p-8-14><div class="lcp-pane-loading">Loading…</div></div>
     </div>
     <!-- COMPACT RESOURCE MATERIALS PANE -->
     <div class="umat-cp-pane" id="lcp-library" style="overflow-y:auto;">
       <div class="lcp-pane-hdr">
-        <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">local_library</span>
+        <span class="material-symbols-outlined" umat-fs-16 umat-c-p>local_library</span>
         <strong style="font-size:12px;">Resource Materials</strong>
         <button class="lcp-pane-expand" id="lcp-lib-open-btn" type="button" title="Open full library"><span class="material-symbols-outlined">open_in_full</span></button>
       </div>
-      <div id="lcp-lib-body" class="lcp-pane-list" style="padding:8px 14px;"><div class="lcp-pane-loading">Loading…</div></div>
+      <div id="lcp-lib-body" class="lcp-pane-list" umat-p-8-14><div class="lcp-pane-loading">Loading…</div></div>
     </div>
     <!-- COMPACT SESSIONS PANE -->
     <div class="umat-cp-pane" id="lcp-sessions" style="overflow-y:auto;">
       <div class="lcp-pane-hdr">
-        <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">history</span>
+        <span class="material-symbols-outlined" umat-fs-16 umat-c-p>history</span>
         <strong style="font-size:12px;">Sessions</strong>
         <button class="lcp-pane-expand" id="lcp-sess-open-btn" type="button" title="Open full sessions"><span class="material-symbols-outlined">open_in_full</span></button>
       </div>
-      <div id="lcp-sess-body" class="lcp-pane-list" style="padding:8px 14px;"><div class="lcp-pane-loading">Loading…</div></div>
+      <div id="lcp-sess-body" class="lcp-pane-list" umat-p-8-14><div class="lcp-pane-loading">Loading…</div></div>
     </div>
     <!-- COMPACT ISSUES PANE -->
     <div class="umat-cp-pane" id="lcp-issues" style="overflow-y:auto;">
       <div class="lcp-pane-hdr">
-        <span class="material-symbols-outlined" style="font-size:16px;color:var(--u-p);">forum</span>
+        <span class="material-symbols-outlined" umat-fs-16 umat-c-p>forum</span>
         <strong style="font-size:12px;">Student Issues</strong>
         <button class="lcp-pane-expand" id="lcp-iss-open-btn" type="button" title="Open full issues"><span class="material-symbols-outlined">open_in_full</span></button>
       </div>
-      <div id="lcp-iss-body" class="lcp-pane-list" style="padding:8px 14px;"><div class="lcp-pane-loading">Loading…</div></div>
+      <div id="lcp-iss-body" class="lcp-pane-list" umat-p-8-14><div class="lcp-pane-loading">Loading…</div></div>
     </div>
     <div class="umat-cp-pane" id="lcp-feature">
       <div class="umat-cp-feature-head"><span class="material-symbols-outlined" id="lcp-feature-icon">bar_chart</span><div><strong id="lcp-feature-title">Analytics</strong><small id="lcp-feature-sub">Quick view</small></div></div>
@@ -967,7 +970,7 @@ HTML;
             <!-- INSIGHTS DASHBOARD (unified analytics + struggle) -->
       <div class="umat-tab-pane" id="lec-insights" style="overflow-y:auto;position:relative;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">psychology</span> Struggle Dashboard <span id="ins-course-label"></span></h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>psychology</span> Struggle Dashboard <span id="ins-course-label"></span></h2>
           <div style="display:flex;gap:6px;align-items:center;">
             <button class="umat-content-hdr-btn" id="ins-cs-btn" type="button" title="Select course"><span class="material-symbols-outlined">menu_book</span><span id="ins-cs-label">All Courses</span></button>
             <span class="umat-pill pill-info" id="ins-mode-badge">v2.0</span>
@@ -991,7 +994,7 @@ HTML;
 <!-- QUIZ GENERATOR -->
       <div class="umat-tab-pane" id="lec-quizgen" style="overflow-y:auto;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">quiz</span> Quiz Generator <span id="qgen-course-label"></span></h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>quiz</span> Quiz Generator <span id="qgen-course-label"></span></h2>
           <div style="display:flex;gap:8px;align-items:center;">
             <button class="umat-content-hdr-btn" id="qgen-cs-btn" type="button" title="Select course"><span class="material-symbols-outlined">menu_book</span><span id="qgen-cs-label">All Courses</span></button>
           </div>
@@ -1014,7 +1017,7 @@ HTML;
       <!-- MY COURSES (LECTURER) -->
       <div class="umat-tab-pane" id="lec-courses">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">menu_book</span> My Courses</h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>menu_book</span> My Courses</h2>
           <input type="text" id="lec-courses-search" placeholder="Filter courses…" style="padding:6px 12px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:12px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sfl);width:min(160px,40vw);">
         </div>
         <div class="umat-courses-grid" id="lec-courses-grid">
@@ -1037,26 +1040,36 @@ HTML;
         </div>
         <!-- Course Materials view (default) — fills remaining height -->
         <div id="lec-lib-course-view" style="display:flex;flex-direction:column;flex:1;min-height:0;">
-          <div class="umat-content-hdr">
-            <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">local_library</span> Library</h2>
+          <!-- Content header: hidden until a course is selected -->
+          <div class="umat-content-hdr" id="lec-lib-hdr" style="display:none;">
+            <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>local_library</span> Library</h2>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="lec-lib-hdr-actions">
-              <button type="button" id="lec-upload-rec-btn" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid var(--u-p);border-radius:var(--u-rp);font-size:12px;font-weight:600;color:var(--u-p);background:var(--u-sflo);cursor:pointer;font-family:inherit;"><span class="material-symbols-outlined" style="font-size:15px;">upload_file</span>Upload Recording</button>
-              <input type="text" id="lec-lib-search" placeholder="Search materials…" style="padding:6px 12px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:12px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sfl);width:min(140px,35vw);">
+              <button type="button" id="lec-upload-rec-btn" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid var(--u-p);border-radius:var(--u-rp);font-size:12px;font-weight:600;color:var(--u-p);background:var(--u-sflo);cursor:pointer;font-family:inherit;"><span class="material-symbols-outlined" umat-fs-15>upload_file</span>Upload File</button>
+              <input type="text" id="lec-lib-search" placeholder="Search materials…" class="umat-input-sm">
+            </div>
+          </div>
+          <!-- Course selector (shown when multiple courses, hidden after selection) -->
+          <div id="lec-lib-cs-inline" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;">
+            <div class="umat-content-hdr">
+              <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>local_library</span> Resource Materials</h2>
+            </div>
+            <div style="padding:12px 16px;">
+              <div id="lec-lib-cs-inline-list" style="display:flex;flex-direction:column;gap:8px;"></div>
             </div>
           </div>
           <!-- Upload modal -->
           <div class="umat-cs-overlay" id="lec-upload-ov" style="display:none;">
             <div class="umat-cs-modal" style="max-width:420px;">
               <div class="umat-cs-modal-hdr">
-                <h3><span class="material-symbols-outlined">upload_file</span>Upload Lecture Recording</h3>
+                <h3><span class="material-symbols-outlined">upload_file</span>Upload File</h3>
                 <button class="umat-cs-close" id="lec-upload-close" type="button"><span class="material-symbols-outlined">close</span></button>
               </div>
               <div style="padding:16px;">
                 <div id="lec-upload-dropzone" style="border:2px dashed var(--u-olv);border-radius:var(--u-r12);padding:32px 16px;text-align:center;cursor:pointer;transition:border-color .2s;">
                   <span class="material-symbols-outlined" style="font-size:40px;color:var(--u-ol);">cloud_upload</span>
-                  <p style="margin:8px 0 4px;font-size:13px;font-weight:600;color:var(--u-ons);">Drop audio/video file here</p>
-                  <p style="margin:0;font-size:11px;color:var(--u-ol);">MP3, WAV, MP4, WebM, MKV (max 500 MB)</p>
-                  <input type="file" id="lec-upload-file" accept="audio/*,video/*" style="display:none;">
+                  <p style="margin:8px 0 4px;font-size:13px;font-weight:600;color:var(--u-ons);">Drop any file here or click to browse</p>
+                  <p style="margin:0;font-size:11px;color:var(--u-ol);">Audio, video, documents (max 500 MB)</p>
+                  <input type="file" id="lec-upload-file" style="display:none;">
                 </div>
                 <div id="lec-upload-progress" style="display:none;margin-top:12px;">
                   <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--u-ol);margin-bottom:4px;">
@@ -1069,8 +1082,8 @@ HTML;
                 </div>
                 <div id="lec-upload-result" style="display:none;margin-top:12px;padding:10px;border-radius:var(--u-r8);font-size:12px;"></div>
                 <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
-                  <button type="button" id="lec-upload-cancel" style="padding:6px 14px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;background:var(--u-sflo);color:var(--u-ons);cursor:pointer;font-family:inherit;">Cancel</button>
-                  <button type="button" id="lec-upload-submit" disabled style="padding:6px 14px;border:none;border-radius:var(--u-r8);font-size:12px;font-weight:600;background:var(--u-p);color:#fff;cursor:pointer;font-family:inherit;opacity:.5;">Upload & Transcribe</button>
+                  <button type="button" id="lec-upload-cancel" class="umat-btn-sm">Cancel</button>
+                  <button type="button" id="lec-upload-submit" disabled style="padding:6px 14px;border:none;border-radius:var(--u-r8);font-size:12px;font-weight:600;background:var(--u-p);color:#fff;cursor:pointer;font-family:inherit;opacity:.5;">Upload File</button>
                 </div>
               </div>
             </div>
@@ -1086,8 +1099,20 @@ HTML;
               <div class="umat-cs-list" id="lec-lib-cs-list"></div>
             </div>
           </div>
-          <!-- Materials grid — fills remaining height -->
-          <div class="umat-lib-grid" id="lec-lib-grid" style="flex:1;overflow-y:auto;min-height:0;">
+          <!-- Lecture Recordings section — hidden until course is selected -->
+          <div id="lec-lib-recordings-wrap" style="display:none;flex:1;overflow-y:auto;min-height:0;">
+            <div class="umat-lib-section">
+              <div class="umat-lib-section-hdr">
+                <span class="material-symbols-outlined" style="font-size:18px;color:var(--u-p);">play_circle</span>
+                <h3>Lecture Recordings</h3>
+              </div>
+              <div class="umat-video-grid" id="lec-lib-lectures">
+                <div class="umat-empty"><span class="material-symbols-outlined">play_circle</span><p>Loading lecture recordings\u2026</p></div>
+              </div>
+            </div>
+          </div>
+          <!-- Materials grid — hidden until course is selected -->
+          <div class="umat-lib-grid" id="lec-lib-grid" style="flex:1;overflow-y:auto;min-height:0;display:none;">
             <div class="umat-lib-picker">
               <span class="material-symbols-outlined">folder_open</span>
               <p>Select a course to browse its library materials.</p>
@@ -1102,7 +1127,7 @@ HTML;
       <!-- SESSIONS (LECTURER) -->
       <div class="umat-tab-pane" id="lec-sessions" style="position:relative;overflow:hidden;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">history</span> AI Chat Sessions</h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>history</span> AI Chat Sessions</h2>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="lec-sess-hdr-actions"></div>
         </div>
         <!-- Course picker overlay -->
@@ -1123,7 +1148,7 @@ HTML;
       <!-- STUDENT ISSUES (LECTURER) -->
       <div class="umat-tab-pane" id="lec-issues" style="width:100%;min-width:0;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">forum</span> Student Issues</h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>forum</span> Student Issues</h2>
           <button class="umat-content-hdr-btn" id="lec-issues-refresh" type="button"><span class="material-symbols-outlined">refresh</span></button>
         </div>
         <div class="umat-issue-app umat-issue-lecturer" id="lec-issue-app">
@@ -1171,7 +1196,7 @@ HTML;
 
 {$sharedJs}
 
-<script>(function(){
+<script>var _lecBoot=function(){
 var CID = {$jsCid};
 var CN  = {$jsName};
 var UD  = {$jsUD};
@@ -1422,7 +1447,7 @@ function renderLecCourses(courses,g){
         var ctx=document.getElementById('lec-ctx-label');if(ctx)ctx.textContent=CN;
         var act=btn.dataset.act;
         if(act==='analytics'){anLoaded[CID]=false;switchPane('lec-insights');loadAnalytics(CID);}
-        else if(act==='library'){lecLoaded['lec-library']=false;switchPane('lec-library');loadLibrary();}
+        else if(act==='library'){lecLoaded['lec-library']=false;lecLibCourseId=CID;switchPane('lec-library');selectLibCourse(CID);}
       });
     });
   });
@@ -1533,7 +1558,7 @@ function loadLcpQuizgen(){
       var shortCount=qs.length-mcCount;
       res.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0 8px;border-bottom:1px solid var(--u-olv);margin-bottom:8px;">'+
         '<span style="font-size:12px;font-weight:700;color:var(--u-ons);">'+qs.length+' Questions</span>'+
-        '<span style="font-size:10px;color:var(--u-ol);">'+(mcCount?mcCount+' MCQ':'')+(mcCount&&shortCount?' · ':'')+(shortCount?shortCount+' Short':'')+'</span>'+
+        '<span class="umat-fs-10 umat-c-ol">'+(mcCount?mcCount+' MCQ':'')+(mcCount&&shortCount?' · ':'')+(shortCount?shortCount+' Short':'')+'</span>'+
       '</div>'+
       qs.slice(0,8).map(function(q,i){
         var isMcq=q.options&&q.options.length;var typeTag=isMcq?'MCQ':'Short';
@@ -1711,7 +1736,14 @@ function switchPane(name){
   var aiFab=document.getElementById('lec-ai-fab');
   if(aiFab)aiFab.style.display='';
   if(!lecLoaded[name]){lecLoaded[name]=true;loadPaneData(name);}
-  else if(name==='lec-insights'){if(window.struggleDashboard)window.struggleDashboard.init(resolveInsightsCid());else loadInsights(resolveInsightsCid());}
+  else if(name==='lec-insights'){
+    /* Re-entry. struggleDashboard.init() de-duplicates identical in-flight and
+       recently-completed requests itself, so returning to the tab no longer
+       costs an API call. The legacy loadInsights() fallback is not called here:
+       it targets sd-* element IDs that this template does not contain, so its
+       only effect was a second, wasted request to a different endpoint. */
+    if(window.struggleDashboard)window.struggleDashboard.init(resolveInsightsCid());
+  }
   else if(name==='lec-sessions'){
     /* Reset inline chat view back to session list */
     var chatEl=document.getElementById('lec-sess-chat');
@@ -1720,6 +1752,9 @@ function switchPane(name){
     if(sp)sp.querySelectorAll('.umat-content-hdr,.umat-sess-toggle,.umat-cs-overlay,.umat-sessions-list').forEach(function(el){el.style.display='';});
   }
 }
+/* Canonical switchPane. umat_lecturer.js delegates to this rather than
+   defining a second copy with its own lecLoaded map. */
+window.__umatSwitchPane=switchPane;
 document.querySelectorAll('#lec-sb [data-lp], #lec-glass-tabs [data-lp]').forEach(function(b){
   b.addEventListener('click',function(){switchPane(b.dataset.lp);});
 });
@@ -1728,42 +1763,93 @@ document.addEventListener('click',function(e){
   if(btn && btn.closest('#lec-home')){switchPane(btn.dataset.lp);}
 });
 
-/* Home init */
+/* Home init.
+ * Populates the three lec-home metric cards. Works in BOTH modes:
+ *  - Per-course (CID > 0): live analytics + struggle KPIs for the course.
+ *  - All Courses (CID = 0): aggregates analytics/struggle across every course
+ *    the lecturer has (UD.courses), instead of leaving the cards at "—".
+ * Deduped via window.__umatHomeLoaded so the AMD module's initHome does not
+ * re-issue the same requests after this inline implementation has run.
+ */
 function initHome(){
-  console.log('[umat] initHome CID=',CID);
-  if(!CID){console.warn('[umat] initHome: no CID');return;}
   var d=new Date(),dEl=document.getElementById('lec-home-date');
   if(dEl)dEl.textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  /* Use panel data if already loaded */
-  if(panelDataLoaded){console.log('[umat] initHome: panel data already loaded');return;}
-  ajax('local_umat_ai_get_analytics',{courseid:CID,days:30},function(data){
-    console.log('[umat] analytics data:',data);
-    var ms=document.getElementById('lec-met-active');
-    if(ms)ms.textContent=data.active_students+'/'+data.enrolled_students;
-  },function(err){console.error('[umat] analytics error:',err);});
+  if(window.__umatHomeLoaded)return;
+  window.__umatHomeLoaded=true;
+  var ms=document.getElementById('lec-met-active');
+  var fEl=document.getElementById('lec-met-friction');
+  var eEl=document.getElementById('lec-met-engagement');
+  /* All Courses mode — aggregate across the lecturer's courses */
+  if(!CID){
+    var courses=(UD&&UD.courses)||[];
+    if(!courses.length){if(ms)ms.textContent='0/0';return;}
+    var agg={active:0,enrolled:0,engSum:0,engCount:0,fName:'',fGauge:-1};
+    var pending=courses.length*2;
+    var render=function(){
+      if(ms)ms.textContent=agg.active+'/'+agg.enrolled;
+      if(fEl)fEl.textContent=agg.fGauge>0?(agg.fName+' ('+agg.fGauge+'%)'):'—';
+      if(eEl)eEl.textContent=agg.engCount?Math.round(agg.engSum/agg.engCount)+'%':'—';
+    };
+    courses.forEach(function(c){
+      ajax('local_umat_ai_get_analytics',{courseid:c.id,days:30},function(data){
+        if(data){agg.active+=data.active_students||0;agg.enrolled+=data.enrolled_students||0;}
+        if(--pending<=0)render();
+      },function(){if(--pending<=0)render();});
+      ajax('local_umat_ai_get_struggle_dashboard_data',{courseid:c.id},function(data){
+        var k=data&&data.kpis;
+        if(k){
+          if(k.engagement_score!=null){agg.engSum+=k.engagement_score;agg.engCount++;}
+          var tt=k.top_topic;
+          if(tt&&tt.gauge_value>0&&tt.gauge_value>agg.fGauge){agg.fGauge=tt.gauge_value;agg.fName=tt.name||'';}
+        }
+        if(--pending<=0)render();
+      },function(){if(--pending<=0)render();});
+    });
+    return;
+  }
+  /* Per-course mode — panel data already populated lec-met-active, so only
+     the struggle KPIs (friction topic + engagement) are always re-fetched. */
+  if(!panelDataLoaded){
+    ajax('local_umat_ai_get_analytics',{courseid:CID,days:30},function(data){
+      if(ms)ms.textContent=data.active_students+'/'+data.enrolled_students;
+    },function(){});
+  }
   ajax('local_umat_ai_get_struggle_dashboard_data',{courseid:CID},function(data){
-    console.log('[umat] struggle data:',data);
-    var fEl=document.getElementById('lec-met-friction');
-    var eEl=document.getElementById('lec-met-engagement');
-    if(fEl&&data.kpis&&data.kpis.top_topic){
-      var tt=data.kpis.top_topic;
-      fEl.textContent=tt.name+' ('+tt.gauge_value+'%)';
+    var k=data&&data.kpis;
+    if(fEl&&k&&k.top_topic){
+      var tt=k.top_topic;
+      fEl.textContent=(tt.name&&tt.gauge_value>0)?(tt.name+' ('+tt.gauge_value+'%)'):'—';
       fEl.title=tt.ai_insight||'';
     }
-    if(eEl&&data.kpis&&data.kpis.engagement_score!=null){
-      eEl.textContent=data.kpis.engagement_score+'%';
+    if(eEl&&k&&k.engagement_score!=null){
+      eEl.textContent=k.engagement_score+'%';
     }
-  },function(err){console.error('[umat] struggle data error:',err);});
+  },function(){});
 }
 
 function loadPaneData(name){
   
   
   if(name==='lec-courses')loadLecturerCourses();
-  if(name==='lec-library'){populateLibCourseSel();loadLibrary(lecLibCourseId);}
+  if(name==='lec-library'){initLibCoursePicker();}
   if(name==='lec-sessions'){populateSessCourseSel();loadSessions(lecSessCourseId);}
   if(name==='lec-issues')initLecturerIssues();
-  if(name==='lec-insights'){populateInsightsCourseSel();if(window.struggleDashboard){window.struggleDashboard.init(resolveInsightsCid());}else{loadInsights(resolveInsightsCid());}}
+  if(name==='lec-insights'){
+    populateInsightsCourseSel();
+    /* If the AMD module has not resolved yet, wait for it rather than firing
+       the legacy loadInsights() path, which queries a different endpoint and
+       writes into DOM IDs this template does not have. */
+    if(window.struggleDashboard){window.struggleDashboard.init(resolveInsightsCid());}
+    else{
+      var insWait=0;
+      var insPoll=setInterval(function(){
+        if(window.struggleDashboard){clearInterval(insPoll);window.struggleDashboard.init(resolveInsightsCid());}
+        else if(++insWait>60){clearInterval(insPoll);
+          var el=document.getElementById('ins-student-list');
+          if(el)el.innerHTML='<div class="ins-empty">Insights could not load. Please refresh the page.</div>';}
+      },250);
+    }
+  }
   if(name==='lec-quizgen')loadQuizGenUI();
   if(name==='lec-home')initHome();
 }
@@ -1796,7 +1882,7 @@ function loadPanelData(){
         var displayText=(q.text||'').replace(/^\[Referencing:\s*[^\]]+\]\s*/i,'');
         return '<div style="padding:8px;background:var(--u-sf);border:1px solid var(--u-olv);border-radius:var(--u-r8);">'+
           '<div style="font-size:12px;color:var(--u-ons);margin-bottom:3px;">'+esc(displayText)+'</div>'+
-          '<div style="font-size:10px;color:var(--u-ol);"><b style="color:var(--u-p);">'+q.ask_count+'</b> students asked</div></div>';
+          '<div class="umat-fs-10 umat-c-ol"><b style="color:var(--u-p);">'+q.ask_count+'</b> students asked</div></div>';
       }).join('');
     }
   },function(){});
@@ -2045,27 +2131,121 @@ function populateLibCourseSel(){
   var g=document.getElementById('lec-lib-grid');
   if(g&&!g._lecLibPickerInited){g._lecLibPickerInited=true;g.addEventListener('click',function(e){if(e.target.closest('#lec-lib-pick-btn'))openLecLibPicker();});}
 }
-function loadLibrary(cid){
-  var g=document.getElementById('lec-lib-grid');
-  var courseId=cid||lecLibCourseId||CID||0;
-  if(!courseId){
-    g.innerHTML='<div class="umat-lib-picker"><span class="material-symbols-outlined">folder_open</span><p>Select a course to browse its library materials.</p><button type="button" id="lec-lib-pick-btn"><span class="material-symbols-outlined">menu_book</span>Select Course</button></div>';
+
+/* Initialize the inline course picker for the Library tab.
+   If the lecturer has only one course, auto-select it.
+   Otherwise, show the inline course selector list. */
+function initLibCoursePicker(){
+  var courses=(UD&&UD.courses)||[];
+  var inline=document.getElementById('lec-lib-cs-inline');
+  var hdr=document.getElementById('lec-lib-hdr');
+  var grid=document.getElementById('lec-lib-grid');
+  /* If a course was already selected, just re-show the materials view */
+  if(lecLibCourseId){selectLibCourse(lecLibCourseId);return;}
+  /* If only one course, auto-select */
+  if(courses.length===1){
+    lecLibCourseId=courses[0].id;
+    selectLibCourse(courses[0].id);
     return;
   }
-  var hdr=document.getElementById('lec-lib-hdr-actions');
-  if(hdr){
-    var course=(UD.courses||[]).find(function(c){return c.id===courseId;});
-    hdr.innerHTML=(course?'<button class="umat-lib-sel-label" id="lec-lib-sel-label" type="button"><span class="material-symbols-outlined">menu_book</span>'+esc(course.shortname)+'</button>':'')+
-      '<input type="text" id="lec-lib-search" placeholder="Search materials…" style="padding:6px 12px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:12px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sfl);width:min(140px,35vw);">';
-    var lbl=document.getElementById('lec-lib-sel-label');
-    if(lbl)lbl.addEventListener('click',openLecLibPicker);
+  /* Multiple courses — show the inline picker */
+  if(inline)inline.style.display='flex';
+  if(hdr)hdr.style.display='none';
+  if(grid)grid.style.display='none';
+  var list=document.getElementById('lec-lib-cs-inline-list');
+  if(!list)return;
+  list.innerHTML=courses.map(function(c){
+    return '<button class="umat-cs-item" data-cid="'+c.id+'" type="button">'+
+      '<div class="umat-cs-item-icon"><span class="material-symbols-outlined">menu_book</span></div>'+
+      '<div class="umat-cs-item-info"><div class="umat-cs-item-name">'+esc(c.fullname)+'</div>'+
+      '<div class="umat-cs-item-code">'+esc(c.shortname)+'</div></div>'+
+      '<span class="umat-cs-item-check material-symbols-outlined">check_circle</span></button>';
+  }).join('');
+  list.querySelectorAll('.umat-cs-item').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var cid=parseInt(this.dataset.cid);
+      lecLibCourseId=cid;
+      selectLibCourse(cid);
+    });
+  });
+}
+
+/* Switch from course picker to the materials view for a given course */
+function selectLibCourse(courseId){
+  var inline=document.getElementById('lec-lib-cs-inline');
+  var hdr=document.getElementById('lec-lib-hdr');
+  var grid=document.getElementById('lec-lib-grid');
+  var recWrap=document.getElementById('lec-lib-recordings-wrap');
+  if(inline)inline.style.display='none';
+  if(hdr)hdr.style.display='flex';
+  if(grid)grid.style.display='';
+  if(recWrap)recWrap.style.display='';
+  loadLibrary(courseId);
+}
+
+/* Re-populate the inline course list (used when switching back to picker) */
+function populateLibInlineList(){
+  var courses=(UD&&UD.courses)||[];
+  var list=document.getElementById('lec-lib-cs-inline-list');
+  if(!list)return;
+  list.innerHTML=courses.map(function(c){
+    return '<button class="umat-cs-item" data-cid="'+c.id+'" type="button">'+
+      '<div class="umat-cs-item-icon"><span class="material-symbols-outlined">menu_book</span></div>'+
+      '<div class="umat-cs-item-info"><div class="umat-cs-item-name">'+esc(c.fullname)+'</div>'+
+      '<div class="umat-cs-item-code">'+esc(c.shortname)+'</div></div>'+
+      '<span class="umat-cs-item-check material-symbols-outlined">check_circle</span></button>';
+  }).join('');
+  list.querySelectorAll('.umat-cs-item').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var cid=parseInt(this.dataset.cid);
+      lecLibCourseId=cid;
+      selectLibCourse(cid);
+    });
+  });
+}
+
+function loadLibrary(cid){
+  var g=document.getElementById('lec-lib-grid');
+  var recGrid=document.getElementById('lec-lib-lectures');
+  var courseId=cid||lecLibCourseId||CID||0;
+  if(!courseId){
+    /* No course selected — show inline course picker */
+    var inline=document.getElementById('lec-lib-cs-inline');
+    var hdr=document.getElementById('lec-lib-hdr');
+    if(inline)inline.style.display='flex';
+    if(hdr)hdr.style.display='none';
+    if(g)g.style.display='none';
+    return;
   }
   g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading materials…</p></div>';
-  ajax('local_umat_ai_get_course_materials',{courseid:courseId},function(r){renderLibTiles(r.materials||[],g);if(typeof updateMaterialAnalysis==='function')updateMaterialAnalysis(courseId);},function(e){console.error('[umat] overlay loadLibrary failed:',e&&e.message||e);g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">error_outline</span><p>Could not load materials.</p></div>';});
+  ajax('local_umat_ai_get_course_materials',{courseid:courseId},function(r){renderLibTiles(r.materials||[],g);},function(e){console.error('[umat] overlay loadLibrary failed:',e&&e.message||e);g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">error_outline</span><p>Could not load materials.</p></div>';});
+  /* Also fetch recordings for this course */
+  if(recGrid){
+    recGrid.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading lecture recordings\u2026</p></div>';
+    if(typeof renderVideoTiles==='function'){
+      ajax('local_umat_ai_get_course_recordings',{courseid:courseId},function(r){renderVideoTiles(r.recordings||[],recGrid);},function(){recGrid.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load recordings.</p></div>';});
+    } else {
+      /* Fallback: load renderVideoTiles from AMD module */
+      require(['local_umat_ai/umatshared'],function(S){
+        if(S.renderVideoTiles){
+          window.renderVideoTiles=S.renderVideoTiles;
+          ajax('local_umat_ai_get_course_recordings',{courseid:courseId},function(r){S.renderVideoTiles(r.recordings||[],recGrid);},function(){recGrid.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load recordings.</p></div>';});
+        }
+      });
+    }
+  }
 }
 function openLecLibPicker(){
-  var ov=document.getElementById('lec-lib-cs-ov');
-  if(ov)ov.classList.add('open');
+  /* Show inline course picker again */
+  var inline=document.getElementById('lec-lib-cs-inline');
+  var hdr=document.getElementById('lec-lib-hdr');
+  var grid=document.getElementById('lec-lib-grid');
+  var recWrap=document.getElementById('lec-lib-recordings-wrap');
+  if(inline){inline.style.display='flex';populateLibInlineList();}
+  if(hdr)hdr.style.display='none';
+  if(grid)grid.style.display='none';
+  if(recWrap)recWrap.style.display='none';
+  lecLibCourseId=0;
 }
 function openLecPdf(url,name){
   if(window.umatMaterialViewer)window.umatMaterialViewer.open('pdf',{
@@ -2101,8 +2281,9 @@ function _lecUpSelectFile(f){
   if(!f||!f.size)return;
   _lecUpFile=f;
   var sb=document.getElementById('lec-upload-submit');if(sb){sb.disabled=false;sb.style.opacity='1';}
+  var isMedia=f.type&&(f.type.indexOf('audio/')===0||f.type.indexOf('video/')===0);
   var dz=document.getElementById('lec-upload-dropzone');
-  if(dz)dz.innerHTML='<span class="material-symbols-outlined" style="font-size:32px;color:var(--u-p);">audio_file</span><p style="margin:8px 0 2px;font-size:13px;font-weight:600;color:var(--u-ons);">'+esc(f.name)+'</p><p style="margin:0;font-size:11px;color:var(--u-ol);">'+(f.size>1048576?(f.size/1048576).toFixed(1)+' MB':(f.size/1024).toFixed(0)+' KB')+'</p><input type="file" id="lec-upload-file" accept="audio/*,video/*" style="display:none;">';
+  if(dz)dz.innerHTML='<span class="material-symbols-outlined" style="font-size:32px;color:var(--u-p);">'+(isMedia?'audio_file':'description')+'</span><p style="margin:8px 0 2px;font-size:13px;font-weight:600;color:var(--u-ons);">'+esc(f.name)+'</p><p style="margin:0;font-size:11px;color:var(--u-ol);">'+(f.size>1048576?(f.size/1048576).toFixed(1)+' MB':(f.size/1024).toFixed(0)+' KB')+'</p><input type="file" id="lec-upload-file" style="display:none;">';
   var fi=document.getElementById('lec-upload-file');if(fi)fi.addEventListener('change',function(){if(this.files.length)_lecUpSelectFile(this.files[0]);});
 }
 function _lecUpSubmit(){
@@ -2110,17 +2291,28 @@ function _lecUpSubmit(){
   var dz=document.getElementById('lec-upload-dropzone'),pr=document.getElementById('lec-upload-progress'),rs=document.getElementById('lec-upload-result'),bar=document.getElementById('lec-upload-bar'),pct=document.getElementById('lec-upload-pct'),fn=document.getElementById('lec-upload-fname');
   if(dz)dz.style.display='none';if(pr)pr.style.display='block';if(rs)rs.style.display='none';
   if(fn)fn.textContent=_lecUpFile.name;
-  var fd=new FormData();fd.append('audio',_lecUpFile);fd.append('courseid',CID);fd.append('sesskey',M.cfg.sesskey);
+  var isMedia=_lecUpFile.type&&(_lecUpFile.type.indexOf('audio/')===0||_lecUpFile.type.indexOf('video/')===0);
+  var fd=new FormData();
   _lecUpXhr=new XMLHttpRequest();
   _lecUpXhr.upload.addEventListener('progress',function(e){if(e.lengthComputable){var p=Math.round(e.loaded/e.total*100);if(bar)bar.style.width=p+'%';if(pct)pct.textContent=p+'%';}});
   _lecUpXhr.addEventListener('load',function(){
     if(pr)pr.style.display='none';if(rs)rs.style.display='block';
     try{var r=JSON.parse(_lecUpXhr.responseText);}catch(e){r={success:false,message:'Invalid response'};}
-    if(r.success){rs.style.background='#dcfce7';rs.style.color='#065f46';rs.innerHTML='<strong>&#10003; Upload successful!</strong><br>Job ID: '+esc(r.job_id)+'<br>Transcription is processing…';}
-    else{rs.style.background='#fee2e2';rs.style.color='#991b1b';rs.innerHTML='<strong>Upload failed</strong><br>'+esc(r.message||'Unknown error');}
+    if(r.success){
+      rs.style.background='#dcfce7';rs.style.color='#065f46';
+      if(isMedia){rs.innerHTML='<strong>&#10003; Recording uploaded!</strong><br>Job ID: '+esc(r.job_id)+'<br>Transcription is processing…';}
+      else{rs.innerHTML='<strong>&#10003; '+esc(r.filename||'File')+' uploaded to course!</strong>';}
+      setTimeout(function(){closeLecUploadModal();if(lecLibCourseId)loadLibrary(lecLibCourseId);},1500);
+    }else{rs.style.background='#fee2e2';rs.style.color='#991b1b';rs.innerHTML='<strong>Upload failed</strong><br>'+esc(r.message||'Unknown error');}
   });
   _lecUpXhr.addEventListener('error',function(){if(pr)pr.style.display='none';if(rs){rs.style.display='block';rs.style.background='#fee2e2';rs.style.color='#991b1b';rs.innerHTML='<strong>Connection error</strong>';}});
-  _lecUpXhr.open('POST','/local/umat_ai/upload.php');_lecUpXhr.send(fd);
+  if(isMedia){
+    fd.append('audio',_lecUpFile);fd.append('courseid',CID);fd.append('sesskey',M.cfg.sesskey);
+    _lecUpXhr.open('POST','/local/umat_ai/upload.php');_lecUpXhr.send(fd);
+  }else{
+    fd.append('file',_lecUpFile);fd.append('courseid',lecLibCourseId||CID||0);fd.append('sesskey',M.cfg.sesskey);
+    _lecUpXhr.open('POST','/local/umat_ai/course_upload.php');_lecUpXhr.send(fd);
+  }
 }
 (function(){
   var dz=document.getElementById('lec-upload-dropzone');
@@ -2135,6 +2327,13 @@ function _lecUpSubmit(){
   var cls=document.getElementById('lec-upload-close');if(cls)cls.addEventListener('click',closeLecUploadModal);
   var canc=document.getElementById('lec-upload-cancel');if(canc)canc.addEventListener('click',closeLecUploadModal);
   var upBtn=document.getElementById('lec-upload-rec-btn');if(upBtn)upBtn.addEventListener('click',openLecUploadModal);
+  /* Library search: filter material + recording tiles */
+  var libSrch=document.getElementById('lec-lib-search');
+  if(libSrch)libSrch.addEventListener('input',function(){
+    var q=this.value.toLowerCase();
+    var g=document.getElementById('lec-lib-grid');if(g)g.querySelectorAll('.yt-tile').forEach(function(t){t.style.display=(!q||t.textContent.toLowerCase().includes(q))?'':'none';});
+    var rg=document.getElementById('lec-lib-lectures');if(rg)rg.querySelectorAll('.yt-tile').forEach(function(t){t.style.display=(!q||t.textContent.toLowerCase().includes(q))?'':'none';});
+  });
 })();
 
 /* Sessions — with course overlay selector */
@@ -2406,9 +2605,14 @@ document.getElementById('qgen-cs-ov')?.addEventListener('click',function(e){if(e
 
 /* ── Insights Dashboard ── */
 var insCid = CID || 0;
+/* True once the lecturer has picked a course from the Insights selector. That
+   explicit choice outranks the page-context CID, which is what the old
+   "CID = 0" hack was trying to achieve at the cost of every other tab. */
+var insSelected = false;
 
-/* Resolve the active insights course: CID > insCid > first course from UD */
+/* Resolve the active insights course: explicit choice > CID > insCid > first course from UD */
 function resolveInsightsCid(){
+  if(insSelected) return insCid;
   if(CID) return CID;
   if(insCid) return insCid;
   if(typeof UD!=='undefined'&&UD&&UD.courses&&UD.courses.length){
@@ -2448,7 +2652,13 @@ function populateInsightsCourseSel(){
   list.querySelectorAll('.umat-cs-item').forEach(function(btn){
     btn.addEventListener('click',function(){
       insCid=parseInt(this.dataset.cid)||0;
-      CID=0; // Clear page-context CID so resolveInsightsCid() uses insCid
+      /* Do NOT clear the page-context CID here. Zeroing the shared variable
+         made resolveInsightsCid() fall through to insCid, but it also broke
+         every other tab: returning to Home logged "initHome: no CID" and the
+         pane stayed blank until a full page reload. The Insights course
+         selection is tracked by insCid alone, and insSelected records that the
+         lecturer has made an explicit choice that should win over CID. */
+      insSelected=true;
       // Visual selected state
       list.querySelectorAll('.umat-cs-item').forEach(function(it){it.classList.remove('umat-cs-item-active');});
       this.classList.add('umat-cs-item-active');
@@ -2792,7 +3002,8 @@ initHome();
 document.getElementById('lec-home-date').textContent=(function(){var d=new Date();return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});})();
 /* Populate course selectors */
 populateLibCourseSel();
-populateInsightsCourseSel_legacy();
+/* Called once. It was invoked twice here, which rebuilt the course list and
+   rebound every click handler a second time. */
 populateInsightsCourseSel_legacy();
 /* Auto-load analytics + struggle when overlay opens */
 if(expand)expand.addEventListener('click',function(){setTimeout(function(){
@@ -2808,7 +3019,10 @@ _umatInitEsc([
   {id:'lec-cp-ov',isOpen:function(e){return e.classList.contains('open');},close:function(e){e.classList.remove('open');}}
 ]);
 
-})();
+};
+</script>
+<script>
+(function(){var f=document.getElementById('lec-fab');if(!f){if(window._lecBoot)window._lecBoot();return;}var L=false;var o=document.getElementById('lec-cp-ov');f.addEventListener('click',function(){if(o&&window.innerWidth>=640)o.classList.add('open');if(L)return;L=true;if(window._lecBoot){window._lecBoot();window._lecBoot=null;}require(['local_umat_ai/umat_lecturer'],function(m){m.init({courseId:{$jsCid},courseName:{$jsName},userData:{$jsUD},streamUrl:{$streamUrl},moodleSesskey:{$moodleSesskey}});});});})();
 </script>
 HTML;
     }
@@ -2819,7 +3033,7 @@ HTML;
         $uName   = json_encode(fullname($user));
         $uInit   = htmlspecialchars(strtoupper(mb_substr($user->firstname,0,1).mb_substr($user->lastname,0,1)), ENT_QUOTES);
         $jsWwwroot = json_encode(rtrim($wwwroot, '/'));
-        $jsUD    = $userData; // raw JSON string from preload_user_data()
+                $jsUD        = $userData; // raw JSON string from preload_user_data()
         $logUrl  = $wwwroot . '/login/logout.php';
         $streamUrl = json_encode('/local/umat_ai/chat_stream.php');
         $moodleSesskey = json_encode(sesskey());
@@ -2927,7 +3141,7 @@ HTML;
       <!-- AI TUTOR -->
       <div class="umat-tab-pane" id="hub-tutor" style="position:relative;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">smart_toy</span> General AI Tutor</h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>smart_toy</span> General AI Tutor</h2>
           <select id="hub-course-sel" style="padding:6px 11px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:12px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sfl);max-width:min(200px,45vw);">
             <option value="0">All Courses</option>
           </select>
@@ -2987,12 +3201,12 @@ HTML;
       <!-- LECTURES -->
       <div class="umat-tab-pane" id="hub-lectures" style="position:relative;overflow:hidden;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">video_library</span> Lecture Recordings</h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>video_library</span> Lecture Recordings</h2>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <select id="hub-lec-course-sel" style="padding:5px 10px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:12px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sfl);max-width:min(170px,40vw);">
               <option value="0">All Courses</option>
             </select>
-            <input type="text" id="hub-lec-search" placeholder="Search…" style="padding:6px 12px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:12px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sfl);width:min(140px,35vw);">
+            <input type="text" id="hub-lec-search" placeholder="Search…" class="umat-input-sm">
           </div>
         </div>
         <div class="umat-video-grid" id="hub-lec-grid">
@@ -3031,7 +3245,7 @@ HTML;
       <!-- MY COURSES -->
       <div class="umat-tab-pane" id="hub-courses">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">menu_book</span> My Courses</h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>menu_book</span> My Courses</h2>
           <input type="text" id="hub-courses-search" placeholder="Filter courses…" style="padding:6px 12px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:12px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sfl);width:min(160px,40vw);">
         </div>
         <div class="umat-courses-grid" id="hub-courses-grid">
@@ -3042,9 +3256,9 @@ HTML;
       <!-- LIBRARY -->
       <div class="umat-tab-pane" id="hub-library" style="position:relative;overflow:hidden;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">local_library</span> Library</h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>local_library</span> Library</h2>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="hub-lib-hdr-actions">
-            <input type="text" id="hub-lib-search" placeholder="Search materials…" style="padding:6px 12px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:12px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sfl);width:min(140px,35vw);">
+            <input type="text" id="hub-lib-search" placeholder="Search materials…" class="umat-input-sm">
           </div>
         </div>
         <!-- Course picker overlay -->
@@ -3072,7 +3286,7 @@ HTML;
       <!-- SESSIONS -->
       <div class="umat-tab-pane" id="hub-sessions">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">history</span> AI Chat Sessions</h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>history</span> AI Chat Sessions</h2>
           <button class="umat-content-hdr-btn" id="hub-new-sess2" type="button"><span class="material-symbols-outlined">add</span>New Session</button>
         </div>
         <div class="umat-sessions-list" id="hub-sess-list">
@@ -3088,7 +3302,7 @@ HTML;
 
 {$sharedJs}
 
-<script>(function(){
+<script>var _hubBoot=function(){
 var wwwroot  = {$jsWwwroot};
 var streamUrl = {$streamUrl};
 var moodleSesskey = {$moodleSesskey};
@@ -3471,7 +3685,7 @@ function loadLibrary(cid){
   if(hdr){
     var course=(UD.courses||[]).find(function(c){return c.id===courseId;});
     hdr.innerHTML=(course?'<button class="umat-lib-sel-label" id="hub-lib-sel-label" type="button"><span class="material-symbols-outlined">menu_book</span>'+esc(course.shortname)+'</button>':'')+
-      '<input type="text" id="hub-lib-search" placeholder="Search materials…" style="padding:6px 12px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:12px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sfl);width:min(140px,35vw);">';
+      '<input type="text" id="hub-lib-search" placeholder="Search materials…" class="umat-input-sm">';
     var lbl=document.getElementById('hub-lib-sel-label');
     if(lbl)lbl.addEventListener('click',openHubLibPicker);
   }
@@ -3566,18 +3780,6 @@ function openHubPdf(url,name){
   onConfirm:function(mats){selMat=mats;_umatRenderMatsBar('hub-mat-bar','hub-attach-btn',selMat,function(id){selMat=selMat.filter(function(s){return s.id!=id;});return selMat;});}
 });}else setTimeout(w,20);}();
 
-/* Voice */
-(function(){
-  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  var micBtn=document.getElementById('hub-mic-btn');if(!SR||!micBtn){if(micBtn)micBtn.style.opacity='.4';return;}
-  var rec=new SR();rec.continuous=false;rec.interimResults=true;rec.lang='en-US';
-  var active=false;
-  micBtn.addEventListener('click',function(){if(active){rec.stop();}else{rec.start();active=true;micBtn.classList.add('recording');}});
-  rec.onresult=function(e){hubIn.value=Array.from(e.results).map(function(r){return r[0].transcript;}).join('');};
-  rec.onend=function(){active=false;micBtn.classList.remove('recording');};
-  rec.onerror=function(){active=false;micBtn.classList.remove('recording');};
-})();
-
 /* New session */
 function newSession(){sessKey='hub_'+Math.random().toString(36).substr(2,18);selMat=[];if(hubDrawerCtrl)hubDrawerCtrl.clear();var msgs=document.getElementById('hub-msgs');if(msgs){msgs.innerHTML='';addWelcome('your courses');}if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('hub-msgs');updateRate();}
 if(newBtn)newBtn.addEventListener('click',newSession);
@@ -3589,7 +3791,10 @@ _umatInitEsc([
   {id:'hub-ov',isOpen:function(e){return e.classList.contains('open');},close:function(e){e.classList.remove('open');}}
 ]);
 
-})();
+};
+</script>
+<script>
+(function(){var f=document.getElementById('hub-fab');if(!f){if(window._hubBoot)window._hubBoot();return;}var L=false;var o=document.getElementById('hub-ov');f.addEventListener('click',function(){if(o)o.classList.add('open');if(L)return;L=true;if(window._hubBoot){window._hubBoot();window._hubBoot=null;}require(['local_umat_ai/umat_hub'],function(m){m.init({userData:{$jsUD},userId:{$uid},streamUrl:{$streamUrl},moodleSesskey:{$moodleSesskey}});});});})();
 </script>
 HTML;
     }
@@ -3663,7 +3868,7 @@ HTML;
       <!-- DASHBOARD TAB -->
       <div class="umat-tab-pane active" id="aexp-dashboard" style="overflow-y:auto;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">dashboard</span> System Dashboard</h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>dashboard</span> System Dashboard</h2>
           <div style="display:flex;gap:6px;align-items:center;">
             <span class="umat-pill pill-info" id="aexp-health-status">● Checking…</span>
             <button class="umat-content-hdr-btn" id="aexp-health-refresh" type="button" title="Refresh"><span class="material-symbols-outlined">refresh</span></button>
@@ -3704,7 +3909,7 @@ HTML;
       <!-- FEATURES TAB -->
       <div class="umat-tab-pane" id="aexp-features" style="overflow-y:auto;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">tune</span> Feature Configuration</h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>tune</span> Feature Configuration</h2>
         </div>
         <div style="padding:20px;max-width:640px;">
           <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--u-ol);margin-bottom:8px;">Feature Toggles</div>
@@ -3719,7 +3924,7 @@ HTML;
       <!-- THEME TAB -->
       <div class="umat-tab-pane" id="aexp-theme" style="overflow-y:auto;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">palette</span> Theme Customisation</h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>palette</span> Theme Customisation</h2>
         </div>
         <div style="padding:20px;max-width:640px;">
           <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--u-ol);margin-bottom:8px;">Colour Scheme</div>
@@ -3743,34 +3948,34 @@ HTML;
       <!-- ACTIONS TAB -->
       <div class="umat-tab-pane" id="aexp-actions" style="overflow-y:auto;">
         <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;color:var(--u-p);">bolt</span> System Actions</h2>
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>bolt</span> System Actions</h2>
         </div>
         <div style="padding:20px;max-width:640px;">
           <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--u-ol);margin-bottom:8px;">System Actions</div>
           <div style="display:flex;flex-direction:column;gap:8px;">
-            <button class="admin-action-btn" data-action="clear_ai_cache" type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-r10);background:var(--u-sflo);cursor:pointer;font-size:12px;text-align:left;">
+            <button class="admin-action-btn umat-action-item" data-action="clear_ai_cache" type="button">
               <span class="material-symbols-outlined" style="color:var(--u-ter);">cleaning_services</span>
-              <div><strong>Clear AI Semantic Cache</strong><span style="display:block;font-size:10px;color:var(--u-ol);">Wipe the analytics semantic cache in ChromaDB</span></div>
+              <div><strong>Clear AI Semantic Cache</strong><span class="umat-db umat-fs-10 umat-c-ol">Wipe the analytics semantic cache in ChromaDB</span></div>
             </button>
-            <button class="admin-action-btn" data-action="trigger_index" type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-r10);background:var(--u-sflo);cursor:pointer;font-size:12px;text-align:left;">
+            <button class="admin-action-btn umat-action-item" data-action="trigger_index" type="button">
               <span class="material-symbols-outlined" style="color:var(--u-p);">sync</span>
-              <div><strong>Force Re-index Materials</strong><span style="display:block;font-size:10px;color:var(--u-ol);">Queue all course materials for RAG indexing</span></div>
+              <div><strong>Force Re-index Materials</strong><span class="umat-db umat-fs-10 umat-c-ol">Queue all course materials for RAG indexing</span></div>
             </button>
-            <button class="admin-action-btn" data-action="purge_moodle_cache" type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-r10);background:var(--u-sflo);cursor:pointer;font-size:12px;text-align:left;">
+            <button class="admin-action-btn umat-action-item" data-action="purge_moodle_cache" type="button">
               <span class="material-symbols-outlined" style="color:#d97706;">cached</span>
-              <div><strong>Purge Moodle Caches</strong><span style="display:block;font-size:10px;color:var(--u-ol);">Clear all Moodle cache stores (themes, JS, templates)</span></div>
+              <div><strong>Purge Moodle Caches</strong><span class="umat-db umat-fs-10 umat-c-ol">Clear all Moodle cache stores (themes, JS, templates)</span></div>
             </button>
-            <button class="admin-action-btn" data-action="purge_theme_cache" type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-r10);background:var(--u-sflo);cursor:pointer;font-size:12px;text-align:left;">
+            <button class="admin-action-btn umat-action-item" data-action="purge_theme_cache" type="button">
               <span class="material-symbols-outlined" style="color:#6366f1;">palette</span>
-              <div><strong>Purge Theme Cache</strong><span style="display:block;font-size:10px;color:var(--u-ol);">Reset theme CSS and template caches</span></div>
+              <div><strong>Purge Theme Cache</strong><span class="umat-db umat-fs-10 umat-c-ol">Reset theme CSS and template caches</span></div>
             </button>
-            <button class="admin-action-btn" data-action="trigger_cron" type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-r10);background:var(--u-sflo);cursor:pointer;font-size:12px;text-align:left;">
+            <button class="admin-action-btn umat-action-item" data-action="trigger_cron" type="button">
               <span class="material-symbols-outlined" style="color:var(--u-sec);">schedule</span>
-              <div><strong>Trigger Cron Now</strong><span style="display:block;font-size:10px;color:var(--u-ol);">Run all scheduled tasks immediately</span></div>
+              <div><strong>Trigger Cron Now</strong><span class="umat-db umat-fs-10 umat-c-ol">Run all scheduled tasks immediately</span></div>
             </button>
             <a href="{$wwwroot}/admin/settings.php?section=local_umat_ai" target="_blank" class="admin-action-btn" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-r10);background:var(--u-sflo);cursor:pointer;font-size:12px;text-decoration:none;color:inherit;box-sizing:border-box;">
               <span class="material-symbols-outlined" style="color:var(--u-ol);">launch</span>
-              <div><strong>Open Native Admin Settings</strong><span style="display:block;font-size:10px;color:var(--u-ol);">Moodle admin page for full plugin configuration</span></div>
+              <div><strong>Open Native Admin Settings</strong><span class="umat-db umat-fs-10 umat-c-ol">Moodle admin page for full plugin configuration</span></div>
             </a>
           </div>
           <div id="aexp-action-msg" style="margin-top:12px;font-size:11px;display:none;"></div>
@@ -3811,28 +4016,28 @@ HTML;
     <!-- DASHBOARD TAB -->
     <div class="umat-cp-pane active" id="acp-dashboard" style="overflow-y:auto;">
       <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:9px;" id="acp-health-grid">
-        <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:12px;">
-          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(0,107,47,.1);color:var(--u-p);display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">check_circle</span></div>
-          <div style="font-size:10px;color:var(--u-ol);">AI Service</div>
-          <div style="font-size:18px;font-weight:800;" id="acp-hlth-service">—</div>
+        <div class="umat-card-sflo">
+          <div class="umat-kpi-icon umat-kpi-icon-p"><span class="material-symbols-outlined" umat-fs-15>check_circle</span></div>
+          <div class="umat-fs-10 umat-c-ol">AI Service</div>
+          <div class="umat-fs-18 umat-fw-8" id="acp-hlth-service">—</div>
           <span style="font-size:9px;" id="acp-hlth-latency"></span>
         </div>
-        <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:12px;">
-          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(0,107,47,.1);color:var(--u-p);display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">storage</span></div>
-          <div style="font-size:10px;color:var(--u-ol);">ChromaDB</div>
-          <div style="font-size:18px;font-weight:800;" id="acp-hlth-chroma">—</div>
+        <div class="umat-card-sflo">
+          <div class="umat-kpi-icon umat-kpi-icon-p"><span class="material-symbols-outlined" umat-fs-15>storage</span></div>
+          <div class="umat-fs-10 umat-c-ol">ChromaDB</div>
+          <div class="umat-fs-18 umat-fw-8" id="acp-hlth-chroma">—</div>
           <span style="font-size:9px;" id="acp-hlth-docs"></span>
         </div>
-        <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:12px;">
-          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(0,107,47,.1);color:var(--u-p);display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">memory</span></div>
-          <div style="font-size:10px;color:var(--u-ol);">Memory</div>
-          <div style="font-size:18px;font-weight:800;" id="acp-hlth-memory">—</div>
+        <div class="umat-card-sflo">
+          <div class="umat-kpi-icon umat-kpi-icon-p"><span class="material-symbols-outlined" umat-fs-15>memory</span></div>
+          <div class="umat-fs-10 umat-c-ol">Memory</div>
+          <div class="umat-fs-18 umat-fw-8" id="acp-hlth-memory">—</div>
           <span style="font-size:9px;" id="acp-hlth-cron"></span>
         </div>
-        <div style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:12px;">
-          <div style="width:26px;height:26px;border-radius:var(--u-r6);background:rgba(99,102,241,.1);color:var(--u-p);display:flex;align-items:center;justify-content:center;margin-bottom:6px;"><span class="material-symbols-outlined" style="font-size:15px;">info</span></div>
-          <div style="font-size:10px;color:var(--u-ol);">Plugin Version</div>
-          <div style="font-size:18px;font-weight:800;" id="acp-hlth-version">—</div>
+        <div class="umat-card-sflo">
+          <div class="umat-kpi-icon umat-kpi-icon-i"><span class="material-symbols-outlined" umat-fs-15>info</span></div>
+          <div class="umat-fs-10 umat-c-ol">Plugin Version</div>
+          <div class="umat-fs-18 umat-fw-8" id="acp-hlth-version">—</div>
           <span style="font-size:9px;cursor:pointer;" id="acp-hlth-refresh">Click to refresh</span>
         </div>
       </div>
@@ -3840,9 +4045,9 @@ HTML;
 
     <!-- FEATURES TAB -->
     <div class="umat-cp-pane" id="acp-features" style="overflow-y:auto;">
-      <div style="padding:12px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--u-ol);">Feature Toggles</div>
+      <div class="umat-p-12-14 umat-fs-11 umat-fw-7 umat-ttu umat-c-ol">Feature Toggles</div>
       <div style="padding:0 14px 6px;display:flex;flex-direction:column;gap:8px;" id="acp-toggles"></div>
-      <div style="padding:12px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--u-ol);">Configuration</div>
+      <div class="umat-p-12-14 umat-fs-11 umat-fw-7 umat-ttu umat-c-ol">Configuration</div>
       <div style="padding:0 14px 10px;display:flex;flex-direction:column;gap:8px;" id="acp-config"></div>
       <div style="padding:0 14px 14px;">
         <button class="umat-btn-p" id="acp-save-features" style="width:100%;justify-content:center;" type="button"><span class="material-symbols-outlined">save</span>Save Changes</button>
@@ -3852,7 +4057,7 @@ HTML;
 
     <!-- THEME TAB -->
     <div class="umat-cp-pane" id="acp-theme" style="overflow-y:auto;">
-      <div style="padding:12px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--u-ol);">Colour Scheme</div>
+      <div class="umat-p-12-14 umat-fs-11 umat-fw-7 umat-ttu umat-c-ol">Colour Scheme</div>
       <div style="padding:0 14px 6px;display:flex;flex-direction:column;gap:10px;" id="acp-theme-colors"></div>
       <div style="padding:10px 14px;">
         <div id="acp-theme-preview" style="background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r12);padding:16px;margin-bottom:10px;">
@@ -3873,31 +4078,31 @@ HTML;
 
     <!-- ACTIONS TAB -->
     <div class="umat-cp-pane" id="acp-actions" style="overflow-y:auto;">
-      <div style="padding:12px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--u-ol);">System Actions</div>
+      <div class="umat-p-12-14 umat-fs-11 umat-fw-7 umat-ttu umat-c-ol">System Actions</div>
       <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:8px;">
-        <button class="admin-action-btn" data-action="clear_ai_cache" type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-r10);background:var(--u-sflo);cursor:pointer;font-size:12px;text-align:left;">
+        <button class="admin-action-btn umat-action-item" data-action="clear_ai_cache" type="button">
           <span class="material-symbols-outlined" style="color:var(--u-ter);">cleaning_services</span>
-          <div><strong>Clear AI Semantic Cache</strong><span style="display:block;font-size:10px;color:var(--u-ol);">Wipe the analytics semantic cache in ChromaDB</span></div>
+          <div><strong>Clear AI Semantic Cache</strong><span class="umat-db umat-fs-10 umat-c-ol">Wipe the analytics semantic cache in ChromaDB</span></div>
         </button>
-        <button class="admin-action-btn" data-action="trigger_index" type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-r10);background:var(--u-sflo);cursor:pointer;font-size:12px;text-align:left;">
+        <button class="admin-action-btn umat-action-item" data-action="trigger_index" type="button">
           <span class="material-symbols-outlined" style="color:var(--u-p);">sync</span>
-          <div><strong>Force Re-index Materials</strong><span style="display:block;font-size:10px;color:var(--u-ol);">Queue all course materials for RAG indexing</span></div>
+          <div><strong>Force Re-index Materials</strong><span class="umat-db umat-fs-10 umat-c-ol">Queue all course materials for RAG indexing</span></div>
         </button>
-        <button class="admin-action-btn" data-action="purge_moodle_cache" type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-r10);background:var(--u-sflo);cursor:pointer;font-size:12px;text-align:left;">
+        <button class="admin-action-btn umat-action-item" data-action="purge_moodle_cache" type="button">
           <span class="material-symbols-outlined" style="color:#d97706;">cached</span>
-          <div><strong>Purge Moodle Caches</strong><span style="display:block;font-size:10px;color:var(--u-ol);">Clear all Moodle cache stores (themes, JS, templates)</span></div>
+          <div><strong>Purge Moodle Caches</strong><span class="umat-db umat-fs-10 umat-c-ol">Clear all Moodle cache stores (themes, JS, templates)</span></div>
         </button>
-        <button class="admin-action-btn" data-action="purge_theme_cache" type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-r10);background:var(--u-sflo);cursor:pointer;font-size:12px;text-align:left;">
+        <button class="admin-action-btn umat-action-item" data-action="purge_theme_cache" type="button">
           <span class="material-symbols-outlined" style="color:#6366f1;">palette</span>
-          <div><strong>Purge Theme Cache</strong><span style="display:block;font-size:10px;color:var(--u-ol);">Reset theme CSS and template caches</span></div>
+          <div><strong>Purge Theme Cache</strong><span class="umat-db umat-fs-10 umat-c-ol">Reset theme CSS and template caches</span></div>
         </button>
-        <button class="admin-action-btn" data-action="trigger_cron" type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-r10);background:var(--u-sflo);cursor:pointer;font-size:12px;text-align:left;">
+        <button class="admin-action-btn umat-action-item" data-action="trigger_cron" type="button">
           <span class="material-symbols-outlined" style="color:var(--u-sec);">schedule</span>
-          <div><strong>Trigger Cron Now</strong><span style="display:block;font-size:10px;color:var(--u-ol);">Run all scheduled tasks immediately</span></div>
+          <div><strong>Trigger Cron Now</strong><span class="umat-db umat-fs-10 umat-c-ol">Run all scheduled tasks immediately</span></div>
         </button>
         <a href="{$wwwroot}/admin/settings.php?section=local_umat_ai" target="_blank" class="admin-action-btn" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-r10);background:var(--u-sflo);cursor:pointer;font-size:12px;text-decoration:none;color:inherit;box-sizing:border-box;">
           <span class="material-symbols-outlined" style="color:var(--u-ol);">launch</span>
-          <div><strong>Open Native Admin Settings</strong><span style="display:block;font-size:10px;color:var(--u-ol);">Moodle admin page for full plugin configuration</span></div>
+          <div><strong>Open Native Admin Settings</strong><span class="umat-db umat-fs-10 umat-c-ol">Moodle admin page for full plugin configuration</span></div>
         </a>
       </div>
       <div id="acp-action-msg" style="padding:0 14px 14px;font-size:11px;display:none;"></div>

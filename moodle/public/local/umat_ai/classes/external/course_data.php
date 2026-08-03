@@ -156,8 +156,14 @@ class course_data extends \external_api {
             $ctx = \context_course::instance($cid);
             self::validate_context($ctx);
             // Allow lecturers (viewanalytics) OR students (chatwithai).
-            if (!has_capability('local/umat_ai:chatwithai', $ctx) && !has_capability('local/umat_ai:viewanalytics', $ctx)) {
-                require_capability('local/umat_ai:chatwithai', $ctx);
+            $hasChatWithAI = has_capability('local/umat_ai:chatwithai', $ctx);
+            $hasViewAnalytics = has_capability('local/umat_ai:viewanalytics', $ctx);
+            if (!$hasChatWithAI && !$hasViewAnalytics) {
+                // Allow access for enrolled users who can access the course
+                // The external service already validates login; check course enrollment
+                if (!is_enrolled($ctx, $USER->id)) {
+                    require_capability('local/umat_ai:chatwithai', $ctx);
+                }
             }
             $contextIds[] = (int)$ctx->id;
             $ctxToCm[(int)$ctx->id] = 0;
@@ -246,9 +252,91 @@ class course_data extends \external_api {
                         'timemodified' => (int)$f->get_timemodified(),
                         'time_ago'     => self::time_ago($f->get_timemodified()),
                         'page_count'   => $pageCount,
+                        'resource_type'=> 'document',
+                        'status'       => 'indexed',
+                        'studentvisible'=> 1,
                     ];
                     if (count($mats) >= 100) break 3;
                 }
+            }
+        }
+
+        // --- FETCH BBB RECORDINGS FOR THIS COURSE ---
+        $recordings = [];
+        if ($cid > 0) {
+            $recs = $DB->get_records('umat_ai_sessions', [
+                'courseid' => $cid,
+            ], 'timecreated DESC', 'id,sessionid,courseid,title,recording_url,timecreated,status,studentvisible,resource_type,timemodified,transcript_json');
+            foreach ($recs as $rec) {
+                // Skip recordings without a URL.
+                if (empty($rec->recording_url)) {
+                    continue;
+                }
+                // Students see only published recordings; lecturers see all.
+                $isStudent = !$hasViewAnalytics;
+                if ($isStudent && !$rec->studentvisible) {
+                    continue;
+                }
+                $statusMap = [
+                    'pending' => 'pending',
+                    'waiting_recording' => 'waiting_recording',
+                    'transcribing' => 'transcribing',
+                    'indexing' => 'indexing',
+                    'ready' => 'ready',
+                    'completed' => 'ready',
+                    'error' => 'failed',
+                    'failed' => 'failed',
+                ];
+                $status = $statusMap[$rec->status] ?? $rec->status;
+                $duration = '';
+                if ($rec->transcript_json) {
+                    $raw = json_decode($rec->transcript_json, true);
+                    if (is_array($raw)) {
+                        $lastSeg = end($raw);
+                        if ($lastSeg && isset($lastSeg['end'])) {
+                            $secs = (int)$lastSeg['end'];
+                            $h = floor($secs / 3600);
+                            $m = floor(($secs % 3600) / 60);
+                            $s = $secs % 60;
+                            $duration = ($h ? $h . 'h ' : '') . $m . 'm ' . $s . 's';
+                        }
+                    }
+                }
+                // Check AI outputs for this recording
+                $outputTypes = ['transcript', 'summary', 'notes', 'quiz'];
+                $aiOutputs = [];
+                if ($rec->status === 'completed' || $rec->status === 'ready') {
+                    $outputs = $DB->get_records('umat_ai_outputs', [
+                        'sessionrecordid' => $rec->id,
+                        'is_approved' => 1,
+                    ]);
+                    foreach ($outputs as $out) {
+                        if (in_array($out->output_type, $outputTypes)) {
+                            $aiOutputs[$out->output_type] = true;
+                        }
+                    }
+                }
+                // Skip recordings whose URL fails Moodle external API validation.
+                $recordingurl = trim((string)$rec->recording_url);
+                if ($recordingurl === '' || !filter_var($recordingurl, FILTER_VALIDATE_URL)) {
+                    continue;
+                }
+                $recordings[] = [
+                    'id'            => (int)$rec->id,
+                    'filename'      => 'BBB Recording — ' . date('d M Y', $rec->timecreated),
+                    'mimetype'      => 'video/webm',
+                    'filesize'      => 0,
+                    'url'           => $recordingurl,
+                    'timemodified'  => (int)$rec->timemodified,
+                    'time_ago'      => self::time_ago((int)$rec->timemodified),
+                    'page_count'    => 0,
+                    'resource_type' => 'bbb_recording',
+                    'status'        => $status,
+                    'studentvisible'=> (int)$rec->studentvisible,
+                    'duration'      => $duration,
+                    'ai_outputs'    => json_encode($aiOutputs ?: new \stdClass()),
+                    'material_id'   => 0,
+                ];
             }
         }
 
@@ -278,29 +366,65 @@ class course_data extends \external_api {
             unset($mat);
         }
 
-        return ['materials' => $mats];
+        // Add resource_type and default fields to documents for unified list
+        foreach ($mats as &$mat) {
+            $mat['resource_type']  = 'document';
+            $mat['studentvisible'] = (int)($mat['material_id'] ? ($DB->get_field('umat_ai_materials', 'studentvisible', ['id' => $mat['material_id']]) ?? 1) : 1);
+            $mat['ai_outputs']     = json_encode(new \stdClass());
+            $mat['duration']       = '';
+        }
+        unset($mat);
+
+        return ['materials' => $mats, 'recordings' => $recordings];
             } catch (\Throwable $e) {
                 error_log('local_umat_ai get_course_materials error: ' . $e->getMessage()
                     . ' in ' . $e->getFile() . ':' . $e->getLine());
-                throw $e;
+                // Return empty array on error to avoid frontend "Could not load materials"
+                return ['materials' => [], 'recordings' => []];
             }
     }
 
     public static function get_course_materials_returns() {
-        return new \external_single_structure(['materials' => new \external_multiple_structure(
-            new \external_single_structure([
-                'id'           => new \external_value(PARAM_INT),
-                'filename'     => new \external_value(PARAM_TEXT),
-                'mimetype'     => new \external_value(PARAM_TEXT),
-                'filesize'     => new \external_value(PARAM_INT),
-                'url'          => new \external_value(PARAM_URL),
-                'timemodified' => new \external_value(PARAM_INT),
-                'time_ago'     => new \external_value(PARAM_TEXT),
-                'page_count'   => new \external_value(PARAM_INT),
-                'status'       => new \external_value(PARAM_ALPHAEXT, 'Indexing status', VALUE_DEFAULT, 'not_indexed'),
-                'material_id'  => new \external_value(PARAM_INT, 'umat_ai_materials record id', VALUE_DEFAULT, 0),
-            ])
-        )]);
+        return new \external_single_structure([
+            'materials'  => new \external_multiple_structure(
+                new \external_single_structure([
+                    'id'             => new \external_value(PARAM_INT),
+                    'filename'       => new \external_value(PARAM_TEXT),
+                    'mimetype'       => new \external_value(PARAM_TEXT),
+                    'filesize'       => new \external_value(PARAM_INT),
+                    'url'            => new \external_value(PARAM_URL),
+                    'timemodified'   => new \external_value(PARAM_INT),
+                    'time_ago'       => new \external_value(PARAM_TEXT),
+                    'page_count'     => new \external_value(PARAM_INT),
+                    'status'         => new \external_value(PARAM_ALPHAEXT, 'Indexing status', VALUE_DEFAULT, 'not_indexed'),
+                    'material_id'    => new \external_value(PARAM_INT, 'umat_ai_materials record id', VALUE_DEFAULT, 0),
+                    'resource_type'  => new \external_value(PARAM_ALPHAEXT, 'document|bbb_recording', VALUE_DEFAULT, 'document'),
+                    'studentvisible' => new \external_value(PARAM_INT, '1=published, 0=hidden', VALUE_DEFAULT, 1),
+                    'ai_outputs'     => new \external_value(PARAM_RAW, 'Available AI outputs', VALUE_DEFAULT, '[]'),
+                    'duration'       => new \external_value(PARAM_TEXT, 'Duration for recordings', VALUE_DEFAULT, ''),
+                ]),
+                VALUE_DEFAULT, []
+            ),
+            'recordings' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'id'             => new \external_value(PARAM_INT),
+                    'filename'       => new \external_value(PARAM_TEXT),
+                    'mimetype'       => new \external_value(PARAM_TEXT),
+                    'filesize'       => new \external_value(PARAM_INT),
+                    'url'            => new \external_value(PARAM_URL),
+                    'timemodified'   => new \external_value(PARAM_INT),
+                    'time_ago'       => new \external_value(PARAM_TEXT),
+                    'page_count'     => new \external_value(PARAM_INT),
+                    'status'         => new \external_value(PARAM_ALPHAEXT, 'Indexing status', VALUE_DEFAULT, 'not_indexed'),
+                    'material_id'    => new \external_value(PARAM_INT, 'umat_ai_materials record id', VALUE_DEFAULT, 0),
+                    'resource_type'  => new \external_value(PARAM_ALPHAEXT, 'document|bbb_recording', VALUE_DEFAULT, 'document'),
+                    'studentvisible' => new \external_value(PARAM_INT, '1=published, 0=hidden', VALUE_DEFAULT, 1),
+                    'ai_outputs'     => new \external_value(PARAM_RAW, 'Available AI outputs', VALUE_DEFAULT, '[]'),
+                    'duration'       => new \external_value(PARAM_TEXT, 'Duration for recordings', VALUE_DEFAULT, ''),
+                ]),
+                VALUE_DEFAULT, []
+            ),
+        ]);
     }
 
     // ------------------------------------------------------------------ //
@@ -425,15 +549,23 @@ class course_data extends \external_api {
 
     public static function get_course_recordings($courseid) {
         global $DB, $USER;
-        $params = self::validate_parameters(
-            self::get_course_recordings_parameters(), ['courseid' => $courseid]);
-        $cid = (int)$params['courseid'];
+        try {
+            $params = self::validate_parameters(
+                self::get_course_recordings_parameters(), ['courseid' => $courseid]);
+            $cid = (int)$params['courseid'];
 
-        $courseIds = [];
-        if ($cid > 0) {
-            $ctx = \context_course::instance($cid);
-            self::validate_context($ctx);
-            require_capability('local/umat_ai:chatwithai', $ctx);
+            $courseIds = [];
+            if ($cid > 0) {
+                $ctx = \context_course::instance($cid);
+                self::validate_context($ctx);
+                // Allow both students (chatwithai) and lecturers (viewanalytics).
+                $hasChatWithAI = has_capability('local/umat_ai:chatwithai', $ctx);
+                $hasViewAnalytics = has_capability('local/umat_ai:viewanalytics', $ctx);
+                if (!$hasChatWithAI && !$hasViewAnalytics) {
+                    if (!is_enrolled($ctx, $USER->id)) {
+                        require_capability('local/umat_ai:chatwithai', $ctx);
+                    }
+            }
             $courseIds[] = $cid;
         } else {
             $courses = enrol_get_users_courses($USER->id, true, 'id');
@@ -442,11 +574,17 @@ class course_data extends \external_api {
         if (empty($courseIds)) return ['recordings' => []];
 
         list($inSql, $inParams) = $DB->get_in_or_equal($courseIds, SQL_PARAMS_NAMED);
+        $hasAnalytics = has_capability('local/umat_ai:viewanalytics', \context_course::instance($cid));
+        $isStudent = !$hasAnalytics;
+
+        $where = "WHERE courseid $inSql AND recording_url IS NOT NULL AND recording_url != ''";
+        if ($isStudent) {
+            $where .= " AND studentvisible = 1";
+        }
+        $where .= " ORDER BY timecreated DESC";
+
         $sessions = $DB->get_records_sql(
-            "SELECT * FROM {umat_ai_sessions}
-              WHERE courseid $inSql
-                AND recording_url IS NOT NULL AND recording_url != ''
-           ORDER BY timecreated DESC",
+            "SELECT * FROM {umat_ai_sessions} $where",
             $inParams, 0, 60);
 
         $recs = [];
@@ -486,36 +624,45 @@ class course_data extends \external_api {
             }
 
             $recs[] = [
-                'id'          => (int)$sess->id,
-                'session_key' => $sess->sessionid,
-                'courseid'    => (int)$sess->courseid,
-                'title'       => $title,
-                'description' => $desc,
-                'url'         => $sess->recording_url,
-                'date'        => date('d M Y', $sess->timecreated),
-                'time_ago'    => self::time_ago($sess->timecreated),
-                'duration'    => '',
-                'page_count'  => 0,
-                'segments'    => $segments,
+                'id'            => (int)$sess->id,
+                'session_key'   => $sess->sessionid,
+                'courseid'      => (int)$sess->courseid,
+                'title'         => $title,
+                'description'   => $desc,
+                'url'           => $sess->recording_url,
+                'status'        => $sess->status ?? 'pending',
+                'has_transcript'=> !empty($segments),
+                'date'          => date('d M Y', $sess->timecreated),
+                'time_ago'      => self::time_ago($sess->timecreated),
+                'duration'      => '',
+                'page_count'    => 0,
+                'segments'      => $segments,
             ];
         }
         return ['recordings' => $recs];
+        } catch (\Throwable $e) {
+            error_log('local_umat_ai get_course_recordings error: ' . $e->getMessage()
+                . ' in ' . $e->getFile() . ':' . $e->getLine());
+            return ['recordings' => []];
+        }
     }
 
     public static function get_course_recordings_returns() {
         return new \external_single_structure(['recordings' => new \external_multiple_structure(
             new \external_single_structure([
-                'id'          => new \external_value(PARAM_INT),
-                'session_key' => new \external_value(PARAM_TEXT),
-                'courseid'    => new \external_value(PARAM_INT),
-                'title'       => new \external_value(PARAM_TEXT),
-                'description' => new \external_value(PARAM_TEXT),
-                'url'         => new \external_value(PARAM_URL),
-                'date'        => new \external_value(PARAM_TEXT),
-                'time_ago'    => new \external_value(PARAM_TEXT),
-                'duration'    => new \external_value(PARAM_TEXT),
-                'page_count'  => new \external_value(PARAM_INT),
-                'segments'    => new \external_multiple_structure(
+                'id'            => new \external_value(PARAM_INT),
+                'session_key'   => new \external_value(PARAM_TEXT),
+                'courseid'      => new \external_value(PARAM_INT),
+                'title'         => new \external_value(PARAM_TEXT),
+                'description'   => new \external_value(PARAM_TEXT),
+                'url'           => new \external_value(PARAM_URL),
+                'status'        => new \external_value(PARAM_TEXT),
+                'has_transcript'=> new \external_value(PARAM_BOOL),
+                'date'          => new \external_value(PARAM_TEXT),
+                'time_ago'      => new \external_value(PARAM_TEXT),
+                'duration'      => new \external_value(PARAM_TEXT),
+                'page_count'    => new \external_value(PARAM_INT),
+                'segments'      => new \external_multiple_structure(
                     new \external_single_structure([
                         'timestamp' => new \external_value(PARAM_TEXT),
                         'start'     => new \external_value(PARAM_FLOAT),

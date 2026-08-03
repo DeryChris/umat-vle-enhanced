@@ -55,7 +55,7 @@ $functions = [
     'local_umat_ai_get_course_recordings' => [
         'classname'   => '\local_umat_ai\external\course_data', 'methodname' => 'get_course_recordings',
         'description' => 'Get BBB recordings with AI metadata', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+        'loginrequired' => true, 'capabilities' => '',
     ],
     'local_umat_ai_get_ai_sessions' => [
         'classname'   => '\local_umat_ai\external\course_data', 'methodname' => 'get_ai_sessions',
@@ -249,6 +249,11 @@ $functions = [
         'description' => 'Single aggregated payload for the Struggle Areas Dashboard', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
+    'local_umat_ai_get_teaching_intelligence' => [
+        'classname'   => '\local_umat_ai\external\get_teaching_intelligence', 'methodname' => 'get_teaching_intelligence',
+        'description' => 'Teaching Intelligence Dashboard with AI recommendations', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
     'local_umat_ai_report_material_progress' => [
         'classname'   => '\local_umat_ai\external\report_material_progress', 'methodname' => 'report_material_progress',
         'description' => 'Report material viewing progress via JS beacon', 'type' => 'write', 'ajax' => true,
@@ -363,6 +368,11 @@ $functions = [
         'description' => 'List transcription jobs for a course', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
+    'local_umat_ai_transcribe_recording' => [
+        'classname'   => '\local_umat_ai\external\transcription', 'methodname' => 'transcribe_recording',
+        'description' => 'Trigger transcription for an existing recording session', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
     'local_umat_ai_direct_upload' => [
         'classname'   => '\local_umat_ai\external\transcription', 'methodname' => 'direct_upload',
         'description' => 'Handle direct file upload for transcription', 'type' => 'write', 'ajax' => true,
@@ -373,37 +383,49 @@ $functions = [
     'local_umat_ai_resource_bank_list' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'list_items',
         'description' => 'List items in a resource bank folder', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
     'local_umat_ai_resource_bank_create_folder' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'create_folder',
         'description' => 'Create a folder in the resource bank', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
     'local_umat_ai_resource_bank_upload' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'upload_file',
         'description' => 'Upload a file to the resource bank', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
     'local_umat_ai_resource_bank_delete' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'delete_items',
         'description' => 'Delete items from the resource bank', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
     'local_umat_ai_resource_bank_push' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'push_to_course',
         'description' => 'Push resource bank items to a course', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
     'local_umat_ai_resource_bank_teaching_courses' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'list_teaching_courses',
         'description' => 'List courses the user can push resources to', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
     'local_umat_ai_resource_bank_rename' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'rename_item',
         'description' => 'Rename a resource bank item', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_get_session_attendance' => [
+        'classname'   => '\local_umat_ai\external\get_session_attendance', 'methodname' => 'get_session_attendance',
+        'description' => 'Per-session BBB attendance breakdown with present/absent student lists',
+        'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_export_attendance' => [
+        'classname'   => '\local_umat_ai\external\export_attendance', 'methodname' => 'export_attendance',
+        'description' => 'Export course attendance data (CSV natively; XLSX/PDF via AI service)',
+        'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
 ];
 

@@ -26,10 +26,6 @@ define([], function() {
             tab.addEventListener('pointercancel', function() { tab.classList.remove('is-pressing'); });
             tab.addEventListener('pointerleave', function() { tab.classList.remove('is-pressing'); });
             tab.addEventListener('click', function() {
-                for (var j = 0; j < self.tabs.length; j++) {
-                    self.tabs[j].classList.remove('active');
-                }
-                tab.classList.add('active');
                 if (window.CustomEvent) {
                     try {
                         tab.dispatchEvent(new CustomEvent('umat-glass-tab-changed', {

@@ -844,5 +844,42 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026072201, 'local', 'umat_ai');
     }
 
+    if ($oldversion < 2026072202) {
+        // Add studentvisible and resource_type to umat_ai_sessions for recording visibility and type.
+        $table = new xmldb_table('umat_ai_sessions');
+        $f1 = new xmldb_field('resource_type', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'bbb_recording', 'source_type');
+        $f2 = new xmldb_field('studentvisible', XMLDB_TYPE_INTEGER, '2', null, XMLDB_NOTNULL, null, '0', 'status');
+        if (!$dbman->field_exists($table, $f1)) $dbman->add_field($table, $f1);
+        if (!$dbman->field_exists($table, $f2)) $dbman->add_field($table, $f2);
+
+        // Add studentvisible to umat_ai_materials for lecturer-uploaded materials visibility.
+        $mattable = new xmldb_table('umat_ai_materials');
+        $f3 = new xmldb_field('studentvisible', XMLDB_TYPE_INTEGER, '2', null, XMLDB_NOTNULL, null, '1', 'timecreated');
+        if (!$dbman->field_exists($mattable, $f3)) $dbman->add_field($mattable, $f3);
+
+        upgrade_plugin_savepoint(true, 2026072202, 'local', 'umat_ai');
+    }
+
+    if ($oldversion < 2026072601) {
+        $table = new xmldb_table('umat_ai_student_metrics');
+
+        $f1 = new xmldb_field('risk_level', XMLDB_TYPE_CHAR, '20', null, null, null, null, 'last_active');
+        if (!$dbman->field_exists($table, $f1)) {
+            $dbman->add_field($table, $f1);
+        }
+
+        $f2 = new xmldb_field('confidence', XMLDB_TYPE_NUMBER, '5, 2', null, null, null, null, 'risk_level');
+        if (!$dbman->field_exists($table, $f2)) {
+            $dbman->add_field($table, $f2);
+        }
+
+        $f3 = new xmldb_field('classification', XMLDB_TYPE_CHAR, '50', null, null, null, null, 'confidence');
+        if (!$dbman->field_exists($table, $f3)) {
+            $dbman->add_field($table, $f3);
+        }
+
+        upgrade_plugin_savepoint(true, 2026072601, 'local', 'umat_ai');
+    }
+
     return true;
 }

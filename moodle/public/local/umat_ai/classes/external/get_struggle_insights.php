@@ -13,6 +13,13 @@ defined('MOODLE_INTERNAL') || die();
 require_once($CFG->libdir . '/externallib.php');
 require_once($CFG->dirroot . '/local/umat_ai/lib.php');
 
+use local_umat_ai\analytics\student_risk_calculator;
+use local_umat_ai\analytics\topic_insight_builder;
+use local_umat_ai\analytics\evidence_formatter;
+use local_umat_ai\analytics\academic_query_classifier;
+use local_umat_ai\analytics\safe_percentage;
+use local_umat_ai\analytics\bbb_attendance_analyser;
+
 class get_struggle_insights extends \external_api {
 
     public static function get_struggle_insights_parameters() {
@@ -65,14 +72,29 @@ class get_struggle_insights extends \external_api {
         // ──────────────────────────────────────────────────────────────
         // 1. Student chat logs (questions, sources, userid, timecreated)
         // ──────────────────────────────────────────────────────────────
-        $logs = $DB->get_records_sql(
-            "SELECT id, userid, question, sources, timecreated
+        $rawLogs = $DB->get_records_sql(
+            "SELECT id, userid, question, sources, session_key, role, timecreated
                FROM {umat_ai_chat_logs}
               WHERE courseid = :cid AND timecreated > :since AND role = 'student'
            ORDER BY timecreated DESC",
             ['cid' => $cid, 'since' => $since]
         );
+
+        // Only genuine academic learning questions drive the analytics. The
+        // dashboard previously counted greetings, "quiz me" commands and filler
+        // as questions, which inflated every downstream figure. Keys are
+        // preserved because later code indexes $logs by chat log id.
+        $intentBreakdown = academic_query_classifier::intent_breakdown($rawLogs);
+        $logs = [];
+        foreach ($rawLogs as $qid => $log) {
+            if (academic_query_classifier::is_academic(
+                    (string) $log->question,
+                    academic_query_classifier::source_from_log($log))) {
+                $logs[$qid] = $log;
+            }
+        }
         $totalQuestions = count($logs);
+        $totalRawMessages = count($rawLogs);
 
         // ──────────────────────────────────────────────────────────────
         // 2. Materials for this course (with AI analysis)
@@ -300,15 +322,12 @@ class get_struggle_insights extends \external_api {
             $cat = $ir->category;
             if (!isset($issueCategoryCounts[$cat])) $issueCategoryCounts[$cat] = 0;
             $issueCategoryCounts[$cat]++;
-            // If issue has a topic, also increment event-based matches
-            if (!empty(trim($ir->topic ?? ''))) {
-                $irtNorm = strtolower(preg_replace('/[^a-z0-9\s]/', '', $ir->topic));
-                if (!empty($irtNorm)) {
-                    if (!isset($topicEvents[$irtNorm])) $topicEvents[$irtNorm] = [];
-                    $topicEvents[$irtNorm]['issue_reported'] = ($topicEvents[$irtNorm]['issue_reported'] ?? 0) + 1;
-                    if (!isset($eventTopicMap[$irtNorm])) $eventTopicMap[$irtNorm] = trim($ir->topic);
-                }
-            }
+            // Issue-report topics are deliberately NOT merged into the academic
+            // topic matrix. A login problem or a broken-file report is a
+            // support ticket, not a subject the class is struggling to learn,
+            // and folding them together is what put "Login Issue Report" on the
+            // Topic Struggle Heatmap. Issue counts remain available separately
+            // via $issueCategoryCounts and the summary block.
         }
         $catLabels = [
             'concept_confusion' => 'Concept Confusion',
@@ -482,6 +501,12 @@ class get_struggle_insights extends \external_api {
                 'materials'       => [],
             ];
         }
+
+        // Filter out non-academic topics (test issues, login issues, etc.)
+        $nonAcademicPattern = '/^(test issue|login issue report|login issue)$/i';
+        $topicMatrix = array_values(array_filter($topicMatrix, function($t) use ($nonAcademicPattern) {
+            return !preg_match($nonAcademicPattern, $t['topic']);
+        }));
 
         // ── AI service: PRIMARY topic extraction (always called when data exists) ──
         // Uses all data sources (questions, issues, events, materials) to extract
@@ -799,12 +824,32 @@ class get_struggle_insights extends \external_api {
         $atRiskStudents = [];
         $since30 = time() - (30 * DAYSECS);
 
-        foreach ($studentQuestions as $uid => $qMap) {
-            $qCnt     = count($qMap);
-            $times    = array_values($qMap);
-            $lastTs   = max($times);
-            $firstTs  = min($times);
-            $span     = max(1, $lastTs - $firstTs);
+        // Score every enrolled student, not only the ones who used the AI
+        // assistant. The previous implementation iterated $studentQuestions, so
+        // a student who never opened the chat could not appear in the at-risk
+        // list at all — precisely the disengaged student a lecturer most needs
+        // to see.
+        $enrolledUsers = get_enrolled_users($context, 'local/umat_ai:chatwithai', 0,
+            'u.id, u.firstname, u.lastname, u.email', null, 0, 0, true);
+        if (empty($enrolledUsers)) {
+            $enrolledUsers = get_enrolled_users($context, '', 0,
+                'u.id, u.firstname, u.lastname, u.email', null, 0, 0, true);
+        }
+
+        // One shared course context for the whole batch — this is what keeps
+        // scoring N students from issuing N copies of the same course queries.
+        $riskCourseContext = student_risk_calculator::build_course_context($cid);
+        $riskResults = student_risk_calculator::compute_batch(
+            array_keys($enrolledUsers), $cid, $riskCourseContext);
+
+        foreach ($enrolledUsers as $uid => $enrolledUser) {
+            $uid   = (int) $uid;
+            $qMap  = $studentQuestions[$uid] ?? [];
+            $qCnt  = count($qMap);
+            $times = array_values($qMap);
+            $lastTs  = $times ? max($times) : 0;
+            $firstTs = $times ? min($times) : 0;
+            $span    = max(1, $lastTs - $firstTs);
 
             // Recent vs older
             $recentQ = 0;
@@ -845,32 +890,29 @@ class get_struggle_insights extends \external_api {
             // Topic diversity
             $topicDiv = count($stuTopics);
 
-            // Recency (days since last question)
-            $daysSince = max(0, (time() - $lastTs) / DAYSECS);
-            $recencyWeight = $daysSince < 3 ? 20 : ($daysSince < 7 ? 15 : ($daysSince < 14 ? 10 : 5));
-
-            // Event-based risk factors
+            // Event context, kept for display only — it no longer feeds risk.
             $stuEv = $studentEvents[$uid] ?? [];
             $evQuizFailures = $stuEv['quiz_failure'] ?? 0;
             $evAssignmentFails = $stuEv['assignment_failure'] ?? 0;
             $evRepeatedViews = $stuEv['repeated_views'] ?? 0;
             $evIssueReports = $stuEv['issue_reported'] ?? 0;
-            $evBonus = min(25, ($evQuizFailures * 8) + ($evAssignmentFails * 6) + ($evRepeatedViews * 3) + ($evIssueReports * 5));
 
-            // Risk score
-            $riskScore = round(min(100,
-                ($qCnt / 50) * 30 +
-                min(20, $topicDiv * 5) +
-                ($trend === 'up' ? 25 : ($trend === 'stable' ? 10 : 0)) +
-                $recencyWeight +
-                $evBonus
-            ));
+            // ── The one authoritative risk score ─────────────────────────
+            // Chat volume, topic diversity and question recency are no longer
+            // risk inputs. A student who asks a lot of good questions and
+            // performs well is engaged, not at risk.
+            $risk = $riskResults[$uid] ?? null;
+            if ($risk === null) {
+                continue;
+            }
+            $riskScore = (int) round($risk['risk_score']);
+            $riskLevel = $risk['risk_level'];
 
-            $riskLevel = $riskScore >= 60 ? 'high' : ($riskScore >= 30 ? 'medium' : 'low');
+            // Days since ANY course activity, from the risk model's own
+            // evidence — not from a display string parsed back into a date.
+            $daysSince = $risk['factors']['inactivity']['raw']['days_inactive'] ?? null;
 
-            // Student info
-            $user = $DB->get_record('user', ['id' => $uid], 'id, firstname, lastname');
-            if (!$user) continue;
+            $user = $enrolledUser;
 
             $issueCnt = $evIssueReports + $DB->count_records_select('umat_ai_issue_reports',
                 'userid = ? AND courseid = ? AND timecreated > ?', [$uid, $cid, $since]);
@@ -892,7 +934,12 @@ class get_struggle_insights extends \external_api {
                 'risk_score'      => $riskScore,
                 'risk_level'      => $riskLevel,
                 'trend'           => $trend,
-                'last_active'     => $daysSince < 1 ? 'Today' : (int)$daysSince . ' days ago',
+                'days_inactive'   => $daysSince,
+                'last_active'     => $daysSince === null
+                    ? 'No recorded activity'
+                    : ($daysSince < 1 ? 'Active today'
+                        : $daysSince . ' day' . ($daysSince === 1 ? '' : 's') . ' ago'),
+                '_risk'           => $risk,
             ];
         }
 
@@ -900,6 +947,10 @@ class get_struggle_insights extends \external_api {
         usort($atRiskStudents, function($a, $b) {
             return $b['risk_score'] - $a['risk_score'];
         });
+
+        // The risk enrichment that used to live here has moved into the loop
+        // above: risk is now computed once, up front, by the authoritative
+        // calculator rather than layered on top of a second formula.
 
         // ──────────────────────────────────────────────────────────────
         // 9. Recording struggle (if transcripts exist)
@@ -970,6 +1021,8 @@ class get_struggle_insights extends \external_api {
     $aiOverallSummary = '';
     $aiCourseHealth = null;
     $cfg = \local_umat_ai_get_service_config();
+    $totalEvents = 0;
+    $eventBreakdown = ['quiz_failures' => 0, 'repeated_views' => 0, 'assignment_failures' => 0, 'issue_reports' => 0];
     if (!empty($cfg['token'])) {
         try {
             require_once($CFG->libdir . '/filelib.php');
@@ -1118,6 +1171,18 @@ class get_struggle_insights extends \external_api {
             }
 
             // ── AI course-health report ──
+            $totalEvents = 0;
+            $eventBreakdown = ['quiz_failures' => 0, 'repeated_views' => 0, 'assignment_failures' => 0, 'issue_reports' => 0];
+            foreach ($topicEvents as $evNorm => $evReasons) {
+                foreach ($evReasons as $reason => $ec) {
+                    $mapKey = ['quiz_failure' => 'quiz_failures', 'repeated_views' => 'repeated_views',
+                               'assignment_failure' => 'assignment_failures', 'issue_reported' => 'issue_reports'];
+                    $k = $mapKey[$reason] ?? null;
+                    if ($k) $eventBreakdown[$k] += $ec;
+                }
+            }
+            $totalEvents = array_sum($eventBreakdown);
+
             if (!empty($topicMatrix)) {
                 $healthPayload = [
                     'course_id'        => $cid,
@@ -1157,21 +1222,6 @@ class get_struggle_insights extends \external_api {
             $aiServiceUsed = false;
         }
     }
-
-    // ──────────────────────────────────────────────────────────────
-    // 11. Event breakdown (already fetched in step 5b)
-    // ──────────────────────────────────────────────────────────────
-    $totalEvents = 0;
-    $eventBreakdown = ['quiz_failures' => 0, 'repeated_views' => 0, 'assignment_failures' => 0, 'issue_reports' => 0];
-    foreach ($topicEvents as $evNorm => $evReasons) {
-        foreach ($evReasons as $reason => $ec) {
-            $mapKey = ['quiz_failure' => 'quiz_failures', 'repeated_views' => 'repeated_views',
-                       'assignment_failure' => 'assignment_failures', 'issue_reported' => 'issue_reports'];
-            $k = $mapKey[$reason] ?? null;
-            if ($k) $eventBreakdown[$k] += $ec;
-        }
-    }
-    $totalEvents = array_sum($eventBreakdown);
 
     // ──────────────────────────────────────────────────────────────
     // 12. Generate actionable insights (narrative cards)
@@ -1254,7 +1304,7 @@ class get_struggle_insights extends \external_api {
             'total_students'     => $enrolledCount,
             'student_pct'        => $stuPct,
             'question_count'     => $tm['question_count'],
-            'prev_question_count' => 0, // computed below
+            'prev_question_count' => 0,
             'trend'              => $tm['trend'],
             'trend_pct'          => $tm['trend_pct'],
             'struggle_score'     => $score,
@@ -1266,6 +1316,10 @@ class get_struggle_insights extends \external_api {
                 return ['name' => $m['name'], 'question_count' => $m['question_count']];
             }, array_slice($tm['materials'] ?? [], 0, 3)),
             'affected_student_ids' => $tm['affected_student_ids'] ?? array_keys($topicStudents[strtolower($tm['topic'])] ?? []),
+            'ai_explanation'     => $description,
+            'confidence'         => min(99, max(50, $score + 5)),
+            'evidence_sources'   => $tm['event_sources'] ?? [],
+            'recommendation'     => $suggestionText,
         ];
     }
 
@@ -1346,6 +1400,81 @@ class get_struggle_insights extends \external_api {
         $summary = self::generate_student_summary($s, $enrolledCount);
         $suggestion = self::generate_student_suggestion($s);
 
+        // Evidence comes from the risk model's own factor breakdown, so what a
+        // lecturer reads is exactly what was scored — nothing more, nothing
+        // invented. Only factors that actually had data appear.
+        $risk = $s['_risk'] ?? null;
+        $reasons = [];
+        $evidence = [];
+        $ev = $s['event_sources'] ?? [];
+
+        if ($risk !== null) {
+            foreach ($risk['evidence'] as $row) {
+                $evidence[] = $row['label'] . ': ' . $row['detail'];
+                // A factor is only worth naming as a reason when it is actually
+                // contributing — a third or more of its available points.
+                if ($row['points_max'] > 0 && ($row['points_earned'] / $row['points_max']) >= 0.34) {
+                    $reasons[] = $row['detail'];
+                }
+            }
+        }
+
+        // Context that is reported but never scored.
+        if (($ev['issue_reports'] ?? 0) > 0) {
+            $evidence[] = sprintf('Support issues filed: %d (not counted as academic risk)', $ev['issue_reports']);
+        }
+        if (!empty($s['struggle_topics'])) {
+            $evidence[] = 'Recurring questions: ' . implode(', ', array_slice($s['struggle_topics'], 0, 3));
+        }
+
+        if (empty($reasons)) {
+            $reasons[] = $risk['primary_reason'] ?? 'No dominant risk factor.';
+        }
+
+        // Plain-language interpretation that distinguishes academic struggle
+        // from disengagement, rather than restating the score.
+        $explanation = $risk['summary'] ?? 'Not enough evidence to interpret this student\'s position.';
+
+        // Recommendations follow the classification, so they match the reason.
+        $recommendations = [];
+        $classification = $risk['classification'] ?? 'low_risk';
+        switch ($classification) {
+            case 'academically_struggling':
+                $recommendations[] = 'Review the specific concepts below with this student — performance, not attendance, is the gap.';
+                $recommendations[] = 'Offer targeted practice on their weakest quiz topics.';
+                break;
+            case 'assessment_risk':
+                $recommendations[] = 'Check whether the missed submissions are a deadline problem or a comprehension problem.';
+                $recommendations[] = 'Confirm the student can still submit, and agree a catch-up date.';
+                break;
+            case 'attendance_risk':
+                $recommendations[] = 'Ask why live sessions are being missed before assuming disengagement.';
+                $recommendations[] = 'Point the student to the recordings for the sessions they missed.';
+                break;
+            case 'disengaged':
+                $recommendations[] = 'Send a check-in message — there is no recent activity of any kind to work from.';
+                break;
+            case 'resource_engagement_risk':
+                $recommendations[] = 'Confirm the student knows which materials are published and where to find them.';
+                break;
+            case 'monitoring':
+                $recommendations[] = 'No action needed today; revisit if the trend continues.';
+                break;
+            default:
+                $recommendations[] = 'No intervention indicated by the current evidence.';
+        }
+
+        // Quick actions
+        $quickActions = [
+            ['action' => 'view_activity', 'label' => 'View Activity', 'icon' => 'timeline'],
+            ['action' => 'send_message', 'label' => 'Send Message', 'icon' => 'mail'],
+            ['action' => 'recommend_resource', 'label' => 'Recommend Resource', 'icon' => 'school'],
+            ['action' => 'view_quiz_history', 'label' => 'View Quiz History', 'icon' => 'quiz'],
+        ];
+
+        $daysSince = $s['days_inactive'] ?? null;
+        $quizAvg = $risk['factors']['quiz_performance']['raw']['avg_pct'] ?? null;
+
         $studentNarratives[] = [
             'userid'             => $s['userid'],
             'fullname'           => $s['fullname'],
@@ -1355,29 +1484,75 @@ class get_struggle_insights extends \external_api {
             'summary'            => $summary,
             'struggle_topics'    => $s['struggle_topics'],
             'last_active'        => $s['last_active'],
-            'days_since_last_login' => (int)round((time() - ($s['last_active'] === 'Today' ? time() : strtotime('-' . $s['last_active']))) / DAYSECS),
+            'days_since_last_login' => $daysSince === null ? 0 : (int) $daysSince,
             'question_count'     => $s['question_count'],
-            'avg_quiz'           => 0, // will be filled from student profile if available
-            'ai_queries'         => 0,
-            'quiz_failures'      => $s['event_sources']['quiz_failures'] ?? 0,
-            'issue_reports'      => $s['event_sources']['issue_reports'] ?? 0,
+            'avg_quiz'           => $quizAvg === null ? 0 : (float) $quizAvg,
+            'ai_queries'         => $s['question_count'],
+            'quiz_failures'      => $ev['quiz_failures'] ?? 0,
+            'issue_reports'      => $ev['issue_reports'] ?? 0,
             'suggestion'         => $suggestion['text'],
             'suggestion_type'    => $suggestion['type'],
+            'reasons'            => $reasons,
+            'evidence'           => $evidence,
+            'explanation'        => $explanation,
+            // Confidence is evidence completeness, not a restatement of the
+            // score. The old formula was min(99, max(50, risk_score + 5)).
+            'confidence'         => (int) ($risk['confidence_pct'] ?? 30),
+            'recommendation'     => $recommendations,
+            'quick_actions'      => $quickActions,
+            'trend'              => $s['trend'],
+
+            // The full, auditable risk record the redesigned UI renders.
+            'v2_risk'            => $risk === null ? null : [
+                'risk_score'     => (float) $risk['risk_score'],
+                'risk_level'     => $risk['risk_level'],
+                'confidence'     => (float) $risk['confidence'],
+                'classification' => $risk['classification'],
+                'category_label' => $risk['category_label'],
+                'primary_reason' => $risk['primary_reason'],
+                'summary'        => $risk['summary'],
+                'evidence'       => array_map(function ($row) {
+                    return [
+                        'factor'        => $row['factor'],
+                        'label'         => $row['label'],
+                        'detail'        => $row['detail'],
+                        'points_earned' => (float) $row['points_earned'],
+                        'points_max'    => (int) $row['points_max'],
+                    ];
+                }, $risk['evidence']),
+                'trends'         => array_map(function ($t) {
+                    return [
+                        'direction'  => $t['direction'] ?? 'unknown',
+                        'comparable' => !empty($t['comparable']),
+                    ];
+                }, $risk['trends']),
+                'date_range'     => [
+                    'from' => (int) $risk['date_range']['from'],
+                    'to'   => (int) $risk['date_range']['to'],
+                    'days' => (int) $risk['date_range']['days'],
+                ],
+                'calculated_at'  => (int) $risk['calculated_at'],
+            ],
         ];
     }
 
     // -- 12e. Common questions (question radar) --
-    $questionCounts = []; // question text => ['count' => N, 'students' => [uid => true], 'topic' => '']
-    foreach ($logs as $l) {
-        $qtext = preg_replace('/^\[Referencing:\s*[^\]]+\]\s*/i', '', trim($l->question));
-        if (strlen($qtext) < 5) continue;
-        $qkey = strtolower($qtext);
-        if (!isset($questionCounts[$qkey])) {
-            $questionCounts[$qkey] = ['text' => $qtext, 'count' => 0, 'students' => [], 'topic' => ''];
-        }
-        $questionCounts[$qkey]['count']++;
-        $questionCounts[$qkey]['students'][$l->userid] = true;
+    // $logs is already academic-only, and near-duplicate phrasings are
+    // collapsed into a single intent by the classifier's dedup key, so
+    // "What is a payment gateway" and "how does the payment gateway work?"
+    // no longer occupy two rows.
+    $questionCounts = [];
+    foreach (academic_query_classifier::build_question_map($logs) as $entry) {
+        $questionCounts[$entry['dedup_key']] = [
+            'text'         => $entry['question'],
+            'count'        => (int) $entry['count'],
+            'students'     => array_fill_keys($entry['studentids'], true),
+            'topic'        => '',
+            'variant_count' => (int) ($entry['variant_count'] ?? 1),
+            'last_asked'   => (int) ($entry['last_asked'] ?? 0),
+        ];
     }
+
     // Assign topics to questions
     foreach ($questionCounts as &$qc) {
         $qLower = strtolower($qc['text']);
@@ -1396,16 +1571,30 @@ class get_struggle_insights extends \external_api {
             }
         }
         if (empty($qc['topic'])) {
-            $qc['topic'] = 'General';
+            $qc['topic'] = 'Unmatched to a material';
         }
     }
     unset($qc);
-    usort($questionCounts, function($a, $b) { return $b['count'] - $a['count']; });
+    // Breadth first — five students asking once matters more than one student
+    // asking five times.
+    $questionCounts = array_values($questionCounts);
+    usort($questionCounts, function($a, $b) {
+        $sa = count($a['students']);
+        $sb = count($b['students']);
+        if ($sa !== $sb) {
+            return $sb - $sa;
+        }
+        return $b['count'] - $a['count'];
+    });
 
     $commonQuestions = [];
     foreach (array_slice($questionCounts, 0, 15) as $qc) {
-        if ($qc['count'] < 2) break;
         $stuCnt = count($qc['students']);
+        // Show anything more than one student asked, or that one student
+        // returned to. A single one-off question is not a class-wide signal.
+        if ($stuCnt < 2 && $qc['count'] < 2) {
+            continue;
+        }
         $topicName = $qc['topic'];
         $suggestion = '';
         // Find matching topic suggestion
@@ -1416,7 +1605,9 @@ class get_struggle_insights extends \external_api {
             }
         }
         if (empty($suggestion)) {
-            $suggestion = 'Address this in your next lecture — ' . $stuCnt . ' student(s) are confused about this.';
+            $suggestion = $stuCnt >= 2
+                ? sprintf('Asked by %d students — worth a short clarification in class.', $stuCnt)
+                : sprintf('One student returned to this %d times — a targeted follow-up may resolve it.', $qc['count']);
         }
 
         $commonQuestions[] = [
@@ -1425,6 +1616,10 @@ class get_struggle_insights extends \external_api {
             'ask_count'     => $qc['count'],
             'topic'         => $topicName,
             'suggestion'    => $suggestion,
+            // How it reads: breadth versus persistence.
+            'interpretation' => $stuCnt >= 2
+                ? sprintf('%d students asked this %d times', $stuCnt, $qc['count'])
+                : sprintf('1 student asked this %d times', $qc['count']),
         ];
     }
 
@@ -1446,27 +1641,27 @@ class get_struggle_insights extends \external_api {
         }
     }
 
-    $qTrend = 'stable';
-    $qTrendPct = 0;
-    if ($lastWeekQ > 0) {
-        $qTrendPct = round((($thisWeekQ - $lastWeekQ) / $lastWeekQ) * 100);
-        if ($qTrendPct > 10) $qTrend = 'up';
-        elseif ($qTrendPct < -10) $qTrend = 'down';
-    } elseif ($thisWeekQ > 0) {
-        $qTrend = 'up';
-        $qTrendPct = 100;
-    }
+    // Question-volume change, with a guarded percentage. Dividing this week's
+    // count by a previous week of 1 is what produced values like "+957%", and
+    // a previous week of 0 used to be hard-coded to "+100%". When the baseline
+    // is too small, pct_change is null and the UI shows the raw counts only.
+    $qChange = safe_percentage::change($thisWeekQ, $lastWeekQ);
+    $qTrend = $qChange['direction'];
+    $qTrendPct = $qChange['pct_change'];
+    $qTrendComparable = $qChange['comparable'];
 
     // Top struggle topic for pulse
     $topStruggle = !empty($struggleAreas) ? $struggleAreas[0]['topic'] : '—';
     $topStruggleTrend = !empty($struggleAreas) ? ($struggleAreas[0]['trend_pct'] > 0 ? '+' . $struggleAreas[0]['trend_pct'] . '%' : 'stable') : '—';
 
-    // Disengaged students (no login in 7+ days)
+    // Disengaged students (no recorded activity in 7+ days).
+    // The previous version ran strtotime('-3 days ago') on a display string,
+    // which returns false, so this list was populated with nonsense.
     $disengagedStudents = [];
     foreach ($atRiskStudents as $s) {
-        $days = (int)round((time() - ($s['last_active'] === 'Today' ? time() : strtotime('-' . $s['last_active']))) / DAYSECS);
-        if ($days >= 7) {
-            $disengagedStudents[] = ['name' => $s['fullname'], 'days' => $days];
+        $days = $s['days_inactive'] ?? null;
+        if ($days !== null && $days >= 7) {
+            $disengagedStudents[] = ['name' => $s['fullname'], 'days' => (int) $days];
         }
     }
 
@@ -1478,12 +1673,43 @@ class get_struggle_insights extends \external_api {
         }
     }
 
+    // ── Real quiz average ────────────────────────────────────────────────
+    // This used to be 100 minus the average risk score, which meant the "Avg
+    // Quiz" tile showed an inversion of a number that was itself mostly AI chat
+    // volume. It is now the actual mean of graded attempts, normalised against
+    // each quiz's maximum grade, and null when the course has no graded
+    // attempts at all.
+    $quizStats = $DB->get_record_sql(
+        "SELECT AVG(qg.grade / q.grade) AS avg_ratio, COUNT(qg.id) AS attempts,
+                COUNT(DISTINCT qg.userid) AS students
+           FROM {quiz_grades} qg
+           JOIN {quiz} q ON q.id = qg.quiz
+          WHERE q.course = :cid AND q.grade > 0",
+        ['cid' => $cid]
+    );
+    $avgQuiz = null;
+    $quizAttempts = 0;
+    if ($quizStats && $quizStats->avg_ratio !== null && (int) $quizStats->attempts > 0) {
+        $avgQuiz = (int) round(max(0, min(100, ((float) $quizStats->avg_ratio) * 100)));
+        $quizAttempts = (int) $quizStats->attempts;
+    }
+
+    // At-risk = medium or above on the one authoritative model.
+    $atRiskCountPulse = 0;
+    foreach ($atRiskStudents as $s) {
+        if (in_array($s['risk_level'], ['critical', 'high', 'medium'], true)) {
+            $atRiskCountPulse++;
+        }
+    }
+
     $coursePulse = [
-        'avg_quiz'              => 0, // computed from student metrics if available
-        'quiz_trend'            => 'stable',
+        'avg_quiz'              => $avgQuiz === null ? 0 : $avgQuiz,
+        'avg_quiz_available'    => $avgQuiz !== null,
+        'quiz_attempts'         => $quizAttempts,
+        'quiz_trend'            => 'unknown',
         'quiz_trend_pct'        => 0,
-        'at_risk_count'         => count($atRiskStudents),
-        'at_risk_trend'         => count($atRiskStudents) > 0 ? 'up' : 'stable',
+        'at_risk_count'         => $atRiskCountPulse,
+        'at_risk_trend'         => 'unknown',
         'at_risk_trend_delta'   => 0,
         'top_struggle_topic'    => $topStruggle,
         'top_struggle_trend'    => $topStruggleTrend,
@@ -1492,17 +1718,35 @@ class get_struggle_insights extends \external_api {
         'questions_this_week'   => $thisWeekQ,
         'questions_last_week'   => $lastWeekQ,
         'questions_trend'       => $qTrend,
-        'questions_trend_pct'   => $qTrendPct,
+        // Null when the baseline is too small to divide by. The JS renders the
+        // absolute counts and the comparison period instead.
+        'questions_trend_pct'   => $qTrendPct === null ? 0 : (int) $qTrendPct,
+        'questions_trend_comparable' => $qTrendComparable,
+        'questions_period_label'     => 'this week vs last week',
+        // Message counts by intent, so a rise in "questions" can be read as
+        // engagement, confusion or simply more greetings.
+        'messages_total'        => $totalRawMessages,
+        'messages_academic'     => $totalQuestions,
+        'messages_greeting'     => $intentBreakdown['greeting'] ?? 0,
+        'messages_command'      => $intentBreakdown['command'] ?? 0,
+        'messages_filler'       => $intentBreakdown['filler'] ?? 0,
+        // BBB attendance summary (tile data; full detail via get_session_attendance)
+        'bbb_available'           => bbb_attendance_analyser::is_available($cid),
     ];
 
-    // Try to get avg quiz from student_metrics
-    $avgQuizRow = $DB->get_record_sql(
-        "SELECT AVG(risk_score) as avg_risk FROM {umat_ai_student_metrics} WHERE courseid = :cid",
-        ['cid' => $cid]
-    );
-    if ($avgQuizRow && $avgQuizRow->avg_risk !== null) {
-        // Invert risk to get a rough engagement/quiz proxy
-        $coursePulse['avg_quiz'] = max(0, min(100, round(100 - $avgQuizRow->avg_risk)));
+    // Compute attendance summary for the course-pulse tile.
+    $bbbAvailable = $coursePulse['bbb_available'];
+    if ($bbbAvailable) {
+        $bbbSummary = bbb_attendance_analyser::get_course_attendance_summary($cid);
+        $coursePulse['bbb_total_sessions']       = $bbbSummary['total_sessions'];
+        $coursePulse['bbb_avg_attendance_rate']  = $bbbSummary['avg_attendance_rate'];
+        $coursePulse['bbb_attended_count']       = count($bbbSummary['students_who_attended']);
+        $coursePulse['bbb_never_attended_count'] = count($bbbSummary['students_who_never_attended']);
+    } else {
+        $coursePulse['bbb_total_sessions']       = 0;
+        $coursePulse['bbb_avg_attendance_rate']  = 0.0;
+        $coursePulse['bbb_attended_count']       = 0;
+        $coursePulse['bbb_never_attended_count'] = 0;
     }
 
     // -- 12g. Priority actions --
@@ -1569,16 +1813,20 @@ class get_struggle_insights extends \external_api {
         ];
     }
 
-    // Quiz scores dropping
-    if ($qTrend === 'down' && $thisWeekQ > 5) {
+    // Academic question activity falling away. Stated in absolute counts; the
+    // percentage is only added when the baseline is large enough to support it.
+    if ($qTrend === 'down' && $qTrendComparable) {
+        $drop = $qTrendPct !== null ? ' (' . abs((int) $qTrendPct) . '% down)' : '';
         $priorityActions[] = [
             'type'       => 'quiz_drop',
             'urgency'    => 'medium',
             'icon'       => 'quiz',
-            'title'      => 'Activity Dropping',
-            'text'       => 'Student questions dropped ' . abs($qTrendPct) . '% this week (' . $thisWeekQ . ' vs ' . $lastWeekQ . ' last week). This could indicate disengagement.',
+            'title'      => 'Academic questions falling',
+            'text'       => 'Academic questions fell from ' . $lastWeekQ . ' last week to '
+                . $thisWeekQ . ' this week' . $drop
+                . '. Greetings and quiz commands are excluded from these counts.',
             'items'      => [],
-            'suggestion' => 'Consider checking if students are facing technical issues or have lost access to materials.',
+            'suggestion' => 'Check whether students still have access to materials, or whether the topic simply moved on.',
             'action_label' => null,
         ];
     }
@@ -1608,6 +1856,14 @@ class get_struggle_insights extends \external_api {
     // ──────────────────────────────────────────────────────────────
     $aiSummary = $aiOverallSummary ?: '';
     $aiCourseHealthJson = $aiCourseHealth ? json_encode($aiCourseHealth) : null;
+
+    // The full risk record travels nested inside each narrative; drop the
+    // working copy so it is not serialised twice.
+    foreach ($atRiskStudents as &$_stu) {
+        unset($_stu['_risk']);
+    }
+    unset($_stu);
+
     $result = [
         // NEW: Actionable insights
         'priority_actions'    => $priorityActions,
@@ -1623,6 +1879,30 @@ class get_struggle_insights extends \external_api {
         'material_breakdown' => $sectionList,
         'recording_struggle' => $recordingStruggle,
         'at_risk_students'   => $atRiskStudents,
+
+        // NEW: Analytics services enrichment.
+        // Failures are reported through debugging() rather than swallowed —
+        // a silent catch here is what hid the broken table names for so long.
+        'v2_topic_insights'  => (function() use ($cid) {
+            try {
+                return topic_insight_builder::build($cid);
+            } catch (\Throwable $e) {
+                debugging('local_umat_ai: topic_insight_builder::build failed — '
+                    . $e->getMessage(), DEBUG_DEVELOPER);
+                return [];
+            }
+        })(),
+
+        // Provenance for everything above: which window was analysed and when.
+        'meta' => [
+            'date_from'     => (int) $since,
+            'date_to'       => time(),
+            'window_days'   => (int) $params['days'],
+            'generated_at'  => time(),
+            'cache_ttl'     => 120,
+            'risk_model'    => 'student_risk_calculator/1',
+        ],
+
         'summary' => [
             'total_questions'    => $totalQuestions,
             'total_students'     => $uniqueStudents,
@@ -2039,6 +2319,10 @@ class get_struggle_insights extends \external_api {
                     'affected_student_ids' => new \external_multiple_structure(
                         new \external_value(PARAM_INT), '', VALUE_OPTIONAL
                     ),
+                    'ai_explanation'     => new \external_value(PARAM_RAW, '', VALUE_OPTIONAL),
+                    'confidence'         => new \external_value(PARAM_FLOAT, '', VALUE_OPTIONAL),
+                    'evidence_sources'   => new \external_single_structure([], '', VALUE_OPTIONAL),
+                    'recommendation'     => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
                 ]), '', VALUE_OPTIONAL
             ),
             'section_struggle' => new \external_multiple_structure(
@@ -2085,19 +2369,94 @@ class get_struggle_insights extends \external_api {
                     'issue_reports'      => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                     'suggestion'         => new \external_value(PARAM_TEXT),
                     'suggestion_type'    => new \external_value(PARAM_TEXT),
+                    'reasons'            => new \external_multiple_structure(
+                        new \external_value(PARAM_TEXT), '', VALUE_OPTIONAL
+                    ),
+                    'evidence'           => new \external_multiple_structure(
+                        new \external_value(PARAM_TEXT), '', VALUE_OPTIONAL
+                    ),
+                    'explanation'        => new \external_value(PARAM_RAW, '', VALUE_OPTIONAL),
+                    'confidence'         => new \external_value(PARAM_FLOAT, '', VALUE_OPTIONAL),
+                    'recommendation'     => new \external_multiple_structure(
+                        new \external_value(PARAM_TEXT), '', VALUE_OPTIONAL
+                    ),
+                    'quick_actions'      => new \external_multiple_structure(
+                        new \external_single_structure([
+                            'action' => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                            'label'  => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                            'icon'   => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                        ]), '', VALUE_OPTIONAL
+                    ),
+                    'trend'              => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+
+                    // The auditable risk record. Declared here because Moodle's
+                    // clean_returnvalue() silently discards any key that is not
+                    // in the structure — which is why the previous v2 payload
+                    // never reached the browser.
+                    'v2_risk' => new \external_single_structure([
+                        'risk_score'     => new \external_value(PARAM_FLOAT),
+                        'risk_level'     => new \external_value(PARAM_TEXT),
+                        'confidence'     => new \external_value(PARAM_FLOAT),
+                        'classification' => new \external_value(PARAM_TEXT),
+                        'category_label' => new \external_value(PARAM_TEXT),
+                        'primary_reason' => new \external_value(PARAM_TEXT),
+                        'summary'        => new \external_value(PARAM_TEXT),
+                        'evidence'       => new \external_multiple_structure(
+                            new \external_single_structure([
+                                'factor'        => new \external_value(PARAM_TEXT),
+                                'label'         => new \external_value(PARAM_TEXT),
+                                'detail'        => new \external_value(PARAM_TEXT),
+                                'points_earned' => new \external_value(PARAM_FLOAT),
+                                'points_max'    => new \external_value(PARAM_INT),
+                            ]), '', VALUE_OPTIONAL
+                        ),
+                        // Named keys, not a list: a multiple_structure would
+                        // discard the array keys and the UI would lose the
+                        // labels that say which metric each trend belongs to.
+                        'trends'         => new \external_single_structure([
+                            'quiz'       => new \external_single_structure([
+                                'direction'  => new \external_value(PARAM_TEXT),
+                                'comparable' => new \external_value(PARAM_BOOL),
+                            ], '', VALUE_OPTIONAL),
+                            'activity'   => new \external_single_structure([
+                                'direction'  => new \external_value(PARAM_TEXT),
+                                'comparable' => new \external_value(PARAM_BOOL),
+                            ], '', VALUE_OPTIONAL),
+                            'attendance' => new \external_single_structure([
+                                'direction'  => new \external_value(PARAM_TEXT),
+                                'comparable' => new \external_value(PARAM_BOOL),
+                            ], '', VALUE_OPTIONAL),
+                        ], '', VALUE_OPTIONAL),
+                        'date_range'     => new \external_single_structure([
+                            'from' => new \external_value(PARAM_INT),
+                            'to'   => new \external_value(PARAM_INT),
+                            'days' => new \external_value(PARAM_INT),
+                        ], '', VALUE_OPTIONAL),
+                        'calculated_at'  => new \external_value(PARAM_INT),
+                    ], '', VALUE_OPTIONAL),
                 ]), '', VALUE_OPTIONAL
             ),
             'common_questions' => new \external_multiple_structure(
                 new \external_single_structure([
-                    'text'          => new \external_value(PARAM_TEXT),
-                    'student_count' => new \external_value(PARAM_INT),
-                    'ask_count'     => new \external_value(PARAM_INT),
-                    'topic'         => new \external_value(PARAM_TEXT),
-                    'suggestion'    => new \external_value(PARAM_TEXT),
+                    'text'           => new \external_value(PARAM_TEXT),
+                    'student_count'  => new \external_value(PARAM_INT),
+                    'ask_count'      => new \external_value(PARAM_INT),
+                    'topic'          => new \external_value(PARAM_TEXT),
+                    'suggestion'     => new \external_value(PARAM_TEXT),
+                    'interpretation' => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
                 ]), '', VALUE_OPTIONAL
             ),
             'course_pulse' => new \external_single_structure([
                 'avg_quiz'              => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'avg_quiz_available'    => new \external_value(PARAM_BOOL, '', VALUE_OPTIONAL),
+                'quiz_attempts'         => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'questions_trend_comparable' => new \external_value(PARAM_BOOL, '', VALUE_OPTIONAL),
+                'questions_period_label'     => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                'messages_total'        => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'messages_academic'     => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'messages_greeting'     => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'messages_command'      => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'messages_filler'       => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                 'quiz_trend'            => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
                 'quiz_trend_pct'        => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                 'at_risk_count'         => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
@@ -2109,8 +2468,13 @@ class get_struggle_insights extends \external_api {
                 'total_students'        => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                 'questions_this_week'   => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                 'questions_last_week'   => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
-                'questions_trend'       => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
-                'questions_trend_pct'   => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'questions_trend'        => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                'questions_trend_pct'    => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'bbb_available'          => new \external_value(PARAM_BOOL, '', VALUE_OPTIONAL),
+                'bbb_total_sessions'     => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'bbb_avg_attendance_rate'=> new \external_value(PARAM_FLOAT, '', VALUE_OPTIONAL),
+                'bbb_attended_count'     => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'bbb_never_attended_count' => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
             ], '', VALUE_OPTIONAL),
 
             // EXISTING: Legacy fields (kept for compatibility)
@@ -2211,6 +2575,37 @@ class get_struggle_insights extends \external_api {
                     'ai_recommendation' => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
                 ])
             ),
+            // Declared so the payload actually survives clean_returnvalue().
+            // It was being built and then silently discarded.
+            'v2_topic_insights' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'topic_name'     => new \external_value(PARAM_TEXT),
+                    'question_count' => new \external_value(PARAM_INT),
+                    'student_count'  => new \external_value(PARAM_INT),
+                    'total_askers'   => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                    'struggle_score' => new \external_value(PARAM_FLOAT),
+                    'top_students'   => new \external_multiple_structure(
+                        new \external_value(PARAM_INT), '', VALUE_OPTIONAL
+                    ),
+                    'student_names'  => new \external_multiple_structure(
+                        new \external_value(PARAM_TEXT), '', VALUE_OPTIONAL
+                    ),
+                    'first_asked'    => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                    'last_asked'     => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                ]), '', VALUE_OPTIONAL
+            ),
+
+            // Provenance: the window analysed and when it was computed, so the
+            // dashboard can show a date range and a last-updated time.
+            'meta' => new \external_single_structure([
+                'date_from'    => new \external_value(PARAM_INT),
+                'date_to'      => new \external_value(PARAM_INT),
+                'window_days'  => new \external_value(PARAM_INT),
+                'generated_at' => new \external_value(PARAM_INT),
+                'cache_ttl'    => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'risk_model'   => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+            ], '', VALUE_OPTIONAL),
+
             'summary' => new \external_single_structure([
                 'total_questions'    => new \external_value(PARAM_INT),
                 'total_students'     => new \external_value(PARAM_INT),
@@ -2358,17 +2753,13 @@ class get_struggle_insights extends \external_api {
             $parts[] = 'failed ' . $quizFails . ' quiz attempt' . ($quizFails !== 1 ? 's' : '');
         }
 
-        // Last active
-        $lastActive = $student['last_active'] ?? 'unknown';
-        if ($lastActive === 'Today') {
-            // no need to mention
-        } elseif (strpos($lastActive, 'days ago') !== false) {
-            $days = (int)$lastActive;
-            if ($days > 7) {
-                $parts[] = 'hasn\'t logged in for ' . $days . ' days';
-            } elseif ($days > 3) {
-                $parts[] = 'last active ' . $days . ' days ago';
-            }
+        // Last active — read from the numeric field rather than parsed back out
+        // of the display string, which broke whenever the wording changed.
+        $days = $student['days_inactive'] ?? null;
+        if ($days !== null && $days > 7) {
+            $parts[] = 'has had no course activity for ' . (int) $days . ' days';
+        } else if ($days !== null && $days > 3) {
+            $parts[] = 'last active ' . (int) $days . ' days ago';
         }
 
         // Issue reports
@@ -2390,62 +2781,75 @@ class get_struggle_insights extends \external_api {
     /**
      * Generate a plain-English suggestion for a student.
      */
+    /**
+     * Suggested next step for one student.
+     *
+     * Driven by the risk model's classification rather than by question volume,
+     * so the advice matches the stated reason. In particular, a student who is
+     * present and failing is never told they have "disengaged", and asking many
+     * questions is no longer treated as a warning sign.
+     *
+     * @param array $student
+     * @return array ['text' => string, 'type' => string]
+     */
     private static function generate_student_suggestion($student) {
-        $risk = $student['risk_score'] ?? 0;
-        $qCnt = $student['question_count'] ?? 0;
-        $quizFails = $student['event_sources']['quiz_failures'] ?? 0;
-        $lastActive = $student['last_active'] ?? '';
+        $risk = $student['_risk'] ?? null;
+        $classification = $risk['classification'] ?? 'low_risk';
         $topics = $student['struggle_topics'] ?? [];
         $topicStr = !empty($topics) ? $topics[0] : 'the course material';
+        $days = $student['days_inactive'] ?? null;
+        $quizAvg = $risk['factors']['quiz_performance']['raw']['avg_pct'] ?? null;
+        $missed = $risk['factors']['missed_assessments']['raw']['missed_count'] ?? 0;
 
-        // Disengaged (no login in 7+ days)
-        if (strpos($lastActive, 'days ago') !== false) {
-            $days = (int)$lastActive;
-            if ($days >= 7) {
+        switch ($classification) {
+            case 'academically_struggling':
                 return [
-                    'text' => 'This student has disengaged — hasn\'t logged in for ' . $days . ' days. Consider sending an encouragement message to re-engage them.',
+                    'text' => $quizAvg !== null
+                        ? sprintf('Present and engaged, but averaging %d%% on quizzes. Work through %s with them — this is a comprehension gap, not an attendance one.',
+                            round($quizAvg), $topicStr)
+                        : sprintf('Present and engaged, but performing below expectation on %s. A worked example may resolve it.', $topicStr),
+                    'type' => 'meeting',
+                ];
+
+            case 'assessment_risk':
+                return [
+                    'text' => sprintf('%d past-due assessment%s unsubmitted. Confirm whether this is a deadline problem or a comprehension problem before escalating.',
+                        $missed, $missed === 1 ? ' is' : 's are'),
+                    'type' => 'assessment',
+                ];
+
+            case 'attendance_risk':
+                return [
+                    'text' => 'Live session attendance is low while coursework continues. Ask what is preventing attendance and point them to the recordings.',
+                    'type' => 'attendance',
+                ];
+
+            case 'disengaged':
+                return [
+                    'text' => $days !== null
+                        ? sprintf('No course activity of any kind for %d days. A short check-in message is the right first step.', (int) $days)
+                        : 'No recorded course activity. A short check-in message is the right first step.',
                     'type' => 'encourage',
                 ];
-            }
-        }
 
-        // High risk + not using AI tutor
-        if ($risk >= 60 && $qCnt > 5) {
-            return [
-                'text' => 'This student is asking many questions but may not be using the AI tutor effectively. Consider encouraging them to use it for extra support on ' . $topicStr . '.',
-                'type' => 'ai_tutor',
-            ];
-        }
+            case 'resource_engagement_risk':
+                return [
+                    'text' => 'Most published materials remain unopened. Confirm the student knows what is available and where.',
+                    'type' => 'resource',
+                ];
 
-        // High risk + quiz failures
-        if ($risk >= 60 && $quizFails > 0) {
-            return [
-                'text' => 'Schedule a 1:1 meeting to discuss their understanding of ' . $topicStr . '. They may benefit from a worked example or targeted practice.',
-                'type' => 'meeting',
-            ];
-        }
+            case 'monitoring':
+                return [
+                    'text' => 'Signals are mixed and none is decisive. Worth watching rather than acting on today.',
+                    'type' => 'monitor',
+                ];
 
-        // Medium risk + many questions
-        if ($risk >= 30 && $qCnt >= 8) {
-            return [
-                'text' => 'This student is actively seeking help but still struggling. Consider assigning a remedial quiz on ' . $topicStr . ' to reinforce understanding.',
-                'type' => 'quiz',
-            ];
+            default:
+                return [
+                    'text' => 'No intervention indicated by the current evidence.',
+                    'type' => 'none',
+                ];
         }
-
-        // Improving (trend down)
-        if ($student['trend'] === 'down') {
-            return [
-                'text' => 'This student is improving — keep up the positive momentum. Consider assigning advanced problems to challenge them.',
-                'type' => 'challenge',
-            ];
-        }
-
-        // Default
-        return [
-            'text' => 'Monitor this student\'s progress. Check in periodically to ensure they\'re keeping up.',
-            'type' => 'monitor',
-        ];
     }
 
     /**

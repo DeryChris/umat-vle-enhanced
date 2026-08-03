@@ -1,10 +1,11 @@
-define([], function () {
+define(['local_umat_ai/touch_utils'], function (T) {
     'use strict';
 
     var viewerEl = null;
     var activeType = null;
     var activeMedia = null;
     var kbdHandler = null;
+    var swipeHandler = null;
     var typeCleanups = {};
 
     var loadedScripts = {};
@@ -152,6 +153,62 @@ define([], function () {
         };
         document.addEventListener('keydown', kbdHandler);
 
+        // Add swipe support for touch devices
+        if (swipeHandler) {
+            try { viewerEl.removeEventListener('touchstart', swipeHandler._touchStart); } catch (e) {}
+            try { viewerEl.removeEventListener('touchmove', swipeHandler._touchMove); } catch (e) {}
+            try { viewerEl.removeEventListener('touchend', swipeHandler._touchEnd); } catch (e) {}
+        }
+        var _touchData = {};
+        swipeHandler = {
+            _touchStart: function (e) {
+                var t = e.changedTouches[0];
+                _touchData.x0 = t.clientX;
+                _touchData.y0 = t.clientY;
+                _touchData.t0 = Date.now();
+                _touchData.swiping = true;
+            },
+            _touchMove: function (e) {
+                if (!_touchData.swiping) return;
+                var t = e.changedTouches[0];
+                _touchData.x1 = t.clientX;
+                _touchData.y1 = t.clientY;
+            },
+            _touchEnd: function (e) {
+                if (!_touchData.swiping) return;
+                _touchData.swiping = false;
+                var dx = _touchData.x1 - _touchData.x0;
+                var dy = _touchData.y1 - _touchData.y0;
+                var threshold = 60;
+                if (Math.abs(dy) > Math.abs(dx) && dy > threshold) {
+                    // Swipe down to close
+                    closeViewer();
+                    return;
+                }
+                if (activeType === 'video' && activeMedia) {
+                    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > threshold) {
+                        // Swipe left/right on video to seek
+                        if (dx > 0) activeMedia.currentTime = Math.max(0, activeMedia.currentTime - 15);
+                        else activeMedia.currentTime = Math.min(activeMedia.duration || 0, activeMedia.currentTime + 15);
+                    } else if (Math.abs(dy) > Math.abs(dx) && dy < -threshold) {
+                        // Swipe up to toggle play/pause
+                        if (activeMedia.paused) activeMedia.play();
+                        else activeMedia.pause();
+                    }
+                }
+            }
+        };
+        viewerEl.addEventListener('touchstart', swipeHandler._touchStart, { passive: true });
+        viewerEl.addEventListener('touchmove', swipeHandler._touchMove, { passive: true });
+        viewerEl.addEventListener('touchend', swipeHandler._touchEnd, { passive: true });
+
+        // Make toolbar buttons touch-friendly
+        viewerEl.querySelectorAll('.umat-vw-btn').forEach(function (btn) {
+            btn.style.minWidth = '44px';
+            btn.style.minHeight = '44px';
+            btn.style.touchAction = 'manipulation';
+        });
+
         switch (type) {
             case 'video': viewVideo(body, opts); break;
             case 'image': viewImage(body, opts); break;
@@ -187,6 +244,12 @@ define([], function () {
         if (kbdHandler) {
             document.removeEventListener('keydown', kbdHandler);
             kbdHandler = null;
+        }
+        if (swipeHandler && viewerEl) {
+            try { viewerEl.removeEventListener('touchstart', swipeHandler._touchStart); } catch (e) {}
+            try { viewerEl.removeEventListener('touchmove', swipeHandler._touchMove); } catch (e) {}
+            try { viewerEl.removeEventListener('touchend', swipeHandler._touchEnd); } catch (e) {}
+            swipeHandler = null;
         }
         // Run type-specific cleanup
         if (typeCleanups[activeType]) {

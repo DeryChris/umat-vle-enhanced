@@ -60,7 +60,7 @@ class index_course_materials extends \core\task\scheduled_task {
     /**
      * Index all unindexed files in a course.
      */
-    private function index_course(int $courseid): array {
+    public function index_course(int $courseid): array {
         global $DB;
 
         $result = ['indexed' => 0, 'skipped' => 0, 'failed' => 0];
@@ -210,7 +210,7 @@ class index_course_materials extends \core\task\scheduled_task {
     /**
      * Upload a file to the AI service for ChromaDB indexing.
      */
-    private function send_to_ai_service(\stored_file $file, int $courseid): void {
+    public function send_to_ai_service(\stored_file $file, int $courseid): void {
         $cfg = local_umat_ai_get_service_config();
         $url  = $cfg['url'] . '/api/v1/materials/index';
         $materialId = $file->get_id();
@@ -257,7 +257,7 @@ class index_course_materials extends \core\task\scheduled_task {
      * Upload a raw filesystem file (not a stored_file) to the AI service.
      * Used for fileid=0 records whose files live in dataroot/ai_materials/.
      */
-    private function send_disk_file_to_ai_service(string $filepath, string $filename, int $materialId, int $courseid): void {
+    public function send_disk_file_to_ai_service(string $filepath, string $filename, int $materialId, int $courseid): void {
         $cfg = local_umat_ai_get_service_config();
         $url = $cfg['url'] . '/api/v1/materials/index';
 

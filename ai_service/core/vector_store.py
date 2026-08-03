@@ -167,23 +167,43 @@ class VectorStoreManager:
             return f"course_{course_id}_openrouter"
         return f"course_{course_id}"
 
-    def _resolve_collection(self, course_id: int):
-        """Get the collection, falling back to legacy name if needed."""
+    def _resolve_collection(self, course_id: int, prefer_generic: bool = True):
+        """Get the collection, falling back to legacy name if needed.
+
+        When *prefer_generic* is True (default for reads), the bare-named
+        collection ``course_{course_id}`` is tried first.  This ensures that
+        course material which was originally indexed under a previous provider
+        (Gemini) is still found even after switching to OpenRouter or OpenAI.
+        The provider-scoped name is used as a fallback so that new provider-
+        specific indexes are also discoverable once they exist.
+        """
         client = get_chroma_client()
         name = self.get_collection_name(course_id)
-        try:
-            return client.get_collection(name=name)
-        except Exception:
-            pass
-        # Fallback: try the legacy collection names
-        for fallback in [f"course_{course_id}", f"course_{course_id}_openai"]:
-            if fallback == name:
+
+        # ── Try order: generic → provider-scoped → legacy names ──
+        probes = [f"course_{course_id}"]
+        if prefer_generic:
+            probes.append(name)
+        else:
+            probes.insert(0, name)
+        probes += [f"course_{course_id}_openai"]
+
+        seen = set()
+        for candidate in probes:
+            if candidate in seen:
                 continue
+            seen.add(candidate)
             try:
-                return client.get_collection(name=fallback)
+                return client.get_collection(name=candidate)
             except Exception:
                 continue
-        return client.get_collection(name=name)
+
+        # Nothing found — create the provider-scoped collection so the
+        # caller gets an empty (but usable) collection rather than an error.
+        return client.create_collection(
+            name=name,
+            metadata={"course_id": course_id},
+        )
 
     def _add_batches(
         self,

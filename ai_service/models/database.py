@@ -28,19 +28,22 @@ Base = declarative_base()
 class ProcessingJob(Base):
     __tablename__ = "processing_jobs"
 
-    id            = Column(Integer, primary_key=True, index=True)
-    job_id        = Column(String(100), unique=True, index=True, nullable=False)
-    session_id    = Column(String(100), nullable=False)
-    course_id     = Column(Integer, nullable=False)
-    recording_url = Column(Text, nullable=True)
-    status        = Column(String(30), default="queued")  # queued|processing|completed|failed
-    transcript    = Column(Text, nullable=True)
-    summary       = Column(Text, nullable=True)
-    notes         = Column(Text, nullable=True)
-    quiz          = Column(Text, nullable=True)
-    error_message = Column(Text, nullable=True)
-    created_at    = Column(DateTime, default=datetime.utcnow)
-    completed_at  = Column(DateTime, nullable=True)
+    id                = Column(Integer, primary_key=True, index=True)
+    job_id            = Column(String(100), unique=True, index=True, nullable=False)
+    session_id        = Column(String(100), nullable=False)
+    course_id         = Column(Integer, nullable=False)
+    recording_url     = Column(Text, nullable=True)
+    status            = Column(String(30), default="queued")  # queued|downloading|transcribing|processing_ai|completed|failed
+    progress_percent  = Column(Integer, default=0)
+    transcript        = Column(Text, nullable=True)
+    segments_json     = Column(Text, nullable=True)   # JSON array of segment objects
+    summary           = Column(Text, nullable=True)
+    notes             = Column(Text, nullable=True)
+    quiz              = Column(Text, nullable=True)
+    error_message     = Column(Text, nullable=True)
+    webhook_url       = Column(Text, nullable=True)   # URL to call on completion
+    created_at        = Column(DateTime, default=datetime.utcnow)
+    completed_at      = Column(DateTime, nullable=True)
 
 
 class IndexedDocument(Base):

@@ -6,8 +6,12 @@
 }}
 <div class="umat-insights-pane sd-dashboard" data-stream-url="{{stream_url}}" data-sesskey="{{sesskey}}">
 
+  <!-- ROW 0: Teaching Brief -->
+  <section class="ins-full-card ins-teaching-brief" id="ins-teaching-brief" style="display:none;">
+  </section>
+
   <!-- ROW 1: Course Pulse Stat Tiles -->
-  <section class="ins-cards-row" id="ins-stat-tiles">
+  <section class="ins-cards-row ins-cards-row-5" id="ins-stat-tiles">
     <div class="ins-stat-tile ins-stat-loading" data-metric="students">
       <div class="ins-stat-icon"><span class="material-symbols-outlined">groups</span></div>
       <div class="ins-stat-val" id="ins-stat-students">--</div>
@@ -27,6 +31,13 @@
       <div class="ins-stat-icon ins-stat-icon-blue"><span class="material-symbols-outlined">person</span></div>
       <div class="ins-stat-val" id="ins-stat-active">--</div>
       <div class="ins-stat-label">Active This Week</div>
+    </div>
+    <div class="ins-stat-tile ins-stat-loading" data-metric="attendance"
+         onclick="window.struggleDashboard.openAttendancePanel()"
+         style="cursor:pointer;">
+      <div class="ins-stat-icon ins-stat-icon-ok"><span class="material-symbols-outlined">meeting_room</span></div>
+      <div class="ins-stat-val" id="ins-stat-attendance">--</div>
+      <div class="ins-stat-label">BB Attendance</div>
     </div>
   </section>
 
@@ -54,6 +65,10 @@
     <div id="ins-topic-heatmap" class="ins-heatmap-grid">
       <div class="ins-empty">No struggle data yet.</div>
     </div>
+  </section>
+
+  <!-- ROW 3b: V2 Topic Insights (from analytics/topic_insight_builder) -->
+  <section class="ins-full-card" id="ins-topic-v2" style="display:none;">
   </section>
 
   <!-- ROW 4: At-Risk Students + Common Questions -->
@@ -128,6 +143,33 @@
       </button>
       <button class="ins-action-btn" onclick="window.struggleDashboard.openActionDrawer('remedial_quiz')">
         <span class="material-symbols-outlined">quiz</span> Quiz
+      </button>
+    </div>
+  </div>
+
+  <!-- Attendance Detail Panel -->
+  <div class="ins-detail-panel" id="ins-attendance-panel" style="display:none;">
+    <div class="ins-detail-header">
+      <div>
+        <strong>BBB Attendance</strong>
+        <span class="ins-pill" id="ins-attendance-summary">-</span>
+      </div>
+      <button class="ins-chip-sm" onclick="window.struggleDashboard.closeAttendancePanel()">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="ins-detail-body" id="ins-attendance-body">
+      <div class="ins-empty">Loading attendance data...</div>
+    </div>
+    <div class="ins-detail-actions">
+      <button class="ins-action-btn" onclick="window.struggleDashboard.exportAttendance('csv')">
+        <span class="material-symbols-outlined">download</span> CSV
+      </button>
+      <button class="ins-action-btn" onclick="window.struggleDashboard.exportAttendance('xlsx')">
+        <span class="material-symbols-outlined">table_chart</span> Excel
+      </button>
+      <button class="ins-action-btn" onclick="window.struggleDashboard.exportAttendance('pdf')">
+        <span class="material-symbols-outlined">picture_as_pdf</span> PDF
       </button>
     </div>
   </div>

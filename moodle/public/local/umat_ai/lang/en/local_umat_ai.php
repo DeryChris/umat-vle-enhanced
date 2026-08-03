@@ -78,6 +78,8 @@ $string['enable_hub_fab']            = 'Enable Hub FAB (non-course pages)';
 $string['enable_hub_fab_desc']       = 'Show a compact hub FAB on non-course pages for enrolled students.';
 $string['enable_admin_fab']          = 'Enable Admin Control FAB';
 $string['enable_admin_fab_desc']     = 'Show the admin system-control FAB + overlay for site managers.';
+$string['enable_resource_bank']      = 'Enable Resource Bank (Private Bank)';
+$string['enable_resource_bank_desc'] = 'Show the Private Resource Bank tab in the lecturer Library, allowing lecturers to manage private files and push them to courses.';
 
 /* ---- Approval page ---- */
 $string['approval_title']  = 'Review AI-Generated Content';
@@ -269,3 +271,11 @@ $string['delete_session'] = 'Delete session';
 $string['delete_session_confirm'] = 'Delete this conversation? This cannot be undone.';
 $string['delete_session_done'] = 'Session deleted.';
 $string['delete_session_error'] = 'Could not delete session. Please try again.';
+
+/* ---- Transcription ---- */
+$string['transcribe_recording'] = 'Transcribe';
+$string['transcribe_processing'] = 'Processing\u2026';
+$string['transcribe_triggered'] = 'Transcription started.';
+$string['transcribe_error'] = 'Transcription failed.';
+$string['view_transcript'] = 'View Transcript';
+$string['no_transcript'] = 'No transcript available yet.';

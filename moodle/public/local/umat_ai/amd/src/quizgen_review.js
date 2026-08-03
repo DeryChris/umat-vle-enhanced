@@ -510,11 +510,11 @@ define(['core/ajax'], function(Ajax) {
             '      <option value="8">8 lines</option>' +
             '    </select>' +
             '  </div>' +
-            '  <div class="qgen-field"><label>Version</label>' +
+            '  <div class="qgen-field"><label>Version(s)</label>' +
             '    <div class="qgen-toggle-row">' +
-            '      <label class="qgen-radio-label"><input type="radio" name="qgen-doc-version" value="A" checked> Version A</label>' +
-            '      <label class="qgen-radio-label"><input type="radio" name="qgen-doc-version" value="B"> Version B</label>' +
-            '      <label class="qgen-radio-label"><input type="radio" name="qgen-doc-version" value="C"> Version C</label>' +
+            '      <label class="qgen-check-label"><input type="checkbox" class="qgen-version-check" value="A" checked> Version A</label>' +
+            '      <label class="qgen-check-label"><input type="checkbox" class="qgen-version-check" value="B"> Version B</label>' +
+            '      <label class="qgen-check-label"><input type="checkbox" class="qgen-version-check" value="C"> Version C</label>' +
             '    </div>' +
             '  </div>' +
             '  <div class="qgen-export-types">' +
@@ -1176,7 +1176,12 @@ define(['core/ajax'], function(Ajax) {
             methodname: 'local_umat_ai_get_course_materials',
             args: { courseid: cid }
         }])[0].done(function(r) {
-            _materials = r.materials || [];
+            _materials = (r.materials || []).map(function(m) {
+                if (typeof m.ai_outputs === 'string') {
+                    try { m.ai_outputs = JSON.parse(m.ai_outputs); } catch (e) { m.ai_outputs = {}; }
+                }
+                return m;
+            });
             if (!_materials.length) {
                 list.innerHTML = '<div class="qgen-empty-sm">No course materials found. Use "Custom Text" instead.</div>';
                 document.getElementById('qgen-source').value = 'text';
@@ -1190,31 +1195,11 @@ define(['core/ajax'], function(Ajax) {
     }
 
     function renderMaterialList(list, cid) {
-        list.innerHTML = _materials.map(function(m) {
-            var label = esc(m.filename || m.name || 'Material ' + m.id);
-            var icon = getFileIcon(m.mimetype || '');
-            var isReady = m.status === 'indexed';
-            var isPending = m.status === 'pending';
-            var isFailed = m.status === 'not_indexed';
-            var checkedAttr = isReady ? '' : ' disabled';
-            var statusBadge = '';
-            if (isReady) {
-                statusBadge = '<span class="qgen-mat-badge qgen-mat-indexed">Ready</span>';
-            } else if (isPending) {
-                statusBadge = '<span class="qgen-mat-badge qgen-mat-pending">Processing</span>';
-            } else {
-                statusBadge = '<span class="qgen-mat-badge qgen-mat-error">Not indexed</span>' +
-                    '<button type="button" class="qgen-mat-retry" data-fileid="' + m.id + '" data-matid="' + m.material_id + '" data-cid="' + cid + '" title="Retry indexing">' +
-                    '<span class="material-symbols-outlined">refresh</span></button>';
-            }
-            return '<label class="qgen-mat-item' + (isFailed ? ' qgen-mat-failed' : '') + '">' +
-                '<input type="checkbox" class="qgen-mat-check" value="' + m.id + '"' + checkedAttr + '>' +
-                '<span class="qgen-mat-icon material-symbols-outlined">' + icon + '</span>' +
-                '<span class="qgen-mat-name">' + label + '</span>' +
-                statusBadge +
-                '</label>';
-        }).join('');
-
+        list.innerHTML = '<div class="qgen-materials-container">' +
+            renderResourceFilterChips() +
+            '<div class="qgen-materials-grid" id="qgen-materials-grid">' + renderUnifiedMaterials(_materials, cid) + '</div>' +
+            '</div>';
+        wireFilterEvents(cid);
         list.querySelectorAll('.qgen-mat-retry').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -1222,6 +1207,148 @@ define(['core/ajax'], function(Ajax) {
                 handleMaterialRetry(this, cid);
             });
         });
+    }
+
+    function renderResourceFilterChips() {
+        return '<div class="qgen-resource-filters">' +
+            '<button class="qgen-filter-chip active" data-filter="all">All resources</button>' +
+            '<button class="qgen-filter-chip" data-filter="bbb_recording">BBB recordings</button>' +
+            '<button class="qgen-filter-chip" data-filter="document">Documents</button>' +
+            '<button class="qgen-filter-chip" data-filter="ready">Ready</button>' +
+            '<button class="qgen-filter-chip" data-filter="processing">Processing</button>' +
+            '<button class="qgen-filter-chip" data-filter="failed">Failed</button>' +
+            '<button class="qgen-filter-chip" data-filter="hidden">Hidden</button>' +
+            '</div>';
+    }
+
+    function renderUnifiedMaterials(materials, cid) {
+        return materials.map(function(m) {
+            var isBBB = m.resource_type === 'bbb_recording';
+            var isDocument = m.resource_type === 'document';
+            var isReady = m.status === 'indexed';
+            var isProcessing = m.status === 'pending' || m.status === 'transcribing' || m.status === 'indexing' || m.status === 'waiting_recording';
+            var isFailed = m.status === 'failed' || m.status === 'not_indexed';
+            var isHidden = m.studentvisible === 0;
+            var icon = getFileIcon(m.mimetype || '');
+            if (isBBB) icon = 'videocam';
+
+            var elementClasses = 'qgen-mat-item';
+            if (isBBB) elementClasses += ' qgen-mat-item-bbb';
+            if (isDocument) elementClasses += ' qgen-mat-item-document';
+            if (isProcessing) elementClasses += ' qgen-mat-item-processing';
+            if (isFailed) elementClasses += ' qgen-mat-item-failed';
+            if (isHidden) elementClasses += ' qgen-mat-item-hidden';
+
+            var label = esc(m.filename || m.name || 'Material ' + m.id);
+            if (isBBB) {
+                var date = m.date || m.time_ago ? m.time_ago : 'BBB Recording';
+                label = 'BBB Recording — ' + date;
+            }
+
+            var statusBadge = '';
+            if (isBBB && m.duration) {
+                statusBadge += '<span class="qgen-mat-badge qgen-mat-bbb-duration"><span class="material-symbols-outlined">schedule</span> ' + esc(m.duration) + '</span>';
+            }
+            if (m.ai_outputs && Object.keys(m.ai_outputs).length > 0) {
+                statusBadge += '<span class="qgen-mat-badge qgen-mat-oi"><span class="material-symbols-outlined">auto_awesome</span> Content available</span>';
+            }
+            if (isReady) {
+                statusBadge += '<span class="qgen-mat-badge qgen-mat-indexed">Ready</span>';
+            } else if (isProcessing) {
+                statusBadge += '<span class="qgen-mat-badge qgen-mat-pending"><span class="material-symbols-outlined">schedule</span> Processing</span>';
+            } else if (isFailed) {
+                statusBadge += '<span class="qgen-mat-badge qgen-mat-error"><span class="material-symbols-outlined">error</span> Failed</span>' +
+                    '<button type="button" class="qgen-mat-retry" data-fileid="' + (m.id || m.sessionId) + '" data-matid="' + (m.material_id || m.id) + '" data-cid="' + cid + '" title="Retry processing">' +
+                    '<span class="material-symbols-outlined">refresh</span></button>';
+            }
+            if (isHidden) {
+                statusBadge += '<span class="qgen-mat-badge qgen-mat-hidden"><span class="material-symbols-outlined">visibility_off</span> Hidden</span>';
+            }
+
+            return '<div class="' + elementClasses + '" data-resource-type="' + (m.resource_type || 'document') + '" data-status="' + (m.status || 'not_indexed') + '" data-hidden="' + (isHidden ? '1' : '0') + '">' +
+                '<div class="qgen-mat-header">' +
+                '<div class="qgen-mat-icon-wrap">' +
+                '<span class="qgen-mat-icon material-symbols-outlined">' + icon + '</span>' +
+                '</div>' +
+                '<div class="qgen-mat-content">' +
+                '<div class="qgen-mat-title">' + label + '</div>' +
+                '<div class="qgen-mat-meta">' + (m.course_title ? '<span class="qgen-mat-course">' + esc(m.course_title) + '</span>' : '') + (m.time_ago ? '<span class="qgen-mat-time">' + esc(m.time_ago) + '</span>' : '') + '</div>' +
+                '</div>' +
+                '<div class="qgen-mat-status">' + statusBadge + '</div>' +
+                '</div>' +
+                '<div class="qgen-mat-controls">' +
+                (isBBB ? '<div class="qgen-bbb-actions">' +
+                    '<button type="button" class="qgen-mat-btn" onclick="openBBBPlayer(\'' + (m.url || '') + '\')" title="Watch recording"><span class="material-symbols-outlined">play_circle</span></button>' +
+                    '<button type="button" class="qgen-mat-btn" onclick="viewBBBTranscript(' + (m.id || m.sessionId) + ', ' + cid + ')" title="View transcript"><span class="material-symbols-outlined">description</span></button>' +
+                    '<button type="button" class="qgen-mat-btn" onclick="viewBBBQuiz(' + (m.id || m.sessionId) + ', ' + cid + ')" title="View quiz"><span class="material-symbols-outlined">quiz</span></button>' +
+                    '</div>' : '') +
+                (isBBB ? '<div class="qgen-bbb-management">' +
+                    '<button type="button" class="qgen-mat-btn" onclick="manageBBBRecording(' + (m.id || m.sessionId) + ', ' + cid + ')" title="Manage recording"><span class="material-symbols-outlined">settings</span></button>' +
+                    '</div>' : '') +
+                '</div>' +
+                '</div>';
+        }).join('');
+    }
+
+    function wireFilterEvents(cid) {
+        var chips = document.querySelectorAll('.qgen-filter-chip');
+        chips.forEach(function(chip) {
+            chip.addEventListener('click', function() {
+                chips.forEach(function(c) { c.classList.remove('active'); });
+                this.classList.add('active');
+                var filter = this.dataset.filter;
+                filterMaterials(filter);
+            });
+        });
+    }
+
+    function filterMaterials(filter) {
+        var grid = document.getElementById('qgen-materials-grid');
+        if (!grid) return;
+        var items = grid.querySelectorAll('.qgen-mat-item');
+
+        var filterMap = {
+            'all': function(item) { return true; },
+            'bbb_recording': function(item) { return item.dataset.resource_type === 'bbb_recording'; },
+            'document': function(item) { return item.dataset.resource_type === 'document'; },
+            'ready': function(item) { return item.dataset.status === 'indexed' || item.dataset.status === 'ready'; },
+            'processing': function(item) {
+                var status = item.dataset.status;
+                return status === 'pending' || status === 'transcribing' || status === 'indexing' || status === 'waiting_recording' || status === 'processing';
+            },
+            'failed': function(item) { return item.dataset.status === 'failed' || item.dataset.status === 'not_indexed'; },
+            'hidden': function(item) { return item.dataset.hidden === '1'; }
+        };
+
+        var filterFn = filterMap[filter] || filterMap.all;
+
+        items.forEach(function(item) {
+            var matches = filterFn(item);
+            item.style.display = matches ? '' : 'none';
+        });
+    }
+
+    function showBBBPlayer(recordingUrl) {
+        if (!recordingUrl) return;
+        window.open(recordingUrl, '_blank');
+    }
+
+    function viewBBBTranscript(sessionId, cid) {
+        if (!sessionId) return;
+        var url = 'view_transcript.php?sessionid=' + sessionId + '&cid=' + cid;
+        window.open(url, '_blank');
+    }
+
+    function viewBBBQuiz(sessionId, cid) {
+        if (!sessionId) return;
+        var url = 'view_quiz.php?sessionid=' + sessionId + '&cid=' + cid;
+        window.open(url, '_blank');
+    }
+
+    function manageBBBRecording(sessionId, cid) {
+        if (!sessionId) return;
+        var url = 'manage_session.php?sessionid=' + sessionId + '&cid=' + cid;
+        window.open(url, '_blank');
     }
 
     function getFileIcon(mime) {

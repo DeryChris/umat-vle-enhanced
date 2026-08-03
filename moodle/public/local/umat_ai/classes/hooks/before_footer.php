@@ -6,11 +6,7 @@ use core\hook\output\before_footer_html_generation;
 
 class before_footer {
 
-    private static function amd_script(string $module, string $func, array $args): string {
-        $json = json_encode($args, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        $json = str_replace('</script>', '<\/script>', $json);
-        return '<script>M.util.js_pending("' . $module . '");!function w(){typeof require===\'function\'?require(["' . $module . '"],function(m){try{m.' . $func . '(' . $json . ');}catch(e){console.error("[umat]",e);}M.util.js_complete("' . $module . '");},function(e){console.error("[umat] module load failed for ' . $module . ':",e);M.util.js_complete("' . $module . '");}):setTimeout(w,20);}();</script>';
-    }
+    private static $lecturerCheckCache = null;
 
     public static function handle(before_footer_html_generation $hook): void {
         global $PAGE, $COURSE, $USER, $CFG, $DB;
@@ -32,7 +28,6 @@ class before_footer {
                 $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-responsive.css?v=' . filemtime(__DIR__ . '/../../styles/umat-responsive.css') . '">');
                 $hook->add_html('<link rel="stylesheet" href="' . $cssPath . '?v=' . $cssVer . '">');
                 $hook->add_html(\local_umat_ai\overlay_helper::login_report_overlay());
-                $hook->add_html(self::amd_script('local_umat_ai/umat_login_report','init',[]));
                 return;
             }
 
@@ -45,30 +40,25 @@ class before_footer {
             } elseif (!empty($COURSE->id) && $COURSE->id != SITEID) {
                 $courseid = (int)$COURSE->id;
             }
-            $sskey   = sesskey();
-            $streamUrl = '/local/umat_ai/chat_stream.php';
             $platformName = get_config('local_umat_ai', 'platform_name') ?: 'UMaT';
-            $sdts = filemtime(__DIR__ . '/../../styles/umat-struggle-dashboard.css');
-            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-overlay.css?v=' . filemtime(__DIR__ . '/../../styles/umat-overlay.css') . '">');
-            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-responsive.css?v=' . filemtime(__DIR__ . '/../../styles/umat-responsive.css') . '">');
-            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-glassmorph-nav.css">');
-            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-viewers.css">');
-            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-notes.css">');
-            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-dashboard.css?v=' . filemtime(__DIR__ . '/../../styles/umat-dashboard.css') . '">');
-            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-cs-overlay.css">');
-            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-yt-grid.css">');
-            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-struggle-dashboard.css?v=' . $sdts . '">');
-            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-admin.css?v=' . filemtime(__DIR__ . '/../../styles/umat-admin.css') . '">');
+            // Core CSS (always loaded)
+            $ocv = filemtime(__DIR__ . '/../../styles/umat-overlay.css');
+            $rcv = filemtime(__DIR__ . '/../../styles/umat-responsive.css');
+            $gnv = filemtime(__DIR__ . '/../../styles/umat-glassmorph-nav.css');
+            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-overlay.css?v=' . $ocv . '">');
+            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-responsive.css?v=' . $rcv . '">');
+            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-glassmorph-nav.css?v=' . $gnv . '">');
             $hook->add_html('<link rel="preconnect" href="https://cdnjs.cloudflare.com">');
             $hook->add_html('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">');
             $hook->add_html('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">');
             /* Admin check — site admins see only the admin FAB, bypass all other overlays */
-            $isAdmin = has_capability('local/umat_ai:adminpanel', \context_system::instance());
+            $isAdmin = has_capability('local_umat_ai:adminpanel', \context_system::instance());
             $isCourseIssueManager = $courseid && has_capability(
-                'local/umat_ai:viewanalytics',
+                'local_umat_ai:viewanalytics',
                 \context_course::instance($courseid)
             );
             if ($isAdmin && get_config('local_umat_ai', 'enable_admin_fab') && !$isCourseIssueManager) {
+                $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-admin.css?v=' . filemtime(__DIR__ . '/../../styles/umat-admin.css') . '">');
                 $hook->add_html(\local_umat_ai\overlay_helper::admin_overlay($wwwroot, $USER, $platformName));
                 $hook->add_html(\local_umat_ai\overlay_helper::glassmorph_init_js());
                 return;
@@ -81,23 +71,37 @@ class before_footer {
                     has_capability('local/umat_ai:reportissue', $courseCtx);
                 if ($isLecturer && get_config('local_umat_ai', 'enable_lecturer_fab')) {
                     $userData = \local_umat_ai\user_data::preload_user_data($USER->id, $wwwroot);
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-dashboard.css?v=' . filemtime(__DIR__ . '/../../styles/umat-dashboard.css') . '">');
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-viewers.css?v=' . filemtime(__DIR__ . '/../../styles/umat-viewers.css') . '">');
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-cs-overlay.css?v=' . filemtime(__DIR__ . '/../../styles/umat-cs-overlay.css') . '">');
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-yt-grid.css?v=' . filemtime(__DIR__ . '/../../styles/umat-yt-grid.css') . '">');
                     $hook->add_html(\local_umat_ai\overlay_helper::lecturer_overlay($courseid, $courseName, $wwwroot, $USER, $userData, $platformName));
-                    $hook->add_html(self::amd_script('local_umat_ai/umat_lecturer','init',['courseId'=>$courseid,'courseName'=>$courseName,'userData'=>$userData,'streamUrl'=>$streamUrl,'moodleSesskey'=>$sskey]));
                 } elseif ($isStudent && get_config('local_umat_ai','enable_student_fab')) {
                     $userData = \local_umat_ai\user_data::preload_user_data($USER->id, $wwwroot);
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-viewers.css?v=' . filemtime(__DIR__ . '/../../styles/umat-viewers.css') . '">');
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-notes.css?v=' . filemtime(__DIR__ . '/../../styles/umat-notes.css') . '">');
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-struggle-dashboard.css?v=' . filemtime(__DIR__ . '/../../styles/umat-struggle-dashboard.css') . '">');
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-yt-grid.css?v=' . filemtime(__DIR__ . '/../../styles/umat-yt-grid.css') . '">');
                     $hook->add_html(\local_umat_ai\overlay_helper::student_overlay($courseid,$courseName,$wwwroot,$USER,$userData,$platformName));
-                    $hook->add_html(self::amd_script('local_umat_ai/umat_student','init',['courseId'=>$courseid,'courseName'=>$courseName,'userData'=>$userData,'streamUrl'=>$streamUrl,'moodleSesskey'=>$sskey]));
                 }
             } elseif (!$isCourseArea) {
-                $isLecturerAnywhere = $DB->record_exists_sql("SELECT 1 FROM {role_assignments} ra JOIN {role} r ON r.id=ra.roleid WHERE ra.userid=:uid AND r.shortname IN ('editingteacher','teacher','manager')",['uid'=>$USER->id]);
+                if (self::$lecturerCheckCache === null) {
+                    self::$lecturerCheckCache = $DB->record_exists_sql("SELECT 1 FROM {role_assignments} ra JOIN {role} r ON r.id=ra.roleid WHERE ra.userid=:uid AND r.shortname IN ('editingteacher','teacher','manager')",['uid'=>$USER->id]);
+                }
+                $isLecturerAnywhere = self::$lecturerCheckCache;
                 if ($isLecturerAnywhere && get_config('local_umat_ai','enable_lecturer_fab')) {
                     $userData = \local_umat_ai\user_data::preload_user_data($USER->id,$wwwroot);
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-dashboard.css?v=' . filemtime(__DIR__ . '/../../styles/umat-dashboard.css') . '">');
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-viewers.css?v=' . filemtime(__DIR__ . '/../../styles/umat-viewers.css') . '">');
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-cs-overlay.css?v=' . filemtime(__DIR__ . '/../../styles/umat-cs-overlay.css') . '">');
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-yt-grid.css?v=' . filemtime(__DIR__ . '/../../styles/umat-yt-grid.css') . '">');
                     $hook->add_html(\local_umat_ai\overlay_helper::lecturer_overlay(0, 'All Courses', $wwwroot, $USER, $userData, $platformName));
-                    $hook->add_html(self::amd_script('local_umat_ai/umat_lecturer','init',['courseId'=>0,'courseName'=>'All Courses','userData'=>$userData,'streamUrl'=>$streamUrl,'moodleSesskey'=>$sskey]));
                 } elseif (get_config('local_umat_ai','enable_hub_fab')) {
                     $userData = \local_umat_ai\user_data::preload_user_data($USER->id,$wwwroot);
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-dashboard.css?v=' . filemtime(__DIR__ . '/../../styles/umat-dashboard.css') . '">');
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-viewers.css?v=' . filemtime(__DIR__ . '/../../styles/umat-viewers.css') . '">');
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-yt-grid.css?v=' . filemtime(__DIR__ . '/../../styles/umat-yt-grid.css') . '">');
                     $hook->add_html(\local_umat_ai\overlay_helper::hub_overlay($wwwroot,$USER,$userData,$platformName));
-                    $hook->add_html(self::amd_script('local_umat_ai/umat_hub','init',['userData'=>$userData,'userId'=>(int)$USER->id,'streamUrl'=>$streamUrl,'moodleSesskey'=>$sskey]));
                 }
             }
             $hook->add_html(\local_umat_ai\overlay_helper::glassmorph_init_js());

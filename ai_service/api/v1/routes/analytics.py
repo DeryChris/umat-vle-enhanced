@@ -195,25 +195,48 @@ def _call_llm(prompt: str, max_chars: int = 4096) -> str:
 
 
 def _parse_llm_json(raw: str):
-    """Parse JSON from an LLM reply, tolerating markdown code fences and
-    surrounding prose (gpt-4o-mini in particular wraps JSON in ```json)."""
+    """Parse JSON from an LLM reply, tolerating markdown code fences anywhere
+    in the text and surrounding prose. Uses bracket-depth tracking for the
+    fallback to avoid picking up stray brackets in narrative text."""
+    import re as _re
     text = raw.strip()
-    if text.startswith("```"):
-        # Drop the opening fence (with optional language tag) and closing fence.
-        text = text.split("\n", 1)[1] if "\n" in text else text
-        if text.rstrip().endswith("```"):
-            text = text.rstrip()[:-3]
-        text = text.strip()
+
+    # 1. Direct parse.
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        # Last resort: extract the outermost JSON array or object.
-        for opener, closer in (("[", "]"), ("{", "}")):
-            start = text.find(opener)
-            end   = text.rfind(closer)
-            if start != -1 and end > start:
-                return json.loads(text[start:end + 1])
-        raise
+        pass
+
+    # 2. Strip markdown code fences (```json … ```) wherever they appear.
+    cleaned = _re.sub(r'```(?:json)?\s*\n?', '', text)
+    cleaned = cleaned.strip()
+    if cleaned.endswith('```'):
+        cleaned = cleaned[:-3].strip()
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    # 3. Bracket-depth tracking — find outermost [...] or {...}
+    #    This correctly skips stray brackets in prose (e.g. "struggle_topics: []").
+    for opener, closer in (('[', ']'), ('{', '}')):
+        depth = 0
+        start = -1
+        for i, c in enumerate(text):
+            if c == opener:
+                if depth == 0:
+                    start = i
+                depth += 1
+            elif c == closer:
+                depth -= 1
+                if depth == 0 and start != -1:
+                    try:
+                        return json.loads(text[start:i + 1])
+                    except json.JSONDecodeError:
+                        start = -1
+                        continue
+
+    raise json.JSONDecodeError("No valid JSON found in LLM response")
 
 
 # ── Prompts ──────────────────────────────────────────────────
@@ -604,8 +627,15 @@ async def struggle_topics(
         prompt = STRUGGLE_TOPICS_PROMPT.format(topics_json=topics_json)
         result = _call_llm(prompt, max_chars=2048)
         parsed = _parse_llm_json(result)
+        # LLM occasionally returns the topic array directly instead of the
+        # {"topics": [...], "summary": ...} envelope — normalize both shapes.
+        if isinstance(parsed, list):
+            parsed = {"topics": parsed, "summary": ""}
+        topics = parsed.get("topics", [])
+        if not isinstance(topics, list):
+            topics = [topics] if isinstance(topics, dict) else []
         return StruggleTopicsResponse(
-            topics=[StruggleTopic(**t) for t in parsed["topics"]],
+            topics=[StruggleTopic(**t) for t in topics],
             summary=parsed.get("summary", ""),
         )
     except json.JSONDecodeError:
@@ -1172,8 +1202,145 @@ async def student_progress(
         parsed = _parse_llm_json(result)
         return StudentProgressResponse(**parsed)
     except json.JSONDecodeError:
-        logger.error(f"LLM returned invalid JSON: {result}")
+        logger.error(f"LLM returned invalid JSON for student progress: {result}")
         raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
     except Exception as e:
         logger.error(f"Student progress error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── AI Teaching Intelligence Recommendation Engine ────────────
+
+TEACHING_INTELLIGENCE_PROMPT = """You are an expert academic advisor producing prioritized, evidence-based teaching recommendations for a university lecturer.
+
+Given the following course analytics data, produce actionable recommendations ranked by urgency and impact.
+
+Course data:
+{course_data_json}
+
+TASK:
+1. Analyze ALL data sources (students at risk, topic struggles, quiz analytics, recording analytics, resource analytics, AI learning analytics).
+2. Produce 5-10 prioritized recommendations, ordered by urgency (most urgent first).
+3. Each recommendation MUST include:
+   - A specific, actionable title
+   - The EXACT evidence from the data that justifies this recommendation (quote numbers)
+   - A confidence score (0-100) based on how strongly the data supports this recommendation
+   - A specific suggestion the lecturer can act on immediately
+   - An urgency level: critical, high, medium, or low
+4. Cross-reference data sources: a topic that appears in struggle areas AND quiz failures AND high AI queries should rank higher than one appearing in only one source.
+5. Ignore generic advice. Every recommendation must reference specific students, topics, or metrics.
+
+OUTPUT STRICT JSON (no markdown, no code fences):
+{{
+  "recommendations": [
+    {{
+      "priority": 1,
+      "type": "<topic_review|student_contact|lecture_split|material_review|quiz_update|engagement_boost>",
+      "title": "<specific actionable title>",
+      "urgency": "<critical|high|medium|low>",
+      "confidence": 92.5,
+      "evidence": "<exact numbers and data points that justify this recommendation>",
+      "suggestion": "<specific action the lecturer can take>",
+      "affected_students": ["<student names if applicable>"],
+      "affected_topics": ["<topic names if applicable>"],
+      "impact_estimate": "<estimated impact if this recommendation is acted on>"
+    }}
+  ],
+  "global_insight": "<2-3 sentence overall assessment of the course health>",
+  "course_health": "<healthy|moderate|struggling>",
+  "priority_focus": "<the single most important thing the lecturer should do this week>"
+}}
+
+Rules:
+- confidence must be between 0 and 100
+- urgency must be one of: critical, high, medium, low
+- type must be one of: topic_review, student_contact, lecture_split, material_review, quiz_update, engagement_boost
+- Each recommendation must reference specific data (numbers, student names, topic names)
+- Maximum 10 recommendations
+"""
+
+
+class TeachingIntelligenceRequest(BaseModel):
+    course_id: int
+    students_at_risk: list = []
+    topic_struggles: list = []
+    quiz_analytics: dict = {}
+    recording_analytics: list = []
+    resource_analytics: list = []
+    ai_learning_analytics: dict = {}
+    common_questions: list = []
+
+
+class TeachingRecommendation(BaseModel):
+    priority: int
+    type: str
+    title: str
+    urgency: str
+    confidence: float
+    evidence: str
+    suggestion: str
+    affected_students: List[str] = []
+    affected_topics: List[str] = []
+    impact_estimate: str = ""
+
+
+class TeachingIntelligenceResponse(BaseModel):
+    recommendations: List[TeachingRecommendation]
+    global_insight: str
+    course_health: str
+    priority_focus: str
+
+
+@router.post("/api/v1/analytics/teaching-intelligence", response_model=TeachingIntelligenceResponse)
+async def teaching_intelligence(
+    request: TeachingIntelligenceRequest,
+    _ = Depends(verify_token),
+):
+    """Generate AI-powered prioritized teaching recommendations with evidence and confidence scores."""
+    try:
+        course_data = {
+            "course_id": request.course_id,
+            "students_at_risk": request.students_at_risk[:20],
+            "topic_struggles": request.topic_struggles[:15],
+            "quiz_analytics": request.quiz_analytics,
+            "recording_analytics": request.recording_analytics[:10],
+            "resource_analytics": request.resource_analytics[:10],
+            "ai_learning_analytics": request.ai_learning_analytics,
+            "common_questions": request.common_questions[:10],
+        }
+
+        prompt = TEACHING_INTELLIGENCE_PROMPT.format(
+            course_data_json=json.dumps(course_data, indent=2)
+        )
+        result = _call_llm(prompt, max_chars=6144)
+        parsed = _parse_llm_json(result)
+
+        recommendations = []
+        for rec in parsed.get("recommendations", []):
+            recommendations.append(TeachingRecommendation(
+                priority=int(rec.get("priority", 0)),
+                type=rec.get("type", "topic_review"),
+                title=rec.get("title", ""),
+                urgency=rec.get("urgency", "medium"),
+                confidence=min(100, max(0, float(rec.get("confidence", 50)))),
+                evidence=rec.get("evidence", ""),
+                suggestion=rec.get("suggestion", ""),
+                affected_students=rec.get("affected_students", []),
+                affected_topics=rec.get("affected_topics", []),
+                impact_estimate=rec.get("impact_estimate", ""),
+            ))
+
+        recommendations.sort(key=lambda r: r.priority)
+
+        return TeachingIntelligenceResponse(
+            recommendations=recommendations,
+            global_insight=parsed.get("global_insight", ""),
+            course_health=parsed.get("course_health", "moderate"),
+            priority_focus=parsed.get("priority_focus", ""),
+        )
+    except json.JSONDecodeError:
+        logger.error(f"LLM returned invalid JSON for teaching intelligence: {result}")
+        raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
+    except Exception as e:
+        logger.error(f"Teaching intelligence error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

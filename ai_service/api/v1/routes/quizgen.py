@@ -626,19 +626,119 @@ class WordExportResponse(BaseModel):
     question_count: int
 
 
+def _validate_export_payload(request: WordExportRequest) -> None:
+    """
+    Validate and normalize the export payload at the API boundary.
+    
+    Raises HTTPException with 422 status if critical fields have wrong types.
+    """
+    # Validate questions is a list of dicts
+    if not isinstance(request.questions, list):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "INVALID_EXPORT_PAYLOAD",
+                "field": "questions",
+                "expected": "list",
+                "received": type(request.questions).__name__
+            }
+        )
+    
+    for i, q in enumerate(request.questions):
+        if not isinstance(q, dict):
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "INVALID_EXPORT_PAYLOAD",
+                    "field": f"questions[{i}]",
+                    "expected": "object",
+                    "received": type(q).__name__,
+                    "hint": "Each question must be a dictionary/object, not a list or string"
+                }
+            )
+        # Validate options is a list if present
+        opts = q.get("options")
+        if opts is not None and not isinstance(opts, list):
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "INVALID_EXPORT_PAYLOAD",
+                    "field": f"questions[{i}].options",
+                    "expected": "list",
+                    "received": type(opts).__name__
+                }
+            )
+    
+    # Validate doc_settings is a dict
+    if not isinstance(request.doc_settings, dict):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "INVALID_EXPORT_PAYLOAD",
+                "field": "doc_settings",
+                "expected": "object",
+                "received": type(request.doc_settings).__name__
+            }
+        )
+    
+    # Validate student_info_fields is a dict if present
+    sif = request.doc_settings.get("student_info_fields")
+    if sif is not None and not isinstance(sif, dict):
+        logger.warning(
+            "[EXPORT] student_info_fields has wrong type: expected=dict, actual=%s. Normalizing to default.",
+            type(sif).__name__
+        )
+        # Normalize instead of rejecting - this is the PHP empty array issue
+        request.doc_settings["student_info_fields"] = {"studentName": True, "studentId": True}
+    
+    # Validate versions is a list if present
+    versions = request.doc_settings.get("versions")
+    if versions is not None:
+        if isinstance(versions, str):
+            request.doc_settings["versions"] = [versions]
+        elif not isinstance(versions, list):
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "INVALID_EXPORT_PAYLOAD",
+                    "field": "doc_settings.versions",
+                    "expected": "list",
+                    "received": type(versions).__name__
+                }
+            )
+    
+    # Validate export_type
+    if request.export_type not in ("question_paper", "answer_key", "examiner_copy"):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "INVALID_EXPORT_PAYLOAD",
+                "field": "export_type",
+                "expected": "question_paper | answer_key | examiner_copy",
+                "received": request.export_type
+            }
+        )
+    
+    # Validate version
+    if request.version not in ("A", "B", "C"):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "INVALID_EXPORT_PAYLOAD",
+                "field": "version",
+                "expected": "A | B | C",
+                "received": request.version
+            }
+        )
+
+
 @router.post("/export-word", response_model=WordExportResponse)
 async def export_word(
     request: WordExportRequest,
     _ = Depends(verify_token),
 ):
-    if not request.questions:
-        raise HTTPException(status_code=422, detail="No questions provided.")
-
-    if request.export_type not in ("question_paper", "answer_key", "examiner_copy"):
-        raise HTTPException(status_code=422, detail="export_type must be question_paper, answer_key, or examiner_copy.")
-
-    if request.version not in ("A", "B", "C"):
-        raise HTTPException(status_code=422, detail="version must be A, B, or C.")
+    # Validate payload at API boundary (raises 422 on type mismatches)
+    _validate_export_payload(request)
 
     try:
         from core.export_word import generate_document

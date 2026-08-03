@@ -218,6 +218,44 @@ function local_umat_ai_request_id(): string {
 }
 
 /**
+ * Parse formatted transcript text (e.g. "[00:00] Hello world") into
+ * structured segments [{start, end, text}] for the transcript viewer.
+ *
+ * Also handles JSON string input (raw segments from AI service).
+ *
+ * @param string $formatted Transcript text or JSON string
+ * @return array Array of segment objects
+ */
+function local_umat_ai_parse_segments(string $formatted): array {
+    // Try JSON first (raw segments from AI service).
+    $decoded = json_decode($formatted, true);
+    if (is_array($decoded) && !empty($decoded) && isset($decoded[0]['start'])) {
+        return $decoded;
+    }
+
+    // Fall back to parsing formatted text with [MM:SS] timestamps.
+    $segments = [];
+    $lines = explode("\n", $formatted);
+
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '') continue;
+
+        if (preg_match('/^\[(\d{1,2}):(\d{2})\]\s*(.*)$/', $line, $m)) {
+            $start = (float)(intval($m[1]) * 60 + intval($m[2]));
+            $text  = trim($m[3]);
+            if (!empty($segments)) {
+                $segments[count($segments) - 1]['end'] = $start;
+            }
+            $segments[] = ['start' => $start, 'end' => $start + 30.0, 'text' => $text];
+        } elseif (!empty($segments)) {
+            $segments[count($segments) - 1]['text'] .= ' ' . $line;
+        }
+    }
+    return $segments;
+}
+
+/**
  * Serve recording files stored in Moodle's file system.
  *
  * URL: /pluginfile.php/{contextid}/local_umat_ai/recordings/{sessionid}/{filename}

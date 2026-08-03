@@ -669,6 +669,7 @@ class core_renderer extends \core_renderer {
         }
 
         $hook->add_html('<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />' . "\n");
+        $hook->add_html('<meta name="viewport" content="width=device-width, initial-scale=1.0" />' . "\n");
         $hook->add_html('<meta name="keywords" content="moodle, ' . $this->page->title . '" />' . "\n");
         // This is only set by the {@see redirect()} method.
         $hook->add_html($this->metarefreshtag);

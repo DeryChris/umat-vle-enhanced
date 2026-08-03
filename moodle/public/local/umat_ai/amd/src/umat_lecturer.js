@@ -1,4 +1,4 @@
-define(['local_umat_ai/umatshared','local_umat_ai/material_viewer'],function(S,M){
+define(['local_umat_ai/umatshared','local_umat_ai/material_viewer','local_umat_ai/touch_utils'],function(S,M,T){
 return{init:function(data){for(var k in S)window[k]=S[k];window.umatMaterialViewer=M;
 window.renderVideoTiles=S.renderVideoTiles;window.renderCourses=S.renderCourses;
 window.renderLibrary=S.renderLibrary;window.renderLibTiles=S.renderLibTiles;
@@ -8,7 +8,7 @@ window.esc=S.esc;
 var CID = data.courseId;
 var CN    = data.courseName;
 var UID   = data.userId;
-var UD; try { UD = JSON.parse(data.userData); } catch(e) { UD = {}; }
+var UD = typeof data.userData === 'string' ? JSON.parse(data.userData) : data.userData || {};
 var PENDING = data.pending || 0;
 var streamUrl = data.streamUrl;
 var moodleSesskey = data.moodleSesskey;
@@ -196,9 +196,9 @@ function renderLecCourses(courses,g){
         '</div>'+
       '</div>'+
       '<div class="yt-actions">'+
-        '<button class="yt-btn" data-act="analytics" onclick="event.stopPropagation()"><span class="material-symbols-outlined">bar_chart</span>Analytics</button>'+
-        '<button class="yt-btn" data-act="library" onclick="event.stopPropagation()"><span class="material-symbols-outlined">local_library</span>Resource Materials</button>'+
-        (pending>0?'<button class="yt-btn" data-act="review" onclick="event.stopPropagation()" style="border-color:var(--u-ter);color:var(--u-ter);"><span class="material-symbols-outlined">fact_check</span>Review</button>':'')+
+        '<button class="yt-btn yt-act-btn" data-act="analytics"><span class="material-symbols-outlined">bar_chart</span>Analytics</button>'+
+        '<button class="yt-btn yt-act-btn" data-act="library"><span class="material-symbols-outlined">local_library</span>Resource Materials</button>'+
+        (pending>0?'<button class="yt-btn yt-act-btn" data-act="review" style="border-color:var(--u-ter);color:var(--u-ter);"><span class="material-symbols-outlined">fact_check</span>Review</button>':'')+
       '</div>'+
     '</div>';
   }).join('');
@@ -213,6 +213,7 @@ function renderLecCourses(courses,g){
       anLoaded[CID]=false;
       switchPane('lec-analytics');loadAnalytics(CID);
     });
+    T.makeTouchable(tile);
     /* Action buttons */
     tile.querySelectorAll('[data-act]').forEach(function(btn){
       btn.addEventListener('click',function(e){
@@ -223,6 +224,7 @@ function renderLecCourses(courses,g){
         var act=btn.dataset.act;
         if(act==='analytics'){anLoaded[CID]=false;switchPane('lec-analytics');loadAnalytics(CID);}
         else if(act==='library'){lecLoaded['lec-library']=false;switchPane('lec-library');loadLibrary();}
+        if (T) T.makeTouchable(btn);
         else if(act==='review'){lecLoaded['lec-review']=false;switchPane('lec-review');if(typeof loadReviewPane==='function')loadReviewPane();}
       });
     });
@@ -387,8 +389,22 @@ function renderLecCourseGrid(gridId, clickAction){
   });
 }
 
-/* Sidebar & mobile tab pane switching */
+/* Sidebar & mobile tab pane switching.
+ *
+ * There is exactly ONE switchPane implementation, and it lives in the inline
+ * overlay script (overlay_helper::lecturer_overlay). This module used to define
+ * a second copy with its own lecLoaded map, and both were bound to the same
+ * '#lec-sb [data-lp], #lec-glass-tabs [data-lp]' buttons. A single click ran
+ * both, both saw a cold lecLoaded entry, and loadPaneData ran twice — which is
+ * why opening Insights fired two identical get_struggle_insights requests while
+ * only one "[dash] switchPane" line appeared in the console.
+ *
+ * This delegates to the canonical implementation instead. window.switchPane is
+ * still exported because generated markup calls it via inline onclick.
+ */
 function switchPane(name){
+  if(window.__umatSwitchPane){return window.__umatSwitchPane(name);}
+  /* Inline script not present (module loaded stand-alone) — minimal fallback. */
   document.querySelectorAll('#lec-ov .umat-tab-pane').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('#lec-sb [data-lp], #lec-glass-tabs [data-lp]').forEach(function(b){b.classList.toggle('active',b.dataset.lp===name);});
   var pane=document.getElementById(name);if(pane)pane.classList.add('active');
@@ -397,27 +413,39 @@ function switchPane(name){
 window.switchPane=switchPane;
 window.initLecturerIssues=initLecturerIssues;
 window.renderLcpFeature=renderLcpFeature;
-/* Handle data-lp clicks from compact panel -> open full overlay */
+/* Handle data-lp clicks from compact panel -> open full overlay.
+   These selectors are unique to this module; the sidebar, glass-tab and
+   lec-home listeners are bound by the inline script and are NOT rebound here. */
 document.querySelectorAll('#lec-cp [data-lp^="lec-"]').forEach(function(b){
   b.addEventListener('click',function(){closePanel();openDash();switchPane(b.dataset.lp);});
-});
-document.querySelectorAll('#lec-sb [data-lp], #lec-glass-tabs [data-lp]').forEach(function(b){
-  b.addEventListener('click',function(){switchPane(b.dataset.lp);});
-});
-document.addEventListener('click',function(e){
-  var btn=e.target.closest('[data-lp]');
-  if(btn && btn.closest('#lec-home')){switchPane(btn.dataset.lp);}
 });
 
 /* Home init */
 function initHome(){
-  if(!CID)return;
   var d=new Date(),dEl=document.getElementById('lec-home-date');
   if(dEl)dEl.textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  /* The inline overlay script already populated the home cards (it runs
+     before this AMD module resolves). Skip to avoid duplicate requests. */
+  if(window.__umatHomeLoaded)return;
+  window.__umatHomeLoaded=true;
+  var ms=document.getElementById('lec-met-active');
+  if(!CID){
+    /* All Courses mode — aggregate active students across lecturer courses */
+    var courses=(UD&&UD.courses)||[];
+    if(!courses.length){if(ms)ms.textContent='0/0';return;}
+    var agg={active:0,enrolled:0},done=0;
+    courses.forEach(function(c){
+      ajax('local_umat_ai_get_analytics',{courseid:c.id,days:30},function(data){
+        agg.active+=data.active_students||0;agg.enrolled+=data.enrolled_students||0;
+        if(++done===courses.length&&ms)ms.textContent=agg.active+'/'+agg.enrolled;
+      },function(){if(++done===courses.length&&ms)ms.textContent=agg.active+'/'+agg.enrolled;});
+    });
+    return;
+  }
   /* Use panel data if already loaded */
   if(panelDataLoaded)return;
   ajax('local_umat_ai_get_analytics',{courseid:CID,days:30},function(data){
-    var ms=document.getElementById('lec-met-active');var mi=document.getElementById('lec-met-int');
+    var mi=document.getElementById('lec-met-int');
     if(ms)ms.textContent=data.active_students+'/'+data.enrolled_students;
     if(mi)mi.textContent=data.total_interactions.toLocaleString();
   },function(){});
@@ -515,7 +543,7 @@ function loadAnalytics(cid){
     if(label)label.textContent='';
     /* Load all courses analytics in parallel */
     var courses=UD&&UD.courses||[];
-    if(!courses.length){document.getElementById('ov-an-kpis').innerHTML='<div class="ov-loading">No courses assigned.</div>';return;}
+    if(!courses.length){var _el=document.getElementById('ov-an-kpis');if(_el)_el.innerHTML='<div class="ov-loading">No courses assigned.</div>';return;}
     var agg={active_students:0,enrolled_students:0,total_interactions:0,questions_per_session:[],daily_counts:{},per_course:[],all_questions:[],high_total:0,risk_total:0,track_total:0},done=0;
     courses.forEach(function(c){
       ajax('local_umat_ai_get_analytics',{courseid:c.id,days:30},function(d){
@@ -644,7 +672,7 @@ function buildHeatmap(daily,maxV,struggleIdx){
   if(!n){grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--u-ol);font-size:13px;">No heatmap data yet.</div>';return;}
   grid.style.gridTemplateColumns='40px repeat('+n+',1fr)';
   var html='<div></div>';
-  for(var c=0;c<n;c++)html+='<div style="font-size:9px;color:var(--u-ol);text-align:center;padding-bottom:4px;">L'+(c+1)+'</div>';
+  for(var c=0;c<n;c++)html+='<div class="umat-heatmap-label">L'+(c+1)+'</div>';
   days.forEach(function(day,row){
     html+='<div class="umat-hm-row-lbl">'+day+'</div>';
     for(var col=0;col<n;col++){
@@ -704,27 +732,101 @@ function populateLibCourseSel(){
   var g=document.getElementById('lec-lib-grid');
   if(g&&!g._lecLibPickerInited){g._lecLibPickerInited=true;g.addEventListener('click',function(e){if(e.target.closest('#lec-lib-pick-btn'))openLecLibPicker();});}
 }
+
+/* Initialize the inline course picker for the Library tab.
+   If the lecturer has only one course, auto-select it.
+   Otherwise, show the inline course selector list. */
+function initLibCoursePicker(){
+  var courses=(UD&&UD.courses)||[];
+  var inline=document.getElementById('lec-lib-cs-inline');
+  var hdr=document.getElementById('lec-lib-hdr');
+  var grid=document.getElementById('lec-lib-grid');
+  /* If a course was already selected, just re-show the materials view */
+  if(lecLibCourseId){selectLibCourse(lecLibCourseId);return;}
+  /* If only one course, auto-select */
+  if(courses.length===1){
+    lecLibCourseId=courses[0].id;
+    selectLibCourse(courses[0].id);
+    return;
+  }
+  /* Multiple courses — show the inline picker */
+  if(inline)inline.style.display='flex';
+  if(hdr)hdr.style.display='none';
+  if(grid)grid.style.display='none';
+  var list=document.getElementById('lec-lib-cs-inline-list');
+  if(!list)return;
+  list.innerHTML=courses.map(function(c){
+    return '<button class="umat-cs-item" data-cid="'+c.id+'" type="button">'+
+      '<div class="umat-cs-item-icon"><span class="material-symbols-outlined">menu_book</span></div>'+
+      '<div class="umat-cs-item-info"><div class="umat-cs-item-name">'+esc(c.fullname)+'</div>'+
+      '<div class="umat-cs-item-code">'+esc(c.shortname)+'</div></div>'+
+      '<span class="umat-cs-item-check material-symbols-outlined">check_circle</span></button>';
+  }).join('');
+  list.querySelectorAll('.umat-cs-item').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var cid=parseInt(this.dataset.cid);
+      lecLibCourseId=cid;
+      selectLibCourse(cid);
+    });
+  });
+}
+
+/* Switch from course picker to the materials view for a given course */
+function selectLibCourse(courseId){
+  var inline=document.getElementById('lec-lib-cs-inline');
+  var hdr=document.getElementById('lec-lib-hdr');
+  var grid=document.getElementById('lec-lib-grid');
+  if(inline)inline.style.display='none';
+  if(hdr)hdr.style.display='flex';
+  if(grid)grid.style.display='';
+  loadLibrary(courseId);
+}
+
+/* Re-populate the inline course list (used when switching back to picker) */
+function populateLibInlineList(){
+  var courses=(UD&&UD.courses)||[];
+  var list=document.getElementById('lec-lib-cs-inline-list');
+  if(!list)return;
+  list.innerHTML=courses.map(function(c){
+    return '<button class="umat-cs-item" data-cid="'+c.id+'" type="button">'+
+      '<div class="umat-cs-item-icon"><span class="material-symbols-outlined">menu_book</span></div>'+
+      '<div class="umat-cs-item-info"><div class="umat-cs-item-name">'+esc(c.fullname)+'</div>'+
+      '<div class="umat-cs-item-code">'+esc(c.shortname)+'</div></div>'+
+      '<span class="umat-cs-item-check material-symbols-outlined">check_circle</span></button>';
+  }).join('');
+  list.querySelectorAll('.umat-cs-item').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var cid=parseInt(this.dataset.cid);
+      lecLibCourseId=cid;
+      selectLibCourse(cid);
+    });
+  });
+}
+
 function loadLibrary(cid){
   var g=document.getElementById('lec-lib-grid');
   var courseId=cid||lecLibCourseId||CID||0;
   if(!courseId){
-    g.innerHTML='<div class="umat-lib-picker"><span class="material-symbols-outlined">folder_open</span><p>Select a course to browse its library materials.</p><button type="button" id="lec-lib-pick-btn"><span class="material-symbols-outlined">menu_book</span>Select Course</button></div>';
+    /* No course selected — show inline course picker */
+    var inline=document.getElementById('lec-lib-cs-inline');
+    var hdr=document.getElementById('lec-lib-hdr');
+    if(inline)inline.style.display='flex';
+    if(hdr)hdr.style.display='none';
+    if(g)g.style.display='none';
     return;
   }
-  var hdr=document.getElementById('lec-lib-hdr-actions');
-  if(hdr){
-    var course=(UD.courses||[]).find(function(c){return c.id===courseId;});
-    hdr.innerHTML=(course?'<button class="umat-lib-sel-label" id="lec-lib-sel-label" type="button"><span class="material-symbols-outlined">menu_book</span>'+esc(course.shortname)+'</button>':'')+
-      '<input type="text" id="lec-lib-search" placeholder="Search materials..." style="padding:6px 12px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:12px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sfl);width:min(140px,35vw);">';
-    var lbl=document.getElementById('lec-lib-sel-label');
-    if(lbl)lbl.addEventListener('click',openLecLibPicker);
-  }
   g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading materials...</p></div>';
-  ajax('local_umat_ai_get_course_materials',{courseid:courseId},function(r){renderLibTiles(r.materials||[],g,courseId);if(typeof updateMaterialAnalysis==='function')updateMaterialAnalysis(courseId);if(typeof updateVideoGenerationStatus==='function')updateVideoGenerationStatus(courseId);},function(e){console.error('[umat] lecturer loadLibrary failed:',e&&e.message||e);g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">error_outline</span><p>Could not load materials.</p></div>';});
+  ajax('local_umat_ai_get_course_materials',{courseid:courseId},function(r){renderLibTiles(r.materials||[],g,courseId);},function(e){console.error('[umat] lecturer loadLibrary failed:',e&&e.message||e);g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">error_outline</span><p>Could not load materials.</p></div>';});
 }
 function openLecLibPicker(){
-  var ov=document.getElementById('lec-lib-cs-ov');
-  if(ov)ov.classList.add('open');
+  /* Show inline course picker again */
+  var inline=document.getElementById('lec-lib-cs-inline');
+  var hdr=document.getElementById('lec-lib-hdr');
+  var grid=document.getElementById('lec-lib-grid');
+  if(inline){inline.style.display='flex';populateLibInlineList();}
+  if(hdr)hdr.style.display='none';
+  if(grid)grid.style.display='none';
+  lecLibCourseId=0;
 }
 function openLecPdf(url,name){
   if(window.umatMaterialViewer)window.umatMaterialViewer.open('pdf',{
@@ -988,7 +1090,7 @@ function observeLecturerIssueMessages(){
   lecturerIssueReadObserver=new IntersectionObserver(function(entries){entries.forEach(function(entry){if(entry.isIntersecting&&entry.intersectionRatio>=.35){var el=entry.target;if(el.dataset.other==='1'&&el.dataset.viewed!=='1'){pending[el.dataset.messageId]=true;el.dataset.viewed='1';lecturerIssueReadObserver.unobserve(el);}}});if(Object.keys(pending).length&&!timer){timer=setTimeout(function(){var ids=Object.keys(pending).map(Number);pending={};timer=null;ajax('local_umat_ai_mark_issue_messages_viewed',{conversationid:lecturerIssueConversationId,messageids:ids},function(){loadLecturerIssueInbox(true);},function(){ids.forEach(function(id){var el=root.querySelector('[data-message-id="'+id+'"]');if(el){el.dataset.viewed='0';lecturerIssueReadObserver.observe(el);}});});},250);}}, {root:root,threshold:[.35]});
   root.querySelectorAll('[data-other="1"][data-viewed="0"]').forEach(function(el){lecturerIssueReadObserver.observe(el);});
 }
-function uploadLecturerIssueAttachment(messageid,file,done,fail){var form=new FormData();form.append('sesskey',moodleSesskey);form.append('messageid',messageid);form.append('attachment',file);fetch(M.cfg.wwwroot+'/local/umat_ai/issue_attachment.php',{method:'POST',body:form,credentials:'same-origin'}).then(function(response){return response.json().then(function(data){if(!response.ok||!data.success)throw new Error(data.message||'Upload failed.');return data;});}).then(done).catch(function(error){fail(error.message||'Upload failed.');});}
+function uploadLecturerIssueAttachment(messageid,file,done,fail){var form=new FormData();form.append('sesskey',moodleSesskey);form.append('messageid',messageid);form.append('attachment',file);fetch((window.M&&window.M.cfg?window.M.cfg.wwwroot:'')+'/local/umat_ai/issue_attachment.php',{method:'POST',body:form,credentials:'same-origin'}).then(function(response){return response.json().then(function(data){if(!response.ok||!data.success)throw new Error(data.message||'Upload failed.');return data;});}).then(done).catch(function(error){fail(error.message||'Upload failed.');});}
 function appendLecturerPendingMessage(item){var box=document.getElementById('lec-issue-messages');if(!box)return;var el=document.createElement('article');el.className='umat-issue-message mine';el.id='lec-issue-temp-'+item.clientid;el.innerHTML='<span class="umat-issue-sender">You</span><div class="umat-issue-bubble"><div class="umat-issue-body">'+esc(item.body)+'</div><div class="umat-issue-message-meta"><span>Sending...</span></div></div>';box.appendChild(el);box.scrollTop=box.scrollHeight;}
 function showLecturerIssueError(text){var el=document.getElementById('lec-issue-send-error');if(!el)return;el.innerHTML=esc(text)+' <button class="umat-issue-retry" data-issue-retry type="button">Retry</button>';el.classList.add('show');}
 function clearLecturerIssueError(){var el=document.getElementById('lec-issue-send-error');if(el){el.classList.remove('show');el.innerHTML='';}}
@@ -1217,13 +1319,17 @@ function renderStruggleSummary(summary){
       '<div class="stru-kpi-card"><div class="stru-kpi-icon stru-kpi-q"><span class="material-symbols-outlined">quiz</span></div><div class="stru-kpi-body"><div class="stru-kpi-val">'+tq+'</div><div class="stru-kpi-lbl">Questions</div></div></div>'+
       '<div class="stru-kpi-card"><div class="stru-kpi-icon stru-kpi-s"><span class="material-symbols-outlined">people</span></div><div class="stru-kpi-body"><div class="stru-kpi-val">'+ts+'</div><div class="stru-kpi-lbl">Students</div></div></div>'+
       '<div class="stru-kpi-card"><div class="stru-kpi-icon stru-kpi-w"><span class="material-symbols-outlined">psychology_alt</span></div><div class="stru-kpi-body"><div class="stru-kpi-val">'+esc(summary.worst_topic||'\u2014')+'</div><div class="stru-kpi-lbl">Most Struggled Topic</div></div></div>'+
-      (summary.total_issues!==undefined?'<div class="stru-kpi-card stru-kpi-click" onclick="switchPane(\'lec-issues\')"><div class="stru-kpi-icon stru-kpi-i"><span class="material-symbols-outlined">flag</span></div><div class="stru-kpi-body"><div class="stru-kpi-val">'+summary.total_issues+'</div><div class="stru-kpi-lbl">'+summary.open_issues+' open issue'+(summary.open_issues!==1?'s':'')+'</div></div></div>':'');
+      (summary.total_issues!==undefined?'<div class="stru-kpi-card stru-kpi-click" data-act="lec-issues"><div class="stru-kpi-icon stru-kpi-i"><span class="material-symbols-outlined">flag</span></div><div class="stru-kpi-body"><div class="stru-kpi-val">'+summary.total_issues+'</div><div class="stru-kpi-lbl">'+summary.open_issues+' open issue'+(summary.open_issues!==1?'s':'')+'</div></div></div>':'');
+    bar.querySelectorAll('.stru-kpi-click[data-act]').forEach(function(el){
+      el.addEventListener('click',function(){switchPane(el.dataset.act);});
+      T.makeTouchable(el);
+    });
   }
   var issuesEl=document.getElementById('stru-issues-summary');
   if(issuesEl&&summary.total_issues!==undefined){
     issuesEl.style.display='flex';
     var cnt=summary.total_issues,open=summary.open_issues;
-    issuesEl.innerHTML='<span class="material-symbols-outlined" style="color:var(--u-ter);">flag</span><div><strong>'+cnt+' issue'+(cnt!==1?'s':'')+' reported</strong><span style="display:block;font-size:11px;color:var(--u-ol);">'+open+' open'+((summary.top_issue_topics||[]).length?' \u00b7 '+summary.top_issue_topics.slice(0,3).join(', '):'')+'</span></div>';
+    issuesEl.innerHTML='<span class="material-symbols-outlined" style="color:var(--u-ter);">flag</span><div><strong>'+cnt+' issue'+(cnt!==1?'s':'')+' reported</strong><span class="umat-text-label" style="display:block;">'+open+' open'+((summary.top_issue_topics||[]).length?' \u00b7 '+summary.top_issue_topics.slice(0,3).join(', '):'')+'</span></div>';
   }
   /* AI Overall Summary */
   var aiSumEl=document.getElementById('stru-ai-summary');
@@ -1345,7 +1451,7 @@ function renderMaterialBreakdown(sections){
       '</div>';
     }).join('');
     return '<div class="struggle-material-group">'+
-      '<div class="struggle-group-header" onclick="var b=this.nextElementSibling;b.style.display=b.style.display===\'none\'?\'\':\'none\';this.querySelector(\'.struggle-toggle\').textContent=b.style.display===\'none\'?\'keyboard_arrow_right\':\'keyboard_arrow_down\';">'+
+      '<div class="struggle-group-header" data-toggle-target>'+
         '<span class="material-symbols-outlined struggle-toggle">keyboard_arrow_down</span>'+
         '<strong>'+esc(sec.section_name)+'</strong>'+
         '<span class="umat-pill pill-info">'+(sec.materials||[]).length+' items</span>'+
@@ -1353,6 +1459,18 @@ function renderMaterialBreakdown(sections){
       '<div class="struggle-group-body">'+matHtml+'</div>'+
     '</div>';
   }).join('');
+  list.querySelectorAll('[data-toggle-target]').forEach(function(hdr){
+    hdr.addEventListener('click',function(){
+      var body=this.nextElementSibling;
+      if(body){
+        var isHidden=body.style.display==='none';
+        body.style.display=isHidden?'':'none';
+        var toggle=this.querySelector('.struggle-toggle');
+        if(toggle)toggle.textContent=isHidden?'keyboard_arrow_down':'keyboard_arrow_right';
+      }
+    });
+    T.makeTouchable(hdr);
+  });
 }
 
 function renderAtRiskStudents(students){
@@ -1639,9 +1757,13 @@ var RB = {
     RB.currentFolder = parentId;
     RB.selected = {};
     _updateRbBatchBtns();
-    document.getElementById('rb-content').innerHTML = '<div class="rb-loading">Loading…</div>';
+    var gc=document.getElementById('rb-content');
+    if(gc)gc.innerHTML = '<div class="rb-loading">Loading…</div>';
     RB._rbAjax('list',{parentid:parentId||0},function(r){
       _renderRbItems(r.items||[]);
+    },function(e){
+      console.error('[rb] load failed:',e);
+      if(gc){gc.innerHTML='<div class="rb-empty"><span class="material-symbols-outlined">error</span><p>Failed to load resources. Check your permissions or try refreshing.</p><button class="umat-chip rb-retry-btn" type="button">Retry</button></div>';var rBtn=gc.querySelector('.rb-retry-btn');if(rBtn){rBtn.addEventListener('click',function(){RB.load(RB.currentFolder);});T.makeTouchable(rBtn);}}
     });
   },
   /* Build breadcrumb from trail */
@@ -1703,11 +1825,15 @@ function _renderRbItems(items){
       +'<input type="checkbox" class="rb-cb" data-rb-id="'+it.id+'" style="accent-color:var(--u-p);width:16px;height:16px;cursor:pointer;"></label>'
       +'<div class="rb-thumb" style="background:'+(it.isfolder?'rgba(0,107,47,.08)':'rgba(99,102,241,.08)')+';border-radius:var(--u-r8);width:100%;aspect-ratio:1.6;display:flex;align-items:center;justify-content:center;font-size:32px;color:'+(it.isfolder?'var(--u-p)':'#6366f1')+';position:relative;">'
       +'<span class="material-symbols-outlined">'+icon+'</span>'
-      +(it.isfolder?'':'<span style="position:absolute;bottom:4px;right:4px;font-size:9px;background:var(--u-bg);padding:1px 4px;border-radius:4px;color:var(--u-ol);font-weight:600;">'+_getExtLabel(it.name)+'</span>')
+      +(it.isfolder?'':'<span class="umat-ext-label">'+_getExtLabel(it.name)+'</span>')
       +'</div>'
       +'<div class="rb-info" style="padding:6px 4px;">'
-      +'<div class="rb-name" style="font-size:11px;font-weight:600;color:var(--u-ons);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+esc(it.name)+'">'+esc(it.name)+'</div>'
-      +'<div style="font-size:10px;color:var(--u-ol);margin-top:2px;">'+(it.isfolder?'Folder':sizeLabel+(timeLabel?' · '+timeLabel:''))+'</div>'
+      +'<div class="rb-name" style="font-size:12px;font-weight:600;color:var(--u-ons);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+esc(it.name)+'">'+esc(it.name)+'</div>'
+      +'<div class="umat-text-label" style="margin-top:2px;">'+(it.isfolder?'Folder':sizeLabel+(timeLabel?' \u00b7 '+timeLabel:''))+'</div>'
+      +'</div>'
+      +'<div class="rb-actions" style="display:flex;gap:4px;padding:4px 4px 0;border-top:1px solid var(--u-olv);margin-top:4px;">'
+      +'<button type="button" class="rb-action-push" data-rb-id="'+it.id+'" title="Push to course" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:3px;padding:3px 6px;border:none;border-radius:4px;font-size:10px;font-weight:600;color:var(--u-p);background:rgba(0,107,47,.08);cursor:pointer;font-family:inherit;"><span class="material-symbols-outlined" style="font-size:12px;">publish</span>Push</button>'
+      +'<button type="button" class="rb-action-del" data-rb-id="'+it.id+'" data-rb-name="'+esc(it.name)+'" title="Delete" style="flex:0;display:inline-flex;align-items:center;justify-content:center;gap:3px;padding:3px 6px;border:none;border-radius:4px;font-size:10px;font-weight:600;color:var(--u-ter);background:rgba(239,68,68,.08);cursor:pointer;font-family:inherit;"><span class="material-symbols-outlined" style="font-size:12px;">delete</span></button>'
       +'</div></div>';
   });
   html+='</div>';
@@ -1734,6 +1860,32 @@ function _renderRbItems(items){
     });
     /* Right-click for context menu (rename, delete) */
     el.addEventListener('contextmenu',_rbCtxHandler);
+  });
+
+  /* Per-item Push button */
+  g.querySelectorAll('.rb-action-push').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      var id=parseInt(this.dataset.rbId);
+      RB.selected={};
+      RB.selected[id]=true;
+      _updateRbBatchBtns();
+      var rbPushBtn=document.getElementById('rb-push-btn');
+      if(rbPushBtn)rbPushBtn.click();
+    });
+  });
+  /* Per-item Delete button */
+  g.querySelectorAll('.rb-action-del').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      var id=parseInt(this.dataset.rbId);
+      var name=this.dataset.rbName;
+      if(!confirm('Delete "'+name+'"? This cannot be undone.'))return;
+      RB._rbAjax('delete',{itemids:[id]},function(){RB.load(RB.currentFolder);},function(e){
+        console.error('[rb] single delete failed:',e);
+        alert('Delete failed: '+(e.message||e.error||'Unknown error'));
+      });
+    });
   });
 
   /* Checkbox change → update batch buttons */
@@ -1824,14 +1976,19 @@ function _uploadRbFiles(files){
     fd.append('parentid',RB.currentFolder||0);
     fd.append('sesskey',moodleSesskey);
     var xhr=new XMLHttpRequest();
+    xhr.open('POST',(window.M&&window.M.cfg?window.M.cfg.wwwroot:'')+'/local/umat_ai/resource_upload.php');
     if(rbUploadFname)xhr.upload&&(xhr.upload.onprogress=function(e){
       if(e.lengthComputable&&rbUploadBar&&rbUploadPct){
         var p=Math.round((done*100000+e.loaded/e.total*100)/total);
         rbUploadBar.style.width=p+'%';rbUploadPct.textContent=Math.round(p)+'%';
       }
     });
-    xhr.onload=function(){done++;if(done>=total){RB.load(RB.currentFolder);_closeRbUpload();}};
-    xhr.onerror=function(){done++;if(done>=total){RB.load(RB.currentFolder);_closeRbUpload();}};
+    xhr.onload=function(){
+      done++;
+      try{var resp=JSON.parse(xhr.responseText);if(resp&&resp.success===false){console.error('[rb] upload error:',resp.message);if(rbUploadResult){rbUploadResult.style.display='block';rbUploadResult.style.background='#fee2e2';rbUploadResult.style.color='#991b1b';rbUploadResult.textContent='Upload failed: '+(resp.message||'Unknown error');}return;}}catch(ex){}
+      if(done>=total){RB.load(RB.currentFolder);_closeRbUpload();}
+    };
+    xhr.onerror=function(){done++;console.error('[rb] upload network error');if(rbUploadResult){rbUploadResult.style.display='block';rbUploadResult.style.background='#fee2e2';rbUploadResult.style.color='#991b1b';rbUploadResult.textContent='Network error during upload.';}if(done>=total){RB.load(RB.currentFolder);_closeRbUpload();}};
     xhr.send(fd);
   });
 }
@@ -1879,6 +2036,10 @@ if(rbFolderSubmit)rbFolderSubmit.addEventListener('click',function(){
   RB._rbAjax('create_folder',{parentid:RB.currentFolder||0,name:name},function(){
     if(rbFolderOv)rbFolderOv.style.display='none';
     RB.load(RB.currentFolder);
+  },function(e){
+    console.error('[rb] create_folder failed:',e);
+    var msg=document.getElementById('rb-folder-ov');
+    if(msg){var r=msg.querySelector('.umat-cs-modal');if(r){var d=r.querySelector('div:last-child');if(d){var err=document.createElement('div');err.style.cssText='padding:8px;margin-top:8px;background:#fee2e2;color:#991b1b;border-radius:6px;font-size:12px;';err.textContent='Failed to create folder: '+(e.message||e.error||'Unknown error');d.appendChild(err);setTimeout(function(){err.remove();},4000);}}}
   });
 });
 var rbFolderClose=document.getElementById('rb-folder-close');
@@ -1910,6 +2071,9 @@ if(rbRenameSubmit)rbRenameSubmit.addEventListener('click',function(){
     if(rbRenameOv)rbRenameOv.style.display='none';
     _rbRenameId=null;
     RB.load(RB.currentFolder);
+  },function(e){
+    console.error('[rb] rename failed:',e);
+    alert('Rename failed: '+(e.message||e.error||'Unknown error'));
   });
 });
 if(rbRenameName)rbRenameName.addEventListener('keydown',function(e){if(e.key==='Enter'&&rbRenameSubmit)rbRenameSubmit.click();});
@@ -1947,7 +2111,10 @@ function _rbCtxHandler(e){
   delItem.addEventListener('click',function(){
     menu.remove();
     if(!confirm('Delete "'+name+'"? This cannot be undone.'))return;
-    RB._rbAjax('delete',{itemids:[id]},function(){RB.load(RB.currentFolder);});
+    RB._rbAjax('delete',{itemids:[id]},function(){RB.load(RB.currentFolder);},function(e){
+      console.error('[rb] delete failed:',e);
+      alert('Delete failed: '+(e.message||e.error||'Unknown error'));
+    });
   });
   menu.appendChild(delItem);
   /* Position menu */
@@ -1970,6 +2137,9 @@ if(rbDeleteBtn)rbDeleteBtn.addEventListener('click',function(){
   if(!confirm('Delete '+ids.length+' item(s)? This cannot be undone.'))return;
   RB._rbAjax('delete',{itemids:ids},function(r){
     RB.load(RB.currentFolder);
+  },function(e){
+    console.error('[rb] batch delete failed:',e);
+    alert('Delete failed: '+(e.message||e.error||'Unknown error'));
   });
 });
 
@@ -2013,7 +2183,10 @@ if(rbPushBtn)rbPushBtn.addEventListener('click',function(){
     var confirmBtn=document.getElementById('rb-push-confirm');
     if(confirmBtn)confirmBtn.onclick=function(){
       if(!selectedCid)return;
-      RB._rbAjax('push',{itemids:ids,courseid:selectedCid},function(r){ov.style.display='none';RB.load(RB.currentFolder);});
+      RB._rbAjax('push',{itemids:ids,courseid:selectedCid},function(r){ov.style.display='none';RB.load(RB.currentFolder);},function(e){
+        console.error('[rb] push failed:',e);
+        alert('Push to course failed: '+(e.message||e.error||'Unknown error'));
+      });
     };
   });
 });

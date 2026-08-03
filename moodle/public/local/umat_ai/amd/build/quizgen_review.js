@@ -510,11 +510,11 @@ define(['core/ajax'], function(Ajax) {
             '      <option value="8">8 lines</option>' +
             '    </select>' +
             '  </div>' +
-            '  <div class="qgen-field"><label>Version</label>' +
+            '  <div class="qgen-field"><label>Version(s)</label>' +
             '    <div class="qgen-toggle-row">' +
-            '      <label class="qgen-radio-label"><input type="radio" name="qgen-doc-version" value="A" checked> Version A</label>' +
-            '      <label class="qgen-radio-label"><input type="radio" name="qgen-doc-version" value="B"> Version B</label>' +
-            '      <label class="qgen-radio-label"><input type="radio" name="qgen-doc-version" value="C"> Version C</label>' +
+            '      <label class="qgen-check-label"><input type="checkbox" class="qgen-version-check" value="A" checked> Version A</label>' +
+            '      <label class="qgen-check-label"><input type="checkbox" class="qgen-version-check" value="B"> Version B</label>' +
+            '      <label class="qgen-check-label"><input type="checkbox" class="qgen-version-check" value="C"> Version C</label>' +
             '    </div>' +
             '  </div>' +
             '  <div class="qgen-export-types">' +

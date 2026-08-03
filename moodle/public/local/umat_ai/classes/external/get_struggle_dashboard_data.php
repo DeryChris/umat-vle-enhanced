@@ -1,4 +1,9 @@
 <?php
+/**
+ * @deprecated Since v2.2.0 — Use get_struggle_insights instead.
+ * This file is retained for backward compatibility only.
+ * Do not add new features here.
+ */
 
 namespace local_umat_ai\external;
 
