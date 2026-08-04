@@ -19,12 +19,26 @@ class ProcessRecordingRequest(BaseModel):
     recording_url: str       = Field(..., description="URL to BBB recording")
     course_id:     int       = Field(..., description="Moodle course ID")
     material_ids:  List[int] = Field(default=[], description="Indexed material IDs for context")
+    title:         str       = Field(default="", description="Display title for the recording")
+    # Re-transcription overrides (optional — only used by /recording/reprocess)
+    transcription_provider: Optional[str] = Field(default=None, description="Override transcription provider")
+    transcription_model:    Optional[str] = Field(default=None, description="Override transcription model")
 
 
 class ProcessRecordingResponse(BaseModel):
-    job_id:  str
-    status:  str
-    message: str
+    job_id:          str
+    status:          str
+    message:         str
+    transcription_provider: Optional[str] = Field(default=None, description="Provider used for transcription")
+    transcription_model:    Optional[str] = Field(default=None, description="Model used for transcription")
+
+
+# ── Transcription Segment ────────────────────────────────
+
+class TranscriptionSegment(BaseModel):
+    start: float = Field(..., description="Start time in seconds")
+    end:   float = Field(..., description="End time in seconds")
+    text:  str   = Field(..., description="Transcribed text segment")
 
 
 class QueryRequest(BaseModel):
@@ -78,10 +92,12 @@ class AIOutputResult(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    status:        str
-    version:       str
-    whisper_model: str
-    llm_model:     str
+    status:                 str
+    version:                str
+    whisper_model:          str
+    llm_model:              str
+    transcription_provider: str
+    transcription_model:    str
 
 
 # ── Material Analysis ───────────────────────────────────
@@ -192,4 +208,53 @@ class VideoStatusResponse(BaseModel):
     error:          Optional[str] = None
     created_at:     Optional[str] = None
     completed_at:   Optional[str] = None
+
+
+# ── Transcription Cost Aggregation ──────────────────────────
+
+class TranscriptionCostRequest(BaseModel):
+    course_id:    int = Field(default=0, description="Course ID (0 = all courses)")
+    months_back:  int = Field(default=12, description="Months of history to include")
+
+
+class PerCourseCost(BaseModel):
+    course_id:            int
+    total_cost:           float = 0.0
+    total_duration_secs:  float = 0.0
+    recording_count:      int   = 0
+    transcribed_count:    int   = 0
+    provider_breakdown:   dict  = {}
+
+
+class MonthlyCost(BaseModel):
+    month:             str   = ""
+    total_cost:        float = 0.0
+    total_duration_secs: float = 0.0
+    recording_count:   int   = 0
+
+
+class ProviderCostSummary(BaseModel):
+    provider:          str   = ""
+    recording_count:   int   = 0
+    total_cost:        float = 0.0
+    total_duration_secs: float = 0.0
+
+
+class TranscriptionCostResponse(BaseModel):
+    total_cost:          float                = 0.0
+    total_duration_secs: float                = 0.0
+    total_recordings:    int                  = 0
+    per_course:          list[PerCourseCost]  = []
+    monthly_trend:       list[MonthlyCost]    = []
+    provider_breakdown:  list[ProviderCostSummary] = []
+
+
+# ── Re-process Recording ────────────────────────────────────
+
+class ReprocessRecordingResponse(BaseModel):
+    job_id:  str
+    status:  str
+    message: str
+    transcription_provider: Optional[str] = None
+    transcription_model:    Optional[str] = None
 

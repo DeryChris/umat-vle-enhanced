@@ -5,14 +5,16 @@
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
-from models.schemas import ProcessRecordingRequest, ProcessRecordingResponse
+from models.schemas import ProcessRecordingRequest, ProcessRecordingResponse, ReprocessRecordingResponse
 from models.database import get_db, ProcessingJob
 from middleware.auth import verify_token
 from core.audio_processor import AudioProcessor
-from core.transcription import TranscriptionService
+from core.api_transcription import ApiTranscriptionService
 from core.document_loader import DocumentLoader
 from core.vector_store import VectorStoreManager
 from core.llm_processor import LLMProcessor
+from config import get_settings
+import json
 import uuid
 from datetime import datetime
 import logging
@@ -65,21 +67,36 @@ def process_recording_background(
     job_id:  str,
     request: ProcessRecordingRequest,
     db_url:  str,
+    transcription_provider_override: Optional[str] = None,
+    transcription_model_override:    Optional[str] = None,
 ):
-    """Background task: download → extract audio → transcribe → index → generate AI outputs."""
+    """Background task: download → extract audio → transcribe → index → generate AI outputs.
+
+    Uses ApiTranscriptionService (OpenAI API) when TRANSCRIPTION_API_KEY is set,
+    falls back to local Whisper otherwise.
+
+    Args:
+        job_id: Unique job identifier.
+        request: Original process request.
+        db_url: Database connection string.
+        transcription_provider_override: If set, overrides the config-level transcription provider.
+        transcription_model_override: If set, overrides the config-level transcription model.
+    """
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy.exc import OperationalError
     from models.database import ProcessingJob
-    import requests as http_requests
 
     engine       = create_engine(db_url, pool_pre_ping=True, pool_recycle=3600)
     SessionLocal = sessionmaker(bind=engine)
     db           = SessionLocal()
 
-    audio_proc  = AudioProcessor()
-    transcriber = TranscriptionService()
-    doc_loader  = DocumentLoader()
+    audio_proc   = AudioProcessor()
+    transcriber  = ApiTranscriptionService(
+        provider=transcription_provider_override,
+        model=transcription_model_override,
+    )
+    doc_loader   = DocumentLoader()
     vector_store = VectorStoreManager()
     llm          = LLMProcessor()
 
@@ -90,13 +107,18 @@ def process_recording_background(
     try:
         job = db.query(ProcessingJob).filter(ProcessingJob.job_id == job_id).first()
 
+        # Store title if provided
+        if request.title:
+            job.title = request.title
+            db.commit()
+
         try:
             # Step 1: Download
             job.status = "downloading"
             db.commit()
             logger.info(f"[{job_id}] Downloading from {request.recording_url}")
             video_path = audio_proc.download_recording(request.recording_url)
-        except (http_requests.exceptions.Timeout, http_requests.exceptions.ConnectionError) as e:
+        except Exception as e:
             step_failed = "download"
             raise Exception(f"BBB API timeout or connection error: {str(e)}")
 
@@ -112,17 +134,31 @@ def process_recording_background(
                 raise Exception(f"Audio extraction failed: {str(e)}")
 
         try:
-            # Step 3: Transcribe
+            # Step 3: Transcribe using ApiTranscriptionService
             logger.info(f"[{job_id}] Transcribing")
-            result     = transcriber.transcribe_audio(audio_path)
+            result = transcriber.transcribe(audio_path)
             transcript = result["text"]
-            job.transcript = transcript
-            job.status     = "processing_ai"
+            segments   = result.get("segments", [])
+            formatted  = result.get("formatted", transcript)
+
+            job.transcript = formatted
+            job.transcription_provider = result.get("provider", "local")
+            job.transcription_model    = result.get("model", "unknown")
+            job.transcription_cost     = result.get("cost", 0.0)
+            job.audio_duration_secs    = result.get("duration_secs", 0.0)
+            job.chunk_count            = result.get("chunk_count", 1)
+
+            # Store segments as JSON for the Moodle side to consume
+            if segments:
+                job.segments_json = json.dumps(segments)
+
+            job.status = "processing_ai"
             db.commit()
+            logger.info(f"[{job_id}] Transcription complete ({len(transcript)} chars, "
+                        f"provider={job.transcription_provider}, cost=${job.transcription_cost:.6f})")
         except Exception as e:
-            if "whisper" in str(e).lower() or "audio" in str(e).lower():
-                step_failed = "transcription"
-                raise Exception(f"Transcription failed: {str(e)}")
+            step_failed = "transcription"
+            raise Exception(f"Transcription failed: {str(e)}")
 
         try:
             # Step 4: Index transcript in ChromaDB (non-fatal)
@@ -185,7 +221,6 @@ async def process_recording(
     db:               Session = Depends(get_db),
     token:            str     = Depends(verify_token),
 ):
-    from config import get_settings
     cfg    = get_settings()
     job_id = str(uuid.uuid4())
 
@@ -194,6 +229,7 @@ async def process_recording(
         session_id    = request.session_id,
         course_id     = request.course_id,
         recording_url = request.recording_url,
+        title         = request.title or None,
         status        = "queued",
     )
     db.add(job)
@@ -210,6 +246,8 @@ async def process_recording(
         job_id  = job_id,
         status  = "queued",
         message = "Recording processing started",
+        transcription_provider = cfg.transcription_provider,
+        transcription_model    = cfg.transcription_model,
     )
 
 
@@ -225,13 +263,30 @@ async def get_job_status(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
+    # Parse segments_json if present
+    segments = []
+    if job.segments_json:
+        try:
+            segments = json.loads(job.segments_json)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     return {
         "job_id":       job.job_id,
         "session_id":   job.session_id,
         "status":       job.status,
+        "title":        job.title or "",
         "created_at":   job.created_at,
         "completed_at": job.completed_at,
         "transcript":   job.transcript,
+        "segments":     segments,
+        "transcription": {
+            "provider": job.transcription_provider or "local",
+            "model":    job.transcription_model or "whisper-local",
+            "cost":     job.transcription_cost or 0.0,
+            "duration_secs": job.audio_duration_secs or 0.0,
+            "chunk_count":   job.chunk_count or 1,
+        },
         "outputs": {
             "summary": job.summary,
             "notes":   job.notes,
@@ -239,3 +294,54 @@ async def get_job_status(
         },
         "error":        job.error_message,
     }
+
+
+@router.post("/reprocess", response_model=ReprocessRecordingResponse)
+async def reprocess_recording(
+    request:          ProcessRecordingRequest,
+    background_tasks: BackgroundTasks,
+    db:               Session = Depends(get_db),
+    token:            str     = Depends(verify_token),
+):
+    """Re-transcribe a recording with optional provider/model overrides.
+
+    Use this endpoint when a lecturer wants to re-run transcription with
+    a different provider (e.g. openai → openrouter) or model.
+
+    The endpoint creates a new processing job, passing the override
+    provider/model to the transcription service.
+    """
+    cfg    = get_settings()
+    job_id = str(uuid.uuid4())
+
+    # Resolve overrides: request level → config level default.
+    prov_override = request.transcription_provider or None
+    model_override = request.transcription_model or None
+
+    job = ProcessingJob(
+        job_id        = job_id,
+        session_id    = request.session_id,
+        course_id     = request.course_id,
+        recording_url = request.recording_url,
+        title         = request.title or None,
+        status        = "queued",
+    )
+    db.add(job)
+    db.commit()
+
+    background_tasks.add_task(
+        process_recording_background,
+        job_id,
+        request,
+        cfg.database_url,
+        prov_override,
+        model_override,
+    )
+
+    return ReprocessRecordingResponse(
+        job_id  = job_id,
+        status  = "queued",
+        message = "Re-transcription job queued",
+        transcription_provider = prov_override or cfg.transcription_provider,
+        transcription_model    = model_override or cfg.transcription_model,
+    )

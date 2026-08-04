@@ -56,7 +56,17 @@ class Settings(BaseSettings):
     upload_dir: str = "./uploads"
     max_file_size_mb: int = 500
 
-    # Whisper
+    # Transcription (uses dedicated OpenAI key — separate from LLM keys)
+    # Provider: "openai" (default), "openrouter", or "local" (local Whisper fallback)
+    transcription_provider: str = "openai"
+    transcription_api_key: str = ""
+    transcription_model: str = "gpt-4o-mini-transcribe"
+    # Max chunk duration in seconds for API transcription (to stay under 25MB limit)
+    transcription_max_chunk_secs: int = 600  # 10 minutes
+    # Enable content-hash caching for idempotent chunk transcription
+    enable_transcription_cache: bool = True
+
+    # Local Whisper (legacy fallback when transcription_api_key is empty)
     whisper_model: str = "base"
 
     # Chunking
@@ -97,6 +107,18 @@ REQUIRED_VARS_HELP = {
     "ai_service_token": "Shared bearer token — must match the Moodle plugin setting (min 32 chars)",
     "ai_db_password":   "PostgreSQL password for the umat_ai_db database",
 }
+
+# Non-blocking transcription provider validation (logged as warning, not fatal)
+def _warn_transcription_config(s: Settings) -> None:
+    provider = s.transcription_provider
+    if provider not in ("openai", "openrouter", "local"):
+        print(f"WARNING: TRANSCRIPTION_PROVIDER={provider!r} unknown; falling back to 'openai'")
+    if provider == "openai" and not s.transcription_api_key:
+        print("WARNING: TRANSCRIPTION_PROVIDER=openai but TRANSCRIPTION_API_KEY not set. Falling back to local Whisper.")
+    if provider == "openrouter" and not s.transcription_api_key:
+        print("WARNING: TRANSCRIPTION_PROVIDER=openrouter but TRANSCRIPTION_API_KEY not set. Falling back to local Whisper.")
+    if provider == "openrouter":
+        print("INFO: OpenRouter transcription has a 60-second upstream timeout. Long chunks may fail; use chunking.")
 
 
 def _fail_startup(lines: list) -> None:
@@ -142,6 +164,7 @@ def get_settings() -> Settings:
     try:
         loaded = Settings()
         _validate_provider(loaded)
+        _warn_transcription_config(loaded)
         return loaded
     except ValidationError as e:
         missing = [str(err["loc"][0]) for err in e.errors() if err["type"] == "missing"]

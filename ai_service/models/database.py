@@ -33,6 +33,7 @@ class ProcessingJob(Base):
     session_id    = Column(String(100), nullable=False)
     course_id     = Column(Integer, nullable=False)
     recording_url = Column(Text, nullable=True)
+    title         = Column(String(255), nullable=True)
     status        = Column(String(30), default="queued")  # queued|processing|completed|failed
     transcript    = Column(Text, nullable=True)
     summary       = Column(Text, nullable=True)
@@ -41,6 +42,14 @@ class ProcessingJob(Base):
     error_message = Column(Text, nullable=True)
     created_at    = Column(DateTime, default=datetime.utcnow)
     completed_at  = Column(DateTime, nullable=True)
+
+    # Transcription metadata (API-based transcription)
+    transcription_provider  = Column(String(30), nullable=True)   # "openai", "openrouter", "local"
+    transcription_model     = Column(String(100), nullable=True)  # e.g. "gpt-4o-mini-transcribe"
+    transcription_cost      = Column(Float, default=0.0)          # USD cost
+    audio_duration_secs     = Column(Float, nullable=True)        # Total audio duration
+    chunk_count             = Column(Integer, default=1)          # Number of chunks transcribed
+    segments_json           = Column(Text, nullable=True)         # JSON array of {start, end, text}
 
 
 class IndexedDocument(Base):
@@ -195,6 +204,18 @@ def init_db():
         if col not in columns:
             with engine.connect() as conn:
                 conn.execute(text(f"ALTER TABLE processing_jobs ADD COLUMN {col} TEXT"))
+                conn.commit()
+
+    # Add transcription metadata columns to processing_jobs (gradual migration)
+    for col in ('transcription_provider', 'transcription_model', 'transcription_cost',
+                'audio_duration_secs', 'chunk_count', 'segments_json', 'title'):
+        if col not in columns:
+            with engine.connect() as conn:
+                col_type = "FLOAT DEFAULT 0.0" if col == 'transcription_cost' else \
+                           "INTEGER DEFAULT 1" if col == 'chunk_count' else \
+                           "VARCHAR(255)" if col in ('title', 'transcription_provider', 'transcription_model') else \
+                           "TEXT"
+                conn.execute(text(f"ALTER TABLE processing_jobs ADD COLUMN {col} {col_type}"))
                 conn.commit()
 
 

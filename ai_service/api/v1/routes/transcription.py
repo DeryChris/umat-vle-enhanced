@@ -1,11 +1,12 @@
 # ============================================================
 # POST /api/v1/transcription/upload  — upload audio/video for transcription
-# GET  /api/v1/transcription/{job_id} — get transcript + outputs
+# GET  /api/v1/transcription/{job_id} — get transcript + outputs + segments
 # GET  /api/v1/transcription/{job_id}/flashcards — generate flashcards
 # GET  /api/v1/transcription/{job_id}/glossary  — generate glossary
 # GET  /api/v1/transcription/{job_id}/chapters  — generate chapter markers
-# GET  /api/v1/transcription/{job_id}/export    — export transcript (txt/pdf/docx)
+# GET  /api/v1/transcription/{job_id}/export    — export transcript (txt/json)
 # WS   /api/v1/transcription/live               — live transcription stream
+# GET  /api/v1/transcription/list/{course_id}   — list recent transcriptions
 # ============================================================
 
 import os
@@ -28,7 +29,7 @@ from models.schemas import ProcessRecordingResponse
 from models.database import get_db, ProcessingJob
 from middleware.auth import verify_token
 from core.audio_processor import AudioProcessor
-from core.transcription import TranscriptionService
+from core.api_transcription import ApiTranscriptionService
 from core.document_loader import DocumentLoader
 from core.vector_store import VectorStoreManager
 from core.llm_processor import LLMProcessor, _make_llm
@@ -49,16 +50,20 @@ MAX_FILE_SIZE = 500 * 1024 * 1024  # 500 MB
 # ── Background processing pipeline ────────────────────────────
 
 def _process_upload_background(job_id: str, file_path: str, filename: str, db_url: str):
-    """Background task: extract audio → transcribe → index → generate AI outputs."""
+    """Background task: extract audio → transcribe (API) → index → generate AI outputs.
+
+    Uses ApiTranscriptionService (OpenAI) when TRANSCRIPTION_API_KEY is set;
+    falls back to local Whisper if no API key is configured.
+    """
     engine = create_engine(db_url, pool_pre_ping=True, pool_recycle=3600)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
 
-    audio_proc = AudioProcessor()
-    transcriber = TranscriptionService()
-    doc_loader = DocumentLoader()
+    audio_proc  = AudioProcessor()
+    transcriber = ApiTranscriptionService()
+    doc_loader  = DocumentLoader()
     vector_store = VectorStoreManager()
-    llm = LLMProcessor()
+    llm         = LLMProcessor()
 
     audio_path = None
     step_failed = None
@@ -75,30 +80,34 @@ def _process_upload_background(job_id: str, file_path: str, filename: str, db_ur
         try:
             job.status = "transcribing"
             db.commit()
-            if ext in (".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac", ".wma"):
-                # Audio file — convert to WAV for Whisper
-                audio_path = audio_proc.extract_audio_from_video(file_path)
-            else:
-                # Video file — extract audio track
-                audio_path = audio_proc.extract_audio_from_video(file_path)
+            audio_path = audio_proc.extract_audio_from_video(file_path)
             logger.info(f"[{job_id}] Audio extracted: {audio_path}")
         except Exception as e:
             step_failed = "audio_extraction"
             raise Exception(f"Audio extraction failed: {str(e)}")
 
-        # Step 2: Transcribe
+        # Step 2: Transcribe using ApiTranscriptionService
         try:
-            logger.info(f"[{job_id}] Transcribing with Whisper")
-            result = transcriber.transcribe_audio(audio_path)
+            logger.info(f"[{job_id}] Transcribing via ApiTranscriptionService")
+            result = transcriber.transcribe(audio_path)
             transcript = result["text"]
-            segments = result.get("segments", [])
+            segments   = result.get("segments", [])
+            formatted  = result.get("formatted", transcript)
 
-            # Store formatted transcript with timestamps
-            formatted = transcriber.format_transcript_with_timestamps(segments)
             job.transcript = formatted
+            job.transcription_provider = result.get("provider", "local")
+            job.transcription_model    = result.get("model", "unknown")
+            job.transcription_cost     = result.get("cost", 0.0)
+            job.audio_duration_secs    = result.get("duration_secs", 0.0)
+            job.chunk_count            = result.get("chunk_count", 1)
+
+            if segments:
+                job.segments_json = json.dumps(segments)
+
             job.status = "processing_ai"
             db.commit()
-            logger.info(f"[{job_id}] Transcription complete: {len(transcript)} chars")
+            logger.info(f"[{job_id}] Transcription complete: {len(transcript)} chars, "
+                        f"provider={job.transcription_provider}, cost=${job.transcription_cost:.6f}")
         except Exception as e:
             step_failed = "transcription"
             raise Exception(f"Transcription failed: {str(e)}")
@@ -107,7 +116,7 @@ def _process_upload_background(job_id: str, file_path: str, filename: str, db_ur
         try:
             logger.info(f"[{job_id}] Indexing transcript in ChromaDB")
             session_id = job.session_id
-            course_id = job.course_id
+            course_id  = job.course_id
             texts, metadatas, ids = doc_loader.process_transcript(transcript, session_id, course_id)
             if texts:
                 vector_store.add_documents(course_id, texts, metadatas, ids)
@@ -120,14 +129,13 @@ def _process_upload_background(job_id: str, file_path: str, filename: str, db_ur
         try:
             logger.info(f"[{job_id}] Generating summary, notes, quiz")
             job.summary = llm.generate_summary(transcript)
-            job.notes = llm.generate_notes(transcript)
-            job.quiz = llm.generate_quiz(transcript)
+            job.notes   = llm.generate_notes(transcript)
+            job.quiz    = llm.generate_quiz(transcript)
         except Exception as e:
             step_failed = "llm_generation"
             logger.warning(f"[{job_id}] LLM generation failed (non-fatal): {e}")
-            # Don't fail the whole job — transcript is still valuable
 
-        job.status = "completed"
+        job.status       = "completed"
         job.completed_at = datetime.utcnow()
         db.commit()
         logger.info(f"[{job_id}] Processing completed successfully")
@@ -138,7 +146,7 @@ def _process_upload_background(job_id: str, file_path: str, filename: str, db_ur
         try:
             job = db.query(ProcessingJob).filter(ProcessingJob.job_id == job_id).first()
             if job:
-                job.status = "failed"
+                job.status        = "failed"
                 job.error_message = f"Step: {step_failed or 'unknown'}, Error: {str(e)}"
                 db.commit()
         except Exception:
@@ -196,7 +204,8 @@ async def upload_for_transcription(
         job_id=job_id,
         session_id=session_id,
         course_id=course_id,
-        recording_url=None,  # No URL — uploaded file
+        recording_url=None,
+        title=title or None,
         status="queued",
     )
     db.add(job)
@@ -217,6 +226,8 @@ async def upload_for_transcription(
         job_id=job_id,
         status="queued",
         message=f"Transcription started for '{title or file.filename}'",
+        transcription_provider=settings.transcription_provider,
+        transcription_model=settings.transcription_model,
     )
 
 
@@ -228,26 +239,43 @@ async def get_transcription(
     db: Session = Depends(get_db),
     token: str = Depends(verify_token),
 ):
-    """Get transcription status, transcript, and AI outputs."""
+    """Get transcription status, transcript, segments, and AI outputs."""
     job = db.query(ProcessingJob).filter(
         (ProcessingJob.job_id == job_id) | (ProcessingJob.session_id == job_id)
     ).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
+    # Parse segments_json if present
+    segments = []
+    if job.segments_json:
+        try:
+            segments = json.loads(job.segments_json)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     return {
-        "job_id": job.job_id,
-        "session_id": job.session_id,
-        "course_id": job.course_id,
-        "status": job.status,
-        "transcript": job.transcript,
+        "job_id":       job.job_id,
+        "session_id":   job.session_id,
+        "course_id":    job.course_id,
+        "title":        job.title or "",
+        "status":       job.status,
+        "transcript":   job.transcript,
+        "segments":     segments,
+        "transcription": {
+            "provider":      job.transcription_provider or "local",
+            "model":         job.transcription_model or "whisper-local",
+            "cost":          job.transcription_cost or 0.0,
+            "duration_secs": job.audio_duration_secs or 0.0,
+            "chunk_count":   job.chunk_count or 1,
+        },
         "outputs": {
             "summary": job.summary,
-            "notes": job.notes,
-            "quiz": job.quiz,
+            "notes":   job.notes,
+            "quiz":    job.quiz,
         },
-        "error": job.error_message,
-        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "error":        job.error_message,
+        "created_at":   job.created_at.isoformat() if job.created_at else None,
         "completed_at": job.completed_at.isoformat() if job.completed_at else None,
     }
 
@@ -395,7 +423,7 @@ async def export_transcript(
     db: Session = Depends(get_db),
     token: str = Depends(verify_token),
 ):
-    """Export transcript as TXT, or structured JSON with all outputs."""
+    """Export transcript as TXT, or structured JSON with all outputs and segments."""
     job = db.query(ProcessingJob).filter(ProcessingJob.job_id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -403,14 +431,30 @@ async def export_transcript(
         raise HTTPException(status_code=400, detail="Transcript not available")
 
     if format == "json":
+        # Parse segments if stored
+        segments = []
+        if job.segments_json:
+            try:
+                segments = json.loads(job.segments_json)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         data = {
-            "transcript": job.transcript,
-            "summary": job.summary,
-            "notes": job.notes,
-            "quiz": job.quiz,
-            "course_id": job.course_id,
-            "session_id": job.session_id,
-            "created_at": job.created_at.isoformat() if job.created_at else None,
+            "transcript":   job.transcript,
+            "segments":     segments,
+            "summary":      job.summary,
+            "notes":        job.notes,
+            "quiz":         job.quiz,
+            "course_id":    job.course_id,
+            "session_id":   job.session_id,
+            "title":        job.title or "",
+            "transcription": {
+                "provider":      job.transcription_provider,
+                "model":         job.transcription_model,
+                "cost":          job.transcription_cost,
+                "duration_secs": job.audio_duration_secs,
+            },
+            "created_at":   job.created_at.isoformat() if job.created_at else None,
         }
         return Response(
             content=json.dumps(data, indent=2),
@@ -419,7 +463,7 @@ async def export_transcript(
         )
 
     # Default: plain text
-    content = f"=== Lecture Transcript ===\nSession: {job.session_id}\nCourse: {job.course_id}\n\n{job.transcript}"
+    content = f"=== Lecture Transcript ===\nSession: {job.session_id}\nCourse: {job.course_id}\nTitle: {job.title or ''}\n\n{job.transcript}"
     if job.summary:
         content += f"\n\n=== Summary ===\n\n{job.summary}"
     if job.notes:
@@ -433,9 +477,13 @@ async def export_transcript(
 
 
 # ── Live transcription WebSocket ──────────────────────────────
+# NOTE: Live transcription uses local Whisper for low-latency streaming.
+# The ApiTranscriptionService is not suitable for real-time use due to
+# per-chunk API latency and cost. For recorded content, the upload
+# endpoint with ApiTranscriptionService is preferred.
 
 class LiveTranscriptionManager:
-    """Manages active live transcription sessions."""
+    """Manages active live transcription sessions (uses local Whisper)."""
 
     def __init__(self):
         self.active_sessions: dict = {}  # session_id -> {ws, buffer, segments}
@@ -461,14 +509,15 @@ class LiveTranscriptionManager:
         buffer_threshold = 16000 * 5 * 2  # 5 seconds * 16kHz * 2 bytes/sample
         if len(session["buffer"]) >= buffer_threshold:
             try:
-                # Write buffer to temp WAV file
+                import tempfile
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
                     tmp.write(session["buffer"])
                     tmp_path = tmp.name
 
-                # Transcribe the chunk
-                transcriber = TranscriptionService()
-                result = transcriber.transcribe_audio(tmp_path)
+                # Use local Whisper for live (low latency, no API call per chunk)
+                from core.transcription import TranscriptionService as LocalTranscriptionService
+                local_transcriber = LocalTranscriptionService()
+                result = local_transcriber.transcribe_audio(tmp_path)
                 segment_text = result.get("text", "").strip()
 
                 if segment_text:
@@ -487,7 +536,6 @@ class LiveTranscriptionManager:
                         "data": segment,
                     })
 
-                # Clean up
                 os.unlink(tmp_path)
                 session["buffer"] = bytearray()
 
@@ -511,8 +559,9 @@ class LiveTranscriptionManager:
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
                     tmp.write(session["buffer"])
                     tmp_path = tmp.name
-                transcriber = TranscriptionService()
-                result = transcriber.transcribe_audio(tmp_path)
+                from core.transcription import TranscriptionService as LocalTranscriptionService
+                local_transcriber = LocalTranscriptionService()
+                result = local_transcriber.transcribe_audio(tmp_path)
                 text = result.get("text", "").strip()
                 if text:
                     session["segments"].append({
@@ -544,6 +593,9 @@ async def live_transcription_ws(websocket: WebSocket, session_id: str):
 
     Client sends binary audio chunks (16-bit PCM, 16kHz, mono).
     Server responds with JSON transcript segments as they are processed.
+
+    NOTE: Uses local Whisper for low-latency streaming, not the API service,
+    to avoid per-chunk latency and cost.
     """
     await websocket.accept()
     logger.info(f"Live transcription started: {session_id}")
@@ -604,15 +656,19 @@ async def list_transcriptions(
     return {
         "jobs": [
             {
-                "job_id": j.job_id,
-                "session_id": j.session_id,
-                "status": j.status,
+                "job_id":       j.job_id,
+                "session_id":   j.session_id,
+                "title":        j.title or "",
+                "status":       j.status,
                 "transcript_length": len(j.transcript) if j.transcript else 0,
-                "has_summary": bool(j.summary),
-                "has_notes": bool(j.notes),
-                "has_quiz": bool(j.quiz),
-                "error": j.error_message,
-                "created_at": j.created_at.isoformat() if j.created_at else None,
+                "has_summary":  bool(j.summary),
+                "has_notes":    bool(j.notes),
+                "has_quiz":     bool(j.quiz),
+                "transcription_provider": j.transcription_provider,
+                "transcription_model":    j.transcription_model,
+                "transcription_cost":     j.transcription_cost,
+                "error":        j.error_message,
+                "created_at":   j.created_at.isoformat() if j.created_at else None,
                 "completed_at": j.completed_at.isoformat() if j.completed_at else None,
             }
             for j in jobs

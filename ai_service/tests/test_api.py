@@ -169,14 +169,18 @@ def test_error_handling_graceful_llm_failure():
     """LLM failure should return graceful error message."""
     from unittest.mock import patch
     from core.llm_processor import LLMProcessor
-    from core.vector_store import VectorStoreManager
+    from rag.hybrid_retriever import HybridRetriever
 
-    with patch.object(VectorStoreManager, 'similarity_search', return_value=[("context", {"source": "test"})]), \
-         patch.object(LLMProcessor, 'answer_question', side_effect=Exception("Gemini API error")):
+    with patch.object(HybridRetriever, 'search', return_value=[("course material context", {"source": "test.pdf"})]), \
+         patch.object(LLMProcessor, 'answer_with_prompt', side_effect=Exception("Gemini API error")):
 
         response = client.post(
             "/api/v1/query",
-            json={"question": "test", "course_id": 1, "user_id": 55556},
+            json={
+                "question": "Explain the water cycle in detail based on my course materials",
+                "course_id": 1,
+                "user_id": 55556,
+            },
             headers=HEADERS,
         )
         assert response.status_code == 200
