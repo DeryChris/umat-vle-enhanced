@@ -22,12 +22,16 @@ def _make_llm(temperature: float, generation_config: dict = None, provider: str 
     response_format is OpenAI-specific (e.g. {"type": "json_object"})."""
     if provider is None:
         provider = settings.llm_provider
+    timeout_secs = 30.0  # fail fast — don't hang for a minute+
+
     if provider == "openai":
         from langchain_openai import ChatOpenAI
         kwargs = dict(
             model=settings.openai_llm_model,
             api_key=settings.openai_api_key,
             temperature=temperature,
+            request_timeout=timeout_secs,
+            max_retries=1,
         )
         if settings.openai_base_url:
             kwargs["base_url"] = settings.openai_base_url
@@ -45,11 +49,15 @@ def _make_llm(temperature: float, generation_config: dict = None, provider: str 
                 "X-Title": settings.openrouter_site_name,
             },
             temperature=temperature,
+            request_timeout=timeout_secs,
+            max_retries=1,
         )
     kwargs = dict(
         model=settings.llm_model,
         google_api_key=settings.google_api_key,
         temperature=temperature,
+        timeout=timeout_secs,
+        max_retries=1,  # default is 6 — too many retries on a flaky connection
     )
     if generation_config:
         kwargs["generation_config"] = generation_config
