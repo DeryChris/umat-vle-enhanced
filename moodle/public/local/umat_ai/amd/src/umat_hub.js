@@ -250,11 +250,26 @@ function loadLectures(cid){
     var recs=r.recordings||[];
     if(!recs.length){g.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">video_library</span><p>No recordings available for this course yet.</p></div>';return;}
     g.innerHTML=recs.map(function(rec){
-      return '<div class="umat-video-tile" data-url="'+esc(rec.url)+'" data-title="'+esc(rec.title)+'" data-segments="'+esc(JSON.stringify(rec.segments||[]))+'" data-duration="'+esc(rec.duration||'')+'">'+
-        '<div class="umat-video-thumb"><span class="material-symbols-outlined umat-vid-play-icon">play_circle</span>'+
+      // Transcription provider badge.
+      var prov=rec.transcription_provider||'';
+      var provBadge='';
+      if(rec.has_transcript&&prov){
+        var provColor=(prov==='openai')?'#4ade80':(prov==='openrouter')?'#fbbf24':'#9ca3af';
+        var provIcon=(prov==='openai'||prov==='openrouter')?'auto_awesome':'mic';
+        provBadge='<span class="hub-trans-badge" title="Transcribed by '+esc(prov)+' | Model: '+esc(rec.transcription_model||'')+'" style="position:absolute;bottom:6px;right:6px;display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;font-size:9px;font-weight:700;background:'+provColor+'22;color:'+provColor+';border:1px solid '+provColor+'44;z-index:2;"><span class="material-symbols-outlined" style="font-size:11px;">'+provIcon+'</span>'+esc(prov)+'</span>';
+      } else if(!rec.has_transcript){
+        provBadge='<span class="hub-trans-badge hub-trans-pending" style="position:absolute;bottom:6px;right:6px;display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;font-size:9px;font-weight:700;background:#9ca3af22;color:#9ca3af;border:1px solid #9ca3af44;z-index:2;"><span class="material-symbols-outlined" style="font-size:11px;">hourglass_empty</span>pending</span>';
+      }
+      return '<div class="umat-video-tile" data-url="'+esc(rec.url)+'" data-title="'+esc(rec.title)+'" data-segments="'+esc(JSON.stringify(rec.segments||[]))+'" data-duration="'+esc(rec.duration||'')+'" data-has-transcript="'+(rec.has_transcript?'1':'0')+'" data-provider="'+esc(prov)+'" data-model="'+esc(rec.transcription_model||'')+'" data-cost="'+(rec.transcription_cost||0)+'" data-session-key="'+esc(rec.session_key||'')+'">'+
+        '<div class="umat-video-thumb" style="position:relative;"><span class="material-symbols-outlined umat-vid-play-icon">play_circle</span>'+
         (rec.duration?'<span class="umat-duration-badge">'+esc(rec.duration)+'</span>':'')+
+        provBadge+
         '</div><div class="umat-video-tile-info"><h4 title="'+esc(rec.title)+'">'+esc(rec.title)+'</h4>'+
         '<span class="umat-vid-time">'+esc(rec.time_ago||'')+'</span>'+
+        (rec.has_transcript
+          ? '<span class="umat-trans-badge-sm" style="font-size:10px;color:var(--sec);font-weight:600;">Transcript Available</span>'+
+            '<button class="umat-reprocess-btn" data-sk="'+esc(rec.session_key||'')+'" data-url="'+esc(rec.url)+'" data-courseid="'+(rec.courseid||0)+'" data-title="'+esc(rec.title||'')+'" title="Re-transcribe with different provider/model" onclick="event.stopPropagation();"><span class="material-symbols-outlined">sync</span></button>'
+          : '')+
         '<a class="umat-video-tile-dl" href="'+esc(rec.url)+'" download title="Download" onclick="event.stopPropagation();"><span class="material-symbols-outlined">download</span></a>'+
         '</div></div>';
     }).join('');
@@ -263,6 +278,18 @@ function loadLectures(cid){
         var segs=[];try{segs=JSON.parse(t.dataset.segments||'[]');}catch(e){}
         openHubPlayer(t.dataset.url,t.dataset.title,segs);
       });
+      var rpBtn=t.querySelector('.umat-reprocess-btn');
+      if(rpBtn){
+        rpBtn.addEventListener('click',function(e){
+          e.stopPropagation();
+          openReprocessModal(
+            this.dataset.sk,
+            this.dataset.url,
+            parseInt(this.dataset.courseid)||0,
+            this.dataset.title||''
+          );
+        });
+      }
     });
   },function(){g.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>Could not load recordings.</p></div>';});
   var srch=document.getElementById('hub-lec-search');
@@ -273,6 +300,89 @@ function openHubPlayer(url,title,segments){
     url:url, name:title||'Lecture Recording',
     segments:segments||[],
     downloadUrl:url
+  });
+}
+
+/* ─── Re-transcribe Modal ──────────────────────────── */
+var _reprocessModal = null;
+
+function openReprocessModal(sessionKey, recordingUrl, courseId, title){
+  if(_reprocessModal)closeReprocessModal();
+
+  var ov=document.createElement('div');
+  ov.className='umat-modal-overlay';
+  ov.id='umat-reprocess-ov';
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;';
+
+  var provOpts=[
+    {value:'',label:'Provider default'},
+    {value:'openai',label:'OpenAI (default)'},
+    {value:'openrouter',label:'OpenRouter'},
+  ];
+
+  ov.innerHTML=
+    '<div class="umat-modal-box" style="background:var(--u-sfl);border-radius:var(--u-rp);padding:28px;max-width:460px;width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.3);color:var(--u-ons);">'+
+      '<h3 style="margin:0 0 6px;font-size:18px;font-weight:700;">Re-transcribe Recording</h3>'+
+      '<p style="margin:0 0 18px;font-size:13px;color:var(--u-ter);">Choose a different transcription provider or model. The existing transcript will be replaced.</p>'+
+      '<label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Provider</label>'+
+      '<select id="umat-reprocess-provider" style="width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-rp);background:var(--u-sur);color:var(--u-ons);font-size:14px;font-family:inherit;margin-bottom:14px;">'+
+        provOpts.map(function(o){return '<option value="'+o.value+'">'+o.label+'</option>';}).join('')+
+      '</select>'+
+      '<label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Model <span style="font-weight:400;color:var(--u-ter);">(optional)</span></label>'+
+      '<input type="text" id="umat-reprocess-model" placeholder="e.g. gpt-4o-mini-transcribe" style="width:100%;padding:10px 12px;border:1px solid var(--u-olv);border-radius:var(--u-rp);background:var(--u-sur);color:var(--u-ons);font-size:14px;font-family:inherit;margin-bottom:18px;box-sizing:border-box;">'+
+      '<p style="margin:0 0 18px;font-size:11px;color:var(--u-ter);">Leave model empty to use the provider\'s default.</p>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">'+
+        '<button type="button" id="umat-reprocess-cancel" style="padding:10px 20px;border:1px solid var(--u-olv);border-radius:var(--u-rp);background:transparent;color:var(--u-ons);font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>'+
+        '<button type="button" id="umat-reprocess-confirm" style="padding:10px 20px;border:none;border-radius:var(--u-rp);background:var(--u-pri);color:var(--u-onp);font-size:13px;font-weight:700;cursor:pointer;">Start Re-transcription</button>'+
+      '</div>'+
+    '</div>';
+
+  document.body.appendChild(ov);
+  _reprocessModal=ov;
+
+  // Wire buttons.
+  document.getElementById('umat-reprocess-cancel').addEventListener('click',closeReprocessModal);
+  document.getElementById('umat-reprocess-confirm').addEventListener('click',function(){
+    var provider=document.getElementById('umat-reprocess-provider').value;
+    var model=document.getElementById('umat-reprocess-model').value.trim();
+    reprocessRecording(sessionKey, recordingUrl, courseId, title, provider, model);
+  });
+  ov.addEventListener('click',function(e){if(e.target===this)closeReprocessModal();});
+}
+
+function closeReprocessModal(){
+  if(_reprocessModal){
+    _reprocessModal.remove();
+    _reprocessModal=null;
+  }
+}
+
+function reprocessRecording(sessionKey, recordingUrl, courseId, title, provider, model){
+  var btn=document.getElementById('umat-reprocess-confirm');
+  if(btn){btn.disabled=true;btn.textContent='Queuing…';}
+
+  ajax('local_umat_ai_reprocess_recording',{
+    course_id: courseId,
+    session_id: sessionKey,
+    recording_url: recordingUrl,
+    title: title,
+    transcription_provider: provider||'',
+    transcription_model: model||'',
+  },function(r){
+    closeReprocessModal();
+    if(r.success){
+      // Show a brief toast/notification.
+      var toast=document.createElement('div');
+      toast.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:100000;background:var(--u-pri);color:var(--u-onp);padding:12px 24px;border-radius:var(--u-rp);font-size:13px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.25);';
+      toast.textContent=r.message||'Re-transcription queued.';
+      document.body.appendChild(toast);
+      setTimeout(function(){toast.remove();},4000);
+    } else {
+      alert(r.message||'Could not queue re-transcription.');
+    }
+  },function(){
+    closeReprocessModal();
+    alert('Network error. Please try again.');
   });
 }
 
@@ -497,4 +607,3 @@ _umatInitEsc([
 }
 };
 });
-

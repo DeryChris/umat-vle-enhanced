@@ -60,9 +60,10 @@ class StruggleTopicsResponse(BaseModel):
 class StudentRiskItem(BaseModel):
     user_id: int
     question_count: int
-    risk_score: float
-    risk_factors: List[str]
-    recommendation: str
+    risk_score: float = 0.0
+    narrative: str = ""
+    risk_factors: Optional[List[str]] = []
+    recommendation: str = ""
 
 class StudentRiskResponse(BaseModel):
     students: List[StudentRiskItem]
@@ -218,7 +219,7 @@ def _parse_llm_json(raw: str):
 
 # ── Prompts ──────────────────────────────────────────────────
 
-CLASSIFY_PROMPT = """You are an educational analytics assistant. Classify each student question into one of the provided topics and a struggle type.
+CLASSIFY_PROMPT = """You are an educational analytics assistant helping a university lecturer understand their students. Classify each student question into one of the provided topics and identify what TYPE of difficulty the student is having.
 
 Known topics: {known_topics}
 
@@ -232,17 +233,26 @@ For each question, respond with a JSON array of objects:
   }}
 ]
 
-Struggle type meanings:
-- conceptual: student misunderstands a core concept
-- procedural: student doesn't know the steps/process
-- clarity: student needs clarification on terminology
-- application: student can't apply the concept to a problem
+Struggle type meanings (use these in your reasoning but output the type tag):
+- conceptual: student misunderstands a core concept or theory
+- procedural: student doesn't know the steps, process, or method
+- clarity: student is confused by terminology, wording, or definitions
+- application: student understands the concept but can't apply it to a problem
 
 Questions:
 {questions_json}
 """
 
-STRUGGLE_TOPICS_PROMPT = """You are an educational analytics assistant. Analyze the following topics with their question counts and student counts. Identify the topics that students struggle with most and provide recommendations.
+STRUGGLE_TOPICS_PROMPT = """You are an educational analytics assistant helping a university lecturer understand where their students need help.
+
+Below are topics that students are struggling with, with student counts and question counts. For each topic, write a recommendation that a busy lecturer could actually USE this week.
+
+IMPORTANT RULES FOR RECOMMENDATIONS:
+- Write as if explaining to a colleague, not an analytics system
+- Every recommendation MUST include specific numbers (how many students, what percentage)
+- Recommend concrete actions: "Dedicate 20 minutes to a live demo" not "Consider reviewing"
+- Use plain language: say "students are confused about X" not "struggle_score of 78"
+- Format: [What's wrong + who's affected] → [What to do about it]
 
 For each topic, respond with a JSON object:
 {{
@@ -251,22 +261,30 @@ For each topic, respond with a JSON object:
       "topic": "<topic name>",
       "question_count": <number>,
       "struggle_score": <0-100>,
-      "recommendation": "<specific actionable recommendation for the lecturer>"
+      "recommendation": "<specific actionable recommendation with numbers and concrete actions>"
     }}
   ],
-  "summary": "<one-sentence summary of the overall struggle pattern>"
+  "summary": "<one-sentence plain-English overview of what the lecturer needs to know>"
 }}
 
 Consider:
-- Higher question counts indicate more struggle
-- Topics with many unique students indicate widespread difficulty
-- Look for patterns across related topics
+- More questions = more students hitting the same wall
+- Topics affecting many different students = widespread confusion, not isolated cases
+- Look for RELATED topics that might share a common root cause
 
 Topics data:
 {topics_json}
 """
 
-EXTRACT_TOPICS_PROMPT = """You are an expert academic diagnostician. Your job is to identify the REAL topics, concepts, and subject areas where students are genuinely struggling, by triangulating ALL available data sources.
+EXTRACT_TOPICS_PROMPT = """You are an expert academic diagnostician helping a university lecturer understand their students' real struggles. Your job is to identify the topics where students are genuinely confused — not just where they asked questions, but where there are clear patterns of misunderstanding.
+
+CRITICAL COMMUNICATION RULES (read these first!):
+1. Write ALL suggestions as if explaining to a busy lecturer over coffee, not writing an analytics report
+2. Every suggestion MUST include: WHICH students (count + percentage), WHAT topic, and a SPECIFIC action
+3. Never use technical terms like "struggle_score", "severity", "evidence_sources" in the suggestion text
+4. Use complete, natural sentences in suggestions
+5. Example GOOD suggestion: "12 students (30%) are confused about SSL certificate validation. Dedicate 20 minutes in your next lecture to a live demo of the certificate chain validation process."
+6. Example BAD suggestion: "Consider a dedicated recap session on SSL" (too vague, no numbers, no specifics)
 
 COURSE: {course_name}
 
@@ -326,16 +344,29 @@ OUTPUT STRICT JSON (no markdown, no code fences):
       "related_materials": ["Week3_Payment_Systems.pdf"],
       "related_sections": ["Week 3: Payment Security"],
       "affected_student_ids": [101, 102, 105, 110, 115],
-      "suggestion": "Dedicated recap session on SSL handshake and certificate chains with live demo",
+      "suggestion": "12 students (30%) are struggling with SSL certificate validation — questions jumped 25% this week. Dedicate 20 minutes in your next lecture to a hands-on demo of the certificate chain validation process.",
       "suggestion_type": "recap"
     }}
   ],
   "confidence": 0.92,
-  "summary_insight": "Students are struggling most with payment security fundamentals (SSL, certificate validation) and API integration patterns. Recommend a hands-on workshop covering certificate chain validation."
+  "summary_insight": "12 of 40 students (30%) are struggling most with SSL certificate validation — questions on this topic jumped 25% this week and quiz scores are dropping. I recommend a hands-on workshop covering certificate chain validation in your next lecture."
 }}
 """
 
-STUDENT_RISK_PROMPT = """You are an educational analytics assistant. Assess student risk based on their question patterns.
+STUDENT_RISK_PROMPT = """You are a supportive educational advisor helping a university lecturer understand individual students who may need help.
+
+For each student, write a ONE-SENTENCE plain-English narrative that explains their situation. Then provide a specific recommendation for the lecturer.
+
+Rules for narratives:
+- Write like a colleague describing a student to their lecturer
+- Include specific details the lecturer would recognize
+- Use natural language: "Kofi hasn't logged in for 12 days" not "risk_factor: low_engagement"
+- End the narrative with the implications for learning
+
+Rules for recommendations:
+- Be specific about what the lecturer can do
+- Include the student's topic struggles if known
+- Suggest 1-1 meeting, encouragement message, or practice materials as appropriate
 
 For each student, respond with a JSON array:
 [
@@ -343,15 +374,17 @@ For each student, respond with a JSON array:
     "user_id": <id>,
     "question_count": <number>,
     "risk_score": <0-100>,
-    "risk_factors": ["<factor1>", "<factor2>"],
-    "recommendation": "<actionable recommendation>"
+    "narrative": "<ONE sentence in plain English. Example: 'Kofi hasn't logged in for 12 days and failed 2 quizzes on payment security — he risks falling significantly behind.'>",
+    "recommendation": "<specific, doable action for the lecturer. Example: 'Send Kofi a quick check-in message and offer a 1-1 review session on payment security topics.'>"
   }}
 ]
 
-Consider:
-- Higher question counts = higher risk
-- Multiple struggle topics = higher risk
-- Increasing trend = higher risk
+Consider in your analysis:
+- Higher question counts = struggling, may need targeted help
+- Multiple struggle topics = spreading too thin or missing prerequisites
+- Increasing trend = getting worse, needs intervention now
+- Low engagement + high questions = frustrated, needs encouragement
+- Low engagement + low questions = disengaged/disconnected, needs outreach
 
 Students data:
 {students_json}
@@ -412,7 +445,7 @@ async def ingest_snapshot(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-NLQ_PROMPT = """You are an expert academic diagnostician. Analyze the student data and evidence to answer the lecturer's query.
+NLQ_PROMPT = """You are an expert academic advisor helping a lecturer understand their students. Answer the lecturer's question in plain, helpful language.
 
 Query: {query}
 
@@ -429,18 +462,20 @@ Output STRICT JSON only:
       "student_id": <int>,
       "name": "<full name>",
       "risk_level": "<high|medium|low>",
-      "root_cause": "<2-3 sentence explanation of why this student is struggling>",
+      "root_cause": "<2-3 sentence plain-English explanation of what this student is struggling with and why — include specific topics and numbers>",
       "evidence_citations": ["<source>"],
-      "ai_draft_message": "<2-3 sentence encouraging message the lecturer can send>"
+      "ai_draft_message": "<2-3 sentence encouraging message the lecturer can send. Be specific about the student's situation and offer concrete help.>"
     }}
   ],
-  "global_insight": "<one-sentence summary of the overall class pattern>"
+  "global_insight": "<one-sentence plain-English summary of the overall class pattern. Include numbers.>"
 }}
 
 Rules:
-- If the query is too vague, return the top 3 most common struggle tags instead of individual students.
-- If no evidence is found, set evidence_citations to [] and explain in root_cause using only quantitative metrics.
-- Keep ai_draft_message supportive and specific.
+- Write root_cause as if telling a colleague: "Kofi has asked 5 questions about SSL certificates this week and failed 2 quizzes on payment security."
+- NOT: "Student demonstrates elevated struggle_score in domain SSL Certificate Validation."
+- If the query is too vague, return the top 3 most common struggle topics instead of individual students.
+- If no evidence is found, set evidence_citations to [] and explain in root_cause using quantitative metrics (question counts, quiz scores, login data).
+- Keep ai_draft_message supportive and SPECIFIC — mention their name, the topic they struggle with, and a specific thing the lecturer can offer.
 - Maximum 10 students in the response.
 """
 
@@ -632,7 +667,13 @@ TASK:
 6. Re-rank final topics by their combined struggle_score
 7. Choose the most severe severity label across merged batches
 8. Choose the most relevant suggestion from merged batches
-9. Provide a concise summary_insight that captures the overall picture
+9. Provide a concise summary_insight that captures the overall picture in plain language
+
+IMPORTANT for summary_insight:
+- Write in plain English, as if telling a busy lecturer what's going on
+- Include specific numbers: how many students, which topics
+- Keep it to ONE sentence
+- Example: "12 of 40 students are struggling with SSL certificate validation and API integration — questions jumped 25% this week."
 
 OUTPUT STRICT JSON (no markdown, no code fences) — same format as individual extraction:
 {{
@@ -655,12 +696,12 @@ OUTPUT STRICT JSON (no markdown, no code fences) — same format as individual e
       "related_materials": ["All unique materials across batches"],
       "related_sections": ["All unique sections across batches"],
       "affected_student_ids": [101, 102, 105, 110, 115, 120],
-      "suggestion": "Best suggestion from merged batches",
+      "suggestion": "Best suggestion from merged batches (include numbers + specific action)",
       "suggestion_type": "recap"
     }}
   ],
   "confidence": 0.90,
-  "summary_insight": "Concise merged analysis of the course's struggle landscape"
+  "summary_insight": "Concise merged analysis in plain English — with numbers, for a busy lecturer"
 }}
 """
 
@@ -985,21 +1026,19 @@ async def student_risk(
 
 # ── Dashboard ────────────────────────────────────────────────
 
-DASHBOARD_PROMPT = """You are an educational analytics assistant producing a dashboard summary for a university lecturer.
-
-Given the following course analytics data, produce a brief dashboard summary.
+DASHBOARD_PROMPT = """You are an educational advisor producing a quick dashboard snapshot for a university lecturer.
 
 Course data:
 {course_data_json}
 
 Respond with a JSON object:
 {{
-  "top_topic_insight": "<one-sentence insight about the most difficult topic based on risk scores and student data>",
-  "recommendations": ["<recommendation 1>", "<recommendation 2>"],
-  "impact_summary": "<one paragraph natural language summary of course health>"
+  "top_topic_insight": "<one-sentence plain-English insight about the most difficult topic. Include how many students and what to do. Example: '12 of 40 students are struggling with SSL certificate validation — consider a recap session this week.'>",
+  "recommendations": ["<recommendation 1 — include specific numbers>", "<recommendation 2>"],
+  "impact_summary": "<one paragraph plain-English summary of course health. Lead with the most important number.>"
 }}
 
-Keep it concise and actionable. Base the top_topic_insight on the student risk data provided.
+Keep it concise and immediately useful. No jargon. Every claim needs a number.
 """
 
 
@@ -1085,9 +1124,14 @@ async def analytics_dashboard(
 
 # ── Course Health Report ─────────────────────────────────────
 
-COURSE_HEALTH_PROMPT = """You are an educational analytics assistant producing a comprehensive course health report for a university lecturer.
+COURSE_HEALTH_PROMPT = """You are a senior educational advisor creating a course health briefing for a university lecturer. Your job is to give them a clear, honest, and immediately useful picture of their course.
 
-Given the following course analytics data, produce a natural-language report that a lecturer can understand at a glance.
+CRITICAL RULES:
+- Write like a helpful colleague, not a report generator
+- Every claim MUST include SPECIFIC NUMBERS (counts, percentages, trends)
+- Never use analytics jargon: say "students are confused" not "struggle_score is 78"
+- Be honest but constructive — if things are going well, say so first
+- If things need attention, say what, why, and how many students are affected
 
 Course data:
 {course_data_json}
@@ -1095,26 +1139,42 @@ Course data:
 Respond with a JSON object:
 {{
   "overall_health": "<healthy|moderate|struggling>",
-  "summary": "<2-3 sentence overall assessment>",
-  "key_findings": ["<finding 1>", "<finding 2>", ...],
-  "worst_topic_analysis": "<brief analysis of the most problematic topic>",
-  "student_risk_summary": "<summary of at-risk student patterns>",
-  "recommendations": ["<recommendation 1>", "<recommendation 2>", ...],
-  "event_pattern_insight": "<if events exist, what the pattern suggests; otherwise empty string>"
+  "health_grade": "<A|B|C|D|F> based on at-risk percentage: A(<10%%), B(10-20%%), C(20-35%%), D(35-50%%), F(>50%%)>",
+  "health_label": "<Excellent|Good|Needs Attention|Concerning|Critical>",
+  "executive_summary": "<2-3 sentence briefing. FIRST sentence: the single most important metric or trend with a specific number. SECOND sentence: what this means for learning. THIRD sentence: the one action the lecturer should take this week. Example: '12 of 40 students (30%%) are struggling with SSL certificate validation — questions jumped 25%% this week. This means 1 in 3 students may not be ready for the payment systems exam. I recommend a 20-minute hands-on demo in your next lecture.'>",
+  "going_well": ["0-2 specific positive things with numbers. Example: 'Question activity is up 18%% this week — students are engaged.' If nothing positive, include 'No significant positive signals yet — early in the term.'"],
+  "needs_attention": ["2-3 specific concerns with numbers and student counts. Example: '3 students haven't logged in for 7+ days — they may need a personal check-in.'"],
+  "top_recommendation": "<SINGLE most important action for this week. Be very specific: include the topic, the action, and the format. Example: 'Dedicate 20 minutes in Thursday's lecture to a live demo of SSL certificate chain validation.'>",
+  "student_risk_summary": "<one-sentence summary of at-risk student patterns with counts. Example: '5 students are at risk, primarily due to struggles with SSL (3 students) and API integration (2 students).'>",
+  "event_pattern_insight": "<if events exist, what the pattern suggests (e.g. 'Quiz failure events are concentrated in Week 3 materials — students may need practice questions before the exam'); otherwise empty string>",
+  "section_insights": ["For EACH course section with data, one sentence with numbers. Example: 'Week 3 (Payment Security): 8 students struggling, 35 questions asked — highest concern section.' Only include sections that have actual student activity."]
 }}
 
-Keep the report concise and actionable. Focus on patterns the lecturer can actually do something about.
+IMPORTANT:
+- executive_summary is the FIRST thing the lecturer reads — it MUST be 2-3 sentences max with specific numbers
+- health_grade: A means most students are doing fine, F means urgent intervention needed
+- going_well should have at least 1 item if there's ANY positive signal (it's important for morale)
+- needs_attention should be concrete with student counts, not generic
+- top_recommendation must be a DOABLE action the lecturer can take THIS WEEK
+- section_insights helps the lecturer know which part of their course needs focus
 """
 
 
 class CourseHealthResponse(BaseModel):
     overall_health: str
-    summary: str
-    key_findings: List[str]
-    worst_topic_analysis: str
-    student_risk_summary: str
-    recommendations: List[str]
+    health_grade: Optional[str] = ""
+    health_label: Optional[str] = ""
+    executive_summary: Optional[str] = ""
+    summary: Optional[str] = ""
+    key_findings: Optional[List[str]] = []
+    going_well: Optional[List[str]] = []
+    needs_attention: Optional[List[str]] = []
+    top_recommendation: Optional[str] = ""
+    worst_topic_analysis: Optional[str] = ""
+    student_risk_summary: Optional[str] = ""
+    recommendations: Optional[List[str]] = []
     event_pattern_insight: Optional[str] = ""
+    section_insights: Optional[List[str]] = []
 
 
 @router.post("/api/v1/analytics/course-health", response_model=CourseHealthResponse)
@@ -1158,6 +1218,101 @@ Focus on:
 
 class StudentProgressResponse(BaseModel):
     recommendation: str
+
+
+# ── Transcription Cost Aggregation ─────────────────────────
+
+from models.schemas import TranscriptionCostRequest, TranscriptionCostResponse, PerCourseCost, MonthlyCost, ProviderCostSummary
+from models.database import ProcessingJob
+from sqlalchemy import func as sa_func, extract
+
+
+@router.post("/api/v1/analytics/transcription-costs", response_model=TranscriptionCostResponse)
+async def get_transcription_costs(
+    req: TranscriptionCostRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_token),
+):
+    """Aggregate transcription costs per course and month from processing_jobs."""
+    query = db.query(ProcessingJob).filter(
+        ProcessingJob.status == "completed",
+        ProcessingJob.transcription_cost.isnot(None),
+        ProcessingJob.transcription_cost > 0,
+    )
+
+    if req.course_id > 0:
+        query = query.filter(ProcessingJob.course_id == req.course_id)
+
+    jobs = query.all()
+
+    if not jobs:
+        return TranscriptionCostResponse()
+
+    # Per-course aggregation
+    course_map = {}
+    for j in jobs:
+        cid = j.course_id
+        if cid not in course_map:
+            course_map[cid] = {
+                "course_id": cid,
+                "total_cost": 0.0,
+                "total_duration_secs": 0.0,
+                "recording_count": 0,
+                "transcribed_count": 0,
+                "provider_breakdown": {},
+            }
+        cm = course_map[cid]
+        cm["total_cost"] += j.transcription_cost or 0.0
+        cm["total_duration_secs"] += j.audio_duration_secs or 0.0
+        cm["recording_count"] += 1
+        if j.transcription_provider:
+            cm["transcribed_count"] += 1
+            prov = j.transcription_provider
+            cm["provider_breakdown"][prov] = cm["provider_breakdown"].get(prov, 0) + 1
+
+    # Monthly trend
+    month_map = {}
+    for j in jobs:
+        month_key = j.created_at.strftime("%Y-%m") if j.created_at else "unknown"
+        if month_key not in month_map:
+            month_map[month_key] = {
+                "month": month_key,
+                "total_cost": 0.0,
+                "total_duration_secs": 0.0,
+                "recording_count": 0,
+            }
+        mm = month_map[month_key]
+        mm["total_cost"] += j.transcription_cost or 0.0
+        mm["total_duration_secs"] += j.audio_duration_secs or 0.0
+        mm["recording_count"] += 1
+
+    # Provider breakdown
+    provider_map = {}
+    for j in jobs:
+        prov = j.transcription_provider or "unknown"
+        if prov not in provider_map:
+            provider_map[prov] = {
+                "provider": prov,
+                "recording_count": 0,
+                "total_cost": 0.0,
+                "total_duration_secs": 0.0,
+            }
+        pm = provider_map[prov]
+        pm["recording_count"] += 1
+        pm["total_cost"] += j.transcription_cost or 0.0
+        pm["total_duration_secs"] += j.audio_duration_secs or 0.0
+
+    total_cost = sum(j.transcription_cost or 0.0 for j in jobs)
+    total_dur = sum(j.audio_duration_secs or 0.0 for j in jobs)
+
+    return TranscriptionCostResponse(
+        total_cost          = round(total_cost, 6),
+        total_duration_secs = round(total_dur, 2),
+        total_recordings    = len(jobs),
+        per_course          = [PerCourseCost(**course_map[cid]) for cid in sorted(course_map)],
+        monthly_trend       = [MonthlyCost(**month_map[m]) for m in sorted(month_map)],
+        provider_breakdown  = [ProviderCostSummary(**provider_map[p]) for p in sorted(provider_map)],
+    )
 
 
 @router.post("/api/v1/analytics/student-progress", response_model=StudentProgressResponse)

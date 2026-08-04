@@ -483,6 +483,28 @@
     -webkit-backdrop-filter: blur(12px);
     border-color: rgba(255,255,255,.5);
 }
+
+/* Transcription badge */
+.umat-ws-trans-badge[data-provider="openai"] {
+    background: rgba(74,222,128,0.15) !important;
+    color: #16a34a !important;
+    border: 1px solid rgba(74,222,128,0.3) !important;
+}
+.umat-ws-trans-badge[data-provider="openrouter"] {
+    background: rgba(251,191,36,0.15) !important;
+    color: #d97706 !important;
+    border: 1px solid rgba(251,191,36,0.3) !important;
+}
+.umat-ws-trans-badge[data-provider="local"] {
+    background: rgba(156,163,175,0.15) !important;
+    color: #6b7280 !important;
+    border: 1px solid rgba(156,163,175,0.3) !important;
+}
+.umat-ws-trans-pending {
+    background: rgba(156,163,175,0.15) !important;
+    color: #6b7280 !important;
+    border: 1px solid rgba(156,163,175,0.3) !important;
+}
 </style>
 
 <div class="umat-ai-workspace umat-ws"
@@ -537,6 +559,20 @@
     <!-- Session info -->
     <div style="padding:10px 16px 0;display:flex;align-items:center;gap:10px;">
       <h3 style="margin:0;font-size:15px;font-weight:700;color:var(--ons);">{{sessiontitle}}</h3>
+      {{#transcription_provider}}
+      <span class="umat-ws-trans-badge" data-provider="{{transcription_provider}}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;">
+        <span class="material-symbols-outlined" style="font-size:14px;">auto_awesome</span>
+        {{transcription_provider}} · {{transcription_model}}
+      </span>
+      {{/transcription_provider}}
+      {{^transcription_provider}}
+      {{#has_video}}
+      <span class="umat-ws-trans-badge umat-ws-trans-pending" style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:rgba(156,163,175,0.15);color:#6b7280;border:1px solid rgba(156,163,175,0.3);">
+        <span class="material-symbols-outlined" style="font-size:14px;">hourglass_empty</span>
+        Pending
+      </span>
+      {{/has_video}}
+      {{/transcription_provider}}
     </div>
 
     <!-- Transcript panel -->

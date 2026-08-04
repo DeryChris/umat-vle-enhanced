@@ -2,10 +2,54 @@
     Template: local/umat_ai/templates/analytics_dashboard.mustache
     Lecturer Insights Dashboard — 5-zone actionable insights layout.
 
+    AI-powered insights across all zones.
+
     Context (provided by JS):
       courseid, coursefullname
+    New API fields:
+      executive_summary, health_grade, health_label, going_well,
+      needs_attention, top_recommendation, metric_explanations
 }}
-<div class="umat-insights-pane">
+<div class="umat-insights-pane" data-courseid="{{{courseid}}}">
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 0: Executive Summary Briefing                                 -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone ins-exec-summary-zone" id="ins-exec-summary-zone">
+    <!-- Health grade badge (left) + 2-3 sentence briefing (right) -->
+    <div class="ins-exs-row">
+      <div class="ins-exs-grade" id="ins-exs-grade">
+        <span class="ins-exs-grade-letter" id="ins-exs-grade-letter">—</span>
+        <span class="ins-exs-grade-label" id="ins-exs-grade-label">Course Health</span>
+      </div>
+      <div class="ins-exs-briefing" id="ins-exs-briefing">
+        <div class="ins-exs-summary" id="ins-exs-summary">Loading executive summary…</div>
+        <div class="ins-exs-top-rec" id="ins-exs-top-rec"></div>
+      </div>
+    </div>
+    <!-- Going Well / Needs Attention (side-by-side chips) -->
+    <div class="ins-exs-lists">
+      <div class="ins-exs-list ins-exs-going-well" id="ins-exs-going-well">
+        <span class="ins-exs-list-icon"><span class="material-symbols-outlined">check_circle</span></span>
+        <div class="ins-exs-list-items" id="ins-exs-going-well-items"></div>
+      </div>
+      <div class="ins-exs-list ins-exs-needs-attention" id="ins-exs-needs-attention">
+        <span class="ins-exs-list-icon"><span class="material-symbols-outlined">warning</span></span>
+        <div class="ins-exs-list-items" id="ins-exs-needs-attention-items"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 5 (now first): Course Pulse — How your course is performing     -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone" id="ins-vitals-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">monitor_heart</span>
+      Course Pulse
+    </h3>
+    <div id="ins-course-pulse" class="ins-pulse-grid"></div>
+  </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════ -->
   <!-- ZONE 1: Priority Briefing — What needs your attention right now     -->
@@ -46,17 +90,6 @@
       Your Students
     </h3>
 
-    <!-- NLQ Search (secondary) -->
-    <div class="ins-nlq-bar">
-      <input type="text" id="ins-nlq-input" class="ins-nlq-input"
-        placeholder="Ask about student performance…" />
-      <button class="ins-nlq-btn" onclick="window.analyticsDashboard.submitNLQ()">
-        <span class="material-symbols-outlined">search</span>
-      </button>
-      <div class="ins-nlq-spinner" id="ins-nlq-spinner" style="display:none;"></div>
-    </div>
-    <div id="ins-nlq-response" class="ins-nlq-response umat-ai-stream-panel" style="display:none;"></div>
-
     <!-- Smart Filters -->
     <div class="ins-filter-row" id="ins-filters">
       <button class="ins-chip ins-chip-active" data-filter="all" onclick="window.analyticsDashboard.setFilter('all', this)">All</button>
@@ -89,17 +122,6 @@
       What Students Are Asking
     </h3>
     <div id="ins-common-questions" class="ins-question-list"></div>
-  </section>
-
-  <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <!-- ZONE 5: Course Vitals — How your course is performing                -->
-  <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <section class="ins-zone" id="ins-vitals-zone">
-    <h3 class="ins-zone-title">
-      <span class="material-symbols-outlined">monitor_heart</span>
-      Course Pulse
-    </h3>
-    <div id="ins-course-pulse" class="ins-pulse-grid"></div>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════ -->

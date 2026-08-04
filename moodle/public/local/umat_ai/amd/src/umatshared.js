@@ -1343,11 +1343,30 @@ define([], function() {
         grid.innerHTML = recs.map(function(r, i) {
             var badge = r.duration ? '<span class="yt-badge">' + _umatEsc(r.duration) + '</span>' : '';
             var segsData = JSON.stringify(r.segments || []).replace(/'/g, '&#39;');
-            return '<div class="yt-tile" data-idx="' + i + '" data-url="' + _umatEsc(r.url || '') + '" data-title="' + _umatEsc(r.title || 'Lecture Recording') + '" data-segs=\'' + segsData + '\'>' +
+
+            // Transcription provider badge.
+            var prov = r.transcription_provider || '';
+            var provBadge = '';
+            if (r.has_transcript && prov) {
+                var provColor = (prov === 'openai') ? '#4ade80' : (prov === 'openrouter') ? '#fbbf24' : '#9ca3af';
+                var provIcon = (prov === 'openai' || prov === 'openrouter') ? 'auto_awesome' : 'mic';
+                provBadge = '<span class="yt-trans-badge" title="Transcribed by ' + _umatEsc(prov) + ' | Model: ' + _umatEsc(r.transcription_model || '') + '" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:700;background:' + provColor + '22;color:' + provColor + ';border:1px solid ' + provColor + '44;"><span class="material-symbols-outlined" style="font-size:12px;">' + provIcon + '</span>' + _umatEsc(prov) + '</span>';
+            } else if (!r.has_transcript) {
+                provBadge = '<span class="yt-trans-badge yt-trans-pending" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:700;background:#9ca3af22;color:#9ca3af;border:1px solid #9ca3af44;" title="No transcript yet"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span>pending</span>';
+            }
+
+            // Action buttons: show Transcribe hover button if no transcript yet.
+            var transcribeBtn = '';
+            if (!r.has_transcript) {
+                transcribeBtn = '<button class="yt-btn yt-transcribe-btn" data-session="' + _umatEsc(r.session_key || '') + '" data-courseid="' + (r.courseid || 0) + '" onclick="event.stopPropagation()"><span class="material-symbols-outlined">auto_awesome</span>Transcribe</button>';
+            }
+
+            return '<div class="yt-tile" data-idx="' + i + '" data-url="' + _umatEsc(r.url || '') + '" data-title="' + _umatEsc(r.title || 'Lecture Recording') + '" data-segs=\'' + segsData + '\' data-has-transcript="' + (r.has_transcript ? '1' : '0') + '" data-provider="' + _umatEsc(prov) + '" data-model="' + _umatEsc(r.transcription_model || '') + '" data-cost="' + (r.transcription_cost || 0) + '" data-duration-secs="' + (r.audio_duration_secs || 0) + '" data-session-key="' + _umatEsc(r.session_key || '') + '" data-courseid="' + (r.courseid || 0) + '">' +
                 '<div class="yt-thumb yt-bg-video">' +
                 '<span class="yt-thumb-icon material-symbols-outlined">play_circle</span>' +
                 '<div class="yt-play-ov"><span class="material-symbols-outlined">play_arrow</span></div>' +
                 badge +
+                provBadge +
                 '</div>' +
                 '<div class="yt-meta">' +
                 '<div class="yt-av yt-av-video"><span class="material-symbols-outlined">smart_toy</span></div>' +
@@ -1360,13 +1379,14 @@ define([], function() {
                 '<div class="yt-actions">' +
                 '<button class="yt-btn" data-play="1" onclick="event.stopPropagation()"><span class="material-symbols-outlined">play_arrow</span>Play</button>' +
                 '<a class="yt-btn" href="' + _umatEsc(r.url || '#') + '" download onclick="event.stopPropagation()"><span class="material-symbols-outlined">download</span>Download</a>' +
+                transcribeBtn +
                 '</div>' +
                 '</div>';
         }).join('');
 
         grid.querySelectorAll('.yt-tile').forEach(function(tile) {
             tile.addEventListener('click', function(e) {
-                if (e.target.closest('a.yt-btn')) return;
+                if (e.target.closest('a.yt-btn') || e.target.closest('.yt-transcribe-btn')) return;
                 e.preventDefault();
                 var segs = [];
                 try { segs = JSON.parse(tile.dataset.segs || '[]'); } catch (ex) {}
@@ -1384,6 +1404,18 @@ define([], function() {
                 e.stopPropagation();
                 tile.click();
             });
+            // Transcribe button handler.
+            var transBtn = tile.querySelector('.yt-transcribe-btn');
+            if (transBtn) {
+                transBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var sk = this.dataset.session;
+                    var cid = this.dataset.courseid;
+                    if (sk && cid) {
+                        triggerTranscribe(sk, parseInt(cid));
+                    }
+                });
+            }
         });
     }
 
@@ -1686,6 +1718,61 @@ define([], function() {
         );
     }
 
+    // ─── Trigger transcription for a recording ─────── //
+    function triggerTranscribe(sessionKey, courseId) {
+        var btn = document.querySelector('.yt-transcribe-btn[data-session="' + sessionKey.replace(/['"\\]/g, '') + '"]');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span>Processing';
+            btn.classList.add('processing');
+        }
+        ajax('local_umat_ai_get_course_recordings', {courseid: courseId || 0}, function(r) {
+            var recs = r.recordings || [];
+            var rec = recs.find(function(rr) { return rr.session_key === sessionKey; });
+            if (!rec || !rec.url) {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span>Transcribe'; btn.classList.remove('processing'); }
+                console.warn('[triggerTranscribe] Recording not found or no URL:', sessionKey);
+                return;
+            }
+            var url = window.umatAiServiceUrl || 'http://localhost:8000';
+            var token = window.umatAiServiceToken || '';
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', url + '/api/v1/recording/process', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            xhr.onload = function() {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    var resp = JSON.parse(xhr.responseText || '{}');
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.innerHTML = '<span class="material-symbols-outlined">pending</span>Queued';
+                        btn.title = 'Job: ' + (resp.job_id || '');
+                    }
+                    var evt = new CustomEvent('umat:transcribe-started', {
+                        detail: { sessionKey: sessionKey, courseId: courseId, jobId: resp.job_id }
+                    });
+                    document.dispatchEvent(evt);
+                } else {
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span>Transcribe'; btn.classList.remove('processing'); }
+                    console.error('[triggerTranscribe] Failed:', xhr.status, xhr.responseText);
+                }
+            };
+            xhr.onerror = function() {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span>Transcribe'; btn.classList.remove('processing'); }
+                console.error('[triggerTranscribe] Network error');
+            };
+            xhr.send(JSON.stringify({
+                session_id: sessionKey,
+                recording_url: rec.url,
+                course_id: courseId || 0,
+                material_ids: [],
+                title: rec.title || ''
+            }));
+        }, function() {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span>Transcribe'; btn.classList.remove('processing'); }
+        });
+    }
+
     // ─── Exports ───────────────────────────────────── //
     return {
         // HTML escaping
@@ -1731,6 +1818,9 @@ define([], function() {
         _isStreamActive: function() { return !!_activeStream; },
         getChatState: function() { return _chatState; },
 
+        // Trigger transcription
+        triggerTranscribe: triggerTranscribe,
+
         // Voice
         _umatInitVoice: _umatInitVoice,
 
@@ -1755,6 +1845,9 @@ define([], function() {
         ytAvCls: _ytAvCls,
         ytIcon: _ytIcon,
         ytExtLabel: _ytExtLabel,
+
+        // Trigger transcription
+        triggerTranscribe: triggerTranscribe,
 
         // Renderers
         renderVideoTiles: renderVideoTiles,

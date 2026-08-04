@@ -1,11 +1,14 @@
 /**
  * Lecturer Insights Dashboard — 5-zone actionable insights.
  *
+ * Zone 0: Executive Summary (AI-powered briefing)
  * Zone 1: Priority Briefing (what needs attention)
  * Zone 2: Struggle Map (where students are confused)
  * Zone 3: Student Dossiers (who needs help and why)
  * Zone 4: Question Radar (what students are asking)
  * Zone 5: Course Vitals (how course is performing)
+ *
+ * Dual mode: single course (cid > 0) or all-courses overview (cid === 0).
  */
 define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str, Shared) {
     'use strict';
@@ -22,14 +25,17 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         return { url: '', sesskey: '' };
     }
 
-    // ── Initialisation ──
+    // ── Initialisation (dual-mode: single course or all-courses) ──
     function init(courseId) {
         cid = parseInt(courseId) || 0;
-        if (!cid) return;
+        if (!cid) {
+            loadAllCourses();
+            return;
+        }
         loadData();
     }
 
-    // ── Data loading ──
+    // ── Data loading (single course) ──
     function loadData() {
         showSkeleton(true);
         Ajax.call([{
@@ -44,6 +50,63 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         });
     }
 
+    // ── Data loading (all courses) ──
+    function loadAllCourses() {
+        showSkeleton(true);
+        Ajax.call([{
+            methodname: 'local_umat_ai_get_struggle_insights',
+            args: { courseid: 0, days: 60 }
+        }])[0].done(function(insights) {
+            renderAllCourses(insights);
+            showSkeleton(false);
+        }).fail(function() {
+            showSkeleton(false);
+            renderAllCourses({});
+        });
+    }
+
+    function renderAllCourses(data) {
+        data = data || {};
+        var mode = data.mode || 'single';
+        var header = document.querySelector('.umat-insights-header');
+        if (header) {
+            var modeBadge = header.querySelector('.ins-mode-badge');
+            if (!modeBadge) {
+                modeBadge = document.createElement('span');
+                modeBadge.className = 'ins-mode-badge';
+                header.appendChild(modeBadge);
+            }
+            modeBadge.textContent = mode === 'all_courses' ? 'All Courses' : '';
+            modeBadge.style.display = mode === 'all_courses' ? 'inline-block' : 'none';
+        }
+        // For all-courses, show a card grid
+        var courses = data.courses || [];
+        var el = document.querySelector('.umat-insights-pane');
+        if (!el) return;
+        if (!courses.length) {
+            el.innerHTML = '<div class="ins-empty" style="padding:60px 20px;text-align:center;">' +
+                '<span class="material-symbols-outlined" style="font-size:48px;color:var(--u-ol);display:block;margin-bottom:12px;">bar_chart</span>' +
+                '<p>No course analytics available yet. Insights will appear once the AI cron processes course data.</p></div>';
+            return;
+        }
+        el.innerHTML = '<div class="ins-all-courses-grid" id="ins-all-courses-grid">' +
+            courses.map(function(c) {
+                var grade = c.health_grade || '—';
+                var gradeColor = grade === 'A' ? '#22c55e' : grade === 'B' ? '#16a34a' :
+                    grade === 'C' ? '#f59e0b' : grade === 'D' ? '#f97316' : '#dc2626';
+                return '<a class="ins-course-card" href="' + c.url + '">' +
+                    '<div class="ins-course-card-grade" style="background:' + gradeColor + '">' + grade + '</div>' +
+                    '<div class="ins-course-card-body">' +
+                    '<div class="ins-course-card-name">' + escapeHtml(c.fullname) + '</div>' +
+                    '<div class="ins-course-card-meta">' +
+                    '<span>' + (c.enrolled || '—') + ' students</span>' +
+                    '<span>' + (c.at_risk || '—') + ' at risk</span>' +
+                    '</div>' +
+                    '<div class="ins-course-card-summary">' + escapeHtml(c.executive_summary || '') + '</div>' +
+                    '</div></a>';
+            }).join('') + '</div>';
+    }
+
     function showSkeleton(show) {
         var sk = document.getElementById('ins-skeleton');
         var pane = document.querySelector('.umat-insights-pane');
@@ -56,16 +119,65 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
         if (el) el.innerHTML = '<div class="ins-empty">No data available yet. The hourly cron will populate insights soon.</div>';
     }
 
-    // ── Master renderer ──
+    // ── Master renderer (single course) ──
     function renderAll(data) {
         if (!data) { renderEmpty(); return; }
+        renderExecutiveSummary(data);
         renderPriorityActions(data.priority_actions || []);
         renderStruggleAreas(data.struggle_areas || []);
         renderSectionStruggle(data.section_struggle || []);
         renderMaterialStruggle(data.material_struggle || []);
         renderStudentDossiers(data.student_narratives || []);
         renderQuestionRadar(data.common_questions || []);
-        renderCoursePulse(data.course_pulse || {});
+        renderCoursePulse(data.course_pulse || {}, data.metric_explanations || {});
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // ZONE 0: Executive Summary
+    // ════════════════════════════════════════════════════════════════
+    function renderExecutiveSummary(data) {
+        var gradeEl = document.getElementById('ins-exs-grade-letter');
+        var labelEl = document.getElementById('ins-exs-grade-label');
+        var summaryEl = document.getElementById('ins-exs-summary');
+        var recEl = document.getElementById('ins-exs-top-rec');
+        var goingWellEl = document.getElementById('ins-exs-going-well-items');
+        var needsAttnEl = document.getElementById('ins-exs-needs-attention-items');
+
+        if (gradeEl) {
+            var grade = data.health_grade || '—';
+            gradeEl.textContent = grade;
+            var gradeColors = { A: '#22c55e', B: '#16a34a', C: '#f59e0b', D: '#f97316', E: '#ef4444', F: '#dc2626' };
+            gradeEl.style.background = gradeColors[grade] || '#94a3b8';
+        }
+        if (labelEl) {
+            labelEl.textContent = data.health_label || 'Course Health';
+        }
+        if (summaryEl) {
+            summaryEl.textContent = data.executive_summary || 'Executive summary not available.';
+        }
+        if (recEl && data.top_recommendation) {
+            recEl.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">auto_awesome</span> ' +
+                escapeHtml(data.top_recommendation);
+            recEl.style.display = 'block';
+        } else if (recEl) {
+            recEl.style.display = 'none';
+        }
+
+        if (goingWellEl && data.going_well && data.going_well.length) {
+            goingWellEl.innerHTML = data.going_well.map(function(g) {
+                return '<span class="ins-exs-chip ins-exs-chip-good">' + escapeHtml(g) + '</span>';
+            }).join('');
+        } else if (goingWellEl) {
+            goingWellEl.innerHTML = '<span class="ins-exs-chip ins-exs-chip-good">No data yet</span>';
+        }
+
+        if (needsAttnEl && data.needs_attention && data.needs_attention.length) {
+            needsAttnEl.innerHTML = data.needs_attention.map(function(n) {
+                return '<span class="ins-exs-chip ins-exs-chip-warn">' + escapeHtml(n) + '</span>';
+            }).join('');
+        } else if (needsAttnEl) {
+            needsAttnEl.innerHTML = '<span class="ins-exs-chip ins-exs-chip-warn">No issues detected</span>';
+        }
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -251,6 +363,9 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
             // Suggestion
             var sugHtml = s.suggestion ? '<div class="ins-student-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' + escapeHtml(s.suggestion) + '</div>' : '';
 
+            // Use AI narrative as primary summary; fall back to PHP-generated summary
+            var studentSummary = s.ai_narrative || s.summary || '';
+
             return '<div class="ins-student-card" data-uid="' + s.userid + '" onclick="window.analyticsDashboard.loadStudentDetail(' + s.userid + ')">' +
                 '<div class="ins-student-header">' +
                 '<div class="ins-student-name-row">' +
@@ -259,7 +374,7 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
                 '</div>' +
                 '<span class="ins-pill ins-pill-' + riskClass + '">' + riskLabel + '</span>' +
                 '</div>' +
-                '<div class="ins-student-summary">' + escapeHtml(s.summary) + '</div>' +
+                '<div class="ins-student-summary">' + escapeHtml(studentSummary) + '</div>' +
                 topicChips +
                 statsHtml +
                 '<div class="ins-student-meta">Last active: ' + escapeHtml(s.last_active) + '</div>' +
@@ -319,9 +434,9 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
     }
 
     // ════════════════════════════════════════════════════════════════
-    // ZONE 5: Course Vitals
+    // ZONE 5: Course Vitals (metric labels with tooltip explanations)
     // ════════════════════════════════════════════════════════════════
-    function renderCoursePulse(pulse) {
+    function renderCoursePulse(pulse, metricExplanations) {
         var el = document.getElementById('ins-course-pulse');
         if (!el) return;
         if (!pulse || !pulse.total_students) {
@@ -329,34 +444,49 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
             return;
         }
 
+        metricExplanations = metricExplanations || {};
+
         function trendIcon(trend, pct) {
             if (trend === 'up') return '<span class="ins-pulse-trend up">↑' + (pct || '') + '%</span>';
             if (trend === 'down') return '<span class="ins-pulse-trend down">↓' + Math.abs(pct || 0) + '%</span>';
             return '<span class="ins-pulse-trend stable">—</span>';
         }
 
-        var html = '<div class="ins-pulse-card">' +
+        function tooltipLabel(label, explanation) {
+            if (explanation) {
+                return '<div class="ins-pulse-label" title="' + escapeHtml(explanation) + '">' + label +
+                    '<span class="material-symbols-outlined ins-pulse-info" style="font-size:12px;vertical-align:middle;margin-left:2px;">info</span></div>';
+            }
+            return '<div class="ins-pulse-label">' + label + '</div>';
+        }
+
+        // --- Avg Performance (was: Avg Quiz) ---
+        var html = '<div class="ins-pulse-card" title="' + escapeHtml(metricExplanations.avg_performance || 'Average student quiz score across all quizzes in this course') + '">' +
             '<div class="ins-pulse-val">' + (pulse.avg_quiz || 0) + '%</div>' +
-            '<div class="ins-pulse-label">Avg Quiz</div>' +
+            tooltipLabel('Avg Performance', metricExplanations.avg_performance) +
             trendIcon(pulse.quiz_trend, pulse.quiz_trend_pct) +
+            '<div class="ins-pulse-source">' + (pulse.avg_quiz_source === 'actual_quiz_grades' ? 'from quiz grades' : '') + '</div>' +
             '</div>';
 
-        html += '<div class="ins-pulse-card">' +
+        // --- Students at Risk (was: At Risk) ---
+        html += '<div class="ins-pulse-card" title="' + escapeHtml(metricExplanations.at_risk || 'Students flagged as high or medium risk based on engagement, quiz performance, and AI activity') + '">' +
             '<div class="ins-pulse-val">' + (pulse.at_risk_count || 0) + '</div>' +
-            '<div class="ins-pulse-label">At Risk</div>' +
-            '<div class="ins-pulse-sub">of ' + pulse.total_students + ' students</div>' +
+            tooltipLabel('Students at Risk', metricExplanations.at_risk) +
+            '<div class="ins-pulse-sub">of ' + pulse.total_students + '</div>' +
             '</div>';
 
-        html += '<div class="ins-pulse-card">' +
-            '<div class="ins-pulse-val ins-pulse-topic">' + escapeHtml(pulse.top_struggle_topic || '—') + '</div>' +
-            '<div class="ins-pulse-label">Top Struggle</div>' +
-            '<div class="ins-pulse-sub">' + escapeHtml(pulse.top_struggle_trend || '') + '</div>' +
-            '</div>';
-
-        html += '<div class="ins-pulse-card">' +
+        // --- Active This Week (was: Active This Week) ---
+        html += '<div class="ins-pulse-card" title="' + escapeHtml(metricExplanations.active_week || 'Students who logged in or interacted with the course in the last 7 days') + '">' +
             '<div class="ins-pulse-val">' + (pulse.active_this_week || 0) + '</div>' +
-            '<div class="ins-pulse-label">Active This Week</div>' +
-            '<div class="ins-pulse-sub">of ' + pulse.total_students + ' students</div>' +
+            tooltipLabel('Active This Week', metricExplanations.active_week) +
+            '<div class="ins-pulse-sub">of ' + pulse.total_students + '</div>' +
+            '</div>';
+
+        // --- Questions This Week (was: Top Struggle) ---
+        html += '<div class="ins-pulse-card" title="' + escapeHtml(metricExplanations.questions_week || 'Total AI questions asked by students in the last 7 days') + '">' +
+            '<div class="ins-pulse-val">' + (pulse.questions_this_week || 0) + '</div>' +
+            tooltipLabel('N Questions', metricExplanations.questions_week) +
+            '<div class="ins-pulse-sub">' + escapeHtml(pulse.top_struggle_trend || '') + '</div>' +
             '</div>';
 
         el.innerHTML = html;
@@ -392,8 +522,9 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
             args: { courseid: cid, userid: uid }
         }])[0].done(function(data) {
             if (!data) return;
+            var detailSummary = s ? (s.ai_narrative || s.summary || '') : '';
             body.innerHTML =
-                '<div class="ins-detail-narrative">' + escapeHtml(s ? s.summary : '') + '</div>' +
+                '<div class="ins-detail-narrative">' + escapeHtml(detailSummary) + '</div>' +
                 '<div class="ins-detail-grid">' +
                 '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.risk_score || 0) + '</div><div class="ins-detail-stat-lbl">Risk Score</div></div>' +
                 '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.total_logins || 0) + '</div><div class="ins-detail-stat-lbl">Logins</div></div>' +
@@ -521,45 +652,6 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
     }
 
     // ════════════════════════════════════════════════════════════════
-    // NLQ Search
-    // ════════════════════════════════════════════════════════════════
-    function submitNLQ() {
-        var input = document.getElementById('ins-nlq-input');
-        var response = document.getElementById('ins-nlq-response');
-        var spinner = document.getElementById('ins-nlq-spinner');
-        if (!input || !response) return;
-        var q = input.value.trim();
-        if (!q || !cid) return;
-
-        if (activeStream && activeStream.abort) activeStream.abort();
-
-        response.style.display = 'block';
-        if (spinner) spinner.style.display = 'inline-block';
-        input.disabled = true;
-
-        var cfg = streamConfig();
-        activeStream = Shared._umatStreamInline({
-            url: cfg.url,
-            sesskey: cfg.sesskey,
-            courseid: cid,
-            question: q,
-            session_key: 'ins_nlq_' + cid,
-            targetId: 'ins-nlq-response',
-            onDone: function() {
-                activeStream = null;
-                if (spinner) spinner.style.display = 'none';
-                input.disabled = false;
-            },
-            onError: function(err) {
-                activeStream = null;
-                if (spinner) spinner.style.display = 'none';
-                input.disabled = false;
-                response.innerHTML = '<span style="color:var(--u-ter);">' + escapeHtml(err.message || 'Failed to query AI service.') + '</span>';
-            }
-        });
-    }
-
-    // ════════════════════════════════════════════════════════════════
     // Utilities
     // ════════════════════════════════════════════════════════════════
     function escapeHtml(s) {
@@ -570,13 +662,13 @@ define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str
     return {
         init: init,
         loadData: loadData,
+        loadAllCourses: loadAllCourses,
         setFilter: setFilter,
         loadStudentDetail: loadStudentDetail,
         closeDetail: closeDetail,
         handlePriorityAction: handlePriorityAction,
         openActionDrawer: openActionDrawer,
         closeActionDrawer: closeActionDrawer,
-        sendIntervention: sendIntervention,
-        submitNLQ: submitNLQ
+        sendIntervention: sendIntervention
     };
 });

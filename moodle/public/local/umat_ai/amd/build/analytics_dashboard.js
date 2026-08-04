@@ -8,575 +8,530 @@
  * Zone 5: Course Vitals (how course is performing)
  */
 define(['core/ajax', 'core/str', 'local_umat_ai/umatshared'], function(Ajax, Str, Shared) {
-    'use strict';
 
-    var cid = 0;
-    var currentDetailUid = 0;
-    var currentDrawerAction = '';
-    var allStudentNarratives = [];
-    var filterMode = 'all';
-    var activeStream = null;
+        var cid = 0;
+        var currentDetailUid = 0;
+        var currentDrawerAction = '';
+        var allStudentNarratives = [];
+        var filterMode = 'all';
 
-    function streamConfig() {
-        if (window._umatChatStream) return window._umatChatStream;
-        return { url: '', sesskey: '' };
-    }
-
-    // ── Initialisation ──
-    function init(courseId) {
-        cid = parseInt(courseId) || 0;
-        if (!cid) return;
-        loadData();
-    }
-
-    // ── Data loading ──
-    function loadData() {
-        showSkeleton(true);
-        Ajax.call([{
-            methodname: 'local_umat_ai_get_struggle_insights',
-            args: { courseid: cid, days: 60 }
-        }])[0].done(function(insights) {
-            renderAll(insights);
-            showSkeleton(false);
-        }).fail(function() {
-            showSkeleton(false);
-            renderEmpty();
-        });
-    }
-
-    function showSkeleton(show) {
-        var sk = document.getElementById('ins-skeleton');
-        var pane = document.querySelector('.umat-insights-pane');
-        if (sk) sk.style.display = show ? 'flex' : 'none';
-        if (pane) pane.style.opacity = show ? '0.3' : '1';
-    }
-
-    function renderEmpty() {
-        var el = document.getElementById('ins-priority-actions');
-        if (el) el.innerHTML = '<div class="ins-empty">No data available yet. The hourly cron will populate insights soon.</div>';
-    }
-
-    // ── Master renderer ──
-    function renderAll(data) {
-        if (!data) { renderEmpty(); return; }
-        renderPriorityActions(data.priority_actions || []);
-        renderStruggleAreas(data.struggle_areas || []);
-        renderSectionStruggle(data.section_struggle || []);
-        renderMaterialStruggle(data.material_struggle || []);
-        renderStudentDossiers(data.student_narratives || []);
-        renderQuestionRadar(data.common_questions || []);
-        renderCoursePulse(data.course_pulse || {});
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // ZONE 1: Priority Briefing
-    // ════════════════════════════════════════════════════════════════
-    function renderPriorityActions(actions) {
-        var el = document.getElementById('ins-priority-actions');
-        if (!el) return;
-        if (!actions || !actions.length) {
-            el.innerHTML = '<div class="ins-priority-card urgency-low">' +
-                '<span class="material-symbols-outlined ins-priority-icon">check_circle</span>' +
-                '<div><div class="ins-priority-text">Everything looks good!</div>' +
-                '<div class="ins-priority-details">No urgent issues detected. Check the sections below for detailed insights.</div></div></div>';
-            return;
+        // ── Initialisation ──
+        function init(courseId) {
+            cid = parseInt(courseId) || 0;
+            if (!cid) return;
+            loadData();
         }
-        el.innerHTML = actions.map(function(a) {
-            var itemsHtml = '';
-            if (a.items && a.items.length) {
-                itemsHtml = '<ul class="ins-priority-items">' +
-                    a.items.map(function(item) {
-                        var detail = item.name || '';
-                        if (item.students) detail += ' — ' + item.students + ' students';
-                        if (item.pct) detail += ' (' + item.pct + '%)';
-                        if (item.trend) detail += ', ' + item.trend;
-                        if (item.days) detail += ' — ' + item.days + ' days ago';
-                        return '<li>' + escapeHtml(detail) + '</li>';
-                    }).join('') + '</ul>';
-            }
-            var actionBtn = '';
-            if (a.action_label) {
-                actionBtn = '<button class="ins-priority-btn" onclick="window.analyticsDashboard.handlePriorityAction(\'' + escapeHtml(a.type) + '\')">' +
-                    escapeHtml(a.action_label) + '</button>';
-            }
-            return '<div class="ins-priority-card urgency-' + escapeHtml(a.urgency) + '">' +
-                '<span class="material-symbols-outlined ins-priority-icon">' + escapeHtml(a.icon) + '</span>' +
-                '<div class="ins-priority-body">' +
-                '<div class="ins-priority-text">' + escapeHtml(a.text) + '</div>' +
-                itemsHtml +
-                '<div class="ins-priority-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' +
-                escapeHtml(a.suggestion) + '</div>' +
-                actionBtn +
-                '</div></div>';
-        }).join('');
-    }
 
-    // ════════════════════════════════════════════════════════════════
-    // ZONE 2: Struggle Map
-    // ════════════════════════════════════════════════════════════════
-    function renderStruggleAreas(areas) {
-        var el = document.getElementById('ins-struggle-areas');
-        if (!el) return;
-        if (!areas || !areas.length) {
-            el.innerHTML = '<div class="ins-empty">No struggle data yet. Student questions will populate this section.</div>';
-            return;
+        // ── Data loading ──
+        function loadData() {
+            showSkeleton(true);
+            Ajax.call([{
+                methodname: 'local_umat_ai_get_struggle_insights',
+                args: { courseid: cid, days: 60 }
+            }])[0].done(function(insights) {
+                renderAll(insights);
+                showSkeleton(false);
+            }).fail(function() {
+                showSkeleton(false);
+                renderEmpty();
+            });
         }
-        el.innerHTML = areas.map(function(a) {
-            var severityLabel = a.severity === 'critical' ? 'Critical' :
-                (a.severity === 'attention' ? 'Needs Attention' : 'Watch');
-            var severityIcon = a.severity === 'critical' ? 'error' :
-                (a.severity === 'attention' ? 'warning' : 'info');
 
-            // Trend indicator
-            var trendHtml = '';
-            if (a.trend === 'up') {
-                trendHtml = '<span class="ins-trend ins-trend-up"><span class="material-symbols-outlined">trending_up</span> +' + a.trend_pct + '%</span>';
-            } else if (a.trend === 'down') {
-                trendHtml = '<span class="ins-trend ins-trend-down"><span class="material-symbols-outlined">trending_down</span> ' + a.trend_pct + '%</span>';
-            } else {
-                trendHtml = '<span class="ins-trend ins-trend-stable"><span class="material-symbols-outlined">trending_flat</span> Stable</span>';
+        function showSkeleton(show) {
+            var sk = document.getElementById('ins-skeleton');
+            var pane = document.querySelector('.umat-insights-pane');
+            if (sk) sk.style.display = show ? 'flex' : 'none';
+            if (pane) pane.style.opacity = show ? '0.3' : '1';
+        }
+
+        function renderEmpty() {
+            var el = document.getElementById('ins-priority-actions');
+            if (el) el.innerHTML = '<div class="ins-empty">No data available yet. The hourly cron will populate insights soon.</div>';
+        }
+
+        // ── Master renderer ──
+        function renderAll(data) {
+            if (!data) { renderEmpty(); return; }
+            renderPriorityActions(data.priority_actions || []);
+            renderStruggleAreas(data.struggle_areas || []);
+            renderSectionStruggle(data.section_struggle || []);
+            renderMaterialStruggle(data.material_struggle || []);
+            renderStudentDossiers(data.student_narratives || []);
+            renderQuestionRadar(data.common_questions || []);
+            renderCoursePulse(data.course_pulse || {});
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // ZONE 1: Priority Briefing
+        // ════════════════════════════════════════════════════════════════
+        function renderPriorityActions(actions) {
+            var el = document.getElementById('ins-priority-actions');
+            if (!el) return;
+            if (!actions || !actions.length) {
+                el.innerHTML = '<div class="ins-priority-card urgency-low">' +
+                    '<span class="material-symbols-outlined ins-priority-icon">check_circle</span>' +
+                    '<div><div class="ins-priority-text">Everything looks good!</div>' +
+                    '<div class="ins-priority-details">No urgent issues detected. Check the sections below for detailed insights.</div></div></div>';
+                return;
             }
-
-            // Sample questions
-            var sqHtml = '';
-            if (a.sample_questions && a.sample_questions.length) {
-                sqHtml = '<div class="ins-struggle-questions">' +
-                    a.sample_questions.slice(0, 2).map(function(q) {
-                        return '<div class="ins-struggle-sample-q">"' + escapeHtml(q) + '"</div>';
-                    }).join('') + '</div>';
-            }
-
-            // Materials
-            var matHtml = '';
-            if (a.materials && a.materials.length) {
-                matHtml = '<div class="ins-struggle-materials">' +
-                    a.materials.map(function(m) {
-                        return '<span class="ins-material-tag">' + escapeHtml(m.name) + '</span>';
-                    }).join('') + '</div>';
-            }
-
-            return '<div class="ins-struggle-card severity-' + escapeHtml(a.severity) + '">' +
-                '<div class="ins-struggle-header">' +
-                '<div class="ins-struggle-topic">' +
-                '<span class="material-symbols-outlined ins-severity-icon">' + severityIcon + '</span>' +
-                '<strong>' + escapeHtml(a.topic) + '</strong>' +
-                '<span class="ins-severity-label">' + severityLabel + '</span>' +
-                '</div>' +
-                trendHtml +
-                '</div>' +
-                '<div class="ins-struggle-narrative">' + escapeHtml(a.description) + '</div>' +
-                '<div class="ins-struggle-evidence">' +
-                '<span class="ins-evidence"><span class="material-symbols-outlined">quiz</span> ' + a.question_count + ' questions</span>' +
-                '<span class="ins-evidence"><span class="material-symbols-outlined">people</span> ' + a.student_count + ' of ' + a.total_students + ' students (' + a.student_pct + '%)</span>' +
-                '</div>' +
-                sqHtml +
-                '<div class="ins-struggle-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' +
-                escapeHtml(a.suggestion) + '</div>' +
-                matHtml +
-                '</div>';
-        }).join('');
-    }
-
-    function renderSectionStruggle(sections) {
-        var el = document.getElementById('ins-section-breakdown');
-        if (!el) return;
-        if (!sections || !sections.length) return;
-        el.innerHTML = '<h4 class="ins-sub-title">Course Sections</h4>' +
-            sections.map(function(s) {
-                var color = s.severity === 'critical' ? '#dc2626' :
-                    (s.severity === 'attention' ? '#f59e0b' : '#16a34a');
-                return '<div class="ins-section-bar">' +
-                    '<div class="ins-section-bar-header">' +
-                    '<span class="ins-section-name">' + escapeHtml(s.section_name) + '</span>' +
-                    '<span class="ins-section-pct" style="color:' + color + '">' + s.struggle_pct + '% struggling (' + s.student_count + ' students)</span>' +
-                    '</div>' +
-                    '<div class="ins-section-track"><div class="ins-section-fill" style="width:' + s.struggle_pct + '%;background:' + color + '"></div></div>' +
-                    '<div class="ins-section-hint">' + escapeHtml(s.hint) + '</div>' +
-                    '</div>';
-            }).join('');
-    }
-
-    function renderMaterialStruggle(materials) {
-        var el = document.getElementById('ins-material-struggle');
-        if (!el) return;
-        if (!materials || !materials.length) return;
-        el.innerHTML = '<h4 class="ins-sub-title">Materials Needing Attention</h4>' +
-            materials.map(function(m, i) {
-                return '<div class="ins-material-item">' +
-                    '<span class="ins-material-rank">#' + (i + 1) + '</span>' +
-                    '<div class="ins-material-info">' +
-                    '<div class="ins-material-name">' + escapeHtml(m.material_name) + ' <span class="ins-material-count">' + m.question_count + ' questions</span></div>' +
-                    '<div class="ins-material-suggestion">' + escapeHtml(m.suggestion) + '</div>' +
+            el.innerHTML = actions.map(function(a) {
+                var itemsHtml = '';
+                if (a.items && a.items.length) {
+                    itemsHtml = '<ul class="ins-priority-items">' +
+                        a.items.map(function(item) {
+                            var detail = item.name || '';
+                            if (item.students) detail += ' — ' + item.students + ' students';
+                            if (item.pct) detail += ' (' + item.pct + '%)';
+                            if (item.trend) detail += ', ' + item.trend;
+                            if (item.days) detail += ' — ' + item.days + ' days ago';
+                            return '<li>' + escapeHtml(detail) + '</li>';
+                        }).join('') + '</ul>';
+                }
+                var actionBtn = '';
+                if (a.action_label) {
+                    actionBtn = '<button class="ins-priority-btn" onclick="window.analyticsDashboard.handlePriorityAction(\'' + escapeHtml(a.type) + '\')">' +
+                        escapeHtml(a.action_label) + '</button>';
+                }
+                return '<div class="ins-priority-card urgency-' + escapeHtml(a.urgency) + '">' +
+                    '<span class="material-symbols-outlined ins-priority-icon">' + escapeHtml(a.icon) + '</span>' +
+                    '<div class="ins-priority-body">' +
+                    '<div class="ins-priority-text">' + escapeHtml(a.text) + '</div>' +
+                    itemsHtml +
+                    '<div class="ins-priority-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' +
+                    escapeHtml(a.suggestion) + '</div>' +
+                    actionBtn +
                     '</div></div>';
             }).join('');
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // ZONE 3: Student Dossiers
-    // ════════════════════════════════════════════════════════════════
-    function renderStudentDossiers(students) {
-        allStudentNarratives = students || [];
-        applyFilterAndRender();
-    }
-
-    function applyFilterAndRender() {
-        var el = document.getElementById('ins-student-list');
-        if (!el) return;
-        var filtered = applyFilter(allStudentNarratives);
-        if (!filtered.length) {
-            el.innerHTML = '<div class="ins-empty">No students match the current filter.</div>';
-            return;
-        }
-        el.innerHTML = filtered.map(function(s) {
-            var riskClass = s.risk_level || 'low';
-            var riskLabel = riskClass === 'high' ? 'High Risk' :
-                (riskClass === 'medium' ? 'Medium Risk' : 'Low Risk');
-
-            // Topic chips
-            var topicChips = '';
-            if (s.struggle_topics && s.struggle_topics.length) {
-                topicChips = '<div class="ins-student-topics">' +
-                    s.struggle_topics.slice(0, 3).map(function(t) {
-                        return '<span class="ins-topic-chip">' + escapeHtml(t) + '</span>';
-                    }).join('') + '</div>';
-            }
-
-            // Stats line
-            var stats = [];
-            if (s.question_count > 0) stats.push(s.question_count + ' questions');
-            if (s.ai_queries > 0) stats.push(s.ai_queries + ' AI queries');
-            if (s.quiz_failures > 0) stats.push(s.quiz_failures + ' quiz fails');
-            var statsHtml = stats.length ? '<div class="ins-student-stats">' + stats.join(' · ') + '</div>' : '';
-
-            // Suggestion
-            var sugHtml = s.suggestion ? '<div class="ins-student-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' + escapeHtml(s.suggestion) + '</div>' : '';
-
-            return '<div class="ins-student-card" data-uid="' + s.userid + '" onclick="window.analyticsDashboard.loadStudentDetail(' + s.userid + ')">' +
-                '<div class="ins-student-header">' +
-                '<div class="ins-student-name-row">' +
-                '<img class="ins-student-avatar" src="' + escapeHtml(s.profileimageurl || '') + '" alt="" onerror="this.style.display=\'none\'">' +
-                '<strong class="ins-student-name">' + escapeHtml(s.fullname) + '</strong>' +
-                '</div>' +
-                '<span class="ins-pill ins-pill-' + riskClass + '">' + riskLabel + '</span>' +
-                '</div>' +
-                '<div class="ins-student-summary">' + escapeHtml(s.summary) + '</div>' +
-                topicChips +
-                statsHtml +
-                '<div class="ins-student-meta">Last active: ' + escapeHtml(s.last_active) + '</div>' +
-                sugHtml +
-                '</div>';
-        }).join('');
-    }
-
-    function applyFilter(students) {
-        if (filterMode === 'all') return students;
-        return students.filter(function(s) {
-            if (filterMode === 'disengaged') {
-                return (s.days_since_last_login || 0) >= 3;
-            }
-            if (filterMode === 'struggling') {
-                return s.risk_score >= 40 && s.question_count >= 5;
-            }
-            if (filterMode === 'failing') {
-                return (s.quiz_failures || 0) > 0 || s.risk_score >= 60;
-            }
-            if (filterMode === 'issues') {
-                return (s.issue_reports || 0) > 0;
-            }
-            return true;
-        });
-    }
-
-    function setFilter(mode, btnEl) {
-        filterMode = mode;
-        var chips = document.querySelectorAll('.ins-chip[data-filter]');
-        for (var i = 0; i < chips.length; i++) chips[i].classList.remove('ins-chip-active');
-        if (btnEl) btnEl.classList.add('ins-chip-active');
-        applyFilterAndRender();
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // ZONE 4: Question Radar
-    // ════════════════════════════════════════════════════════════════
-    function renderQuestionRadar(questions) {
-        var el = document.getElementById('ins-common-questions');
-        if (!el) return;
-        if (!questions || !questions.length) {
-            el.innerHTML = '<div class="ins-empty">No common questions yet.</div>';
-            return;
-        }
-        el.innerHTML = questions.slice(0, 8).map(function(q) {
-            var displayText = (q.text || '').replace(/^\[Referencing:\s*[^\]]+\]\s*/i, '');
-            return '<div class="ins-question-card">' +
-                '<div class="ins-question-text">"' + escapeHtml(displayText) + '"</div>' +
-                '<div class="ins-question-meta">' + q.student_count + ' student' + (q.student_count !== 1 ? 's' : '') +
-                ' · ' + q.ask_count + ' time' + (q.ask_count !== 1 ? 's' : '') +
-                ' · Topic: <strong>' + escapeHtml(q.topic) + '</strong></div>' +
-                '<div class="ins-question-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' +
-                escapeHtml(q.suggestion) + '</div>' +
-                '</div>';
-        }).join('');
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // ZONE 5: Course Vitals
-    // ════════════════════════════════════════════════════════════════
-    function renderCoursePulse(pulse) {
-        var el = document.getElementById('ins-course-pulse');
-        if (!el) return;
-        if (!pulse || !pulse.total_students) {
-            el.innerHTML = '<div class="ins-empty">No pulse data available.</div>';
-            return;
         }
 
-        function trendIcon(trend, pct) {
-            if (trend === 'up') return '<span class="ins-pulse-trend up">↑' + (pct || '') + '%</span>';
-            if (trend === 'down') return '<span class="ins-pulse-trend down">↓' + Math.abs(pct || 0) + '%</span>';
-            return '<span class="ins-pulse-trend stable">—</span>';
-        }
-
-        var html = '<div class="ins-pulse-card">' +
-            '<div class="ins-pulse-val">' + (pulse.avg_quiz || 0) + '%</div>' +
-            '<div class="ins-pulse-label">Avg Quiz</div>' +
-            trendIcon(pulse.quiz_trend, pulse.quiz_trend_pct) +
-            '</div>';
-
-        html += '<div class="ins-pulse-card">' +
-            '<div class="ins-pulse-val">' + (pulse.at_risk_count || 0) + '</div>' +
-            '<div class="ins-pulse-label">At Risk</div>' +
-            '<div class="ins-pulse-sub">of ' + pulse.total_students + ' students</div>' +
-            '</div>';
-
-        html += '<div class="ins-pulse-card">' +
-            '<div class="ins-pulse-val ins-pulse-topic">' + escapeHtml(pulse.top_struggle_topic || '—') + '</div>' +
-            '<div class="ins-pulse-label">Top Struggle</div>' +
-            '<div class="ins-pulse-sub">' + escapeHtml(pulse.top_struggle_trend || '') + '</div>' +
-            '</div>';
-
-        html += '<div class="ins-pulse-card">' +
-            '<div class="ins-pulse-val">' + (pulse.active_this_week || 0) + '</div>' +
-            '<div class="ins-pulse-label">Active This Week</div>' +
-            '<div class="ins-pulse-sub">of ' + pulse.total_students + ' students</div>' +
-            '</div>';
-
-        el.innerHTML = html;
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // Student Detail Panel
-    // ════════════════════════════════════════════════════════════════
-    function loadStudentDetail(uid) {
-        currentDetailUid = uid;
-        var panel = document.getElementById('ins-detail-panel');
-        var body = document.getElementById('ins-detail-body');
-        var nameEl = document.getElementById('ins-detail-name');
-        var riskBadge = document.getElementById('ins-detail-risk-badge');
-        if (!panel || !body) return;
-
-        panel.style.display = 'block';
-        body.innerHTML = '<div class="ins-empty">Loading profile…</div>';
-
-        // Find student from cache
-        var s = null;
-        for (var i = 0; i < allStudentNarratives.length; i++) {
-            if (allStudentNarratives[i].userid === uid) { s = allStudentNarratives[i]; break; }
-        }
-        if (s) {
-            nameEl.textContent = s.fullname;
-            riskBadge.textContent = s.risk_level === 'high' ? 'High Risk' : (s.risk_level === 'medium' ? 'Medium Risk' : 'Low Risk');
-            riskBadge.className = 'ins-pill ins-pill-' + s.risk_level;
-        }
-
-        Ajax.call([{
-            methodname: 'local_umat_ai_get_student_profile',
-            args: { courseid: cid, userid: uid }
-        }])[0].done(function(data) {
-            if (!data) return;
-            body.innerHTML =
-                '<div class="ins-detail-narrative">' + escapeHtml(s ? s.summary : '') + '</div>' +
-                '<div class="ins-detail-grid">' +
-                '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.risk_score || 0) + '</div><div class="ins-detail-stat-lbl">Risk Score</div></div>' +
-                '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.total_logins || 0) + '</div><div class="ins-detail-stat-lbl">Logins</div></div>' +
-                '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.avg_quiz || 0).toFixed(1) + '%</div><div class="ins-detail-stat-lbl">Avg Quiz</div></div>' +
-                '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.ai_queries || 0) + '</div><div class="ins-detail-stat-lbl">AI Queries</div></div>' +
-                '</div>';
-            if (s && s.suggestion) {
-                body.innerHTML += '<div class="ins-detail-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' + escapeHtml(s.suggestion) + '</div>';
+        // ════════════════════════════════════════════════════════════════
+        // ZONE 2: Struggle Map
+        // ════════════════════════════════════════════════════════════════
+        function renderStruggleAreas(areas) {
+            var el = document.getElementById('ins-struggle-areas');
+            if (!el) return;
+            if (!areas || !areas.length) {
+                el.innerHTML = '<div class="ins-empty">No struggle data yet. Student questions will populate this section.</div>';
+                return;
             }
-            if (data.interventions && data.interventions.length) {
-                body.innerHTML += '<div class="ins-detail-section-title">Recent Interventions</div>';
-                body.innerHTML += data.interventions.slice(0, 5).map(function(inv) {
-                    return '<div class="ins-detail-intervention">' +
-                        '<span>' + escapeHtml(inv.action || '') + '</span>' +
-                        '<span class="ins-detail-intervention-meta">' + (inv.status || '') + ' · ' + new Date((inv.timecreated || 0) * 1000).toLocaleDateString() + '</span>' +
+            el.innerHTML = areas.map(function(a) {
+                var severityLabel = a.severity === 'critical' ? 'Critical' :
+                    (a.severity === 'attention' ? 'Needs Attention' : 'Watch');
+                var severityIcon = a.severity === 'critical' ? 'error' :
+                    (a.severity === 'attention' ? 'warning' : 'info');
+
+                // Trend indicator
+                var trendHtml = '';
+                if (a.trend === 'up') {
+                    trendHtml = '<span class="ins-trend ins-trend-up"><span class="material-symbols-outlined">trending_up</span> +' + a.trend_pct + '%</span>';
+                } else if (a.trend === 'down') {
+                    trendHtml = '<span class="ins-trend ins-trend-down"><span class="material-symbols-outlined">trending_down</span> ' + a.trend_pct + '%</span>';
+                } else {
+                    trendHtml = '<span class="ins-trend ins-trend-stable"><span class="material-symbols-outlined">trending_flat</span> Stable</span>';
+                }
+
+                // Sample questions
+                var sqHtml = '';
+                if (a.sample_questions && a.sample_questions.length) {
+                    sqHtml = '<div class="ins-struggle-questions">' +
+                        a.sample_questions.slice(0, 2).map(function(q) {
+                            return '<div class="ins-struggle-sample-q">"' + escapeHtml(q) + '"</div>';
+                        }).join('') + '</div>';
+                }
+
+                // Materials
+                var matHtml = '';
+                if (a.materials && a.materials.length) {
+                    matHtml = '<div class="ins-struggle-materials">' +
+                        a.materials.map(function(m) {
+                            return '<span class="ins-material-tag">' + escapeHtml(m.name) + '</span>';
+                        }).join('') + '</div>';
+                }
+
+                return '<div class="ins-struggle-card severity-' + escapeHtml(a.severity) + '">' +
+                    '<div class="ins-struggle-header">' +
+                    '<div class="ins-struggle-topic">' +
+                    '<span class="material-symbols-outlined ins-severity-icon">' + severityIcon + '</span>' +
+                    '<strong>' + escapeHtml(a.topic) + '</strong>' +
+                    '<span class="ins-severity-label">' + severityLabel + '</span>' +
+                    '</div>' +
+                    trendHtml +
+                    '</div>' +
+                    '<div class="ins-struggle-narrative">' + escapeHtml(a.description) + '</div>' +
+                    '<div class="ins-struggle-evidence">' +
+                    '<span class="ins-evidence"><span class="material-symbols-outlined">quiz</span> ' + a.question_count + ' questions</span>' +
+                    '<span class="ins-evidence"><span class="material-symbols-outlined">people</span> ' + a.student_count + ' of ' + a.total_students + ' students (' + a.student_pct + '%)</span>' +
+                    '</div>' +
+                    sqHtml +
+                    '<div class="ins-struggle-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' +
+                    escapeHtml(a.suggestion) + '</div>' +
+                    matHtml +
+                    '</div>';
+            }).join('');
+        }
+
+        function renderSectionStruggle(sections) {
+            var el = document.getElementById('ins-section-breakdown');
+            if (!el) return;
+            if (!sections || !sections.length) return;
+            el.innerHTML = '<h4 class="ins-sub-title">Course Sections</h4>' +
+                sections.map(function(s) {
+                    var color = s.severity === 'critical' ? '#dc2626' :
+                        (s.severity === 'attention' ? '#f59e0b' : '#16a34a');
+                    return '<div class="ins-section-bar">' +
+                        '<div class="ins-section-bar-header">' +
+                        '<span class="ins-section-name">' + escapeHtml(s.section_name) + '</span>' +
+                        '<span class="ins-section-pct" style="color:' + color + '">' + s.struggle_pct + '% struggling (' + s.student_count + ' students)</span>' +
+                        '</div>' +
+                        '<div class="ins-section-track"><div class="ins-section-fill" style="width:' + s.struggle_pct + '%;background:' + color + '"></div></div>' +
+                        '<div class="ins-section-hint">' + escapeHtml(s.hint) + '</div>' +
                         '</div>';
                 }).join('');
+        }
+
+        function renderMaterialStruggle(materials) {
+            var el = document.getElementById('ins-material-struggle');
+            if (!el) return;
+            if (!materials || !materials.length) return;
+            el.innerHTML = '<h4 class="ins-sub-title">Materials Needing Attention</h4>' +
+                materials.map(function(m, i) {
+                    return '<div class="ins-material-item">' +
+                        '<span class="ins-material-rank">#' + (i + 1) + '</span>' +
+                        '<div class="ins-material-info">' +
+                        '<div class="ins-material-name">' + escapeHtml(m.material_name) + ' <span class="ins-material-count">' + m.question_count + ' questions</span></div>' +
+                        '<div class="ins-material-suggestion">' + escapeHtml(m.suggestion) + '</div>' +
+                        '</div></div>';
+                }).join('');
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // ZONE 3: Student Dossiers
+        // ════════════════════════════════════════════════════════════════
+        function renderStudentDossiers(students) {
+            allStudentNarratives = students || [];
+            applyFilterAndRender();
+        }
+
+        function applyFilterAndRender() {
+            var el = document.getElementById('ins-student-list');
+            if (!el) return;
+            var filtered = applyFilter(allStudentNarratives);
+            if (!filtered.length) {
+                el.innerHTML = '<div class="ins-empty">No students match the current filter.</div>';
+                return;
             }
-        }).fail(function() {
-            body.innerHTML = '<div class="ins-empty">Failed to load profile.</div>';
-        });
-    }
+            el.innerHTML = filtered.map(function(s) {
+                var riskClass = s.risk_level || 'low';
+                var riskLabel = riskClass === 'high' ? 'High Risk' :
+                    (riskClass === 'medium' ? 'Medium Risk' : 'Low Risk');
 
-    function closeDetail() {
-        var panel = document.getElementById('ins-detail-panel');
-        if (panel) panel.style.display = 'none';
-        currentDetailUid = 0;
-    }
+                // Topic chips
+                var topicChips = '';
+                if (s.struggle_topics && s.struggle_topics.length) {
+                    topicChips = '<div class="ins-student-topics">' +
+                        s.struggle_topics.slice(0, 3).map(function(t) {
+                            return '<span class="ins-topic-chip">' + escapeHtml(t) + '</span>';
+                        }).join('') + '</div>';
+                }
 
-    // ════════════════════════════════════════════════════════════════
-    // Priority Action Handler
-    // ════════════════════════════════════════════════════════════════
-    function handlePriorityAction(type) {
-        if (type === 'disengagement') {
-            setFilter('disengaged', document.querySelector('[data-filter="disengaged"]'));
-        } else if (type === 'recap_needed') {
-            setFilter('struggling', document.querySelector('[data-filter="struggling"]'));
-        } else if (type === 'issues') {
-            setFilter('issues', document.querySelector('[data-filter="issues"]'));
-        }
-        // Scroll to student section
-        var zone = document.getElementById('ins-students-zone');
-        if (zone) zone.scrollIntoView({ behavior: 'smooth' });
-    }
+                // Stats line
+                var stats = [];
+                if (s.question_count > 0) stats.push(s.question_count + ' questions');
+                if (s.ai_queries > 0) stats.push(s.ai_queries + ' AI queries');
+                if (s.quiz_failures > 0) stats.push(s.quiz_failures + ' quiz fails');
+                var statsHtml = stats.length ? '<div class="ins-student-stats">' + stats.join(' · ') + '</div>' : '';
 
-    // ════════════════════════════════════════════════════════════════
-    // Action Drawer
-    // ════════════════════════════════════════════════════════════════
-    function openActionDrawer(action) {
-        currentDrawerAction = action;
-        var drawer = document.getElementById('ins-action-drawer');
-        var title = document.getElementById('ins-drawer-title');
-        var recipient = document.getElementById('ins-drawer-recipient');
-        var message = document.getElementById('ins-drawer-message');
-        if (!drawer) return;
+                // Suggestion
+                var sugHtml = s.suggestion ? '<div class="ins-student-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' + escapeHtml(s.suggestion) + '</div>' : '';
 
-        var actionNames = { encouragement: 'Send Encouragement', meeting: 'Schedule 1:1', remedial_quiz: 'Assign Remedial Quiz' };
-        if (title) title.textContent = actionNames[action] || 'Send Intervention';
-
-        var student = null;
-        for (var i = 0; i < allStudentNarratives.length; i++) {
-            if (allStudentNarratives[i].userid === currentDetailUid) { student = allStudentNarratives[i]; break; }
-        }
-        if (student) {
-            if (recipient) recipient.textContent = 'To: ' + student.fullname + ' (' + student.risk_level + ')';
+                return '<div class="ins-student-card" data-uid="' + s.userid + '" onclick="window.analyticsDashboard.loadStudentDetail(' + s.userid + ')">' +
+                    '<div class="ins-student-header">' +
+                    '<div class="ins-student-name-row">' +
+                    '<img class="ins-student-avatar" src="' + escapeHtml(s.profileimageurl || '') + '" alt="" onerror="this.style.display=\'none\'">' +
+                    '<strong class="ins-student-name">' + escapeHtml(s.fullname) + '</strong>' +
+                    '</div>' +
+                    '<span class="ins-pill ins-pill-' + riskClass + '">' + riskLabel + '</span>' +
+                    '</div>' +
+                    '<div class="ins-student-summary">' + escapeHtml(s.summary) + '</div>' +
+                    topicChips +
+                    statsHtml +
+                    '<div class="ins-student-meta">Last active: ' + escapeHtml(s.last_active) + '</div>' +
+                    sugHtml +
+                    '</div>';
+            }).join('');
         }
 
-        var templates = {
-            encouragement: 'Hi {{name}}, I noticed you might be struggling with the course material. Remember that I\'m here to help — don\'t hesitate to reach out or use the AI assistant for extra support. Keep going!',
-            meeting: 'Hi {{name}}, would you like to schedule a 1:1 meeting this week? I\'d love to discuss how we can help you get back on track. Please let me know what times work for you.',
-            remedial_quiz: 'Hi {{name}}, I\'ve prepared some additional practice questions to help reinforce the key concepts. Check your course page for the remedial quiz. Let me know if you have questions!'
-        };
-        var name = student ? student.fullname.split(' ')[0] : 'Student';
-        if (message) message.value = (templates[action] || '').replace('{{name}}', name);
+        function applyFilter(students) {
+            if (filterMode === 'all') return students;
+            return students.filter(function(s) {
+                if (filterMode === 'disengaged') {
+                    return (s.days_since_last_login || 0) >= 3;
+                }
+                if (filterMode === 'struggling') {
+                    return s.risk_score >= 40 && s.question_count >= 5;
+                }
+                if (filterMode === 'failing') {
+                    return (s.quiz_failures || 0) > 0 || s.risk_score >= 60;
+                }
+                if (filterMode === 'issues') {
+                    return (s.issue_reports || 0) > 0;
+                }
+                return true;
+            });
+        }
 
-        drawer.style.display = 'flex';
-        var status = document.getElementById('ins-drawer-status');
-        if (status) status.style.display = 'none';
-    }
+        function setFilter(mode, btnEl) {
+            filterMode = mode;
+            var chips = document.querySelectorAll('.ins-chip[data-filter]');
+            for (var i = 0; i < chips.length; i++) chips[i].classList.remove('ins-chip-active');
+            if (btnEl) btnEl.classList.add('ins-chip-active');
+            applyFilterAndRender();
+        }
 
-    function closeActionDrawer() {
-        var drawer = document.getElementById('ins-action-drawer');
-        if (drawer) drawer.style.display = 'none';
-        currentDrawerAction = '';
-    }
-
-    function sendIntervention() {
-        var btn = document.getElementById('ins-drawer-send-btn');
-        var status = document.getElementById('ins-drawer-status');
-        var message = document.getElementById('ins-drawer-message');
-        if (!btn || !status || !message) return;
-        if (!currentDetailUid || !currentDrawerAction) return;
-
-        btn.disabled = true;
-        status.style.display = 'block';
-        status.textContent = 'Sending…';
-        status.style.color = 'var(--u-ol)';
-
-        Ajax.call([{
-            methodname: 'local_umat_ai_execute_intervention',
-            args: {
-                courseid: cid,
-                userid: currentDetailUid,
-                action: currentDrawerAction,
-                message: message.value
+        // ════════════════════════════════════════════════════════════════
+        // ZONE 4: Question Radar
+        // ════════════════════════════════════════════════════════════════
+        function renderQuestionRadar(questions) {
+            var el = document.getElementById('ins-common-questions');
+            if (!el) return;
+            if (!questions || !questions.length) {
+                el.innerHTML = '<div class="ins-empty">No common questions yet.</div>';
+                return;
             }
-        }])[0].done(function(resp) {
-            if (resp.status === 'sent') {
-                status.textContent = '✓ Message sent successfully!';
-                status.style.color = 'var(--u-p)';
-                setTimeout(closeActionDrawer, 2000);
-            } else if (resp.status === 'cooldown') {
-                status.textContent = '⏳ Already sent within 24h. Please wait.';
-                status.style.color = '#f59e0b';
-            } else {
-                status.textContent = '✗ Failed: ' + (resp.message || 'Unknown error');
+            el.innerHTML = questions.slice(0, 8).map(function(q) {
+                var displayText = (q.text || '').replace(/^\[Referencing:\s*[^\]]+\]\s*/i, '');
+                return '<div class="ins-question-card">' +
+                    '<div class="ins-question-text">"' + escapeHtml(displayText) + '"</div>' +
+                    '<div class="ins-question-meta">' + q.student_count + ' student' + (q.student_count !== 1 ? 's' : '') +
+                    ' · ' + q.ask_count + ' time' + (q.ask_count !== 1 ? 's' : '') +
+                    ' · Topic: <strong>' + escapeHtml(q.topic) + '</strong></div>' +
+                    '<div class="ins-question-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' +
+                    escapeHtml(q.suggestion) + '</div>' +
+                    '</div>';
+            }).join('');
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // ZONE 5: Course Vitals
+        // ════════════════════════════════════════════════════════════════
+        function renderCoursePulse(pulse) {
+            var el = document.getElementById('ins-course-pulse');
+            if (!el) return;
+            if (!pulse || !pulse.total_students) {
+                el.innerHTML = '<div class="ins-empty">No pulse data available.</div>';
+                return;
+            }
+
+            function trendIcon(trend, pct) {
+                if (trend === 'up') return '<span class="ins-pulse-trend up">↑' + (pct || '') + '%</span>';
+                if (trend === 'down') return '<span class="ins-pulse-trend down">↓' + Math.abs(pct || 0) + '%</span>';
+                return '<span class="ins-pulse-trend stable">—</span>';
+            }
+
+            var html = '<div class="ins-pulse-card">' +
+                '<div class="ins-pulse-val">' + (pulse.avg_quiz || 0) + '%</div>' +
+                '<div class="ins-pulse-label">Avg Quiz</div>' +
+                trendIcon(pulse.quiz_trend, pulse.quiz_trend_pct) +
+                '</div>';
+
+            html += '<div class="ins-pulse-card">' +
+                '<div class="ins-pulse-val">' + (pulse.at_risk_count || 0) + '</div>' +
+                '<div class="ins-pulse-label">At Risk</div>' +
+                '<div class="ins-pulse-sub">of ' + pulse.total_students + ' students</div>' +
+                '</div>';
+
+            html += '<div class="ins-pulse-card">' +
+                '<div class="ins-pulse-val ins-pulse-topic">' + escapeHtml(pulse.top_struggle_topic || '—') + '</div>' +
+                '<div class="ins-pulse-label">Top Struggle</div>' +
+                '<div class="ins-pulse-sub">' + escapeHtml(pulse.top_struggle_trend || '') + '</div>' +
+                '</div>';
+
+            html += '<div class="ins-pulse-card">' +
+                '<div class="ins-pulse-val">' + (pulse.active_this_week || 0) + '</div>' +
+                '<div class="ins-pulse-label">Active This Week</div>' +
+                '<div class="ins-pulse-sub">of ' + pulse.total_students + ' students</div>' +
+                '</div>';
+
+            el.innerHTML = html;
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // Student Detail Panel
+        // ════════════════════════════════════════════════════════════════
+        function loadStudentDetail(uid) {
+            currentDetailUid = uid;
+            var panel = document.getElementById('ins-detail-panel');
+            var body = document.getElementById('ins-detail-body');
+            var nameEl = document.getElementById('ins-detail-name');
+            var riskBadge = document.getElementById('ins-detail-risk-badge');
+            if (!panel || !body) return;
+
+            panel.style.display = 'block';
+            body.innerHTML = '<div class="ins-empty">Loading profile…</div>';
+
+            // Find student from cache
+            var s = null;
+            for (var i = 0; i < allStudentNarratives.length; i++) {
+                if (allStudentNarratives[i].userid === uid) { s = allStudentNarratives[i]; break; }
+            }
+            if (s) {
+                nameEl.textContent = s.fullname;
+                riskBadge.textContent = s.risk_level === 'high' ? 'High Risk' : (s.risk_level === 'medium' ? 'Medium Risk' : 'Low Risk');
+                riskBadge.className = 'ins-pill ins-pill-' + s.risk_level;
+            }
+
+            Ajax.call([{
+                methodname: 'local_umat_ai_get_student_profile',
+                args: { courseid: cid, userid: uid }
+            }])[0].done(function(data) {
+                if (!data) return;
+                body.innerHTML =
+                    '<div class="ins-detail-narrative">' + escapeHtml(s ? s.summary : '') + '</div>' +
+                    '<div class="ins-detail-grid">' +
+                    '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.risk_score || 0) + '</div><div class="ins-detail-stat-lbl">Risk Score</div></div>' +
+                    '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.total_logins || 0) + '</div><div class="ins-detail-stat-lbl">Logins</div></div>' +
+                    '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.avg_quiz || 0).toFixed(1) + '%</div><div class="ins-detail-stat-lbl">Avg Quiz</div></div>' +
+                    '<div class="ins-detail-stat"><div class="ins-detail-stat-val">' + (data.ai_queries || 0) + '</div><div class="ins-detail-stat-lbl">AI Queries</div></div>' +
+                    '</div>';
+                if (s && s.suggestion) {
+                    body.innerHTML += '<div class="ins-detail-suggestion"><span class="material-symbols-outlined">auto_awesome</span> ' + escapeHtml(s.suggestion) + '</div>';
+                }
+                if (data.interventions && data.interventions.length) {
+                    body.innerHTML += '<div class="ins-detail-section-title">Recent Interventions</div>';
+                    body.innerHTML += data.interventions.slice(0, 5).map(function(inv) {
+                        return '<div class="ins-detail-intervention">' +
+                            '<span>' + escapeHtml(inv.action || '') + '</span>' +
+                            '<span class="ins-detail-intervention-meta">' + (inv.status || '') + ' · ' + new Date((inv.timecreated || 0) * 1000).toLocaleDateString() + '</span>' +
+                            '</div>';
+                    }).join('');
+                }
+            }).fail(function() {
+                body.innerHTML = '<div class="ins-empty">Failed to load profile.</div>';
+            });
+        }
+
+        function closeDetail() {
+            var panel = document.getElementById('ins-detail-panel');
+            if (panel) panel.style.display = 'none';
+            currentDetailUid = 0;
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // Priority Action Handler
+        // ════════════════════════════════════════════════════════════════
+        function handlePriorityAction(type) {
+            if (type === 'disengagement') {
+                setFilter('disengaged', document.querySelector('[data-filter="disengaged"]'));
+            } else if (type === 'recap_needed') {
+                setFilter('struggling', document.querySelector('[data-filter="struggling"]'));
+            } else if (type === 'issues') {
+                setFilter('issues', document.querySelector('[data-filter="issues"]'));
+            }
+            // Scroll to student section
+            var zone = document.getElementById('ins-students-zone');
+            if (zone) zone.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // Action Drawer
+        // ════════════════════════════════════════════════════════════════
+        function openActionDrawer(action) {
+            currentDrawerAction = action;
+            var drawer = document.getElementById('ins-action-drawer');
+            var title = document.getElementById('ins-drawer-title');
+            var recipient = document.getElementById('ins-drawer-recipient');
+            var message = document.getElementById('ins-drawer-message');
+            if (!drawer) return;
+
+            var actionNames = { encouragement: 'Send Encouragement', meeting: 'Schedule 1:1', remedial_quiz: 'Assign Remedial Quiz' };
+            if (title) title.textContent = actionNames[action] || 'Send Intervention';
+
+            var student = null;
+            for (var i = 0; i < allStudentNarratives.length; i++) {
+                if (allStudentNarratives[i].userid === currentDetailUid) { student = allStudentNarratives[i]; break; }
+            }
+            if (student) {
+                if (recipient) recipient.textContent = 'To: ' + student.fullname + ' (' + student.risk_level + ')';
+            }
+
+            var templates = {
+                encouragement: 'Hi {{name}}, I noticed you might be struggling with the course material. Remember that I\'m here to help — don\'t hesitate to reach out or use the AI assistant for extra support. Keep going!',
+                meeting: 'Hi {{name}}, would you like to schedule a 1:1 meeting this week? I\'d love to discuss how we can help you get back on track. Please let me know what times work for you.',
+                remedial_quiz: 'Hi {{name}}, I\'ve prepared some additional practice questions to help reinforce the key concepts. Check your course page for the remedial quiz. Let me know if you have questions!'
+            };
+            var name = student ? student.fullname.split(' ')[0] : 'Student';
+            if (message) message.value = (templates[action] || '').replace('{{name}}', name);
+
+            drawer.style.display = 'flex';
+            var status = document.getElementById('ins-drawer-status');
+            if (status) status.style.display = 'none';
+        }
+
+        function closeActionDrawer() {
+            var drawer = document.getElementById('ins-action-drawer');
+            if (drawer) drawer.style.display = 'none';
+            currentDrawerAction = '';
+        }
+
+        function sendIntervention() {
+            var btn = document.getElementById('ins-drawer-send-btn');
+            var status = document.getElementById('ins-drawer-status');
+            var message = document.getElementById('ins-drawer-message');
+            if (!btn || !status || !message) return;
+            if (!currentDetailUid || !currentDrawerAction) return;
+
+            btn.disabled = true;
+            status.style.display = 'block';
+            status.textContent = 'Sending…';
+            status.style.color = 'var(--u-ol)';
+
+            Ajax.call([{
+                methodname: 'local_umat_ai_execute_intervention',
+                args: {
+                    courseid: cid,
+                    userid: currentDetailUid,
+                    action: currentDrawerAction,
+                    message: message.value
+                }
+            }])[0].done(function(resp) {
+                if (resp.status === 'sent') {
+                    status.textContent = '✓ Message sent successfully!';
+                    status.style.color = 'var(--u-p)';
+                    setTimeout(closeActionDrawer, 2000);
+                } else if (resp.status === 'cooldown') {
+                    status.textContent = '⏳ Already sent within 24h. Please wait.';
+                    status.style.color = '#f59e0b';
+                } else {
+                    status.textContent = '✗ Failed: ' + (resp.message || 'Unknown error');
+                    status.style.color = 'var(--u-ter)';
+                }
+                btn.disabled = false;
+            }).fail(function() {
+                status.textContent = '✗ Connection error. Please try again.';
                 status.style.color = 'var(--u-ter)';
-            }
-            btn.disabled = false;
-        }).fail(function() {
-            status.textContent = '✗ Connection error. Please try again.';
-            status.style.color = 'var(--u-ter)';
-            btn.disabled = false;
-        });
-    }
+                btn.disabled = false;
+            });
+        }
 
-    // ════════════════════════════════════════════════════════════════
-    // NLQ Search
-    // ════════════════════════════════════════════════════════════════
-    function submitNLQ() {
-        var input = document.getElementById('ins-nlq-input');
-        var response = document.getElementById('ins-nlq-response');
-        var spinner = document.getElementById('ins-nlq-spinner');
-        if (!input || !response) return;
-        var q = input.value.trim();
-        if (!q || !cid) return;
+        // ════════════════════════════════════════════════════════════════
+        // Utilities
+        // ════════════════════════════════════════════════════════════════
+        function escapeHtml(s) {
+            if (!s) return '';
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
 
-        if (activeStream && activeStream.abort) activeStream.abort();
+        return {
+            init: init,
+            loadData: loadData,
+            setFilter: setFilter,
+            loadStudentDetail: loadStudentDetail,
+            closeDetail: closeDetail,
+            handlePriorityAction: handlePriorityAction,
+            openActionDrawer: openActionDrawer,
+            closeActionDrawer: closeActionDrawer,
+            sendIntervention: sendIntervention,
+        };
+    });
 
-        response.style.display = 'block';
-        if (spinner) spinner.style.display = 'inline-block';
-        input.disabled = true;
 
-        var cfg = streamConfig();
-        activeStream = Shared._umatStreamInline({
-            url: cfg.url,
-            sesskey: cfg.sesskey,
-            courseid: cid,
-            question: q,
-            session_key: 'ins_nlq_' + cid,
-            targetId: 'ins-nlq-response',
-            onDone: function() {
-                activeStream = null;
-                if (spinner) spinner.style.display = 'none';
-                input.disabled = false;
-            },
-            onError: function(err) {
-                activeStream = null;
-                if (spinner) spinner.style.display = 'none';
-                input.disabled = false;
-                response.innerHTML = '<span style="color:var(--u-ter);">' + escapeHtml(err.message || 'Failed to query AI service.') + '</span>';
-            }
-        });
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // Utilities
-    // ════════════════════════════════════════════════════════════════
-    function escapeHtml(s) {
-        if (!s) return '';
-        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    return {
-        init: init,
-        loadData: loadData,
-        setFilter: setFilter,
-        loadStudentDetail: loadStudentDetail,
-        closeDetail: closeDetail,
-        handlePriorityAction: handlePriorityAction,
-        openActionDrawer: openActionDrawer,
-        closeActionDrawer: closeActionDrawer,
-        sendIntervention: sendIntervention,
-        submitNLQ: submitNLQ
-    };
-});

@@ -48,7 +48,6 @@ class before_footer {
             $sskey   = sesskey();
             $streamUrl = '/local/umat_ai/chat_stream.php';
             $platformName = get_config('local_umat_ai', 'platform_name') ?: 'UMaT';
-            $sdts = filemtime(__DIR__ . '/../../styles/umat-struggle-dashboard.css');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-overlay.css?v=' . filemtime(__DIR__ . '/../../styles/umat-overlay.css') . '">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-responsive.css?v=' . filemtime(__DIR__ . '/../../styles/umat-responsive.css') . '">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-glassmorph-nav.css">');
@@ -57,7 +56,6 @@ class before_footer {
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-dashboard.css?v=' . filemtime(__DIR__ . '/../../styles/umat-dashboard.css') . '">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-cs-overlay.css">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-yt-grid.css">');
-            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-struggle-dashboard.css?v=' . $sdts . '">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-admin.css?v=' . filemtime(__DIR__ . '/../../styles/umat-admin.css') . '">');
             $hook->add_html('<link rel="preconnect" href="https://cdnjs.cloudflare.com">');
             $hook->add_html('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">');

@@ -57,6 +57,12 @@ if (!$sessionRec) {
 $sessionTitle   = $sessionRec ? 'Session ' . date('d M Y', $sessionRec->timecreated) : get_string('ai_assistant', 'local_umat_ai');
 $sessionDbId    = $sessionRec ? (int) $sessionRec->id : 0;
 
+// Transcription metadata (from process_recordings sync).
+$transcriptionProvider = $sessionRec->transcription_provider ?? '';
+$transcriptionModel    = $sessionRec->transcription_model ?? '';
+$transcriptionCost     = (float)($sessionRec->transcription_cost ?? 0);
+$audioDuration         = (float)($sessionRec->audio_duration_secs ?? 0);
+
 // ---- Template context --------------------------------------------------- //
 $tctx = [
     'courseid'       => $courseid,
@@ -70,6 +76,10 @@ $tctx = [
     'is_lecturer'    => has_capability('local/umat_ai:viewanalytics', $context),
     'hub_url'        => (new moodle_url('/local/umat_ai/hub.php'))->out(false),
     'wwwroot'        => $CFG->wwwroot,
+    'transcription_provider' => $transcriptionProvider,
+    'transcription_model'    => $transcriptionModel,
+    'transcription_cost'     => $transcriptionCost,
+    'audio_duration_secs'    => $audioDuration,
 ];
 
 // Load the AMD workspace module.

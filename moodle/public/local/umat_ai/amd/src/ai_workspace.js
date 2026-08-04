@@ -884,60 +884,6 @@ class TranscriptionService {
                 language: data.language || 'en'
             };
         } catch (error) {
-           raise*/
-
-
-    async transcribe(audioBlob) {
-        // Validate input
-        if (!audioBlob || audioBlob.size < 1024) {
-            throw new Error('Audio file is too small or invalid');
-        }
-
-        const formData = new FormData();
-        formData.append('audio', audioBlob, `recording_${Date.now()}.webm`);
-
-        try {
-            // Use the project's existing transcription endpoint
-            const response = await fetch(this.apiEndpoint, {
-                method: 'POST',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-MoodleFormKey': Moodle.formkey || ''
-                },
-                body: formData,
-                timeout: this.timeout
-            });
-
-            if (!response.ok) {
-                let errorMessage = 'Transcription failed';
-                try {
-                    const errorData = await response.json();
-                    errorMessage = errorData.error || errorMessage;
-                } catch (e) {
-                    if (response.status === 413) {
-                        errorMessage = 'Audio file too large';
-                    } else if (response.status === 400) {
-                        errorMessage = 'Invalid audio format';
-                    } else {
-                        errorMessage = `Server error: ${response.status}`;
-                    }
-                }
-                throw new Error(errorMessage);
-            }
-
-            const data = await response.json();
-
-            if (!data.success || !data.transcript) {
-                throw new Error(data.error || 'No transcript returned');
-            }
-
-            return {
-                success: true,
-                transcript: data.transcript,
-                confidence: data.confidence || 0.95,
-                language: data.language || 'en'
-            };
-        } catch (error) {
             if (error.name === 'AbortError') {
                 throw new Error('Transcription timeout');
             }
