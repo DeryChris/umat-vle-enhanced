@@ -1,0 +1,511 @@
+{{!
+    Template: local/umat_ai/templates/cost_dashboard.mustache
+    Transcription Cost Dashboard — aggregated cost breakdown.
+
+    Context:
+      courseid (int, 0 = all)
+      courses (array: id, fullname, shortname)
+      hascourses (bool)
+      wwwroot (string)
+      tab (string)
+}}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+
+<style>
+/* ---- UMaT Precision Green tokens (matching lecturer dashboard) ---- */
+:root {
+  --p:   #006b2f; --pb: #00873d; --op: #ffffff;
+  --sf:  #f5fbf0; --sfl: #eff6eb; --sflo: #ffffff;
+  --ons: #171d17; --onsv: #3e4a3e;
+  --ol:  #6e7a6d; --olv: #bdcaba;
+  --sec: #3d6844; --secc: #beefc1;
+  --ter: #a5304d; --err: #ba1a1a;
+  --r8:  8px; --r12: 12px; --r16: 16px; --r20: 20px;
+}
+
+.umat-cd-wrap {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+  color: var(--ons);
+}
+
+/* ---- Topbar ---- */
+.umat-cd-topbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.umat-cd-topbar h1 {
+  margin: 0 0 4px;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--p);
+  line-height: 1.1;
+}
+.umat-cd-topbar p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--onsv);
+}
+.umat-cd-topbar-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ---- Course selector ---- */
+.umat-cd-coursesel {
+  padding: 8px 14px;
+  border: 1.5px solid var(--olv);
+  border-radius: var(--r8);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--ons);
+  background: var(--sflo);
+  cursor: pointer;
+  outline: none;
+}
+.umat-cd-coursesel:focus { border-color: var(--p); }
+
+/* ---- KPI grid (4 cols desktop, 2 mobile) ---- */
+.umat-cd-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+@media (max-width: 900px) { .umat-cd-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px) { .umat-cd-kpi-grid { grid-template-columns: 1fr; } }
+
+.umat-cd-kpi {
+  background: var(--sflo);
+  border: 1px solid var(--olv);
+  border-radius: var(--r12);
+  padding: 18px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+.umat-cd-kpi-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.umat-cd-kpi-icon {
+  width: 36px; height: 36px;
+  border-radius: var(--r8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.umat-cd-kpi-icon .material-symbols-outlined { font-size: 20px; }
+.kpi-cd-green  { background: rgba(0,107,47,.1);  color: var(--p); }
+.kpi-cd-sec    { background: rgba(61,104,68,.1); color: var(--sec); }
+.kpi-cd-warn   { background: rgba(245,158,11,.1); color: #d97706; }
+.kpi-cd-purple { background: rgba(139,92,246,.1); color: #7c3aed; }
+.umat-cd-kpi-val {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 4px;
+  color: var(--ons);
+}
+.umat-cd-kpi-label { font-size: 12px; color: var(--ol); margin-bottom: 6px; }
+
+/* ---- Section cards ---- */
+.umat-cd-card {
+  background: var(--sflo);
+  border: 1px solid var(--olv);
+  border-radius: var(--r16);
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,.05);
+  margin-bottom: 20px;
+}
+.umat-cd-card-hdr {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--olv);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.umat-cd-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ons);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.umat-cd-card-title .material-symbols-outlined { font-size: 18px; color: var(--p); }
+.umat-cd-card-body { padding: 20px; }
+
+/* ---- Table ---- */
+.umat-cd-table-wrap { overflow-x: auto; }
+.umat-cd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.umat-cd-table th {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--ol);
+  border-bottom: 2px solid var(--olv);
+  white-space: nowrap;
+}
+.umat-cd-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--sfl);
+  vertical-align: middle;
+}
+.umat-cd-table tr:last-child td { border-bottom: none; }
+.umat-cd-table tr:hover td { background: var(--sfl); }
+
+/* ---- Provider badges ---- */
+.umat-cd-prov-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.prov-openai { background: rgba(74,222,128,.15); color: #166534; border: 1px solid rgba(74,222,128,.3); }
+.prov-openrouter { background: rgba(251,191,36,.15); color: #92400e; border: 1px solid rgba(251,191,36,.3); }
+.prov-local { background: rgba(156,163,175,.15); color: #374151; border: 1px solid rgba(156,163,175,.3); }
+.prov-unknown { background: rgba(156,163,175,.1); color: #6b7280; border: 1px solid rgba(156,163,175,.2); }
+
+/* ---- Chart containers ---- */
+.umat-cd-chart-wrap {
+  position: relative;
+  height: 260px;
+  width: 100%;
+}
+.umat-cd-chart-wrap canvas { max-height: 260px; }
+
+/* ---- Cost formatting ---- */
+.umat-cd-cost {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.umat-cd-duration {
+  font-size: 12px;
+  color: var(--ol);
+}
+
+/* ---- Empty state ---- */
+.umat-cd-empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--ol);
+}
+.umat-cd-empty .material-symbols-outlined { font-size: 48px; color: var(--olv); display: block; margin-bottom: 10px; }
+.umat-cd-empty p { font-size: 14px; margin: 0; }
+
+/* ---- Tab bar ---- */
+.umat-cd-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  background: var(--sfl);
+  border-radius: var(--r12);
+  padding: 4px;
+  flex-wrap: wrap;
+}
+.umat-cd-tab {
+  padding: 8px 18px;
+  border-radius: var(--r8);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--onsv);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .2s;
+}
+.umat-cd-tab:hover { color: var(--p); background: rgba(0,107,47,.06); }
+.umat-cd-tab.active { background: var(--sflo); color: var(--p); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.umat-cd-tab .material-symbols-outlined { font-size: 16px; vertical-align: middle; margin-right: 4px; }
+
+/* ---- Loading spinner ---- */
+.umat-cd-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px;
+  color: var(--ol);
+  font-size: 14px;
+}
+.umat-cd-spinner::before {
+  content: '';
+  width: 20px; height: 20px;
+  border: 2.5px solid var(--olv);
+  border-top-color: var(--p);
+  border-radius: 50%;
+  animation: cd-spin .7s linear infinite;
+}
+@keyframes cd-spin { to { transform: rotate(360deg); } }
+
+/* ---- Provider donut legend ---- */
+.umat-cd-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.umat-cd-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--onsv);
+}
+.umat-cd-legend-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+
+/* ---- Drill-down course detail ---- */
+.umat-cd-course-detail {
+  display: none;
+  margin-top: 4px;
+  padding: 16px 20px;
+  background: var(--sf);
+  border-radius: var(--r8);
+}
+.umat-cd-course-detail.open { display: block; }
+
+/* Responsive tweaks */
+@media (max-width: 640px) {
+  .umat-cd-topbar { flex-direction: column; align-items: flex-start; }
+}
+</style>
+
+<div class="umat-cd-wrap">
+
+  <!-- ================================================================ -->
+  <!-- Top bar                                                           -->
+  <!-- ================================================================ -->
+  <div class="umat-cd-topbar">
+    <div>
+      <h1>{{#str}}cost_dashboard_title, local_umat_ai{{/str}}</h1>
+      <p>Transcription cost analytics &nbsp;·&nbsp; All time</p>
+    </div>
+    <div class="umat-cd-topbar-actions">
+      {{#hascourses}}
+      <select id="cd-course-sel" class="umat-cd-coursesel" aria-label="Filter by course">
+        <option value="0">{{#str}}all_courses, local_umat_ai{{/str}}</option>
+        {{#courses}}
+        <option value="{{id}}"{{#courseid}}{{#id}}{{#equals}}{{/equals}}{{/id}}{{/courseid}}>{{shortname}} — {{fullname}}</option>
+        {{/courses}}
+      </select>
+      {{/hascourses}}
+      <button class="umat-btn umat-btn-outline" onclick="window.print()" id="cd-print-btn">
+        <span class="material-symbols-outlined">download</span>
+        Export
+      </button>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Tab bar                                                           -->
+  <!-- ================================================================ -->
+  <div class="umat-cd-tabs" id="cd-tabs">
+    <button class="umat-cd-tab active" data-tab="overview">
+      <span class="material-symbols-outlined">dashboard</span> Overview
+    </button>
+    <button class="umat-cd-tab" data-tab="courses">
+      <span class="material-symbols-outlined">menu_book</span> Per Course
+    </button>
+    <button class="umat-cd-tab" data-tab="trend">
+      <span class="material-symbols-outlined">trending_up</span> Monthly Trend
+    </button>
+    <button class="umat-cd-tab" data-tab="providers">
+      <span class="material-symbols-outlined">auto_awesome</span> Providers
+    </button>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Loading State                                                      -->
+  <!-- ================================================================ -->
+  <div class="umat-cd-spinner" id="cd-loading">
+    <span>Loading transcription cost data&hellip;</span>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Dashboard Content (hidden until loaded)                           -->
+  <!-- ================================================================ -->
+  <div id="cd-content" style="display:none;">
+
+    <!-- ============================================================== -->
+    <!-- KPI Cards                                                        -->
+    <!-- ============================================================== -->
+    <div class="umat-cd-kpi-grid" id="cd-kpi-grid">
+      <div class="umat-cd-kpi">
+        <div class="umat-cd-kpi-head">
+          <div class="umat-cd-kpi-icon kpi-cd-green"><span class="material-symbols-outlined">payments</span></div>
+          <span class="umat-pill pill-info">Total</span>
+        </div>
+        <div class="umat-cd-kpi-label">Total Transcription Cost</div>
+        <div class="umat-cd-kpi-val" id="cd-kpi-total-cost">$0.00</div>
+      </div>
+      <div class="umat-cd-kpi">
+        <div class="umat-cd-kpi-head">
+          <div class="umat-cd-kpi-icon kpi-cd-sec"><span class="material-symbols-outlined">mic</span></div>
+          <span class="umat-pill pill-info">Recordings</span>
+        </div>
+        <div class="umat-cd-kpi-label">Recordings Transcribed</div>
+        <div class="umat-cd-kpi-val" id="cd-kpi-recordings">0</div>
+        <div style="font-size:12px;color:var(--ol);" id="cd-kpi-transcribed-of">0 with provider data</div>
+      </div>
+      <div class="umat-cd-kpi">
+        <div class="umat-cd-kpi-head">
+          <div class="umat-cd-kpi-icon kpi-cd-warn"><span class="material-symbols-outlined">schedule</span></div>
+          <span class="umat-pill pill-info">Duration</span>
+        </div>
+        <div class="umat-cd-kpi-label">Total Audio Duration</div>
+        <div class="umat-cd-kpi-val" id="cd-kpi-duration">0h 0m</div>
+      </div>
+      <div class="umat-cd-kpi">
+        <div class="umat-cd-kpi-head">
+          <div class="umat-cd-kpi-icon kpi-cd-purple"><span class="material-symbols-outlined">auto_awesome</span></div>
+          <span class="umat-pill pill-info">Avg</span>
+        </div>
+        <div class="umat-cd-kpi-label">Avg Cost Per Recording</div>
+        <div class="umat-cd-kpi-val" id="cd-kpi-avg-cost">$0.00</div>
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- Tab Panels                                                       -->
+    <!-- ============================================================== -->
+
+    <!-- Tab: Overview (default) -->
+    <div class="cd-tab-panel" id="cd-panel-overview">
+      <div class="umat-cd-card">
+        <div class="umat-cd-card-hdr">
+          <h3 class="umat-cd-card-title"><span class="material-symbols-outlined">bar_chart</span>Cost by Course</h3>
+        </div>
+        <div class="umat-cd-card-body">
+          <div class="umat-cd-chart-wrap"><canvas id="cd-chart-course-costs"></canvas></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div class="umat-cd-card">
+          <div class="umat-cd-card-hdr">
+            <h3 class="umat-cd-card-title"><span class="material-symbols-outlined">donut_small</span>Provider Share</h3>
+          </div>
+          <div class="umat-cd-card-body">
+            <div class="umat-cd-chart-wrap" style="height:200px;"><canvas id="cd-chart-providers"></canvas></div>
+          </div>
+        </div>
+        <div class="umat-cd-card">
+          <div class="umat-cd-card-hdr">
+            <h3 class="umat-cd-card-title"><span class="material-symbols-outlined">trending_up</span>Monthly Spend</h3>
+          </div>
+          <div class="umat-cd-card-body">
+            <div class="umat-cd-chart-wrap"><canvas id="cd-chart-monthly"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Per Course -->
+    <div class="cd-tab-panel" id="cd-panel-courses" style="display:none;">
+      <div class="umat-cd-card">
+        <div class="umat-cd-card-hdr">
+          <h3 class="umat-cd-card-title"><span class="material-symbols-outlined">menu_book</span>Course Breakdown</h3>
+        </div>
+        <div class="umat-cd-card-body" style="padding:0;">
+          <div class="umat-cd-table-wrap">
+            <table class="umat-cd-table" id="cd-course-table">
+              <thead>
+                <tr>
+                  <th>Course</th>
+                  <th>Recordings</th>
+                  <th>Transcribed</th>
+                  <th>Total Cost</th>
+                  <th>Avg Cost/Rec</th>
+                  <th>Duration</th>
+                  <th>Provider</th>
+                </tr>
+              </thead>
+              <tbody id="cd-course-tbody">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Monthly Trend -->
+    <div class="cd-tab-panel" id="cd-panel-trend" style="display:none;">
+      <div class="umat-cd-card">
+        <div class="umat-cd-card-hdr">
+          <h3 class="umat-cd-card-title"><span class="material-symbols-outlined">calendar_month</span>Monthly Transcription Spend</h3>
+        </div>
+        <div class="umat-cd-card-body">
+          <div class="umat-cd-chart-wrap" style="height:300px;"><canvas id="cd-chart-monthly-full"></canvas></div>
+        </div>
+      </div>
+      <div class="umat-cd-card">
+        <div class="umat-cd-card-hdr">
+          <h3 class="umat-cd-card-title"><span class="material-symbols-outlined">table</span>Monthly Data</h3>
+        </div>
+        <div class="umat-cd-card-body" style="padding:0;">
+          <div class="umat-cd-table-wrap">
+            <table class="umat-cd-table" id="cd-monthly-table">
+              <thead>
+                <tr><th>Month</th><th>Recordings</th><th>Cost</th><th>Duration</th></tr>
+              </thead>
+              <tbody id="cd-monthly-tbody">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Providers -->
+    <div class="cd-tab-panel" id="cd-panel-providers" style="display:none;">
+      <div class="umat-cd-card">
+        <div class="umat-cd-card-hdr">
+          <h3 class="umat-cd-card-title"><span class="material-symbols-outlined">auto_awesome</span>Provider Comparison</h3>
+        </div>
+        <div class="umat-cd-card-body" style="padding:0;">
+          <div class="umat-cd-table-wrap">
+            <table class="umat-cd-table">
+              <thead>
+                <tr><th>Provider</th><th>Recordings</th><th>Total Cost</th><th>Total Duration</th><th>Avg Cost/Rec</th></tr>
+              </thead>
+              <tbody id="cd-provider-tbody">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="umat-cd-card">
+        <div class="umat-cd-card-hdr">
+          <h3 class="umat-cd-card-title"><span class="material-symbols-outlined">donut_small</span>Cost Share by Provider</h3>
+        </div>
+        <div class="umat-cd-card-body">
+          <div class="umat-cd-chart-wrap" style="height:240px;"><canvas id="cd-chart-provider-cost"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /cd-content -->
+
+</div><!-- /umat-cd-wrap -->

@@ -844,5 +844,21 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026072201, 'local', 'umat_ai');
     }
 
+    if ($oldversion < 2026072300) {
+        // Add transcription metadata columns to umat_ai_sessions for Phase 2 API integration.
+        $table = new xmldb_table('umat_ai_sessions');
+        $f1 = new xmldb_field('transcription_provider', XMLDB_TYPE_CHAR, '20', null, null, null, null, 'transcript_json');
+        $f2 = new xmldb_field('transcription_model', XMLDB_TYPE_CHAR, '50', null, null, null, null, 'transcription_provider');
+        $f3 = new xmldb_field('transcription_cost', XMLDB_TYPE_NUMBER, '10,6', null, null, null, 0, 'transcription_model');
+        $f4 = new xmldb_field('audio_duration_secs', XMLDB_TYPE_NUMBER, '10,2', null, null, null, 0, 'transcription_cost');
+        $f5 = new xmldb_field('chunk_count', XMLDB_TYPE_INTEGER, '5', null, null, null, 0, 'audio_duration_secs');
+        if (!$dbman->field_exists($table, $f1)) $dbman->add_field($table, $f1);
+        if (!$dbman->field_exists($table, $f2)) $dbman->add_field($table, $f2);
+        if (!$dbman->field_exists($table, $f3)) $dbman->add_field($table, $f3);
+        if (!$dbman->field_exists($table, $f4)) $dbman->add_field($table, $f4);
+        if (!$dbman->field_exists($table, $f5)) $dbman->add_field($table, $f5);
+        upgrade_plugin_savepoint(true, 2026072300, 'local', 'umat_ai');
+    }
+
     return true;
 }

@@ -369,6 +369,14 @@ $functions = [
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
 
+    /* ─── Transcription Cost Dashboard ─── */
+    'local_umat_ai_get_transcription_costs' => [
+        'classname'   => '\local_umat_ai\external\transcription_costs', 'methodname' => 'get_transcription_costs',
+        'description' => 'Get aggregated transcription cost data per course/month',
+        'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+
     /* ─── Resource Bank ─── */
     'local_umat_ai_resource_bank_list' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'list_items',
@@ -404,6 +412,14 @@ $functions = [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'rename_item',
         'description' => 'Rename a resource bank item', 'type' => 'write', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
+
+    /* ─── Bulk Re-transcribe ─── */
+    'local_umat_ai_reprocess_recording' => [
+        'classname'   => '\local_umat_ai\external\reprocess_recording', 'methodname' => 'reprocess',
+        'description' => 'Re-transcribe a recording with optional provider/model overrides',
+        'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
 ];
 

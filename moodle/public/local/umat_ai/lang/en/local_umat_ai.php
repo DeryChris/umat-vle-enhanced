@@ -114,6 +114,32 @@ $string['no_resources']      = 'Indexed course materials will appear here once u
 /* ---- Analytics ---- */
 $string['analytics_dashboard_title'] = 'Lecturer Analytics Dashboard';
 
+/* ---- Cost Dashboard ---- */
+$string['cost_dashboard_title']   = 'Transcription Cost Dashboard';
+$string['alltime']               = 'All time';
+$string['cost_overview']         = 'Overview';
+$string['cost_per_course']       = 'Per Course';
+$string['cost_monthly_trend']    = 'Monthly Trend';
+$string['cost_providers']        = 'Providers';
+$string['cost_total']            = 'Total Transcription Cost';
+$string['cost_recordings']       = 'Recordings Transcribed';
+$string['cost_duration']         = 'Total Audio Duration';
+$string['cost_avg']              = 'Avg Cost Per Recording';
+$string['cost_no_data']          = 'No transcription cost data available yet.';
+
+/* ---- Re-transcribe ---- */
+$string['re_transcribe']              = 'Re-transcribe';
+$string['re_transcribe_title']        = 'Re-transcribe Recording';
+$string['re_transcribe_desc']         = 'Change the transcription provider and/or model for this recording and start a new transcription job.';
+$string['re_transcribe_current']      = 'Current';
+$string['re_transcribe_new']          = 'New';
+$string['re_transcribe_provider']     = 'Transcription Provider';
+$string['re_transcribe_model']        = 'Model';
+$string['re_transcribe_start']        = 'Start Re-transcription';
+$string['re_transcribe_queued']       = 'Re-transcription job queued. Processing will begin shortly.';
+$string['re_transcribe_error']        = 'Failed to start re-transcription. Please try again.';
+$string['re_transcribe_processing']   = 'Re-transcribing…';
+
 /* ---- Student Notes ---- */
 $string['my_notes']              = 'My Notes';
 $string['new_note']              = 'New Note';
@@ -269,3 +295,17 @@ $string['delete_session'] = 'Delete session';
 $string['delete_session_confirm'] = 'Delete this conversation? This cannot be undone.';
 $string['delete_session_done'] = 'Session deleted.';
 $string['delete_session_error'] = 'Could not delete session. Please try again.';
+
+/* ---- Re-transcribe (Bulk Re-process) ---- */
+$string['reprocess_recording']     = 'Re-transcribe';
+$string['reprocess_modal_title']   = 'Re-transcribe Recording';
+$string['reprocess_modal_desc']    = 'Choose a different transcription provider or model for this recording. The existing transcript will be replaced.';
+$string['reprocess_provider']      = 'Provider';
+$string['reprocess_model']         = 'Model (optional)';
+$string['reprocess_model_help']    = 'Leave empty to use the provider\'s default model.';
+$string['reprocess_confirm']       = 'Start Re-transcription';
+$string['reprocess_cancel']        = 'Cancel';
+$string['reprocess_queued']        = 'Re-transcription queued. Processing will begin shortly.';
+$string['reprocess_error']         = 'Could not queue re-transcription. Please try again.';
+$string['reprocess_provider_openai']     = 'OpenAI (default)';
+$string['reprocess_provider_openrouter'] = 'OpenRouter';
