@@ -15,7 +15,7 @@ define([], function() {
     }
 
     // ─── Format AI response text (full Markdown → HTML) ─── //
-    function _umatFormatAI(text) {
+    function _umatFormatAI(text, citations) {
         if (!text) return '';
 
         /* Extract fenced code blocks before escaping */
@@ -42,6 +42,19 @@ define([], function() {
         text = text.replace(/~~(.+?)(~~|$)/g, '<del>$1</del>');
         text = text.replace(/`([^`]+)(`|$)/g, '<code>$1</code>');
         text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+        /* Convert inline citation markers [n] → clickable refs (when citations known) */
+        if (citations && citations.length) {
+            text = text.replace(/\[(\d{1,2})\]/g, function(m, n) {
+                var idx = parseInt(n, 10);
+                var found = false;
+                for (var ci = 0; ci < citations.length; ci++) {
+                    if (parseInt(citations[ci].index || citations[ci].n || 0, 10) === idx || ci + 1 === idx) { found = true; break; }
+                }
+                if (!found) return m;
+                return '<a href="#umat-cite-' + idx + '" class="umat-ref-link" data-umat-cite="' + idx + '">[' + idx + ']</a>';
+            });
+        }
 
         /* Block-level: line-by-line */
         var lines = text.split('\n');
@@ -264,23 +277,27 @@ define([], function() {
     }
 
     // ─── Append AI message bubble ──────────────────── //
-    function _umatAppendAi(cid, t, s) {
+    function _umatAppendAi(cid, t, s, citations) {
         var c = document.getElementById(cid);
         if (!c) return;
         t = (t || '').replace(/```(?:json)?\s*\{[\s\S]*?"quiz"\s*:[\s\S]*?\}\s*```\s*/g, '');
         var src = '';
         if (s && s.length) {
             src = '<div class="umat-src-chips">' + s.map(function(x) {
-                return '<span class="umat-src-chip">' + _umatEsc(x) + '</span>';
+                return '<span class="umat-src-chip">' + _umatEsc(typeof x === 'string' ? x : (x.title || x.name || '')) + '</span>';
             }).join('') + '</div>';
         }
         var d = document.createElement('div');
         var mid = 'msg_' + (++_msgIdCounter);
         d.setAttribute('data-msg-id', mid);
         d.setAttribute('data-msg-role', 'ai');
-        d.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">' + _umatFormatAI(t) + '</div>' + src + '</div><button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div></div>';
+        d.innerHTML = '<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">' + _umatFormatAI(t, citations) + '</div>' + src + '</div><button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div></div>';
         d.querySelector('.umat-reply-btn').addEventListener('click', _umatHandleReply);
         c.appendChild(d);
+        if (citations && citations.length) {
+            var bubbleEl = d.querySelector('.umat-bubble-ai');
+            _umatAppendSources(bubbleEl, s, citations);
+        }
         c.scrollTop = c.scrollHeight;
     }
 
@@ -309,15 +326,118 @@ define([], function() {
     }
 
     // ─── Append source chips to a streaming bubble ─── //
-    function _umatAppendSources(bubble, sources) {
-        if (!bubble || !sources || !sources.length) return;
+    function _umatAppendSources(bubble, sources, citations) {
+        if (!bubble) return;
+        var hasCitations = citations && citations.length;
+        if (hasCitations) {
+            if (bubble.querySelector('.umat-src-cards')) return;
+            _umatRenderCitations(bubble, citations);
+            bubble._umatCitations = citations;
+            return;
+        }
+        if (!sources || !sources.length) return;
         if (bubble.querySelector('.umat-src-chips')) return;
         var src = document.createElement('div');
         src.className = 'umat-src-chips';
         src.innerHTML = sources.map(function(x) {
-            return '<span class="umat-src-chip">' + _umatEsc(x) + '</span>';
+            return '<span class="umat-src-chip">' + _umatEsc(typeof x === 'string' ? x : (x.title || x.name || '')) + '</span>';
         }).join('');
         bubble.appendChild(src);
+    }
+
+    // ─── Keep last citation list for inline [n] linking ─── //
+    function _umatRenderCitations(container, citations, courseId) {
+        if (!container || !citations || !citations.length) return;
+        var wrap = document.createElement('div');
+        wrap.className = 'umat-src-cards';
+        wrap.innerHTML = '<div class="umat-src-cards-title"><span class="material-symbols-outlined">format_quote</span>Sources</div>'
+            + citations.map(function(c) {
+                if (!c || typeof c !== 'object') return '';
+                var idx = parseInt(c.index || 0, 10) || 0;
+                var title = c.title || 'Source';
+                var loc = c.location ? '<span class="umat-citation-loc">' + _umatEsc(c.location) + '</span>' : '';
+                var snippet = c.snippet ? '<p class="umat-citation-snippet">' + _umatEsc(c.snippet) + '</p>' : '';
+                var openBtn = '<button class="umat-citation-open" type="button" data-umat-cite-mid="' + (parseInt(c.material_id, 10) || 0) + '" data-umat-cite-title="' + _Mesc(c.title || '') + '" data-umat-cite-loc="' + _Mesc(c.location || '') + '"><span class="material-symbols-outlined">open_in_new</span></button>';
+                return '<div class="umat-citation-card" id="umat-cite-' + idx + '" data-umat-cite-n="' + idx + '">'
+                    + '<span class="umat-citation-num">' + idx + '</span>'
+                    + '<div class="umat-citation-body"><div class="umat-citation-title">' + _Mesc(title) + '</div>' + loc + snippet + '</div>'
+                    + openBtn
+                    + '</div>';
+            }).join('');
+        container.appendChild(wrap);
+        // Wire "Open" buttons → material viewer deep-link.
+        wrap.querySelectorAll('.umat-citation-open').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var mid = parseInt(btn.getAttribute('data-umat-cite-mid'), 10) || 0;
+                var t = btn.getAttribute('data-umat-cite-title') || '';
+                var loc = btn.getAttribute('data-umat-cite-loc') || '';
+                _umatOpenCitation(mid, t, loc, courseId);
+            });
+        });
+    }
+
+    // ─── Resolve a material id → viewer open (uses registry populated by
+    //     student/lecturer/hub modules from get_course_materials) ─────────── //
+    function _umatOpenCitation(materialId, title, loc, courseId) {
+        if (!window._umatMaterialLookup) window._umatMaterialLookup = {};
+        var info = window._umatMaterialLookup[String(materialId)] || null;
+        if (info && info.url) {
+            if (window.umatMaterialViewer) {
+                var type = _umatViewerTypeFromMime(info.mime || '');
+                window.umatMaterialViewer.open(type, {
+                    url: info.url,
+                    name: info.filename || title,
+                    downloadUrl: info.url,
+                    mime: info.mime,
+                    materialId: materialId,
+                    courseId: info.courseid || courseId || 0,
+                    location: loc
+                });
+                return;
+            }
+        }
+        _umatOpenCitationFallback(materialId, title, loc);
+    }
+
+    function _umatViewerTypeFromMime(mime) {
+        mime = (mime || '').toLowerCase();
+        if (mime.indexOf('video') !== -1) return 'video';
+        if (mime.indexOf('audio') !== -1) return 'audio';
+        if (mime.indexOf('image') !== -1) return 'image';
+        if (mime.indexOf('pdf') !== -1) return 'pdf';
+        if (mime.indexOf('word') !== -1 || mime.indexOf('document') !== -1) return 'docx';
+        if (mime.indexOf('sheet') !== -1 || mime.indexOf('excel') !== -1) return 'xlsx';
+        if (mime.indexOf('presentation') !== -1 || mime.indexOf('powerpoint') !== -1) return 'pptx';
+        if (mime.indexOf('text') !== -1 || mime.indexOf('json') !== -1 || mime.indexOf('xml') !== -1) return 'code';
+        return 'pdf';
+    }
+
+    function _Mesc(s) {
+        return _umatEsc(typeof s === 'string' ? s : String(s == null ? '' : s));
+    }
+
+    // ─── Citation [n] → scroll/highlight its card ────────────── //
+    function _umatInitCitationClicks() {
+        if (window._umatCitationDelegated) return;
+        window._umatCitationDelegated = true;
+        document.addEventListener('click', function (e) {
+            var a = e.target.closest ? e.target.closest('.umat-ref-link') : null;
+            if (!a) return;
+            e.preventDefault();
+            var n = a.getAttribute('data-umat-cite');
+            if (!n) return;
+            var card = document.getElementById('umat-cite-' + n);
+            if (!card) return;
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            card.classList.add('umat-citation-highlight');
+            setTimeout(function () { card.classList.remove('umat-citation-highlight'); }, 2200);
+        });
+    }
+
+    function _umatOpenCitationFallback(materialId, title, loc) {
+        // Fallback if no viewer/auth: dispatch an open event the page can handle.
+        var evt = new CustomEvent('umat:open-citation', { detail: { materialId: materialId, title: title, location: loc } });
+        document.dispatchEvent(evt);
     }
 
     // ─── Shared SSE block parser (chat + inline panels) ── //
@@ -396,6 +516,9 @@ define([], function() {
             try { _activeStream.abort(); } catch(e) {}
         }
         _activeStream = controller;
+
+        var streamCitations = [];
+        _umatInitCitationClicks();
 
         // --- Send-button management ---
         var sendBtnId = opts.sendBtnId || null;
@@ -485,7 +608,7 @@ define([], function() {
             if (!contentEl) {
                 return;
             }
-            contentEl.innerHTML = _umatFormatAI(accumulated);
+            contentEl.innerHTML = _umatFormatAI(accumulated, streamCitations);
             var c = document.getElementById(opts.msgsId);
             if (c) {
                 c.scrollTop = c.scrollHeight;
@@ -531,7 +654,8 @@ define([], function() {
             if (streamRow) {
                 streamRow.classList.remove('umat-msg-streaming');
             }
-            _umatAppendSources(bubbleEl, (payload && payload.sources) || []);
+            var doneCitations = (payload && payload.citations && payload.citations.length) ? payload.citations : streamCitations;
+            _umatAppendSources(bubbleEl, (payload && payload.sources) || [], doneCitations);
             if (streamRow) {
                 var wrap = streamRow.querySelector('.umat-msg-ai-wrap');
                 if (wrap && !wrap.querySelector('.umat-reply-btn')) {
@@ -612,6 +736,9 @@ define([], function() {
                 if (event === 'meta') {
                     _chatState = 'waiting';
                     if (typeof opts.onStateChange === 'function') opts.onStateChange(_chatState);
+                    if (payload && payload.citations && payload.citations.length) {
+                        streamCitations = payload.citations;
+                    }
                     if (opts.onMeta) opts.onMeta(payload);
                 } else if (event === 'token') {
                     ensureBubble();
@@ -691,12 +818,14 @@ define([], function() {
         target.classList.add('umat-ai-stream-panel', 'is-streaming');
         target.innerHTML = '<div class="umat-ai-stream-content umat-ai-content"></div>';
         var contentEl = target.querySelector('.umat-ai-stream-content');
+        var streamCitationsInline = [];
+        _umatInitCitationClicks();
 
         function renderContent() {
             if (!contentEl) {
                 return;
             }
-            contentEl.innerHTML = _umatFormatAI(accumulated);
+            contentEl.innerHTML = _umatFormatAI(accumulated, streamCitationsInline);
             if (typeof opts.onRender === 'function') {
                 opts.onRender(contentEl);
             }
@@ -718,6 +847,14 @@ define([], function() {
             }
             renderContent();
             target.classList.remove('is-streaming');
+            var doneCitations = (payload && payload.citations && payload.citations.length) ? payload.citations : streamCitationsInline;
+            if (doneCitations && doneCitations.length) {
+                var srcWrap = document.createElement('div');
+                _umatRenderCitations(srcWrap, doneCitations);
+                if (srcWrap.firstChild) {
+                    target.appendChild(srcWrap.firstChild);
+                }
+            }
         }
 
         var body = new FormData();
@@ -735,6 +872,9 @@ define([], function() {
         }).then(function(response) {
             return _umatConsumeSseStream(response, function(event, payload) {
                 if (event === 'meta') {
+                    if (payload && payload.citations && payload.citations.length) {
+                        streamCitationsInline = payload.citations;
+                    }
                     if (opts.onMeta) {
                         opts.onMeta(payload);
                     }
@@ -2127,6 +2267,17 @@ define([], function() {
         _umatStreamInline: _umatStreamInline,
         _umatFormatAI: _umatFormatAI,
         _umatHandleReply: _umatHandleReply,
+        _umatRenderCitations: _umatRenderCitations,
+        _umatInitCitationClicks: _umatInitCitationClicks,
+        _umatOpenCitation: _umatOpenCitation,
+        _umatRegisterMaterials: function(mats, courseId) {
+            if (!window._umatMaterialLookup) window._umatMaterialLookup = {};
+            (mats || []).forEach(function(m) {
+                if (m.id) window._umatMaterialLookup[String(m.id)] = {
+                    url: m.url || '', filename: m.filename || m.name || '', mime: m.mimetype || '', courseid: courseId || 0
+                };
+            });
+        },
         _getReplyContext: function() { return _replyContext; },
         _clearReplyContext: function() { _replyContext = null; },
         _cancelActiveStream: function() {

@@ -897,5 +897,20 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026072601, 'local', 'umat_ai');
     }
 
+    if ($oldversion < 2026080400) {
+        // M1 (Source-Cited Q&A): persist structured citation payloads alongside
+        // the legacy source-name strings so chat history can resume with
+        // clickable citations.
+        $ct = new xmldb_table('umat_ai_chat_logs');
+        $cf = new xmldb_field('citations', XMLDB_TYPE_TEXT, null, null, null, null, null, 'sources');
+        if (!$dbman->field_exists($ct, $cf)) $dbman->add_field($ct, $cf);
+
+        $lt = new xmldb_table('umat_ai_lecturer_notes');
+        $lf = new xmldb_field('citations', XMLDB_TYPE_TEXT, null, null, null, null, null, 'sources');
+        if (!$dbman->field_exists($lt, $lf)) $dbman->add_field($lt, $lf);
+
+        upgrade_plugin_savepoint(true, 2026080400, 'local', 'umat_ai');
+    }
+
     return true;
 }

@@ -200,6 +200,13 @@ moodle/local/umat_ai/amd/build/*
 .qodo
 .claude
 .blackbox
+.opencode
+
+# ============================================================
+# Stray runtime artefacts (created when running from repo root)
+# ============================================================
+ai_service.log
+chroma_db/
 
 # ============================================================
 # Agents

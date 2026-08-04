@@ -52,7 +52,7 @@ class ai_query extends \external_api {
         $remaining = local_umat_ai_questions_remaining($USER->id, $rateLimit);
         if ($remaining <= 0) {
             return ['success' => false, 'answer' => get_string('rate_limit_hit', 'local_umat_ai'),
-                    'sources' => [], 'error' => 'rate_limit', 'remaining' => 0];
+                    'sources' => [], 'citations' => [], 'error' => 'rate_limit', 'remaining' => 0];
         }
 
         // Filter materials by access restrictions (security boundary).
@@ -95,6 +95,7 @@ class ai_query extends \external_api {
                 'question'    => $params['question'],
                 'answer'      => $result['answer'],
                 'sources'     => json_encode($result['sources'] ?? []),
+                'citations'   => json_encode($result['citations'] ?? []),
                 'timecreated' => time(),
             ]);
 
@@ -106,13 +107,14 @@ class ai_query extends \external_api {
             }
 
             return ['success' => true, 'answer' => $result['answer'], 'sources' => $result['sources'] ?? [],
-                    'error' => '', 'remaining' => $remaining - 1];
+                    'citations' => $result['citations'] ?? [], 'error' => '', 'remaining' => $remaining - 1];
         }
 
         // AI service returned no answer — return graceful error.
         // Failed questions are not logged, so they do not consume the rate-limit window.
         $msg = $result['detail']['message'] ?? get_string('ai_unavailable', 'local_umat_ai');
-        return ['success' => false, 'answer' => $msg, 'sources' => [], 'error' => 'service_error', 'remaining' => $remaining];
+        return ['success' => false, 'answer' => $msg, 'sources' => [], 'citations' => [],
+                'error' => 'service_error', 'remaining' => $remaining];
     }
 
     public static function ask_question_returns() {
@@ -120,6 +122,23 @@ class ai_query extends \external_api {
             'success'   => new \external_value(PARAM_BOOL),
             'answer'    => new \external_value(PARAM_RAW),
             'sources'   => new \external_multiple_structure(new \external_value(PARAM_TEXT)),
+            'citations' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'index'        => new \external_value(PARAM_INT),
+                    'title'        => new \external_value(PARAM_TEXT),
+                    'material_id'  => new \external_value(PARAM_INT),
+                    'chunk_index'  => new \external_value(PARAM_INT, '', VALUE_DEFAULT, 0),
+                    'snippet'      => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                    'location'     => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                    'source_type'  => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                    'session_id'   => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                    'score'        => new \external_value(PARAM_FLOAT, '', VALUE_DEFAULT, 0),
+                    'visibility'   => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                ]),
+                'Structured source citations for the answer',
+                VALUE_DEFAULT,
+                []
+            ),
             'error'     => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
             'remaining' => new \external_value(PARAM_INT, 'Questions remaining in the current rate-limit window', VALUE_DEFAULT, -1),
         ]);
@@ -159,6 +178,7 @@ class ai_query extends \external_api {
                 'question'    => $r->question,
                 'answer'      => $r->answer ?? '',
                 'sources'     => json_decode($r->sources ?? '[]', true) ?? [],
+                'citations'   => json_decode($r->citations ?? '[]', true) ?? [],
                 'timecreated' => (int)$r->timecreated,
             ];
         }, (array)$records))];
@@ -171,6 +191,23 @@ class ai_query extends \external_api {
                 'question'    => new \external_value(PARAM_TEXT),
                 'answer'      => new \external_value(PARAM_RAW),
                 'sources'     => new \external_multiple_structure(new \external_value(PARAM_TEXT)),
+                'citations'   => new \external_multiple_structure(
+                    new \external_single_structure([
+                        'index'        => new \external_value(PARAM_INT),
+                        'title'        => new \external_value(PARAM_TEXT),
+                        'material_id'  => new \external_value(PARAM_INT),
+                        'chunk_index'  => new \external_value(PARAM_INT, '', VALUE_DEFAULT, 0),
+                        'snippet'      => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                        'location'     => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                        'source_type'  => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                        'session_id'   => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                        'score'        => new \external_value(PARAM_FLOAT, '', VALUE_DEFAULT, 0),
+                        'visibility'   => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                    ]),
+                    'Structured source citations for this message',
+                    VALUE_DEFAULT,
+                    []
+                ),
                 'timecreated' => new \external_value(PARAM_INT),
             ])
         )]);

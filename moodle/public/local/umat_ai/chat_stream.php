@@ -163,6 +163,7 @@ global $DB;
 $buffer = '';
 $fullanswer = '';
 $sources = [];
+$citations = [];
 $logged = false;
 
 $ch = curl_init($cfg['url'] . '/api/v1/query/stream');
@@ -178,7 +179,7 @@ curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => false,
     CURLOPT_TIMEOUT        => 120,
     CURLOPT_CONNECTTIMEOUT => 15,
-    CURLOPT_WRITEFUNCTION  => function($curl, $data) use (&$buffer, &$fullanswer, &$sources, &$logged, $DB, $USER, $courseid, $question, $sessionkey, $role) {
+    CURLOPT_WRITEFUNCTION  => function($curl, $data) use (&$buffer, &$fullanswer, &$sources, &$citations, &$logged, $DB, $USER, $courseid, $question, $sessionkey, $role) {
         echo $data;
         if (function_exists('ob_flush')) {
             @ob_flush();
@@ -216,6 +217,7 @@ curl_setopt_array($ch, [
             } else if ($event === 'done') {
                 $fullanswer = $parsed['answer'] ?? $fullanswer;
                 $sources = $parsed['sources'] ?? $sources;
+                $citations = $parsed['citations'] ?? $citations;
                 if (!$logged && $fullanswer !== '') {
                     if ($role === 'lecturer') {
                         $DB->insert_record('umat_ai_lecturer_notes', (object)[
@@ -225,6 +227,7 @@ curl_setopt_array($ch, [
                             'query'       => $question,
                             'response'    => $fullanswer,
                             'sources'     => json_encode($sources),
+                            'citations'   => json_encode($citations),
                             'timecreated' => time(),
                         ]);
                     } else {
@@ -236,6 +239,7 @@ curl_setopt_array($ch, [
                             'question'    => $question,
                             'answer'      => $fullanswer,
                             'sources'     => json_encode($sources),
+                            'citations'   => json_encode($citations),
                             'timecreated' => time(),
                         ]);
                     }

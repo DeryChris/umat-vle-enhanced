@@ -1240,3 +1240,37 @@ body.umat-body-lock{overflow:hidden;}
 .umat-kpi-icon-r{background:rgba(165,48,77,.1);color:var(--u-ter)}
 .umat-kpi-icon-i{background:rgba(99,102,241,.1);color:var(--u-p)}
 
+/* ==== SOURCE CITATIONS (M1) ==== */
+.umat-ref-link{color:var(--u-p);font-weight:700;text-decoration:none;cursor:pointer;border-bottom:1px dotted var(--u-p);padding:0 1px;margin:0 1px;}
+.umat-ref-link:hover{color:#fff;background:var(--u-p);border-bottom-color:var(--u-p);border-radius:3px;}
+
+.umat-src-cards{margin-top:8px;border-top:1px dashed var(--u-olv);padding-top:8px;display:flex;flex-direction:column;gap:6px;}
+.umat-src-cards-title{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--u-ol);}
+.umat-src-cards-title .material-symbols-outlined{font-size:13px;}
+.umat-citation-card{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r8);transition:background .2s,border-color .2s,box-shadow .2s;}
+.umat-citation-card.umat-citation-highlight{background:rgba(217,119,6,.14);border-color:rgba(217,119,6,.45);box-shadow:0 0 0 2px rgba(217,119,6,.18);}
+.umat-citation-num{flex-shrink:0;min-width:18px;height:18px;line-height:18px;text-align:center;font-size:10px;font-weight:800;color:#fff;background:var(--u-p);border-radius:50%;margin-top:1px;}
+.umat-citation-body{flex:1;min-width:0;}
+.umat-citation-title{font-size:11.5px;font-weight:600;color:var(--u-ons);line-height:1.35;}
+.umat-citation-loc{display:inline-flex;align-items:center;gap:3px;margin:2px 0 0;font-size:10px;color:var(--u-o);font-weight:600;background:var(--u-secc);padding:1px 6px;border-radius:var(--u-rp);}
+.umat-citation-loc::before{content:'\e55d';font-family:'Material Symbols Outlined';font-size:11px;line-height:1;}
+.umat-citation-snippet{margin:4px 0 0;font-size:11px;color:var(--u-ol);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.umat-citation-open{flex-shrink:0;display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border:1px solid var(--u-p);border-radius:var(--u-rp);background:transparent;color:var(--u-p);font-size:10.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s,color .15s;}
+.umat-citation-open .material-symbols-outlined{font-size:13px;}
+.umat-citation-open:hover{background:var(--u-p);color:#fff;}
+
+/* ==== SMART SEARCH (M1) ==== */
+.umat-smart-search-btn{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid var(--u-p);border-radius:var(--u-rp);font-size:12px;font-weight:600;color:var(--u-p);background:linear-gradient(135deg,var(--u-sflo),var(--u-secc));cursor:pointer;font-family:inherit;transition:background .15s,color .15s,transform .1s;}
+.umat-smart-search-btn:hover{background:var(--u-p);color:#fff;}
+.umat-smart-search-btn:active{transform:scale(.97);}
+.umat-smart-search-btn .material-symbols-outlined{font-size:15px;}
+
+.umat-smart-search-hint{display:flex;flex-direction:column;align-items:center;gap:8px;padding:28px 16px;text-align:center;color:var(--u-ol);}
+.umat-smart-search-hint .material-symbols-outlined{font-size:34px;color:var(--u-o);}
+.umat-smart-search-hint p{margin:0;font-size:12px;line-height:1.5;}
+
+.umat-smart-search-result{padding:10px 12px;background:var(--u-sflo);border:1px solid var(--u-olv);border-radius:var(--u-r8);transition:border-color .15s,box-shadow .15s;}
+.umat-smart-search-result:hover{border-color:rgba(0,107,47,.35);box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.umat-smart-search-result .umat-citation-title{font-size:12.5px;}
+.umat-smart-search-actions{display:flex;justify-content:flex-end;margin-top:6px;}
+

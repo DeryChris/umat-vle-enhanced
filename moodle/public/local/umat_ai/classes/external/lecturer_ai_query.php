@@ -80,6 +80,7 @@ class lecturer_ai_query extends \external_api {
 
         $answer = $result['answer'] ?? get_string('ai_unavailable', 'local_umat_ai');
         $sources = $result['sources'] ?? [];
+        $citations = $result['citations'] ?? [];
 
         // Log lecturer interaction.
         $DB->insert_record('umat_ai_lecturer_notes', (object)[
@@ -89,19 +90,40 @@ class lecturer_ai_query extends \external_api {
             'query'       => $params['query'],
             'response'    => $answer,
             'sources'     => json_encode($sources),
+            'citations'   => json_encode($citations),
             'timecreated' => time(),
         ]);
 
         return [
-            'success'  => !empty($result['answer']),
-            'response' => $answer,
+            'success'   => !empty($result['answer']),
+            'response'  => $answer,
+            'sources'   => $sources,
+            'citations' => $citations,
         ];
     }
 
     public static function ask_returns() {
         return new \external_single_structure([
-            'success'  => new \external_value(PARAM_BOOL),
-            'response' => new \external_value(PARAM_RAW),
+            'success'   => new \external_value(PARAM_BOOL),
+            'response'  => new \external_value(PARAM_RAW),
+            'sources'   => new \external_multiple_structure(new \external_value(PARAM_TEXT), '', VALUE_DEFAULT, []),
+            'citations' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'index'        => new \external_value(PARAM_INT),
+                    'title'        => new \external_value(PARAM_TEXT),
+                    'material_id'  => new \external_value(PARAM_INT),
+                    'chunk_index'  => new \external_value(PARAM_INT, '', VALUE_DEFAULT, 0),
+                    'snippet'      => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                    'location'     => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                    'source_type'  => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                    'session_id'   => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                    'score'        => new \external_value(PARAM_FLOAT, '', VALUE_DEFAULT, 0),
+                    'visibility'   => new \external_value(PARAM_TEXT, '', VALUE_DEFAULT, ''),
+                ]),
+                'Structured source citations for the answer',
+                VALUE_DEFAULT,
+                []
+            ),
         ]);
     }
 }

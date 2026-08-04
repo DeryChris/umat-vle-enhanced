@@ -429,8 +429,13 @@ JS;
     <!-- LIBRARY TAB — Lecture Recordings + Course Materials -->
     <div class="umat-tab-pane" data-tab="library" style="position:relative;overflow-y:auto;">
       <div class="umat-content-hdr">
-        <h2>Resource Materials</h2>
-        <input class="umat-lib-search" id="ws-lib-search" type="text" placeholder="Search recordings & materials…" />
+        <h2>Course Library</h2>
+        <div class="umat-lib-hdr-actions">
+          <input class="umat-lib-search" id="ws-lib-search" type="text" placeholder="Search recordings &amp; materials…" />
+          <button class="umat-smart-search-btn" id="ws-smart-search-btn" type="button" title="Smart Search across course materials">
+            <span class="material-symbols-outlined">travel_explore</span><span>Smart Search</span>
+          </button>
+        </div>
       </div>
       <!-- Lecture Recordings section -->
       <div class="umat-lib-section">
@@ -1090,6 +1095,7 @@ HTML;
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="lec-lib-hdr-actions">
               <button type="button" id="lec-upload-rec-btn" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid var(--u-p);border-radius:var(--u-rp);font-size:12px;font-weight:600;color:var(--u-p);background:var(--u-sflo);cursor:pointer;font-family:inherit;"><span class="material-symbols-outlined" umat-fs-15>upload_file</span>Upload File</button>
               <input type="text" id="lec-lib-search" placeholder="Search materials…" class="umat-input-sm">
+              <button type="button" id="lec-smart-search-btn" class="umat-smart-search-btn" title="Smart Search across course materials"><span class="material-symbols-outlined" style="font-size:15px;">travel_explore</span>Smart Search</button>
             </div>
           </div>
           <!-- Course selector (shown when multiple courses, hidden after selection) -->
@@ -2792,10 +2798,20 @@ function expandLecSession(tile){
           +'<div class="umat-msg umat-msg-user" style="margin-bottom:4px;"><div class="umat-msg-bubble" style="display:inline-block;background:var(--u-p)20;padding:8px 12px;border-radius:12px 12px 4px 12px;font-size:12px;">'+esc(m.question)+'</div></div>'
           +'<div class="umat-msg umat-msg-ai"><div class="umat-msg-bubble umat-msg-bubble-ai" style="display:inline-block;background:var(--u-sfll);padding:8px 12px;border-radius:12px 12px 12px 4px;font-size:12px;">'
           +(m.answer?'<div class="umat-msg-text">'+esc(m.answer)+'</div>':'<em style="color:var(--u-ol);">No answer recorded.</em>')
-          +(m.sources&&m.sources.length?'<div class="umat-msg-src" style="font-size:10px;color:var(--u-ol);margin-top:4px;">Sources: '+m.sources.map(function(x){return esc(typeof x==='string'?x:x.name||'');}).join(', ')+'</div>':'')
+          +(m.citations&&m.citations.length?'<div class="umat-msg-citations-cards" data-cites=\''+esc(JSON.stringify(m.citations))+'\'></div>':'')
+          +(m.sources&&m.sources.length&&(!m.citations||!m.citations.length)?'<div class="umat-msg-src" style="font-size:10px;color:var(--u-ol);margin-top:4px;">Sources: '+m.sources.map(function(x){return esc(typeof x==='string'?x:x.name||'');}).join(', ')+'</div>':'')
           +'</div></div></div>';
       }).join('');
     det.querySelector('.umat-collapse-detail-btn').addEventListener('click',function(){det.remove();});
+    /* Render structured citation cards (if the detail shows any). */
+    var citeRenderFn=(typeof window._umatRenderCitations==='function')?window._umatRenderCitations:(typeof _umatRenderCitations==='function'?_umatRenderCitations:null);
+    if(citeRenderFn){
+      det.querySelectorAll('.umat-msg-citations-cards').forEach(function(zone){
+        var cites=[];
+        try{cites=JSON.parse(zone.dataset.cites||'[]')||[];}catch(e){cites=[];}
+        if(cites.length)citeRenderFn(zone,cites);
+      });
+    }
   },function(){
     det.innerHTML='<div style="padding:10px;text-align:center;color:var(--u-ter);font-size:12px;">Failed to load messages.</div>';
   });

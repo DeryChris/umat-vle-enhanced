@@ -23,18 +23,33 @@ def _reciprocal_rank_fusion(
     ranked_lists: List[List[Tuple[str, dict]]],
     k: int = 60,
 ) -> List[Tuple[str, dict, float]]:
-    """Merge multiple ranked result lists using Reciprocal Rank Fusion."""
+    """Merge multiple ranked result lists using Reciprocal Rank Fusion.
+
+    The first-seen full metadata dict per fused key is preserved, so rich
+    citation metadata (``chunk_index``, ``session_id``, ``content_type``,
+    scores, etc.) survives the fusion — not just ``source``/``material_id``.
+    """
     scores: dict = {}
+    metadata_holder: dict = {}
 
     for result_list in ranked_lists:
         for rank, (doc, meta) in enumerate(result_list):
+            meta = meta or {}
             key = (doc, meta.get("source", ""), str(meta.get("material_id", "")))
             scores[key] = scores.get(key, 0.0) + 1.0 / (k + rank + 1)
+            if key not in metadata_holder:
+                # First-seen metadata wins; merge in fusion score.
+                metadata_holder[key] = {
+                    **meta,
+                    "rrf_score": 0.0,  # overwritten below with the final fused score
+                }
 
     fused = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     output = []
-    for (doc, source, mid), score in fused:
-        output.append((doc, {"source": source, "material_id": mid, "rrf_score": score}, score))
+    for (doc, _source, _mid), score in fused:
+        meta = dict(metadata_holder.get((doc, _source, _mid), {}))
+        meta["rrf_score"] = score
+        output.append((doc, meta, score))
     return output
 
 

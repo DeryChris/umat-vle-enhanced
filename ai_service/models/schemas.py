@@ -64,11 +64,50 @@ class QuizData(BaseModel):
     questions: List[QuizQuestion]
 
 
+class Citation(BaseModel):
+    """Structured citation for a source chunk used to answer a query.
+
+    Derived from actual retrieved chunks (never LLM-generated) so students can
+    verify every claim against the original material.
+    """
+    index:        int = 0        # 1-based number referenced inline as [n]
+    title:        str = ""       # source filename (friendly name shown client-side)
+    material_id:  int = 0        # umat_ai_materials.id
+    chunk_index:  int = 0        # position of the chunk within the source
+    snippet:      str = ""       # trimmed excerpt (~220 chars) shown in the card
+    location:     str = ""       # human label e.g. "Page 4", "Slide 7", "12:34"
+    source_type:  str = ""       # course_material | transcript | ...
+    session_id:   str = ""       # BBB session id for transcript citations
+    score:        float = 0.0    # hybrid retrieval score (rrf)
+    visibility:   str = "student"
+
+
 class QueryResponse(BaseModel):
     answer:     str
     sources:    List[str] = []
+    citations:  List[Citation] = []
     confidence: float = 0.0
     quiz_data:  Optional[QuizData] = None
+
+
+# ── Smart Search ──────────────────────────────────────
+
+class SearchRequest(BaseModel):
+    course_id:    int
+    user_id:      int
+    role:         str = "student"
+    query:        str = Field(..., min_length=2, max_length=500)
+    material_ids: List[int] = Field(default=[], description="Restrict search to these material IDs (empty = all accessible)")
+
+
+class SearchResult(BaseModel):
+    chunk:    str
+    citation: Citation
+    score:    float = 0.0
+
+
+class SearchResponse(BaseModel):
+    results: List[SearchResult] = []
 
 
 class IndexMaterialRequest(BaseModel):

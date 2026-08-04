@@ -11,7 +11,7 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
-from models.schemas import QueryRequest, QuizData
+from models.schemas import QueryRequest, QuizData, Citation
 from models.database import ChatLog
 from core.llm_processor import TASK_GUIDANCE
 from core.content_classifier import is_sensitive_query, get_sensitive_refusal
@@ -254,6 +254,112 @@ class PreparedQuery:
     prompt: Optional[str] = None
     instant_answer: Optional[str] = None
     confidence: float = 0.85
+    citations: List[Citation] = None  # structured citations (set after retrieval)
+
+
+# ── Citation building ──────────────────────────────────
+
+_LOCATION_PATTERNS = [
+    # media / transcript timestamps: "[mm:ss - mm:ss]" or "[h:mm:ss - ...]"
+    (re.compile(r"\[((?:\d{1,2}:)?\d{1,2}:\d{2})\s*-\s*(?:\d{1,2}:)?\d{1,2}:\d{2}\s*\]"), None),
+    # PDF page marker: "[Page N]"
+    (re.compile(r"\[Page\s+(\d{1,5})\]", re.IGNORECASE), "page"),
+    # PPTX slide marker: "--- Slide N ---"
+    (re.compile(r"---\s*Slide\s+(\d{1,5})\s*---", re.IGNORECASE), "slide"),
+]
+
+
+def _extract_location(doc: str, meta: dict) -> str:
+    """Derive a human-readable location label for a chunk.
+
+    Checks the chunk text for page/slide/timestamp markers (added by the
+    document loader) and falls back to a section label for untagged chunks.
+    """
+    # 1. Timestamp markers (from transcripts / media)
+    ts = _LOCATION_PATTERNS[0][0].search(doc)
+    if ts:
+        return ts.group(1).strip()
+
+    # 2. Page markers (PDF — loader emits "[Page N]" at the start of each page).
+    m = _LOCATION_PATTERNS[1][0].search(doc)
+    if m and _LOCATION_PATTERNS[1][1] == "page":
+        return f"Page {m.group(1)}"
+
+    # 3. Slide markers (PPTX — loader emits "--- Slide N ---").
+    m = _LOCATION_PATTERNS[2][0].search(doc)
+    if m and _LOCATION_PATTERNS[2][1] == "slide":
+        return f"Slide {m.group(1)}"
+
+    # 4. Session/transcript metadata fallback.
+    if meta.get("source_type") == "transcript" and meta.get("session_id"):
+        return "Recording transcript"
+
+    # 5. Generic fallback.
+    ci = int(meta.get("chunk_index", 0) or 0)
+    return f"Section {ci + 1}"
+
+
+def _clean_snippet(doc: str, limit: int = 220) -> str:
+    """Strip loader markers and normalize whitespace for a short citation snippet."""
+    snippet = doc
+    snippet = re.sub(r"\[Page\s+\d{1,5}\]", "", snippet, flags=re.IGNORECASE)
+    snippet = re.sub(r"---\s*Slide\s+\d{1,5}\s*---", "", snippet, flags=re.IGNORECASE)
+    snippet = re.sub(r"\[\d{1,2}:\d{2}(?::\d{2})?\s*-\s*\d{1,2}:\d{2}(?::\d{2})?\s*\]", "", snippet)
+    snippet = re.sub(r"\s+", " ", snippet).strip()
+    if len(snippet) > limit:
+        snippet = snippet[:limit].rsplit(" ", 1)[0] + "…"
+    return snippet
+
+
+def build_citations(
+    results: List[tuple],
+    start_index: int = 1,
+    max_citations: int = 6,
+) -> List[Citation]:
+    """Convert hybrid-retrieval results into structured Citation objects.
+
+    Citations are deduced from the *actual* retrieved chunks (never invented by
+    the LLM), deduplicated by material_id, numbered 1-based in rank order, and
+    capped to keep streaming payloads light.
+
+    Args:
+        results: list of ``(doc, meta)`` tuples from ``HybridRetriever.search``.
+        start_index: offset for the first citation index (used by consumers that
+            merge multiple result sets).
+        max_citations: cap on the number of citations produced.
+    """
+    citations: List[Citation] = []
+    seen: set = set()
+    for idx, (doc, meta) in enumerate(results):
+        meta = meta or {}
+        try:
+            material_id = int(meta.get("material_id", 0) or 0)
+        except (TypeError, ValueError):
+            material_id = 0
+        if material_id and material_id in seen:
+            continue
+        seen.add(material_id)
+
+        location = _extract_location(doc, meta)
+        title = meta.get("source", "") or f"Material {material_id}" if material_id else "Unknown source"
+        if not title and meta.get("session_id"):
+            title = f"Session {meta['session_id']}"
+
+        citations.append(Citation(
+            index       = start_index + idx,
+            title       = title,
+            material_id = material_id,
+            chunk_index = int(meta.get("chunk_index", 0) or 0),
+            snippet     = _clean_snippet(doc),
+            location    = location,
+            source_type = meta.get("source_type", ""),
+            session_id  = meta.get("session_id", "") or "",
+            score       = round(float(meta.get("rrf_score", 0.0) or 0.0), 4),
+            visibility  = meta.get("visibility", "student"),
+        ))
+        if len(citations) >= max_citations:
+            break
+    return citations
 
 
 def prepare_query(request: QueryRequest, db: Session) -> PreparedQuery:
@@ -341,6 +447,9 @@ def prepare_query(request: QueryRequest, db: Session) -> PreparedQuery:
                 "Discarded weak chunk (rrf=%.4f, source=%s)",
                 score, meta.get("source", "?"),
             )
+    context_texts = [doc for doc, _ in filtered]
+    sources = list({meta.get("source", "Unknown source") for _, meta in filtered})
+    citations = build_citations(filtered)
 
     context_texts = [doc for doc, _ in filtered]
 
@@ -380,11 +489,22 @@ def prepare_query(request: QueryRequest, db: Session) -> PreparedQuery:
     student_profile = _get_student_profile_if_needed(db, request)
     guidance = TASK_GUIDANCE.get(task, "")
 
+    # Numbered source list for the LLM citation contract:
+    # "[1] lecture1.pdf — Page 4", "[2] Session 2026-07-01 — 12:34"
+    citations_list = ""
+    if citations:
+        lines = []
+        for c in citations:
+            loc = f" — {c.location}" if c.location else ""
+            lines.append(f"[{c.index}] {c.title}{loc}")
+        citations_list = "\n".join(lines)
+
     if request.role == "lecturer":
         prompt = build_lecturer_system_prompt(
             rag_context=context_block,
             user_question=request.question,
             conversation_history=conversation_history,
+            citations_list=citations_list,
         )
     else:
         prompt = build_tutor_system_prompt(
@@ -393,10 +513,12 @@ def prepare_query(request: QueryRequest, db: Session) -> PreparedQuery:
             user_question=request.question,
             task_guidance=guidance,
             conversation_history=conversation_history,
+            citations_list=citations_list,
         )
 
     return PreparedQuery(task=task, sources=sources, prompt=prompt,
-                         confidence=care_result.retrieval_confidence)
+                         confidence=care_result.retrieval_confidence,
+                         citations=citations)
 
 
 def _get_brief_outside_scope_answer(question: str) -> str:
