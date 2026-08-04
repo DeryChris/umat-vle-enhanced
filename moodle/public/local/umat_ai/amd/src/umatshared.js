@@ -1626,11 +1626,24 @@ define([], function() {
             } else {
                 transBtnHtml = '<button class="yt-btn yt-transcribe-btn" data-session="' + _umatEsc(r.session_key || r.id || '') + '" data-status="' + _umatEsc(recordingStatus) + '" onclick="event.stopPropagation()"><span class="material-symbols-outlined">mic</span>Transcribe</button>';
             }
-            return '<div class="yt-tile" data-idx="' + i + '" data-url="' + _umatEsc(r.url || '') + '" data-title="' + _umatEsc(r.title || 'Lecture Recording') + '" data-segs=\'' + segsData + '\' data-has-transcript="' + (hasTranscript ? '1' : '0') + '" data-session-key="' + _umatEsc(r.session_key || r.id || '') + '">' +
+
+            // Transcription provider badge.
+            var prov = r.transcription_provider || '';
+            var provBadge = '';
+            if (hasTranscript && prov) {
+                var provColor = (prov === 'openai') ? '#4ade80' : (prov === 'openrouter') ? '#fbbf24' : '#9ca3af';
+                var provIcon = (prov === 'openai' || prov === 'openrouter') ? 'auto_awesome' : 'mic';
+                provBadge = '<span class="yt-trans-badge" title="Transcribed by ' + _umatEsc(prov) + ' | Model: ' + _umatEsc(r.transcription_model || '') + '" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:700;background:' + provColor + '22;color:' + provColor + ';border:1px solid ' + provColor + '44;"><span class="material-symbols-outlined" style="font-size:12px;">' + provIcon + '</span>' + _umatEsc(prov) + '</span>';
+            } else if (!hasTranscript) {
+                provBadge = '<span class="yt-trans-badge yt-trans-pending" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:700;background:#9ca3af22;color:#9ca3af;border:1px solid #9ca3af44;" title="No transcript yet"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span>pending</span>';
+            }
+
+            return '<div class="yt-tile" data-idx="' + i + '" data-url="' + _umatEsc(r.url || '') + '" data-title="' + _umatEsc(r.title || 'Lecture Recording') + '" data-segs=\'' + segsData + '\' data-has-transcript="' + (hasTranscript ? '1' : '0') + '" data-provider="' + _umatEsc(prov) + '" data-model="' + _umatEsc(r.transcription_model || '') + '" data-cost="' + (r.transcription_cost || 0) + '" data-duration-secs="' + (r.audio_duration_secs || 0) + '" data-session-key="' + _umatEsc(r.session_key || r.id || '') + '" data-courseid="' + (r.courseid || 0) + '">' +
                 '<div class="yt-thumb yt-bg-video">' +
                 '<span class="yt-thumb-icon material-symbols-outlined">play_circle</span>' +
                 '<div class="yt-play-ov"><span class="material-symbols-outlined">play_arrow</span></div>' +
                 badge +
+                provBadge +
                 '</div>' +
                 '<div class="yt-meta">' +
                 '<div class="yt-av yt-av-video"><span class="material-symbols-outlined">smart_toy</span></div>' +
@@ -1643,6 +1656,7 @@ define([], function() {
                 '<div class="yt-actions">' +
                 '<button class="yt-btn" data-play="1" onclick="event.stopPropagation()"><span class="material-symbols-outlined">play_arrow</span>Play</button>' +
                 transBtnHtml +
+                '<a class="yt-btn" href="' + _umatEsc(r.url || '#') + '" download onclick="event.stopPropagation()"><span class="material-symbols-outlined">download</span>Download</a>' +
                 '</div>' +
                 '</div>';
         }).join('');
@@ -1851,6 +1865,234 @@ define([], function() {
         });
     }
 
+    // ─── Material Analysis Status ───────────────────── //
+    function updateMaterialAnalysis(courseId) {
+        if (!courseId) return;
+        ajax('local_umat_ai_get_analysis_status', { courseid: courseId },
+            function (resp) {
+                var materials = resp.materials || [];
+                var lookup = {};
+                materials.forEach(function (m) {
+                    lookup[m.fileid] = m;
+                });
+                document.querySelectorAll('.yt-tile[data-fileid]').forEach(function (tile) {
+                    var fid = parseInt(tile.dataset.fileid);
+                    var info = lookup[fid];
+                    var btn = tile.querySelector('.yt-analysis-btn');
+                    if (!btn) return;
+                    if (!info) {
+                        btn.style.display = 'none';
+                        return;
+                    }
+                    btn.style.display = '';
+                    btn.dataset.materialId = info.material_id || 0;
+                    btn.dataset.analysed = info.is_analyzed ? 'true' : 'false';
+                    var dot = btn.querySelector('.anal-status-dot');
+                    var txt = btn.querySelector('.anal-text');
+                    if (info.is_analyzed) {
+                        dot.textContent = 'check_circle';
+                        dot.style.color = '#4caf50';
+                        txt.textContent = info.last_analysis ? (info.last_analysis.summary ? 'Analysis' : 'Analyzed') : 'Analyzed';
+                        btn.title = info.last_analysis && info.last_analysis.summary ? info.last_analysis.summary : 'Material has been analyzed';
+                        btn.onclick = function (e) {
+                            e.stopPropagation();
+                            // Show analysis modal / details (future)
+                        };
+                    } else {
+                        dot.textContent = 'radio_button_unchecked';
+                        dot.style.color = '#999';
+                        txt.textContent = 'Analyze';
+                        btn.title = 'Request AI analysis of this material';
+                        btn.onclick = function (e) {
+                            e.stopPropagation();
+                            var mid = parseInt(this.dataset.materialId);
+                            if (!mid) return;
+                            var self = this;
+                            var dot2 = self.querySelector('.anal-status-dot');
+                            var txt2 = self.querySelector('.anal-text');
+                            dot2.textContent = 'sync';
+                            dot2.style.color = '#ff9800';
+                            txt2.textContent = 'Analyzing\u2026';
+                            self.disabled = true;
+                            ajax('local_umat_ai_request_analysis', {
+                                courseid: courseId,
+                                material_id: mid,
+                                analysis_type: 'full_analysis',
+                                scope: '',
+                                force: false,
+                            }, function (res) {
+                                self.disabled = false;
+                                if (res.success) {
+                                    dot2.textContent = 'check_circle';
+                                    dot2.style.color = '#4caf50';
+                                    txt2.textContent = 'Analyzed';
+                                    self.dataset.analysed = 'true';
+                                } else {
+                                    dot2.textContent = 'error';
+                                    dot2.style.color = '#f44336';
+                                    txt2.textContent = 'Failed';
+                                    setTimeout(function () {
+                                        dot2.textContent = 'radio_button_unchecked';
+                                        dot2.style.color = '#999';
+                                        txt2.textContent = 'Analyze';
+                                    }, 3000);
+                                }
+                            });
+                        };
+                    }
+                });
+            },
+            function () { /* silently fail */ }
+        );
+    }
+
+    // ─── Video generation status ──────────────────── //
+    function updateVideoGenerationStatus(courseId) {
+        if (!courseId) return;
+        ajax('local_umat_ai_get_video_status', { courseid: courseId },
+            function (resp) {
+                var materials = resp.materials || [];
+                var lookup = {};
+                materials.forEach(function (m) { lookup[m.fileid] = m; });
+                document.querySelectorAll('.yt-tile').forEach(function (tile) {
+                    var btn = tile.querySelector('.yt-video-btn');
+                    if (!btn) return;
+                    var fileid = parseInt(tile.dataset.fileid) || 0;
+                    var info = lookup[fileid] || null;
+                    var mime = (tile.dataset.mime || '').toLowerCase();
+                    var isDoc = mime.indexOf('pdf') >= 0 || mime.indexOf('wordprocessingml') >= 0
+                        || mime.indexOf('presentationml') >= 0 || mime.indexOf('powerpoint') >= 0
+                        || mime.indexOf('msword') >= 0 || mime.indexOf('text/') === 0;
+                    if (!isDoc) { btn.style.display = 'none'; return; }
+                    btn.style.display = '';
+                    btn.dataset.fileid = fileid;
+                    var txt = btn.querySelector('.video-text');
+                    var ic = btn.querySelector('.material-symbols-outlined');
+                    var setQueuing = function(self) {
+                        ic.textContent = 'sync'; ic.style.color = '#ff9800';
+                        txt.textContent = 'Queuing...'; self.disabled = true;
+                    };
+                    var setGen = function(self) {
+                        ic.textContent = 'sync'; ic.style.color = '#ff9800';
+                        txt.textContent = 'Generating...'; self.disabled = true;
+                    };
+                    var setReady = function(self) {
+                        ic.textContent = 'check_circle'; ic.style.color = '#4caf50';
+                        txt.textContent = 'Watch'; self.disabled = false;
+                    };
+                    var setDefault = function(self) {
+                        ic.textContent = 'videocam'; ic.style.color = '';
+                        txt.textContent = 'Gen Video'; self.disabled = false;
+                    };
+                    var showError = function(self, msg) {
+                        ic.textContent = 'error'; ic.style.color = '#f44336';
+                        txt.textContent = msg || 'Failed';
+                        setTimeout(function() { setDefault(self); }, 3000);
+                    };
+                    if (info && info.has_video) {
+                        btn.title = 'View generated video';
+                        btn.onclick = function (e) {
+                            e.stopPropagation();
+                            if (info.video_url && window.umatMaterialViewer) {
+                                window.umatMaterialViewer.open('video', {
+                                    url: info.video_url,
+                                    name: 'AI-Generated Lecture Video',
+                                    downloadUrl: info.video_url,
+                                    mime: 'video/mp4'
+                                });
+                            } else if (info.video_url) {
+                                window.open(info.video_url, '_blank');
+                            }
+                        };
+                        setReady(btn);
+                    } else if (info && (info.job_status === 'processing' || info.job_status === 'queued')) {
+                        btn.title = 'Video is being generated';
+                        setGen(btn);
+                    } else {
+                        btn.title = 'Generate AI video from this material';
+                        btn.onclick = function (e) {
+                            e.stopPropagation();
+                            var self = this;
+                            setQueuing(self);
+                            ajax('local_umat_ai_request_video_generation', {
+                                courseid: courseId,
+                                fileid: fileid,
+                            }, function (res) {
+                                if (res.success) {
+                                    setGen(self);
+                                    self.title = 'Video generation queued';
+                                    setTimeout(function () {
+                                        if (typeof updateVideoGenerationStatus === 'function')
+                                            updateVideoGenerationStatus(courseId);
+                                    }, 5000);
+                                } else {
+                                    showError(self, res.message || 'Failed');
+                                }
+                            });
+                        };
+                        setDefault(btn);
+                    }
+                });
+            },
+            function () { /* silently fail */ }
+        );
+    }
+
+    // ─── Trigger transcription for a recording ─────── //
+    function triggerTranscribe(sessionKey, courseId) {
+        var btn = document.querySelector('.yt-transcribe-btn[data-session="' + sessionKey.replace(/['"\\]/g, '') + '"]');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span>Processing';
+            btn.classList.add('processing');
+        }
+        ajax('local_umat_ai_get_course_recordings', {courseid: courseId || 0}, function(r) {
+            var recs = r.recordings || [];
+            var rec = recs.find(function(rr) { return rr.session_key === sessionKey; });
+            if (!rec || !rec.url) {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span>Transcribe'; btn.classList.remove('processing'); }
+                console.warn('[triggerTranscribe] Recording not found or no URL:', sessionKey);
+                return;
+            }
+            var url = window.umatAiServiceUrl || 'http://localhost:8000';
+            var token = window.umatAiServiceToken || '';
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', url + '/api/v1/recording/process', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            xhr.onload = function() {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    var resp = JSON.parse(xhr.responseText || '{}');
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.innerHTML = '<span class="material-symbols-outlined">pending</span>Queued';
+                        btn.title = 'Job: ' + (resp.job_id || '');
+                    }
+                    var evt = new CustomEvent('umat:transcribe-started', {
+                        detail: { sessionKey: sessionKey, courseId: courseId, jobId: resp.job_id }
+                    });
+                    document.dispatchEvent(evt);
+                } else {
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span>Transcribe'; btn.classList.remove('processing'); }
+                    console.error('[triggerTranscribe] Failed:', xhr.status, xhr.responseText);
+                }
+            };
+            xhr.onerror = function() {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span>Transcribe'; btn.classList.remove('processing'); }
+                console.error('[triggerTranscribe] Network error');
+            };
+            xhr.send(JSON.stringify({
+                session_id: sessionKey,
+                recording_url: rec.url,
+                course_id: courseId || 0,
+                material_ids: [],
+                title: rec.title || ''
+            }));
+        }, function() {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">auto_awesome</span>Transcribe'; btn.classList.remove('processing'); }
+        });
+    }
+
     // ─── Exports ───────────────────────────────────── //
     return {
         // HTML escaping
@@ -1896,6 +2138,9 @@ define([], function() {
         _isStreamActive: function() { return !!_activeStream; },
         getChatState: function() { return _chatState; },
 
+        // Trigger transcription
+        triggerTranscribe: triggerTranscribe,
+
         // Voice
         ChatVoiceInput: ChatVoiceInput,
 
@@ -1920,6 +2165,9 @@ define([], function() {
         ytAvCls: _ytAvCls,
         ytIcon: _ytIcon,
         ytExtLabel: _ytExtLabel,
+
+        // Trigger transcription
+        triggerTranscribe: triggerTranscribe,
 
         // Renderers
         renderVideoTiles: renderVideoTiles,

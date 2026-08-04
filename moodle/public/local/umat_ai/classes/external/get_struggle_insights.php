@@ -1020,6 +1020,12 @@ class get_struggle_insights extends \external_api {
     $aiServiceUsed = false;
     $aiOverallSummary = '';
     $aiCourseHealth = null;
+    $executiveSummary = '';
+    $healthGrade = '';
+    $healthLabel = '';
+    $goingWell = [];
+    $needsAttention = [];
+    $topRecommendation = '';
     $cfg = \local_umat_ai_get_service_config();
     $totalEvents = 0;
     $eventBreakdown = ['quiz_failures' => 0, 'repeated_views' => 0, 'assignment_failures' => 0, 'issue_reports' => 0];
@@ -1156,12 +1162,14 @@ class get_struggle_insights extends \external_api {
                     $aiRiskMap = [];
                     foreach ($srResult['students'] as $aiS) {
                         $aiRiskMap[$aiS['user_id']] = [
+                            'narrative'       => $aiS['narrative'] ?? '',
                             'risk_factors'    => $aiS['risk_factors'] ?? [],
                             'recommendation'  => $aiS['recommendation'] ?? '',
                         ];
                     }
                     foreach ($atRiskStudents as &$s) {
                         if (isset($aiRiskMap[$s['userid']])) {
+                            $s['ai_narrative']      = $aiRiskMap[$s['userid']]['narrative'];
                             $s['ai_risk_factors']   = $aiRiskMap[$s['userid']]['risk_factors'];
                             $s['ai_recommendation'] = $aiRiskMap[$s['userid']]['recommendation'];
                         }
@@ -1184,38 +1192,101 @@ class get_struggle_insights extends \external_api {
             $totalEvents = array_sum($eventBreakdown);
 
             if (!empty($topicMatrix)) {
+                $courseName = $DB->get_field('course', 'fullname', ['id' => $cid]) ?: 'Course';
+                $sectionSummaries = [];
+                foreach ($sectionStruggle as $ss) {
+                    if ($ss['student_count'] > 0 || $ss['question_count'] > 0) {
+                        $sectionSummaries[] = $ss['section_name'] . ': ' . $ss['student_count'] . ' students, ' . $ss['question_count'] . ' questions, ' . $ss['struggle_pct'] . '% struggle rate';
+                    }
+                }
                 $healthPayload = [
-                    'course_id'        => $cid,
-                    'total_questions'  => $totalQuestions,
-                    'total_students'   => $uniqueStudents,
-                    'worst_topic'      => $worstTopic,
-                    'topic_matrix'     => array_map(function($t) {
+                    'course_id'           => $cid,
+                    'course_name'         => $courseName,
+                    'enrolled_students'   => $enrolledCount,
+                    'total_questions'     => $totalQuestions,
+                    'total_students'      => $uniqueStudents,
+                    'worst_topic'         => $worstTopic,
+                    'topic_matrix'        => array_map(function($t) {
                         return [
                             'topic'          => $t['topic'],
                             'question_count' => $t['question_count'],
+                            'student_count'  => $t['student_count'] ?? 0,
                             'struggle_score' => $t['struggle_score'],
                             'trend'          => $t['trend'],
+                            'trend_pct'      => $t['trend_pct'] ?? 0,
                             'event_sources'  => $t['event_sources'] ?? [],
+                            'sample_questions' => array_slice($t['sample_questions'] ?? [], 0, 2),
+                            'suggestion'     => $t['suggestion'] ?? '',
                         ];
                     }, array_slice($topicMatrix, 0, 10)),
-                    'at_risk_students' => array_map(function($s) {
+                    'at_risk_students'    => array_map(function($s) {
                         return [
-                            'fullname'       => $s['fullname'],
-                            'question_count' => $s['question_count'],
-                            'risk_score'     => $s['risk_score'],
-                            'struggle_topics'=> $s['struggle_topics'],
+                            'fullname'        => $s['fullname'],
+                            'question_count'  => $s['question_count'],
+                            'risk_score'      => $s['risk_score'],
+                            'struggle_topics' => $s['struggle_topics'],
+                            'ai_narrative'    => $s['ai_narrative'] ?? '',
                         ];
                     }, array_slice($atRiskStudents, 0, 5)),
-                    'event_breakdown'  => $eventBreakdown,
-                    'total_events'     => $totalEvents,
-                    'total_issues'     => $totalIssues,
-                    'open_issues'      => $openIssues,
+                    'section_breakdown'   => $sectionSummaries,
+                    'section_struggle'    => array_map(function($ss) {
+                        return [
+                            'section_name'  => $ss['section_name'],
+                            'student_count' => $ss['student_count'],
+                            'question_count'=> $ss['question_count'],
+                            'struggle_pct'  => $ss['struggle_pct'],
+                            'severity'      => $ss['severity'],
+                            'hint'          => $ss['hint'],
+                        ];
+                    }, array_slice($sectionStruggle, 0, 10)),
+                    'event_breakdown'     => $eventBreakdown,
+                    'total_events'        => $totalEvents,
+                    'total_issues'        => $totalIssues,
+                    'open_issues'         => $openIssues,
+                    'improving_topics'    => array_slice($improvingTopics, 0, 5),
                 ];
                 $payload = json_encode($healthPayload);
                 $raw4 = $client->post($cfg['url'] . '/api/v1/analytics/course-health', $payload);
                 $chResult = json_decode($raw4, true);
                 if ($chResult) {
                     $aiCourseHealth = $chResult;
+                    // Extract executive summary fields from enriched course health response
+                    $executiveSummary = $chResult['executive_summary'] ?? '';
+                    $healthGrade = $chResult['health_grade'] ?? '';
+                    $healthLabel = $chResult['health_label'] ?? '';
+                    $goingWell = $chResult['going_well'] ?? [];
+                    $needsAttention = $chResult['needs_attention'] ?? [];
+                    $topRecommendation = $chResult['top_recommendation'] ?? '';
+
+                    // Apply AI section insights to section_struggle hints
+                    $aiSectionInsights = $chResult['section_insights'] ?? [];
+                    if (!empty($aiSectionInsights)) {
+                        $aiInsightMap = [];
+                        foreach ($aiSectionInsights as $insight) {
+                            // Try to extract section name from insight (text before first colon or dash)
+                            $parts = preg_split('/[:–-]/', $insight, 2);
+                            $secNameHint = trim($parts[0] ?? '');
+                            if ($secNameHint) {
+                                $aiInsightMap[strtolower($secNameHint)] = $insight;
+                            }
+                        }
+                        foreach ($sectionStruggle as &$ss) {
+                            $ssNorm = strtolower($ss['section_name']);
+                            // Direct match
+                            if (isset($aiInsightMap[$ssNorm])) {
+                                $ss['hint'] = $aiInsightMap[$ssNorm];
+                            } else {
+                                // Partial match
+                                foreach ($aiInsightMap as $aiName => $aiText) {
+                                    if (strpos($ssNorm, $aiName) !== false || strpos($aiName, $ssNorm) !== false) {
+                                        $ss['hint'] = $aiText;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        unset($ss);
+                    }
                 }
             }
         } catch (\Throwable $e) {
@@ -1236,6 +1307,10 @@ class get_struggle_insights extends \external_api {
     $older7 = $nowTs - (14 * DAYSECS);
 
     foreach ($topicMatrix as $tm) {
+        // Skip topics with zero data — they'd show "0 of X students" which is misleading
+        if (empty($tm['student_count']) && empty($tm['question_count']) && (!isset($tm['struggle_score']) || $tm['struggle_score'] < 10)) {
+            continue;
+        }
         $stuPct = $enrolledCount > 0 ? round(($tm['student_count'] / $enrolledCount) * 100) : 0;
         $score  = $tm['struggle_score'] ?? 0;
 
@@ -1323,40 +1398,82 @@ class get_struggle_insights extends \external_api {
         ];
     }
 
+    // If all struggle areas were filtered out, add a single "all clear" entry
+    if (empty($struggleAreas)) {
+        $struggleAreas[] = [
+            'topic'              => 'All Clear',
+            'severity'           => 'watch',
+            'student_count'      => 0,
+            'total_students'     => $enrolledCount,
+            'student_pct'        => 0,
+            'question_count'     => 0,
+            'prev_question_count' => 0,
+            'trend'              => 'stable',
+            'trend_pct'          => 0,
+            'struggle_score'     => 0,
+            'description'        => 'No significant struggle detected yet. Student questions will populate this section as the course progresses.',
+            'sample_questions'   => [],
+            'suggestion'         => 'Keep monitoring student engagement through the AI assistant.',
+            'suggestion_type'    => 'monitor',
+            'materials'          => [],
+            'affected_student_ids' => [],
+        ];
+    }
+
     // -- 12b. Section struggle breakdown --
+    // Enhanced: properly trace questions to sections via their materials,
+    // then generate natural-language hints with specific numbers.
     $sectionStruggle = [];
     foreach ($sectionList as $sec) {
         $secQCnt = 0;
-        $secStuCnt = 0;
+        $secStuSet = []; // unique student ids
         $secTopics = [];
+        $secMatIds = [];
+
         foreach ($sec['materials'] as $mat) {
+            $mid = $mat['id'];
+            $secMatIds[] = $mid;
             $secQCnt += $mat['question_count'];
             foreach ($mat['key_concepts'] as $kc) {
                 $secTopics[$kc['concept']] = ($secTopics[$kc['concept']] ?? 0) + $kc['question_count'];
             }
         }
-        // Count unique students in this section's materials
-        foreach ($topicStudents as $lc => $stuMap) {
-            foreach ($sec['materials'] as $mat) {
-                $matId = $mat['id'];
-                if (isset($topicMaterials[$lc][$matId])) {
-                    $secStuCnt = max($secStuCnt, count($stuMap));
+
+        // Find all students who asked questions about materials in this section
+        foreach ($logs as $l) {
+            $uid = (int)$l->userid;
+            // Check if any of this question's sources match materials in this section
+            $sourceFiles = json_decode($l->sources ?? '[]', true) ?? [];
+            foreach ($sourceFiles as $src) {
+                $srcLower = strtolower(trim($src));
+                foreach ($sec['materials'] as $mat) {
+                    $matName = strtolower(trim($mat['filename']));
+                    if ($srcLower === $matName || strpos($srcLower, $matName) !== false || strpos($matName, $srcLower) !== false) {
+                        $secStuSet[$uid] = true;
+                        break 2;
+                    }
                 }
             }
         }
+
         arsort($secTopics);
         $topTopics = array_slice(array_keys($secTopics), 0, 3);
 
+        $secStuCnt = count($secStuSet);
         $secPct = $enrolledCount > 0 ? round(($secStuCnt / $enrolledCount) * 100) : 0;
         $secSeverity = $secPct >= 50 ? 'critical' : ($secPct >= 25 ? 'attention' : 'watch');
 
-        $hint = '';
-        if ($secSeverity === 'critical') {
-            $hint = '⚠️ Needs recap — ' . implode(', ', $topTopics);
-        } elseif ($secSeverity === 'attention') {
-            $hint = '📎 ' . implode(', ', $topTopics);
+        // Natural-language hint with specific numbers
+        if ($secQCnt > 0 || $secStuCnt > 0) {
+            if ($secSeverity === 'critical') {
+                $hint = $secStuCnt . ' of ' . $enrolledCount . ' students (' . $secPct . '%) struggling — ' . $secQCnt . ' questions asked. Needs a recap session focusing on ' . implode(', ', array_slice($topTopics, 0, 2)) . '.';
+            } elseif ($secSeverity === 'attention') {
+                $hint = $secStuCnt . ' students showing difficulty (' . $secPct . '%) — ' . $secQCnt . ' questions. Address ' . ($topTopics[0] ?? 'key concepts') . ' in your next lecture.';
+            } else {
+                $hint = $secStuCnt . ' students engaged (' . $secPct . '%) — ' . $secQCnt . ' questions asked. Monitoring ' . ($topTopics[0] ?? 'these topics') . '.';
+            }
         } else {
-            $hint = '✅ Healthy' . ($secPct > 0 ? ' — minor issues' : ' — no issues');
+            $hint = '✅ No student questions yet for this section.';
         }
 
         $sectionStruggle[] = [
@@ -1399,6 +1516,10 @@ class get_struggle_insights extends \external_api {
     foreach ($atRiskStudents as $s) {
         $summary = self::generate_student_summary($s, $enrolledCount);
         $suggestion = self::generate_student_suggestion($s);
+
+        // Use AI narrative if available (plain English from LLM), else fallback to PHP-generated summary
+        $aiNarrative = $s['ai_narrative'] ?? '';
+        $aiRecommendation = $s['ai_recommendation'] ?? '';
 
         // Evidence comes from the risk model's own factor breakdown, so what a
         // lecturer reads is exactly what was scored — nothing more, nothing
@@ -1481,7 +1602,8 @@ class get_struggle_insights extends \external_api {
             'profileimageurl'    => $s['profileimageurl'],
             'risk_score'         => $s['risk_score'],
             'risk_level'         => $s['risk_level'],
-            'summary'            => $summary,
+            'ai_narrative'       => $aiNarrative,
+            'summary'            => $aiNarrative ?: $summary,
             'struggle_topics'    => $s['struggle_topics'],
             'last_active'        => $s['last_active'],
             'days_since_last_login' => $daysSince === null ? 0 : (int) $daysSince,
@@ -1490,8 +1612,8 @@ class get_struggle_insights extends \external_api {
             'ai_queries'         => $s['question_count'],
             'quiz_failures'      => $ev['quiz_failures'] ?? 0,
             'issue_reports'      => $ev['issue_reports'] ?? 0,
-            'suggestion'         => $suggestion['text'],
-            'suggestion_type'    => $suggestion['type'],
+            'suggestion'         => $aiRecommendation ?: $suggestion['text'],
+            'suggestion_type'    => $s['suggestion_type'] ?? $suggestion['type'],
             'reasons'            => $reasons,
             'evidence'           => $evidence,
             'explanation'        => $explanation,
@@ -1749,6 +1871,29 @@ class get_struggle_insights extends \external_api {
         $coursePulse['bbb_never_attended_count'] = 0;
     }
 
+    // Compute average quiz grade from actual Moodle quiz_grades
+    $avgQuizRow = $DB->get_record_sql(
+        "SELECT AVG(qg.grade) as avg_grade
+           FROM {quiz_grades} qg
+           JOIN {quiz} q ON q.id = qg.quiz
+          WHERE q.course = :cid",
+        ['cid' => $cid]
+    );
+    if ($avgQuizRow && $avgQuizRow->avg_grade !== null) {
+        $coursePulse['avg_quiz'] = max(0, min(100, round($avgQuizRow->avg_grade)));
+        $coursePulse['avg_quiz_source'] = 'actual_quiz_grades';
+    } else {
+        // Fallback: use inverted risk score from student_metrics
+        $riskRow = $DB->get_record_sql(
+            "SELECT AVG(risk_score) as avg_risk FROM {umat_ai_student_metrics} WHERE courseid = :cid",
+            ['cid' => $cid]
+        );
+        if ($riskRow && $riskRow->avg_risk !== null) {
+            $coursePulse['avg_quiz'] = max(0, min(100, round(100 - $riskRow->avg_risk)));
+            $coursePulse['avg_quiz_source'] = 'estimated_from_risk';
+        }
+    }
+
     // -- 12g. Priority actions --
     $priorityActions = [];
 
@@ -1865,7 +2010,7 @@ class get_struggle_insights extends \external_api {
     unset($_stu);
 
     $result = [
-        // NEW: Actionable insights
+        // NEW: Actionable insights + executive summary
         'priority_actions'    => $priorityActions,
         'struggle_areas'      => $struggleAreas,
         'section_struggle'    => $sectionStruggle,
@@ -1873,6 +2018,23 @@ class get_struggle_insights extends \external_api {
         'student_narratives'  => $studentNarratives,
         'common_questions'    => $commonQuestions,
         'course_pulse'        => $coursePulse,
+
+        // NEW: Executive summary (plain-English briefing, first thing lecturer reads)
+        'executive_summary'   => $executiveSummary ?: ($aiSummaryInsight ?? ''),
+        'health_grade'        => $healthGrade,
+        'health_label'        => $healthLabel,
+        'going_well'          => $goingWell,
+        'needs_attention'     => $needsAttention,
+        'top_recommendation'  => $topRecommendation,
+
+        // NEW: Metric explanations for tooltips (plain language)
+        'metric_explanations' => [
+            'avg_performance'  => 'Average quiz score across all assessments in this course. Based on actual quiz grades from Moodle.',
+            'at_risk'          => 'Students showing patterns of struggling or disengaging, based on question frequency, quiz results, and login activity.',
+            'active_week'      => 'Students who accessed course materials, asked questions, or submitted work this week.',
+            'questions_week'   => 'Total questions students asked the AI tutor this week.',
+            'at_risk_detail'   => 'Risk is determined by a combination of: quiz performance, question frequency, login frequency, and topic struggle indicators.',
+        ],
 
         // EXISTING: Legacy fields (kept for compatibility)
         'topic_matrix'       => $topicMatrix,
@@ -2270,6 +2432,25 @@ class get_struggle_insights extends \external_api {
 
     public static function get_struggle_insights_returns() {
         $structure = [
+            // NEW: Executive summary (plain-English briefing)
+            'executive_summary'  => new \external_value(PARAM_RAW, 'Plain-English 2-3 sentence briefing', VALUE_OPTIONAL),
+            'health_grade'       => new \external_value(PARAM_TEXT, 'A-F health grade', VALUE_OPTIONAL),
+            'health_label'       => new \external_value(PARAM_TEXT, 'Health grade label', VALUE_OPTIONAL),
+            'going_well'         => new \external_multiple_structure(
+                new \external_value(PARAM_TEXT), 'Positive things going well', VALUE_OPTIONAL
+            ),
+            'needs_attention'    => new \external_multiple_structure(
+                new \external_value(PARAM_TEXT), 'Things needing attention', VALUE_OPTIONAL
+            ),
+            'top_recommendation' => new \external_value(PARAM_RAW, 'Single most important action for this week', VALUE_OPTIONAL),
+            'metric_explanations' => new \external_single_structure([
+                'avg_performance'  => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                'at_risk'          => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                'active_week'      => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                'questions_week'   => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+                'at_risk_detail'   => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),
+            ], '', VALUE_OPTIONAL),
+
             // NEW: Actionable insights
             'priority_actions' => new \external_multiple_structure(
                 new \external_single_structure([
@@ -2356,6 +2537,7 @@ class get_struggle_insights extends \external_api {
                     'profileimageurl'    => new \external_value(PARAM_URL),
                     'risk_score'         => new \external_value(PARAM_INT),
                     'risk_level'         => new \external_value(PARAM_TEXT),
+                    'ai_narrative'       => new \external_value(PARAM_TEXT, 'AI-generated plain-English narrative', VALUE_OPTIONAL),
                     'summary'            => new \external_value(PARAM_TEXT),
                     'struggle_topics'    => new \external_multiple_structure(
                         new \external_value(PARAM_TEXT), '', VALUE_OPTIONAL
@@ -2449,6 +2631,7 @@ class get_struggle_insights extends \external_api {
             'course_pulse' => new \external_single_structure([
                 'avg_quiz'              => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                 'avg_quiz_available'    => new \external_value(PARAM_BOOL, '', VALUE_OPTIONAL),
+                'avg_quiz_source'       => new \external_value(PARAM_TEXT, 'actual_quiz_grades or estimated_from_risk', VALUE_OPTIONAL),
                 'quiz_attempts'         => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                 'questions_trend_comparable' => new \external_value(PARAM_BOOL, '', VALUE_OPTIONAL),
                 'questions_period_label'     => new \external_value(PARAM_TEXT, '', VALUE_OPTIONAL),

@@ -625,19 +625,24 @@ class course_data extends \external_api {
             }
 
             $recs[] = [
-                'id'            => (int)$sess->id,
-                'session_key'   => $sess->sessionid,
-                'courseid'      => (int)$sess->courseid,
-                'title'         => $title,
-                'description'   => $desc,
-                'url'           => $sess->recording_url,
-                'status'        => $sess->status ?? 'pending',
-                'has_transcript'=> !empty($segments),
-                'date'          => date('d M Y', $sess->timecreated),
-                'time_ago'      => self::time_ago($sess->timecreated),
-                'duration'      => '',
-                'page_count'    => 0,
-                'segments'      => $segments,
+                'id'                    => (int)$sess->id,
+                'session_key'           => $sess->sessionid,
+                'courseid'              => (int)$sess->courseid,
+                'title'                 => $title,
+                'description'           => $desc,
+                'url'                   => $sess->recording_url,
+                'status'                => $sess->status ?? 'pending',
+                'has_transcript'        => !empty($segments),
+                'date'                  => date('d M Y', $sess->timecreated),
+                'time_ago'              => self::time_ago($sess->timecreated),
+                'duration'              => '',
+                'page_count'            => 0,
+                'segments'              => $segments,
+                'transcription_provider' => $sess->transcription_provider ?? null,
+                'transcription_model'    => $sess->transcription_model ?? null,
+                'transcription_cost'     => (float)($sess->transcription_cost ?? 0),
+                'audio_duration_secs'    => (float)($sess->audio_duration_secs ?? 0),
+                'chunk_count'            => (int)($sess->chunk_count ?? 0),
             ];
         }
         return ['recordings' => $recs];
@@ -671,6 +676,12 @@ class course_data extends \external_api {
                         'text'      => new \external_value(PARAM_TEXT),
                     ])
                 ),
+                'transcription_provider' => new \external_value(PARAM_TEXT, 'Transcription provider (openai|openrouter|local)', VALUE_OPTIONAL),
+                'transcription_model'    => new \external_value(PARAM_TEXT, 'Transcription model name', VALUE_OPTIONAL),
+                'transcription_cost'     => new \external_value(PARAM_FLOAT, 'Cost in USD', VALUE_OPTIONAL, 0),
+                'audio_duration_secs'    => new \external_value(PARAM_FLOAT, 'Audio duration in seconds', VALUE_OPTIONAL, 0),
+                'chunk_count'            => new \external_value(PARAM_INT, 'Number of audio chunks transcribed', VALUE_OPTIONAL, 0),
+                'has_transcript'         => new \external_value(PARAM_BOOL, 'Whether transcript is available', VALUE_OPTIONAL, false),
             ])
         )]);
     }

@@ -132,15 +132,30 @@ class transcription extends external_api {
             }
         }
 
+        // Parse transcription metadata.
+        $transMeta = $result['transcription'] ?? [];
+        $segments = $result['segments'] ?? [];
+
+        // If local DB has segments_json but AI response doesn't, decode from local.
+        if (empty($segments) && !empty($session->transcript_json)) {
+            $decoded = json_decode($session->transcript_json, true);
+            if (is_array($decoded)) $segments = $decoded;
+        }
+
         return [
             'success'    => true,
             'job_id'     => $result['job_id'] ?? $job_id,
             'status'     => $result['status'] ?? 'unknown',
             'transcript' => $result['transcript'] ?? '',
+            'segments'   => json_encode($segments),
             'summary'    => $result['outputs']['summary'] ?? '',
             'notes'      => $result['outputs']['notes'] ?? '',
             'error'      => $result['error'] ?? '',
             'created_at' => $result['created_at'] ?? '',
+            'transcription_provider' => $transMeta['provider'] ?? ($session->transcription_provider ?? ''),
+            'transcription_model'    => $transMeta['model'] ?? ($session->transcription_model ?? ''),
+            'transcription_cost'     => (float)($transMeta['cost'] ?? $session->transcription_cost ?? 0),
+            'audio_duration_secs'    => (float)($transMeta['duration_secs'] ?? $session->audio_duration_secs ?? 0),
         ];
     }
 
@@ -153,10 +168,15 @@ class transcription extends external_api {
             'job_id'     => new external_value(PARAM_RAW),
             'status'     => new external_value(PARAM_RAW),
             'transcript' => new external_value(PARAM_RAW),
+            'segments'   => new external_value(PARAM_RAW, 'JSON-encoded array of transcript segments', VALUE_OPTIONAL, ''),
             'summary'    => new external_value(PARAM_RAW),
             'notes'      => new external_value(PARAM_RAW),
             'error'      => new external_value(PARAM_RAW),
             'created_at' => new external_value(PARAM_RAW),
+            'transcription_provider' => new external_value(PARAM_TEXT, 'openai|openrouter|local', VALUE_OPTIONAL, ''),
+            'transcription_model'    => new external_value(PARAM_TEXT, 'Model used (e.g. gpt-4o-mini-transcribe)', VALUE_OPTIONAL, ''),
+            'transcription_cost'     => new external_value(PARAM_FLOAT, 'Transcription cost in USD', VALUE_OPTIONAL, 0),
+            'audio_duration_secs'    => new external_value(PARAM_FLOAT, 'Audio duration in seconds', VALUE_OPTIONAL, 0),
         ]);
     }
 

@@ -2,10 +2,54 @@
     Template: local/umat_ai/templates/analytics_dashboard.mustache
     Lecturer Insights Dashboard — 5-zone actionable insights layout.
 
+    AI-powered insights across all zones.
+
     Context (provided by JS):
       courseid, coursefullname
+    New API fields:
+      executive_summary, health_grade, health_label, going_well,
+      needs_attention, top_recommendation, metric_explanations
 }}
-<div class="umat-insights-pane">
+<div class="umat-insights-pane" data-courseid="{{{courseid}}}">
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 0: Executive Summary Briefing                                 -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone ins-exec-summary-zone" id="ins-exec-summary-zone">
+    <!-- Health grade badge (left) + 2-3 sentence briefing (right) -->
+    <div class="ins-exs-row">
+      <div class="ins-exs-grade" id="ins-exs-grade">
+        <span class="ins-exs-grade-letter" id="ins-exs-grade-letter">—</span>
+        <span class="ins-exs-grade-label" id="ins-exs-grade-label">Course Health</span>
+      </div>
+      <div class="ins-exs-briefing" id="ins-exs-briefing">
+        <div class="ins-exs-summary" id="ins-exs-summary">Loading executive summary…</div>
+        <div class="ins-exs-top-rec" id="ins-exs-top-rec"></div>
+      </div>
+    </div>
+    <!-- Going Well / Needs Attention (side-by-side chips) -->
+    <div class="ins-exs-lists">
+      <div class="ins-exs-list ins-exs-going-well" id="ins-exs-going-well">
+        <span class="ins-exs-list-icon"><span class="material-symbols-outlined">check_circle</span></span>
+        <div class="ins-exs-list-items" id="ins-exs-going-well-items"></div>
+      </div>
+      <div class="ins-exs-list ins-exs-needs-attention" id="ins-exs-needs-attention">
+        <span class="ins-exs-list-icon"><span class="material-symbols-outlined">warning</span></span>
+        <div class="ins-exs-list-items" id="ins-exs-needs-attention-items"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 5 (now first): Course Pulse — How your course is performing     -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone" id="ins-vitals-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">monitor_heart</span>
+      Course Pulse
+    </h3>
+    <div id="ins-course-pulse" class="ins-pulse-grid"></div>
+  </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════ -->
   <!-- AI TEACHING RECOMMENDATIONS — Top priority actions for the lecturer  -->
@@ -28,7 +72,27 @@
       <span class="ins-badge" id="ins-at-risk-count">0</span>
       <span class="ins-expand-all" onclick="window.analyticsDashboard.expandAllCards()">Expand All</span>
     </h3>
-    <div id="ins-students-at-risk" class="ins-student-cards"></div>
+    <!-- Smart Filters -->
+    <div class="ins-filter-row" id="ins-filters">
+      <button class="ins-chip ins-chip-active" data-filter="all" onclick="window.analyticsDashboard.setFilter('all', this)">All</button>
+      <button class="ins-chip" data-filter="disengaged" onclick="window.analyticsDashboard.setFilter('disengaged', this)">
+        <span class="material-symbols-outlined">person_off</span> Disengaged
+      </button>
+      <button class="ins-chip" data-filter="struggling" onclick="window.analyticsDashboard.setFilter('struggling', this)">
+        <span class="material-symbols-outlined">psychology</span> Struggling
+      </button>
+      <button class="ins-chip" data-filter="failing" onclick="window.analyticsDashboard.setFilter('failing', this)">
+        <span class="material-symbols-outlined">trending_down</span> Failing
+      </button>
+      <button class="ins-chip" data-filter="issues" onclick="window.analyticsDashboard.setFilter('issues', this)">
+        <span class="material-symbols-outlined">report</span> Issues
+      </button>
+    </div>
+
+    <!-- Student Narrative Cards -->
+    <div id="ins-student-list" class="ins-student-cards">
+      <div class="ins-empty">No student data loaded yet.</div>
+    </div>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════ -->

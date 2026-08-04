@@ -12,7 +12,12 @@ require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/filelib.php');
 
 $action = required_param('action', PARAM_ALPHA);
-$url    = required_param('url', PARAM_URL);
+$url    = required_param('url', PARAM_RAW_TRIMMED);
+// Ensure the URL starts with http:// or https://
+if (!preg_match('#^https?://#', $url)) {
+    http_response_code(400);
+    die(json_encode(['error' => 'Invalid URL']));
+}
 $slide  = optional_param('slide', 1, PARAM_INT);
 
 // ─────────────────────────────────────────────────
@@ -100,13 +105,22 @@ if ($action === 'slides') {
 }
 
 // ─────────────────────────────────────────────────
-// 5. ACTION: slide — return PNG image
+// 5. ACTION: slide — return PNG image (auto-renders if not cached)
 // ─────────────────────────────────────────────────
 if ($action === 'slide') {
     $slidepath = $cachedir . '/slide_' . $slide . '.png';
+    // Auto-render if the slide doesn't exist yet
     if (!file_exists($slidepath)) {
-        http_response_code(404);
-        die('Slide not found');
+        $slides = render_pptx($actualpath, $cachedir);
+        if ($slides === false) {
+            http_response_code(500);
+            die('Failed to render presentation');
+        }
+        // Re-check after render
+        if (!file_exists($slidepath)) {
+            http_response_code(404);
+            die('Slide not found after render');
+        }
     }
     header('Content-Type: image/png');
     header('Content-Length: ' . filesize($slidepath));

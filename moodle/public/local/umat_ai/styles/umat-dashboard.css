@@ -8143,3 +8143,172 @@
     max-width: 100px;
   }
 }
+/* ══════════════════════════════════════════════════════════════
+   EXECUTIVE SUMMARY ZONE (Zone 0)
+   What → So What → Now What framework
+   ══════════════════════════════════════════════════════════════ */
+.ins-exec-summary-zone {
+  background: linear-gradient(135deg, rgba(255,255,255,.7), rgba(240,250,240,.5));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,.5);
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 20px rgba(0,53,128,.05);
+  animation: sd-rise .35s ease forwards;
+}
+
+.ins-exs-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* Health grade badge (A-F with color) */
+.ins-exs-grade {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 70px;
+}
+
+.ins-exs-grade-letter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(0,0,0,.1);
+}
+
+.ins-exs-grade-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--u-onsv);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  text-align: center;
+}
+
+/* Briefing text area */
+.ins-exs-briefing {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ins-exs-summary {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--u-ons);
+  font-weight: 500;
+}
+
+.ins-exs-top-rec {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--u-p);
+  background: rgba(0,107,47,.06);
+  padding: 8px 12px;
+  border-radius: 10px;
+  border-left: 3px solid var(--u-p);
+}
+
+/* Going Well / Needs Attention side-by-side */
+.ins-exs-lists {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.ins-exs-list {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.ins-exs-list-icon .material-symbols-outlined {
+  font-size: 18px;
+  margin-top: 2px;
+}
+
+.ins-exs-going-well .ins-exs-list-icon .material-symbols-outlined {
+  color: var(--u-p);
+}
+
+.ins-exs-needs-attention .ins-exs-list-icon .material-symbols-outlined {
+  color: var(--u-warn);
+}
+
+.ins-exs-list-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ins-exs-chip {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+  white-space: normal;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.ins-exs-chip-good {
+  background: rgba(0,107,47,.08);
+  color: var(--u-p);
+}
+
+.ins-exs-chip-warn {
+  background: rgba(245,158,11,.1);
+  color: #b45309;
+}
+
+/* All-courses grid (for multi-course mode) */
+.ins-all-courses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+
+
+/* Course pulse source tag */
+.ins-pulse-source {
+  font-size: 9px;
+  color: var(--u-ol);
+  margin-top: 2px;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .ins-exs-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ins-exs-grade {
+    flex-direction: row;
+    gap: 10px;
+    min-width: unset;
+  }
+  .ins-exs-lists {
+    grid-template-columns: 1fr;
+  }
+  .ins-all-courses-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

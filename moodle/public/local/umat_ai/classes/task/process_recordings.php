@@ -31,9 +31,43 @@ class process_recordings extends \core\task\scheduled_task {
                 $tjson = (!empty($result['transcript'])) ? $result['transcript'] : null;
                 $DB->set_field('umat_ai_sessions', 'status',         'completed', ['id'=>$sess->id]);
                 $DB->set_field('umat_ai_sessions', 'timemodified',   time(),      ['id'=>$sess->id]);
+
+                // Store transcript segments.
                 if ($tjson) {
                     $segments = local_umat_ai_parse_segments($tjson);
                     $DB->set_field('umat_ai_sessions', 'transcript_json', json_encode($segments), ['id'=>$sess->id]);
+                }
+
+                // Store transcription metadata from AI service.
+                $transMeta = $result['transcription'] ?? [];
+                if (!empty($transMeta)) {
+                    if (isset($transMeta['provider'])) {
+                        $DB->set_field('umat_ai_sessions', 'transcription_provider', $transMeta['provider'], ['id'=>$sess->id]);
+                    }
+                    if (isset($transMeta['model'])) {
+                        $DB->set_field('umat_ai_sessions', 'transcription_model', $transMeta['model'], ['id'=>$sess->id]);
+                    }
+                    if (isset($transMeta['cost'])) {
+                        $DB->set_field('umat_ai_sessions', 'transcription_cost', (float)$transMeta['cost'], ['id'=>$sess->id]);
+                    }
+                    if (isset($transMeta['duration_secs'])) {
+                        $DB->set_field('umat_ai_sessions', 'audio_duration_secs', (float)$transMeta['duration_secs'], ['id'=>$sess->id]);
+                    }
+                    if (isset($transMeta['chunk_count'])) {
+                        $DB->set_field('umat_ai_sessions', 'chunk_count', (int)$transMeta['chunk_count'], ['id'=>$sess->id]);
+                    }
+                }
+
+                // Store segments from AI service directly if available (more precise than parse).
+                if (!empty($result['segments'])) {
+                    $DB->set_field('umat_ai_sessions', 'transcript_json', json_encode($result['segments']), ['id'=>$sess->id]);
+                }
+
+                // Store AI-generated title if provided.
+                if (!empty($result['title'])) {
+                    $DB->set_field('umat_ai_sessions', 'recording_url', $result['title'], ['id'=>$sess->id]);
+                    // Note: title is stored in a separate field in the future; for now we don't
+                    // have a dedicated title column, so it's kept in the AI service.
                 }
                 $newtypes = [];
                 foreach (['summary','notes','quiz'] as $type) {

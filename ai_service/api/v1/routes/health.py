@@ -19,8 +19,10 @@ async def health_check():
     else:
         active_model = settings.llm_model
     return HealthResponse(
-        status        = "healthy",
-        version       = "1.0.0",
-        whisper_model = settings.whisper_model,
-        llm_model     = f"{settings.llm_provider}:{active_model}",
+        status                 = "healthy",
+        version                = "1.0.0",
+        whisper_model          = settings.whisper_model,
+        llm_model              = f"{settings.llm_provider}:{active_model}",
+        transcription_provider = settings.transcription_provider,
+        transcription_model    = settings.transcription_model,
     )

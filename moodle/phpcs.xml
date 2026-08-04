@@ -12,8 +12,8 @@
   <exclude-pattern>public/filter/algebra/AlgParser.pm</exclude-pattern>
   <exclude-pattern>public/filter/codehighlighter/amd/src/prism.js</exclude-pattern>
   <exclude-pattern>public/filter/tex/mimetex.*</exclude-pattern>
-  <exclude-pattern>public/h5p/h5plib/v128/joubel/core/</exclude-pattern>
-  <exclude-pattern>public/h5p/h5plib/v128/joubel/editor/</exclude-pattern>
+  <exclude-pattern>public/h5p/h5plib/v127/joubel/core/</exclude-pattern>
+  <exclude-pattern>public/h5p/h5plib/v127/joubel/editor/</exclude-pattern>
   <exclude-pattern>public/lib/editor/tiny/plugins/html/amd/src/codemirror-lazy.js</exclude-pattern>
   <exclude-pattern>public/lib/editor/tiny/plugins/html/amd/src/beautify/</exclude-pattern>
   <exclude-pattern>public/lib/editor/tiny/plugins/recordrtc/amd/src/lame.all.js</exclude-pattern>
