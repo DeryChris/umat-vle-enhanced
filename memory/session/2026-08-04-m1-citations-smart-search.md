@@ -47,7 +47,11 @@ production AMD bundles.
 - Tests: `cd ai_service && venv\Scripts\python.exe -m pytest tests/ -v`.
 
 ## Next Steps (hand-off)
-- **Full pytest suite is GREEN (30/30)** with the real `.env` — no remaining code blocker.
-- No commit was made this session (user to confirm). Before commit per AGENTS.md:
-  `git pull origin main` → test → commit → push.
-- M1 scope for M2+: spaced repetition, mastery, oral practice, audio overview (see plan).
+- **M1 FULLY SHIPPED 2026-08-04 (session 3):** full pytest suite GREEN (30/30, 33.06s, real `.env`,
+  no overrides); `git pull origin main` was up-to-date; added root-level `.gitignore` entries for stray
+  runtime artefacts (`ai_service.log`, `chroma_db/` from running the service at repo root); staged 39
+  files (no secrets/strays); committed `85e1fa8c` "Add source-cited Q&A citations and smart search
+  (M1 of next-gen features)" (35 files, +1231/−39) and pushed to `main`.
+- M2+ candidates from plan: spaced repetition, mastery, oral practice, audio overview.
+- Note: the "[503] The request queue is full." seen in this chat is OpenCode's own free-tier LLM
+  gateway error (transient) — NOT a project issue; no code change needed.
