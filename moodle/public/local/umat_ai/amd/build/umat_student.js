@@ -38,6 +38,17 @@ function _stuWireAlertChips(container,onSelect){
   });
 }
 
+/* ---- Material registry for citation deep-links ---- */
+function _umatRegisterMaterials(mats){
+  if(!mats||!mats.length)return;
+  if(!window._umatMaterialLookup)window._umatMaterialLookup={};
+  (mats||[]).forEach(function(m){
+    if(m.id)window._umatMaterialLookup[String(m.id)]={
+      url:m.url||'', filename:m.filename||m.name||'', mime:m.mimetype||'', courseid:courseId
+    };
+  });
+}
+
 /* Time formatting helper for chat timestamps */
 function _umatFmtTime(ts){
   if(!ts)return '';
@@ -1166,7 +1177,13 @@ function loadLibrary(){
   grid.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading materials' + '?' + '</p></div>';
   require(['core/ajax'],function(Ajax){
     Ajax.call([{methodname:'local_umat_ai_get_course_materials',args:{courseid:courseId}}])[0]
-      .done(function(r){_matData=r.materials||[];renderLibrary(_matData, courseId);if(typeof updateMaterialAnalysis==='function')updateMaterialAnalysis(courseId);if(typeof updateVideoGenerationStatus==='function')updateVideoGenerationStatus(courseId);})
+      .done(function(r){
+        _matData=r.materials||[];
+        _umatRegisterMaterials(_matData);
+        renderLibrary(_matData, courseId);
+        if(typeof updateMaterialAnalysis==='function')updateMaterialAnalysis(courseId);
+        if(typeof updateVideoGenerationStatus==='function')updateVideoGenerationStatus(courseId);
+      })
       .fail(function(err){console.error('[umat] loadLibrary failed:',err&&err.message||err||'unknown');grid.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Failed to load materials.</p></div>';});
   });
   /* Also load lecture recordings into the library tab */
@@ -1199,6 +1216,107 @@ function openPdfViewer(url,name){
     url:url, name:name||'Document', downloadUrl:url
   });
 }
+
+/* ---- SMART SEARCH (F2): cited results modal ---- */
+var _ssModal=null;
+function _ssEnsureModal(){
+  if(_ssModal&&_ssModal.parentNode)return _ssModal;
+  _ssModal=document.createElement('div');
+  _ssModal.id='umat-smart-search-modal';
+  _ssModal.className='umat-cs-overlay umat-smart-search-ov';
+  _ssModal.innerHTML=
+    '<div class="umat-cs-modal umat-smart-search-modal">'+
+      '<div class="umat-cs-modal-hdr">'+
+        '<h3><span class="material-symbols-outlined">travel_explore</span>Smart Search</h3>'+
+        '<button class="umat-cs-close" id="ws-ss-close" type="button"><span class="material-symbols-outlined">close</span></button>'+
+      '</div>'+
+      '<div class="umat-smart-search-body">'+
+        '<div class="umat-smart-search-input-wrap">'+
+          '<span class="material-symbols-outlined">search</span>'+
+          '<input type="text" id="ws-ss-input" placeholder="Search across all course materials…" autocomplete="off">'+
+        '</div>'+
+        '<div class="umat-smart-search-status" id="ws-ss-status" style="display:none;"></div>'+
+        '<div class="umat-smart-search-results" id="ws-ss-results"></div>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(_ssModal);
+  var closeBtn=_ssModal.querySelector('#ws-ss-close');
+  closeBtn.addEventListener('click',function(){_ssModal.classList.remove('open');});
+  _ssModal.addEventListener('click',function(e){if(e.target===_ssModal)_ssModal.classList.remove('open');});
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'&&_ssModal.classList.contains('open'))_ssModal.classList.remove('open');
+  });
+  var input=_ssModal.querySelector('#ws-ss-input');
+  var debounce=null;
+  input.addEventListener('input',function(){
+    clearTimeout(debounce);
+    debounce=setTimeout(function(){_ssRunSearch(input.value);},350);
+  });
+  input.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){clearTimeout(debounce);_ssRunSearch(input.value);}
+  });
+  return _ssModal;
+}
+function _ssOpen(){
+  var m=_ssEnsureModal();
+  m.classList.add('open');
+  var input=m.querySelector('#ws-ss-input');
+  input.value='';
+  input.focus();
+  m.querySelector('#ws-ss-results').innerHTML='<div class="umat-smart-search-hint"><span class="material-symbols-outlined">travel_explore</span><p>Search across your course materials. Results include the exact source, location and a snippet.</p></div>';
+  m.querySelector('#ws-ss-status').style.display='none';
+}
+function _ssRunSearch(q){
+  var statusEl=document.getElementById('ws-ss-status');
+  var resultsEl=document.getElementById('ws-ss-results');
+  if(!statusEl||!resultsEl)return;
+  q=(q||'').trim();
+  if(q.length<2){
+    statusEl.style.display='none';
+    resultsEl.innerHTML='<div class="umat-smart-search-hint"><span class="material-symbols-outlined">travel_explore</span><p>Type at least 2 characters to search.</p></div>';
+    return;
+  }
+  if(!courseId){
+    statusEl.style.display='block';
+    statusEl.innerHTML='<span class="material-symbols-outlined">warning</span>Select a course first to search its materials.';
+    resultsEl.innerHTML='';
+    return;
+  }
+  statusEl.style.display='block';
+  statusEl.innerHTML='<span class="umat-vw-spinner" style="width:14px;height:14px;border-width:2px;vertical-align:-2px;margin-right:6px;"></span>Searching course materials…';
+  resultsEl.innerHTML='';
+  ajax('local_umat_ai_smart_search',{courseid:courseId,query:q},function(r){
+    statusEl.style.display='none';
+    var results=(r&&r.results)||[];
+    if(!results.length){
+      resultsEl.innerHTML='<div class="umat-smart-search-hint"><span class="material-symbols-outlined">search_off</span><p>No matches found. Try different keywords.</p></div>';
+      return;
+    }
+    resultsEl.innerHTML=results.map(function(res){
+      var c=res.citation||{};
+      var loc=c.location?('<span class="umat-citation-loc">'+_umatEsc(c.location)+'</span>'):'';
+      var snippet=c.snippet?('<p class="umat-citation-snippet">'+_umatEsc(c.snippet)+'</p>'):'';
+      return '<div class="umat-smart-search-result" data-mid="'+(parseInt(c.material_id,10)||0)+'" data-title="'+_umatEsc(c.title||'')+'" data-loc="'+_umatEsc(c.location||'')+'">'+
+        '<div class="umat-citation-title"><span class="umat-citation-num">'+(parseInt(c.index,10)||0)+'</span>'+_umatEsc(c.title||'Source')+loc+'</div>'+
+        snippet+
+        '<div class="umat-smart-search-actions">'+
+          '<button class="umat-citation-open" type="button" data-mid="'+(parseInt(c.material_id,10)||0)+'" data-title="'+_umatEsc(c.title||'')+'" data-loc="'+_umatEsc(c.location||'')+'"><span class="material-symbols-outlined">open_in_new</span>Open</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+    resultsEl.querySelectorAll('.umat-smart-search-result .umat-citation-open').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        _umatOpenCitation(parseInt(btn.dataset.mid,10)||0,btn.dataset.title||'',btn.dataset.loc||'',courseId);
+      });
+    });
+  },function(){
+    statusEl.style.display='none';
+    resultsEl.innerHTML='<div class="umat-smart-search-hint"><span class="material-symbols-outlined">error</span><p>Search failed. Check your connection and try again.</p></div>';
+  });
+}
+/* Wire the Smart Search button (Library header) */
+var _wsSmartSearchBtn=document.getElementById('ws-smart-search-btn');
+if(_wsSmartSearchBtn)_wsSmartSearchBtn.addEventListener('click',function(){_ssOpen();});
 
 /* ---- SESSIONS ---- */
 function loadSessions(){
@@ -1767,7 +1885,7 @@ function doResumeSession(sk,cid){
           if(msg.answer){
             var stripped=_umatStripQuizFromText(msg.answer);
             if(stripped.quiz)foundQuiz=stripped.quiz;
-            _umatAppendAi('ws-msgs',stripped.text,msg.sources||[]);
+            _umatAppendAi('ws-msgs',stripped.text,msg.sources||[],msg.citations||[]);
           }
         });
         if(!msgsArr.length){

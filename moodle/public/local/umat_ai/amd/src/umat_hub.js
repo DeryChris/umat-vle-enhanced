@@ -224,7 +224,7 @@ function resumeSession(sk,cid,cname){
       var msgs=document.getElementById('hub-msgs');if(!msgs)return;
       msgs.innerHTML='';
       addWelcome(cname||'your course');
-      (r.messages||[]).forEach(function(m){appendMsg(m.question,true,msgs);if(m.answer)appendMsg(m.answer,false,msgs,m.sources||[]);});
+      (r.messages||[]).forEach(function(m){appendMsg(m.question,true,msgs);if(m.answer)appendMsg(m.answer,false,msgs,m.sources||[],null,m.citations||[]);});
     },function(){}
   );
 }
@@ -438,6 +438,7 @@ function loadLibrary(cid){
   g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading materials…</p></div>';
   ajax('local_umat_ai_get_course_materials',{courseid:courseId},function(r){
     var mats=r.materials||[];
+    if(typeof _umatRegisterMaterials==='function')_umatRegisterMaterials(mats,courseId);
     if(!mats.length){g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">folder_open</span><p>No materials found for this course.</p></div>';return;}
     g.className='yt-grid';
     g.innerHTML=mats.map(function(m){
@@ -508,7 +509,7 @@ function qRemaining(){var now=Date.now();qTimes=qTimes.filter(function(t){return
 function syncRemaining(rem){if(typeof rem!=='number'||rem<0)return;var now=Date.now();while(qRemaining()>rem)qTimes.push(now);}
 function updateRate(){var left=qRemaining();var e=document.getElementById('hub-rate');if(e){e.textContent=left+' Q/min';e.style.color=left<=2?'var(--u-ter)':'';}}
 var _hubRateTimer=setInterval(updateRate,5000);
-function appendMsg(text,isUser,container,sources,mats){
+function appendMsg(text,isUser,container,sources,mats,citations){
   var d=document.createElement('div');
   var mid='msg_'+(++_msgIdCounter);
   d.setAttribute('data-msg-id',mid);
@@ -521,11 +522,21 @@ function appendMsg(text,isUser,container,sources,mats){
     var chipHtml='';
     if(refNames.length){chipHtml='<div class="umat-ref-chips">'+refNames.map(function(n){return '<span class="umat-ref-chip"><span class="material-symbols-outlined">attach_file</span>'+esc(n)+'</span>';}).join('')+'</div>';}
     d.innerHTML='<div class="umat-msg-user"><div class="umat-bubble-user"><p>'+esc(cleanQ)+'</p></div>'+chipHtml+'<button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div>';
-  } else {var srcs='';if(sources&&sources.length)srcs='<div class="umat-src-chips">'+sources.map(function(s){return '<span class="umat-src-chip">'+esc(s)+'</span>';}).join('')+'</div>';
-    d.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">'+_umatFormatAI(text)+'</div>'+srcs+'</div><button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div></div>';}
+  } else {
+    var srcs='';
+    if(sources&&sources.length&&(!citations||!citations.length))srcs='<div class="umat-src-chips">'+sources.map(function(s){return '<span class="umat-src-chip">'+esc(s)+'</span>';}).join('')+'</div>';
+    var citeZone='';
+    if(citations&&citations.length)citeZone='<div class="umat-msg-citations-cards" data-cites=\''+esc(JSON.stringify(citations))+'\'></div>';
+    d.innerHTML='<div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div><div class="umat-bubble-ai"><div class="umat-ai-content">'+_umatFormatAI(text)+'</div>'+srcs+citeZone+'</div><button class="umat-reply-btn" type="button" title="Reply"><span class="material-symbols-outlined">reply</span></button></div></div>';
+  }
   var rb=d.querySelector('.umat-reply-btn');
   if(rb)rb.addEventListener('click',_umatHandleReply);
   container.appendChild(d);container.scrollTop=container.scrollHeight;
+  /* Render citation cards after the message is in the DOM. */
+  if(!isUser&&citations&&citations.length&&typeof _umatRenderCitations==='function'){
+    var zone=d.querySelector('.umat-msg-citations-cards');
+    if(zone)_umatRenderCitations(zone,citations);
+  }
 }
 function sendQ(q){
   q=(q||'').trim();if(!q)return;

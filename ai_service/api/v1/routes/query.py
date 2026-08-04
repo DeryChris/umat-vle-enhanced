@@ -72,6 +72,7 @@ async def query_course_ai_stream(
         yield _sse("meta", {
             "task": prepared.task,
             "sources": prepared.sources,
+            "citations": [c.model_dump() for c in (prepared.citations or [])],
             "remaining": max(0, remaining - 1),
         })
 
@@ -83,6 +84,7 @@ async def query_course_ai_stream(
             yield _sse("done", {
                 "answer": answer,
                 "sources": prepared.sources,
+                "citations": [c.model_dump() for c in (prepared.citations or [])],
                 "confidence": prepared.confidence,
             })
             return
@@ -123,6 +125,7 @@ async def query_course_ai_stream(
         yield _sse("done", {
             "answer": answer,
             "sources": prepared.sources,
+            "citations": [c.model_dump() for c in (prepared.citations or [])],
             "confidence": prepared.confidence,
         })
 
@@ -166,6 +169,7 @@ async def query_course_ai(
         return QueryResponse(
             answer=prepared.instant_answer,
             sources=prepared.sources,
+            citations=prepared.citations or [],
             confidence=prepared.confidence,
         )
 
@@ -201,6 +205,7 @@ async def query_course_ai(
     return QueryResponse(
         answer=answer,
         sources=prepared.sources,
+        citations=prepared.citations or [],
         confidence=prepared.confidence,
         quiz_data=quiz_data,
     )

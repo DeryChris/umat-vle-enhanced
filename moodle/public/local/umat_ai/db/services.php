@@ -17,6 +17,11 @@ $functions = [
         'description' => 'Get recording URL + transcript', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
+    'local_umat_ai_smart_search' => [
+        'classname'   => '\local_umat_ai\external\smart_search', 'methodname' => 'smart_search',
+        'description' => 'Smart Search over course materials (cited results)', 'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => '',
+    ],
     'local_umat_ai_get_session_outputs' => [
         'classname'   => '\local_umat_ai\external\get_summary', 'methodname' => 'get_session_outputs',
         'description' => 'Get approved AI outputs', 'type' => 'read', 'ajax' => true,
