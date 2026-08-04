@@ -4,7 +4,7 @@
 
 import sys
 
-from pydantic import ValidationError
+from pydantic import ConfigDict, ValidationError
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -59,6 +59,32 @@ class Settings(BaseSettings):
     # Whisper
     whisper_model: str = "base"
 
+    # OpenAI Whisper API (cloud) — set this for fast cloud transcription (~1-3s).
+    # If empty, falls back to local Whisper on CPU (~10-30s).
+    # Can use your existing OpenAI API key, or get one at https://platform.openai.com/api-keys
+    openai_whisper_api_key: str = ""
+    openai_whisper_base_url: str = ""  # Leave empty for default OpenAI endpoint
+
+    # Cloud transcription model — use cheaper model by default to stay within budget.
+    #   gpt-4o-mini-transcribe  = $0.0006/min (~278 hrs per $10)  ← DEFAULT (budget-friendly)
+    #   gpt-4o-transcribe       = $0.006/min  (~28 hrs per $10)
+    #   gpt-4o-transcribe-diarize = $0.012/min (~14 hrs per $10, includes speaker labels)
+    #   whisper-1               = $0.006/min  (~28 hrs per $10)
+    openai_whisper_model: str = "gpt-4o-mini-transcribe"
+
+    # Speaker diarization — when true, uses gpt-4o-transcribe-diarize model
+    # which labels segments by speaker (e.g. "Speaker A", "Speaker B").
+    # WARNING: diarize model is 20x more expensive than mini!
+    # Only applies when OPENAI_WHISPER_API_KEY is set.
+    openai_whisper_diarize: bool = False
+
+    # Monthly budget cap for cloud transcription (in USD). Set to 0 for unlimited.
+    # When the running total exceeds this, cloud API falls back to local Whisper.
+    openai_whisper_budget_usd: float = 10.0
+
+    # Path to a local file that tracks accumulated cloud transcription cost.
+    openai_whisper_cost_tracker_path: str = "./.whisper_cost.json"
+
     # Chunking
     max_chunk_size: int = 1000
     chunk_overlap: int = 200
@@ -87,9 +113,10 @@ class Settings(BaseSettings):
             f"{self.ai_db_port}/{self.ai_db_name}"
         )
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
 
 # Required vars have no default in Settings above; everything else is optional.

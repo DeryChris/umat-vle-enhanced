@@ -33,7 +33,7 @@ window.renderVideoTiles=S.renderVideoTiles;window.renderCourses=S.renderCourses;
 window.renderLibrary=S.renderLibrary;window.renderLibTiles=S.renderLibTiles;window.esc=S.esc;
 (function(){
 'use strict';
-var UD; try { UD = JSON.parse(data.userData); } catch(e) { UD = {}; }
+var UD = typeof data.userData === 'string' ? JSON.parse(data.userData) : data.userData || {};
 var UID = data.userId;
 var streamUrl = data.streamUrl;
 var moodleSesskey = data.moodleSesskey;
@@ -472,14 +472,10 @@ var hubDrawerCtrl = _umatInitAttachDrawer({
 
 /* Voice */
 (function(){
-  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  var micBtn=document.getElementById('hub-mic-btn');if(!SR||!micBtn||!hubIn){if(micBtn)micBtn.style.opacity='.4';return;}
-  var rec=new SR();rec.continuous=false;rec.interimResults=true;rec.lang='en-US';
-  var active=false;
-  micBtn.addEventListener('click',function(){if(active){rec.stop();}else{rec.start();active=true;micBtn.classList.add('recording');}});
-  rec.onresult=function(e){hubIn.value=Array.from(e.results).map(function(r){return r[0].transcript;}).join('');if(hubChatControl)hubChatControl.sync();};
-  rec.onend=function(){active=false;micBtn.classList.remove('recording');};
-  rec.onerror=function(){active=false;micBtn.classList.remove('recording');};
+  var micBtn=document.getElementById('hub-mic-btn');
+  var hubIn=document.getElementById('hub-input');
+  if(!micBtn||!hubIn)return;
+  new ChatVoiceInput({input:hubIn, btn:micBtn, sesskey:moodleSesskey});
 })();
 
 /* New session */

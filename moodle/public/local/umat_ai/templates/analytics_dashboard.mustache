@@ -8,80 +8,86 @@
 <div class="umat-insights-pane">
 
   <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <!-- ZONE 1: Priority Briefing — What needs your attention right now     -->
+  <!-- AI TEACHING RECOMMENDATIONS — Top priority actions for the lecturer  -->
   <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <section class="ins-zone" id="ins-priority-zone">
+  <section class="ins-zone" id="ins-recommendations-zone">
     <h3 class="ins-zone-title">
-      <span class="material-symbols-outlined">notification_important</span>
-      What Needs Your Attention
+      <span class="material-symbols-outlined">auto_awesome</span>
+      AI Teaching Recommendations
     </h3>
-    <div id="ins-priority-actions" class="ins-priority-list"></div>
+    <div id="ins-priority-recommendations" class="ins-priority-list"></div>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <!-- ZONE 2: Struggle Map — Where students are confused                  -->
-  <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <section class="ins-zone" id="ins-struggle-zone">
-    <h3 class="ins-zone-title">
-      <span class="material-symbols-outlined">map</span>
-      Where Students Are Struggling
-    </h3>
-
-    <!-- Topic Struggle Cards (narrative cards) -->
-    <div id="ins-struggle-areas" class="ins-struggle-list"></div>
-
-    <!-- Section Struggle Bars -->
-    <div id="ins-section-breakdown" class="ins-section-bars"></div>
-
-    <!-- Material Struggle List -->
-    <div id="ins-material-struggle" class="ins-material-list"></div>
-  </section>
-
-  <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <!-- ZONE 3: Student Dossiers — Who needs help and why                   -->
+  <!-- ZONE 1: Students At Risk — with drill-down evidence and actions      -->
   <!-- ═══════════════════════════════════════════════════════════════════ -->
   <section class="ins-zone" id="ins-students-zone">
     <h3 class="ins-zone-title">
       <span class="material-symbols-outlined">groups</span>
-      Your Students
+      Students At Risk
+      <span class="ins-badge" id="ins-at-risk-count">0</span>
+      <span class="ins-expand-all" onclick="window.analyticsDashboard.expandAllCards()">Expand All</span>
     </h3>
-
-    <!-- NLQ Search (secondary) -->
-    <div class="ins-nlq-bar">
-      <input type="text" id="ins-nlq-input" class="ins-nlq-input"
-        placeholder="Ask about student performance…" />
-      <button class="ins-nlq-btn" onclick="window.analyticsDashboard.submitNLQ()">
-        <span class="material-symbols-outlined">search</span>
-      </button>
-      <div class="ins-nlq-spinner" id="ins-nlq-spinner" style="display:none;"></div>
-    </div>
-    <div id="ins-nlq-response" class="ins-nlq-response umat-ai-stream-panel" style="display:none;"></div>
-
-    <!-- Smart Filters -->
-    <div class="ins-filter-row" id="ins-filters">
-      <button class="ins-chip ins-chip-active" data-filter="all" onclick="window.analyticsDashboard.setFilter('all', this)">All</button>
-      <button class="ins-chip" data-filter="disengaged" onclick="window.analyticsDashboard.setFilter('disengaged', this)">
-        <span class="material-symbols-outlined">person_off</span> Disengaged
-      </button>
-      <button class="ins-chip" data-filter="struggling" onclick="window.analyticsDashboard.setFilter('struggling', this)">
-        <span class="material-symbols-outlined">psychology</span> Struggling
-      </button>
-      <button class="ins-chip" data-filter="failing" onclick="window.analyticsDashboard.setFilter('failing', this)">
-        <span class="material-symbols-outlined">trending_down</span> Failing
-      </button>
-      <button class="ins-chip" data-filter="issues" onclick="window.analyticsDashboard.setFilter('issues', this)">
-        <span class="material-symbols-outlined">report</span> Issues
-      </button>
-    </div>
-
-    <!-- Student Narrative Cards -->
-    <div id="ins-student-list" class="ins-student-cards">
-      <div class="ins-empty">No student data loaded yet.</div>
-    </div>
+    <div id="ins-students-at-risk" class="ins-student-cards"></div>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <!-- ZONE 4: Question Radar — What students are asking                   -->
+  <!-- ZONE 2: Topic Struggle — with student lists, quiz questions, AI Qs   -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone" id="ins-struggle-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">map</span>
+      Topic Struggle Analysis
+    </h3>
+    <div id="ins-topic-struggles" class="ins-struggle-list"></div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 3: Quiz Analytics — with question-level detail                  -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone" id="ins-quiz-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">quiz</span>
+      Quiz Analytics
+    </h3>
+    <div id="ins-quiz-analytics" class="ins-quiz-analytics"></div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 4: Lecture Recording Analytics                                  -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone" id="ins-recording-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">play_circle</span>
+      Lecture Recording Analytics
+    </h3>
+    <div id="ins-recording-analytics" class="ins-recording-list"></div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 5: Resource Analytics                                           -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone" id="ins-resource-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">school</span>
+      Resource Analytics
+    </h3>
+    <div id="ins-resource-analytics" class="ins-resource-list"></div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 6: AI Learning Analytics                                        -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="ins-zone" id="ins-ai-analytics-zone">
+    <h3 class="ins-zone-title">
+      <span class="material-symbols-outlined">psychology</span>
+      AI Learning Analytics
+    </h3>
+    <div id="ins-ai-learning-analytics" class="ins-ai-analytics"></div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ZONE 7: Common Questions (existing)                                   -->
   <!-- ═══════════════════════════════════════════════════════════════════ -->
   <section class="ins-zone" id="ins-questions-zone">
     <h3 class="ins-zone-title">
@@ -92,20 +98,28 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <!-- ZONE 5: Course Vitals — How your course is performing                -->
+  <!-- ZONE 8: NLQ Search                                                    -->
   <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <section class="ins-zone" id="ins-vitals-zone">
+  <section class="ins-zone" id="ins-nlq-zone">
     <h3 class="ins-zone-title">
-      <span class="material-symbols-outlined">monitor_heart</span>
-      Course Pulse
+      <span class="material-symbols-outlined">smart_toy</span>
+      Ask About Your Students
     </h3>
-    <div id="ins-course-pulse" class="ins-pulse-grid"></div>
+    <div class="ins-nlq-bar">
+      <input type="text" id="ins-nlq-input" class="ins-nlq-input"
+        placeholder="Ask about student performance…" />
+      <button class="ins-nlq-btn" onclick="window.analyticsDashboard.submitNLQ()">
+        <span class="material-symbols-outlined">search</span>
+      </button>
+      <div class="ins-nlq-spinner" id="ins-nlq-spinner" style="display:none;"></div>
+    </div>
+    <div id="ins-nlq-response" class="ins-nlq-response umat-ai-stream-panel" style="display:none;"></div>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <!-- Student Detail Panel (slide-in overlay)                             -->
+  <!-- Student Timeline Panel                                                -->
   <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <div class="ins-detail-panel" id="ins-detail-panel" style="display:none;">
+  <div class="ins-detail-panel ins-timeline-panel" id="ins-detail-panel" style="display:none;">
     <div class="ins-detail-header">
       <div>
         <strong id="ins-detail-name">—</strong>
@@ -119,20 +133,20 @@
       <div class="ins-empty">Loading profile…</div>
     </div>
     <div class="ins-detail-actions">
-      <button class="ins-action-btn" onclick="window.analyticsDashboard.openActionDrawer('encouragement')">
-        <span class="material-symbols-outlined">favorite</span> Encourage
+      <button class="ins-action-btn" onclick="window.analyticsDashboard.handleStudentAction('send_message', window.analyticsDashboard.currentDetailUid || 0)">
+        <span class="material-symbols-outlined">mail</span> Message
       </button>
-      <button class="ins-action-btn" onclick="window.analyticsDashboard.openActionDrawer('meeting')">
-        <span class="material-symbols-outlined">event</span> 1:1
+      <button class="ins-action-btn" onclick="window.analyticsDashboard.handleStudentAction('recommend_resource', window.analyticsDashboard.currentDetailUid || 0)">
+        <span class="material-symbols-outlined">school</span> Recommend
       </button>
-      <button class="ins-action-btn" onclick="window.analyticsDashboard.openActionDrawer('remedial_quiz')">
-        <span class="material-symbols-outlined">quiz</span> Quiz
+      <button class="ins-action-btn" onclick="window.analyticsDashboard.handleStudentAction('view_activity', window.analyticsDashboard.currentDetailUid || 0)">
+        <span class="material-symbols-outlined">timeline</span> Activity
       </button>
     </div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <!-- Action Drawer (slide-up for interventions)                          -->
+  <!-- Action Drawer                                                         -->
   <!-- ═══════════════════════════════════════════════════════════════════ -->
   <div class="ins-action-drawer" id="ins-action-drawer" style="display:none;">
     <div class="ins-drawer-backdrop" onclick="window.analyticsDashboard.closeActionDrawer()"></div>

@@ -32,7 +32,7 @@ class process_recordings extends \core\task\scheduled_task {
                 $DB->set_field('umat_ai_sessions', 'status',         'completed', ['id'=>$sess->id]);
                 $DB->set_field('umat_ai_sessions', 'timemodified',   time(),      ['id'=>$sess->id]);
                 if ($tjson) {
-                    $segments = self::parse_transcript_to_segments($tjson);
+                    $segments = local_umat_ai_parse_segments($tjson);
                     $DB->set_field('umat_ai_sessions', 'transcript_json', json_encode($segments), ['id'=>$sess->id]);
                 }
                 $newtypes = [];
@@ -103,34 +103,4 @@ class process_recordings extends \core\task\scheduled_task {
         mtrace("  [umat_ai] Notified " . count($lecturers) . " lecturer(s) of pending approvals in course {$courseid}.");
     }
 
-    /**
-     * Parse formatted transcript text (e.g. "[00:00] Hello world") into
-     * structured segments [{start, end, text}] for the transcript viewer.
-     *
-     * @param string $formatted Transcript text with [MM:SS] timestamps
-     * @return array Array of segment objects
-     */
-    private static function parse_transcript_to_segments(string $formatted): array {
-        $segments = [];
-        $lines = explode("\n", $formatted);
-        $prevStart = 0.0;
-
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if ($line === '') continue;
-
-            if (preg_match('/^\[(\d{1,2}):(\d{2})\]\s*(.*)$/', $line, $m)) {
-                $start = (float)(intval($m[1]) * 60 + intval($m[2]));
-                $text  = trim($m[3]);
-                if (!empty($segments)) {
-                    $segments[count($segments) - 1]['end'] = $start;
-                }
-                $segments[] = ['start' => $start, 'end' => $start + 30.0, 'text' => $text];
-                $prevStart = $start;
-            } elseif (!empty($segments)) {
-                $segments[count($segments) - 1]['text'] .= ' ' . $line;
-            }
-        }
-        return $segments;
-    }
 }

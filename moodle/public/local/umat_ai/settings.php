@@ -81,4 +81,12 @@ if ($hassiteconfig) {
         get_string('enable_admin_fab_desc', 'local_umat_ai'),
         '1'
     ));
+
+    /* ---- Enable Resource Bank (Private Bank for lecturers) ---- */
+    $settings->add(new admin_setting_configcheckbox(
+        'local_umat_ai/enable_resource_bank',
+        get_string('enable_resource_bank', 'local_umat_ai'),
+        get_string('enable_resource_bank_desc', 'local_umat_ai'),
+        '1'
+    ));
 }

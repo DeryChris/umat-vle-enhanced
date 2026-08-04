@@ -35,10 +35,33 @@ async def lifespan(app: FastAPI):
     init_db()
     logger.info("Database initialized.")
 
-    # Pre-load Whisper so the first request is not slow
-    from core.transcription import get_whisper_model
-    get_whisper_model()
-    logger.info("Whisper model pre-loaded.")
+    # Pre-load Whisper so the first request is not slow (local mode only)
+    if not settings.openai_whisper_api_key:
+        from core.transcription import get_whisper_model
+        get_whisper_model()
+        logger.info("Local Whisper model pre-loaded.")
+    else:
+        logger.info("Using cloud Whisper API (OPENAI_WHISPER_API_KEY is set).")
+
+    # Recover stuck jobs from previous runs
+    try:
+        from core.job_queue import recover_stuck_jobs
+        recovered = recover_stuck_jobs(settings.database_url)
+        if recovered:
+            logger.info("Recovered %d stuck job(s) from previous run.", len(recovered))
+    except Exception as e:
+        logger.warning("Job recovery failed (non-fatal): %s", e)
+
+    # Log accumulated cloud transcription cost
+    try:
+        import json
+        cost_path = settings.openai_whisper_cost_tracker_path
+        if cost_path and os.path.exists(cost_path):
+            with open(cost_path) as f:
+                data = json.load(f)
+                logger.info("Accumulated cloud transcription cost: $%.4f", data.get("total_spent", 0))
+    except Exception:
+        pass
 
     logger.info(f"UMaT AI Service ready on port {settings.ai_service_port}")
     yield
@@ -78,7 +101,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins    = ["http://localhost", "http://localhost/moodle"],
+    allow_origins    = ["http://localhost", "http://localhost/moodle", "https://umat-vle-test.loca.lt"],
     allow_credentials = True,
     allow_methods    = ["POST", "GET", "DELETE"],
     allow_headers    = ["Authorization", "Content-Type"],

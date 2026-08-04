@@ -16,6 +16,7 @@ error_reporting(E_ERROR | E_PARSE);
 ob_start();
 
 try {
+    global $DB, $USER;
     require_login(false, false);
     require_sesskey();
 

@@ -3,6 +3,7 @@
     "material-symbols": "^0.44.12"
   },
   "devDependencies": {
+    "grunt": "^1.6.2",
     "terser": "^5.49.0"
   }
 }

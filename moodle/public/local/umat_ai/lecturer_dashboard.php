@@ -124,18 +124,25 @@ if (!empty($sessionsData)) {
 
 // Student performance breakdown (approximate from AI usage frequency).
 // Same fix as get_analytics.php: COUNT over a grouped subquery, not GROUP BY in count_records_sql.
+// High performers: students with avg quiz grade ≥ 70% (14-day window).
+// Falls back to 0 if the metrics table has not yet been populated by cron.
 $highPerformers = (int) $DB->get_field_sql(
-    "SELECT COUNT(*) FROM (
-        SELECT userid
-          FROM {umat_ai_chat_logs}
-         WHERE courseid = :cid AND timecreated > :since AND role = 'student'
-      GROUP BY userid
-        HAVING COUNT(*) >= 10
-     ) hp_subq",
-    ['cid' => $courseid, 'since' => $since]
+    "SELECT COUNT(*) FROM {umat_ai_student_metrics}
+      WHERE courseid = :cid AND avg_quiz_grade >= 70",
+    ['cid' => $courseid]
 ) ?: 0;
 
-$atRiskCount = max(0, $enrolledCount - (int) $activeStudents);
+// At-risk: students with a compound risk score ≥ 60, computed by the hourly
+// aggregate_student_metrics cron task using inactivity + quiz + login signals.
+// Falls back to (enrolled - active-AI-users) before the first cron run.
+$atRiskFromMetrics = (int) $DB->count_records_select(
+    'umat_ai_student_metrics',
+    'courseid = :cid AND risk_score >= 60',
+    ['cid' => $courseid]
+);
+$atRiskCount = $atRiskFromMetrics > 0
+    ? $atRiskFromMetrics
+    : max(0, $enrolledCount - (int) $activeStudents);
 
 // ---- Build template context -------------------------------------------- //
 $tctx = [

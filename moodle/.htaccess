@@ -1,3 +1,0 @@
-# Double-compression fix: handled in XAMPP's httpd.conf (SetEnvIf at server level).
-# .htaccess SetEnvIfNoCase is ignored by AddOutputFilterByType in XAMPP.
-# See C:\xampp\apache\conf\httpd.conf lines 510-520 for the current fix.

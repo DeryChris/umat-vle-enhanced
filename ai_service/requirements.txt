@@ -39,6 +39,16 @@ cryptography==43.0.1
 # LLM response cache
 diskcache>=5.6.1
 
+# Audio preprocessing (noise reduction for better transcription)
+# NOTE: pip install may be slow due to matplotlib dependency. Optional — skipped if missing.
+noisereduce>=3.0.0
+soundfile>=0.12.1
+
+# Voice Activity Detection — trims silence before sending to cloud API (saves $$$).
+# Requires C compiler on Windows (MSVC Build Tools). Optional — skipped if missing.
+# Install with: pip install webrtcvad
+# webrtcvad>=2.0.10
+
 # Video generation (slideshow + TTS)
 Pillow>=10.0.0
 edge-tts>=6.1.0

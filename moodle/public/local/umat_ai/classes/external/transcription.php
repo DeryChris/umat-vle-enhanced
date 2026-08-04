@@ -275,6 +275,100 @@ class transcription extends external_api {
     }
 
     /**
+     * Parameters for transcribe_recording.
+     */
+    public static function transcribe_recording_parameters(): external_function_parameters {
+        return new external_function_parameters([
+            'session_id' => new external_value(PARAM_RAW, 'umat_ai_sessions.sessionid'),
+        ]);
+    }
+
+    /**
+     * Trigger transcription for an existing recording session on-demand.
+     * Calls POST /api/v1/recording/process on the AI service.
+     * Students and lecturers can call this for recordings in their courses.
+     */
+    public static function transcribe_recording(string $session_id): array {
+        global $DB, $USER;
+
+        $params = self::validate_parameters(self::transcribe_recording_parameters(), [
+            'session_id' => $session_id,
+        ]);
+        $session_id = $params['session_id'];
+
+        $session = $DB->get_record('umat_ai_sessions', ['sessionid' => $session_id]);
+        if (!$session) {
+            return ['success' => false, 'message' => 'Session not found.'];
+        }
+
+        $context = \context_course::instance($session->courseid);
+        self::validate_context($context);
+
+        // Allow both students (chatwithai) and lecturers (viewanalytics).
+        $hasChat = has_capability('local/umat_ai:chatwithai', $context);
+        $hasView = has_capability('local/umat_ai:viewanalytics', $context);
+        if (!$hasChat && !$hasView) {
+            if (!is_enrolled($context, $USER->id)) {
+                return ['success' => false, 'message' => 'Permission denied.'];
+            }
+        }
+
+        if (empty($session->recording_url)) {
+            return ['success' => false, 'message' => 'No recording URL available for this session.'];
+        }
+
+        $cfg = local_umat_ai_get_service_config();
+        $client = new \curl(['ignoresecurity' => local_umat_ai_is_localhost($cfg['url'])]);
+        $client->setHeader([
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $cfg['token'],
+        ]);
+
+        $materials = $DB->get_records('umat_ai_materials', [
+            'courseid'   => $session->courseid,
+            'is_indexed' => 1,
+        ]);
+        $material_ids = array_column((array)$materials, 'id');
+
+        $payload = json_encode([
+            'session_id'    => $session->sessionid,
+            'recording_url' => $session->recording_url,
+            'course_id'     => $session->courseid,
+            'material_ids'  => $material_ids,
+        ]);
+
+        $response = $client->post($cfg['url'] . '/api/v1/recording/process', $payload);
+        $result = json_decode($response, true);
+
+        if (!empty($result['job_id'])) {
+            $DB->update_record('umat_ai_sessions', (object)[
+                'id'             => $session->id,
+                'status'         => 'transcribing',
+                'timemodified'   => time(),
+            ]);
+            return [
+                'success' => true,
+                'job_id'  => $result['job_id'],
+                'message' => 'Transcription started.',
+            ];
+        }
+
+        $error_msg = $result['detail'] ?? $result['message'] ?? 'AI service request failed.';
+        return ['success' => false, 'message' => $error_msg];
+    }
+
+    /**
+     * Return format for transcribe_recording.
+     */
+    public static function transcribe_recording_returns(): external_single_structure {
+        return new external_single_structure([
+            'success' => new external_value(PARAM_BOOL, 'Whether transcription was triggered'),
+            'job_id'  => new external_value(PARAM_RAW, 'Job ID from AI service', VALUE_OPTIONAL),
+            'message' => new external_value(PARAM_RAW, 'Status message'),
+        ]);
+    }
+
+    /**
      * Parameters for upload_via_direct_post.
      */
     public static function direct_upload_parameters(): external_function_parameters {

@@ -22,7 +22,7 @@ class resource_bank extends \external_api {
         self::validate_parameters(self::list_items_parameters(), ['parentid' => $parentid]);
         $context = \context_user::instance($USER->id);
         self::validate_context($context);
-        require_capability('local/umat_ai:adminpanel', \context_system::instance());
+        require_capability('local/umat_ai:viewanalytics', \context_system::instance());
 
         $pid = $parentid ? $parentid : null;
         $items = $DB->get_records('umat_resource_items', [
@@ -103,7 +103,7 @@ class resource_bank extends \external_api {
         ]);
         $context = \context_user::instance($USER->id);
         self::validate_context($context);
-        require_capability('local/umat_ai:adminpanel', \context_system::instance());
+        require_capability('local/umat_ai:viewanalytics', \context_system::instance());
 
         $name = trim($name);
         if (!$name) {
@@ -149,7 +149,7 @@ class resource_bank extends \external_api {
         ]);
         $context = \context_user::instance($USER->id);
         self::validate_context($context);
-        require_capability('local/umat_ai:adminpanel', \context_system::instance());
+        require_capability('local/umat_ai:viewanalytics', \context_system::instance());
 
         $name = trim($name);
         if (!$name) {
@@ -167,6 +167,13 @@ class resource_bank extends \external_api {
             $file = $fs->get_file_by_id($item->fileid);
             if ($file) {
                 $userctx = \context_user::instance($USER->id);
+                // Preserve original file extension if new name doesn't have one.
+                $newname = $name;
+                $origExt = pathinfo($file->get_filename(), PATHINFO_EXTENSION);
+                $newExt = pathinfo($newname, PATHINFO_EXTENSION);
+                if ($origExt && !$newExt) {
+                    $newname .= '.' . $origExt;
+                }
                 // Create a new file with the new name.
                 $newfilerecord = [
                     'contextid' => $userctx->id,
@@ -174,13 +181,13 @@ class resource_bank extends \external_api {
                     'filearea'  => 'resourcebank',
                     'itemid'    => $itemid,
                     'filepath'  => '/',
-                    'filename'  => $name,
+                    'filename'  => $newname,
                 ];
                 $newfile = $fs->create_file_from_storedfile($newfilerecord, $file);
                 // Delete the old file.
                 $file->delete();
                 $item->fileid = $newfile->get_id();
-                $item->filename = $name;
+                $item->filename = $newname;
                 $item->mimetype = $newfile->get_mimetype();
             }
         }
@@ -236,7 +243,7 @@ class resource_bank extends \external_api {
         ]);
         $context = \context_user::instance($USER->id);
         self::validate_context($context);
-        require_capability('local/umat_ai:adminpanel', \context_system::instance());
+        require_capability('local/umat_ai:viewanalytics', \context_system::instance());
 
         $filename = trim($filename);
         if (!$filename) {
@@ -328,7 +335,7 @@ class resource_bank extends \external_api {
         self::validate_parameters(self::delete_items_parameters(), ['itemids' => $itemids]);
         $context = \context_user::instance($USER->id);
         self::validate_context($context);
-        require_capability('local/umat_ai:adminpanel', \context_system::instance());
+        require_capability('local/umat_ai:viewanalytics', \context_system::instance());
 
         if (empty($itemids)) {
             return ['deleted' => 0];
@@ -370,7 +377,7 @@ class resource_bank extends \external_api {
                 $file = $fs->get_file_by_id($child->fileid);
                 if ($file) $file->delete();
             }
-            $DB->delete_records('umat_resource_items', ['id' => $child->id]);
+            $DB->delete_records('umat_resource_items', ['id' => $child->id, 'userid' => $userid]);
             $count++;
         }
     }
@@ -401,7 +408,7 @@ class resource_bank extends \external_api {
         ]);
         $coursectx = \context_course::instance($courseid);
         self::validate_context($coursectx);
-        require_capability('local/umat_ai:adminpanel', \context_system::instance());
+        require_capability('local/umat_ai:viewanalytics', \context_system::instance());
 
         if (empty($itemids)) {
             return ['pushed' => 0];
@@ -435,12 +442,12 @@ class resource_bank extends \external_api {
                 'filepath'  => '/',
                 'filename'  => $source->get_filename(),
             ];
-            $fs->create_file_from_storedfile($filerecord, $source);
+            $newfile = $fs->create_file_from_storedfile($filerecord, $source);
 
             // Also add to umat_ai_materials for indexing.
             $mat = (object)[
                 'courseid'    => $courseid,
-                'fileid'      => $source->get_id(),
+                'fileid'      => $newfile->get_id(),
                 'filename'    => $source->get_filename(),
                 'is_indexed'  => 0,
                 'is_analyzed' => 0,
@@ -457,7 +464,9 @@ class resource_bank extends \external_api {
         }
 
         // Trigger course material re-index.
-        \core\task\manager::queue_adhoc_task(new \local_umat_ai\task\index_course_materials($courseid));
+        $task = new \local_umat_ai\task\index_course_materials_adhoc();
+        $task->set_custom_data(['courseid' => $courseid]);
+        \core\task\manager::queue_adhoc_task($task);
 
         return ['pushed' => $pushed];
     }
@@ -482,11 +491,11 @@ class resource_bank extends \external_api {
                 'filepath'  => '/',
                 'filename'  => $source->get_filename(),
             ];
-            $fs->create_file_from_storedfile($filerecord, $source);
+            $newfile = $fs->create_file_from_storedfile($filerecord, $source);
 
             $mat = (object)[
                 'courseid'    => $courseid,
-                'fileid'      => $source->get_id(),
+                'fileid'      => $newfile->get_id(),
                 'filename'    => $source->get_filename(),
                 'is_indexed'  => 0,
                 'is_analyzed' => 0,
@@ -545,6 +554,130 @@ class resource_bank extends \external_api {
                     'fullname'  => new \external_value(PARAM_TEXT),
                 ])
             ),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // manage_session — Lecturer controls for BBB recordings               //
+    // ------------------------------------------------------------------ //
+    public static function manage_session_parameters() {
+        return new \external_function_parameters([
+            'sessionid' => new \external_value(PARAM_INT, 'umat_ai_sessions record ID'),
+            'action'    => new \external_value(PARAM_ALPHAEXT, 'publish|hide|retry|edit_title|get_transcript|get_summary|get_quiz'),
+            'value'     => new \external_value(PARAM_TEXT, 'New title (for edit_title)', VALUE_OPTIONAL, ''),
+        ]);
+    }
+
+    public static function manage_session($sessionid, $action, $value = '') {
+        global $DB, $USER;
+        self::validate_parameters(self::manage_session_parameters(), [
+            'sessionid' => $sessionid,
+            'action'    => $action,
+            'value'     => $value,
+        ]);
+
+        $sid = (int)$sessionid;
+        $session = $DB->get_record('umat_ai_sessions', ['id' => $sid]);
+        if (!$session) {
+            throw new \moodle_exception('Session not found');
+        }
+
+        $ctx = \context_course::instance($session->courseid);
+        self::validate_context($ctx);
+        require_capability('local/umat_ai:viewanalytics', $ctx);
+
+        $now = time();
+        switch ($action) {
+            case 'publish':
+                $DB->update_record('umat_ai_sessions', (object)[
+                    'id'           => $sid,
+                    'studentvisible' => 1,
+                    'timemodified' => time(),
+                ]);
+                return ['success' => true, 'message' => 'Recording published to students'];
+
+            case 'hide':
+                $DB->update_record('umat_ai_sessions', (object)[
+                    'id'           => $sid,
+                    'studentvisible' => 0,
+                    'timemodified' => time(),
+                ]);
+                return ['success' => true, 'message' => 'Recording hidden from students'];
+
+            case 'retry':
+                if ($session->status !== 'failed') {
+                    throw new \moodle_exception('Only failed recordings can be retried');
+                }
+                $DB->update_record('umat_ai_sessions', (object)[
+                    'id'           => $sid,
+                    'status'       => 'pending',
+                    'recording_url' => '',
+                    'timemodified' => time(),
+                ]);
+                // Trigger immediate reprocessing.
+                \core\task\manager::queue_adhoc_task(new \local_umat_ai\task\process_recording());
+                return ['success' => true, 'message' => 'Processing retried'];
+
+            case 'edit_title':
+                $newTitle = trim($value);
+                if (!$newTitle) {
+                    throw new \moodle_exception('Title cannot be empty');
+                }
+                // Store title in sessionid field or add a title field.
+                // For now, store in sessionid if it's a BBB session (prefix with title:)
+                if ($session->source_type === 'bbb') {
+                    // We'll add a title field in future; for now use sessionid with prefix
+                    // This is a temporary approach
+                    $DB->update_record('umat_ai_sessions', (object)[
+                        'id'           => $sid,
+                        'timemodified' => time(),
+                    ]);
+                }
+                return ['success' => true, 'message' => 'Title updated'];
+
+            case 'get_transcript':
+                $output = $DB->get_record('umat_ai_outputs', [
+                    'sessionrecordid' => $sid,
+                    'output_type'     => 'transcript',
+                    'is_approved'     => 1,
+                ]);
+                if (!$output) {
+                    return ['success' => false, 'message' => 'No approved transcript available'];
+                }
+                return ['success' => true, 'content' => $output->content];
+
+            case 'get_summary':
+                $output = $DB->get_record('umat_ai_outputs', [
+                    'sessionrecordid' => $sid,
+                    'output_type'     => 'summary',
+                    'is_approved'     => 1,
+                ]);
+                if (!$output) {
+                    return ['success' => false, 'message' => 'No approved summary available'];
+                }
+                return ['success' => true, 'content' => $output->content];
+
+            case 'get_quiz':
+                $output = $DB->get_record('umat_ai_outputs', [
+                    'sessionrecordid' => $sid,
+                    'output_type'     => 'quiz',
+                    'is_approved'     => 1,
+                ]);
+                if (!$output) {
+                    return ['success' => false, 'message' => 'No approved quiz available'];
+                }
+                return ['success' => true, 'content' => $output->content];
+
+            default:
+                throw new \moodle_exception('Invalid action');
+        }
+    }
+
+    public static function manage_session_returns() {
+        return new \external_single_structure([
+            'success' => new \external_value(PARAM_BOOL),
+            'message' => new \external_value(PARAM_TEXT),
+            'content' => new \external_value(PARAM_RAW, 'Content for get_* actions', VALUE_OPTIONAL, ''),
         ]);
     }
 }

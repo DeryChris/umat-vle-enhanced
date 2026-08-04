@@ -1,6 +1,7 @@
 # ============================================================
-# POST /api/v1/transcription/upload  — upload audio/video for transcription
-# GET  /api/v1/transcription/{job_id} — get transcript + outputs
+# POST /api/v1/transcription/transcribe — fast chat voice transcription
+# POST /api/v1/transcription/upload     — upload audio/video for transcription
+# GET  /api/v1/transcription/{job_id}   — get transcript + outputs
 # GET  /api/v1/transcription/{job_id}/flashcards — generate flashcards
 # GET  /api/v1/transcription/{job_id}/glossary  — generate glossary
 # GET  /api/v1/transcription/{job_id}/chapters  — generate chapter markers
@@ -44,6 +45,75 @@ ALLOWED_EXTENSIONS = {
     ".mp4", ".webm", ".mov", ".avi", ".mkv", ".m4v",
 }
 MAX_FILE_SIZE = 500 * 1024 * 1024  # 500 MB
+
+# Singleton transcriber for fast chat transcription (avoids re-init per request)
+_chat_transcriber: Optional[TranscriptionService] = None
+
+
+def _get_chat_transcriber() -> TranscriptionService:
+    global _chat_transcriber
+    if _chat_transcriber is None:
+        _chat_transcriber = TranscriptionService()
+    return _chat_transcriber
+
+
+# ── Fast chat transcription (sync, no background) ────────────
+
+@router.post("/transcribe")
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    token: str = Depends(verify_token),
+):
+    """Fast synchronous transcription for chat voice clips.
+
+    Accepts an audio file, runs Whisper with lightweight settings,
+    and returns the transcript immediately. No indexing, no LLM.
+    """
+    import time
+    t_start = time.time()
+
+    ext = Path(file.filename).suffix.lower().lstrip(".") if file.filename else "webm"
+    if ext not in {"webm", "ogg", "wav", "mp3", "mp4", "m4a", "flac", "aac"}:
+        raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}")
+
+    content = await file.read()
+    if len(content) < 512:
+        raise HTTPException(status_code=400, detail="Audio too short")
+    if len(content) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Audio too large (max 25 MB)")
+
+    t_read = time.time()
+
+    # Write to temp file for Whisper (it needs a file path)
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    try:
+        transcriber = _get_chat_transcriber()
+        t_before_whisper = time.time()
+        result = transcriber.transcribe_chat(tmp_path)
+        t_after_whisper = time.time()
+
+        logger.info(
+            "Chat transcription: read=%.1fms whisper=%.1fms total=%.1fms chars=%d",
+            (t_before_whisper - t_read) * 1000,
+            (t_after_whisper - t_before_whisper) * 1000,
+            (t_after_whisper - t_start) * 1000,
+            len(result.get("text", "")),
+        )
+
+        return {
+            "success": True,
+            "transcript": result.get("text", ""),
+            "language": result.get("language", "en"),
+        }
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
 
 # ── Background processing pipeline ────────────────────────────
@@ -93,12 +163,13 @@ def _process_upload_background(job_id: str, file_path: str, filename: str, db_ur
             transcript = result["text"]
             segments = result.get("segments", [])
 
-            # Store formatted transcript with timestamps
+            # Store both formatted text and raw segments JSON
             formatted = transcriber.format_transcript_with_timestamps(segments)
             job.transcript = formatted
+            job.segments_json = json.dumps(segments)
             job.status = "processing_ai"
             db.commit()
-            logger.info(f"[{job_id}] Transcription complete: {len(transcript)} chars")
+            logger.info(f"[{job_id}] Transcription complete: {len(transcript)} chars, {len(segments)} segments")
         except Exception as e:
             step_failed = "transcription"
             raise Exception(f"Transcription failed: {str(e)}")
@@ -228,19 +299,28 @@ async def get_transcription(
     db: Session = Depends(get_db),
     token: str = Depends(verify_token),
 ):
-    """Get transcription status, transcript, and AI outputs."""
+    """Get transcription status, transcript, segments JSON, and AI outputs."""
     job = db.query(ProcessingJob).filter(
         (ProcessingJob.job_id == job_id) | (ProcessingJob.session_id == job_id)
     ).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
+    segments = []
+    if job.segments_json:
+        try:
+            segments = json.loads(job.segments_json)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     return {
         "job_id": job.job_id,
         "session_id": job.session_id,
         "course_id": job.course_id,
         "status": job.status,
+        "progress_percent": job.progress_percent,
         "transcript": job.transcript,
+        "segments": segments,
         "outputs": {
             "summary": job.summary,
             "notes": job.notes,

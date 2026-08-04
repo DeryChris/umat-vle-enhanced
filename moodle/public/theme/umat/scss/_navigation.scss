@@ -135,7 +135,7 @@
     display: flex;
     justify-content: space-around;
     align-items: center;
-    padding: $space-8 $space-16 (calc(#{$space-16} + env(safe-area-inset-bottom)));
+    padding: $space-8 $space-16 calc(#{$space-16} + env(safe-area-inset-bottom, 0px));
     border-radius: $rounded-xl $rounded-xl 0 0;
 
     a, .umat-bottomnav-item {

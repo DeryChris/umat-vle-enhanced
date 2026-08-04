@@ -766,27 +766,263 @@ define([], function() {
         return promise;
     }
 
-    // ─── Voice input init ──────────────────────────── //
-    function _umatInitVoice(inp, btn) {
-        var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR || !btn) {
-            if (btn) btn.style.opacity = '.4';
+    // ─── Voice input (MediaRecorder + server transcription) ── //
+    /**
+     * ChatVoiceInput — in-place voice recording for chatbars.
+     *
+     * Transforms the chatbar into a recording panel with waveform,
+     * timer, and Done/Cancel controls. Sends audio to the server
+     * for Whisper transcription and inserts the result into the
+     * associated text input.
+     *
+     * @param {Object} opts
+     *   input   — the text input element (or its ID)
+     *   btn     — the mic button element (or its ID)
+     *   formUrl — URL of the PHP transcription proxy (transcribe_chat.php)
+     *   sesskey — Moodle sesskey for CSRF protection
+     */
+    function ChatVoiceInput(opts) {
+        this.inp = typeof opts.input === 'string' ? document.getElementById(opts.input) : opts.input;
+        this.btn = typeof opts.btn === 'string' ? document.getElementById(opts.btn) : opts.btn;
+        this.formUrl = opts.formUrl || M.cfg.wwwroot + '/local/umat_ai/transcribe_chat.php';
+        this.sesskey = opts.sesskey || (typeof M !== 'undefined' && M.cfg && M.cfg.sesskey) || '';
+        this._recording = false;
+        this._mediaRecorder = null;
+        this._chunks = [];
+        this._timerInterval = null;
+        this._seconds = 0;
+        this._panel = null;
+        this._origParent = null;
+        this._origNext = null;
+
+        var self = this;
+        if (this.btn) {
+            this.btn.addEventListener('click', function() {
+                if (self._recording) { self._cancel(); } else { self._start(); }
+            });
+        }
+    }
+
+    ChatVoiceInput.prototype._start = function() {
+        var self = this;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            this._showError('Voice recording is not supported in this browser.');
             return;
         }
-        var rec = new SR();
-        rec.continuous = false;
-        rec.interimResults = true;
-        rec.lang = 'en-US';
-        var a = false;
-        btn.addEventListener('click', function() {
-            if (a) { rec.stop(); } else { rec.start(); a = true; btn.classList.add('recording'); }
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+            self._beginRecording(stream);
+        })['catch'](function(err) {
+            console.error('[UMAT-Voice] getUserMedia failed:', err);
+            self._showError('Microphone access denied. Please allow microphone access and try again.');
         });
-        rec.onresult = function(e) {
-            inp.value = Array.from(e.results).map(function(r) { return r[0].transcript; }).join('');
+    };
+
+    ChatVoiceInput.prototype._beginRecording = function(stream) {
+        this._recording = true;
+        this._chunks = [];
+        this._seconds = 0;
+
+        // Pick best supported MIME type
+        var mime = 'audio/webm';
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+            mime = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+            mime = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+            mime = 'audio/ogg;codecs=opus';
+        }
+
+        try {
+            this._mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
+        } catch(e) {
+            this._mediaRecorder = new MediaRecorder(stream);
+        }
+
+        var self = this;
+        this._mediaRecorder.ondataavailable = function(e) {
+            if (e.data && e.data.size > 0) self._chunks.push(e.data);
         };
-        rec.onend = function() { a = false; btn.classList.remove('recording'); };
-        rec.onerror = function() { a = false; btn.classList.remove('recording'); };
-    }
+        this._mediaRecorder.onstop = function() {
+            self._stop(stream);
+        };
+
+        // Build the in-place recording panel
+        this._buildPanel();
+        this._mediaRecorder.start(250); // collect in 250ms chunks
+
+        this._timerInterval = setInterval(function() {
+            self._seconds++;
+            var el = self._panel && self._panel.querySelector('.umat-voice-timer');
+            if (el) el.textContent = self._fmtTime(self._seconds);
+        }, 1000);
+    };
+
+    ChatVoiceInput.prototype._buildPanel = function() {
+        if (!this.inp) return;
+        var chatbar = this.inp.closest('.umat-chatbar');
+        if (!chatbar) return;
+
+        // Remember original position for restoration
+        this._origParent = this.inp.parentNode;
+        this._origNext = this.inp.nextSibling;
+
+        // Build voice panel
+        var panel = document.createElement('div');
+        panel.className = 'umat-voice-panel';
+        panel.innerHTML =
+            '<div class="umat-voice-wave">' +
+                '<span></span><span></span><span></span><span></span><span></span>' +
+            '</div>' +
+            '<div class="umat-voice-timer">0:00</div>' +
+            '<div class="umat-voice-controls">' +
+                '<button type="button" class="umat-voice-btn umat-voice-cancel" title="Cancel">' +
+                    '<span class="material-symbols-outlined">close</span> Cancel' +
+                '</button>' +
+                '<button type="button" class="umat-voice-btn umat-voice-done" title="Done">' +
+                    '<span class="material-symbols-outlined">check</span> Done' +
+                '</button>' +
+            '</div>';
+
+        this._panel = panel;
+
+        // Hide input, insert panel in its place
+        this.inp.style.display = 'none';
+        if (this._origNext && this._origNext.parentNode === this._origParent) {
+            this._origParent.insertBefore(panel, this._origNext);
+        } else {
+            this._origParent.appendChild(panel);
+        }
+
+        // Wire up buttons
+        var self = this;
+        panel.querySelector('.umat-voice-cancel').addEventListener('click', function() { self._cancel(); });
+        panel.querySelector('.umat-voice-done').addEventListener('click', function() { self._finish(); });
+    };
+
+    ChatVoiceInput.prototype._fmtTime = function(s) {
+        var m = Math.floor(s / 60);
+        var sc = Math.floor(s % 60);
+        return m + ':' + (sc < 10 ? '0' : '') + sc;
+    };
+
+    ChatVoiceInput.prototype._cancel = function() {
+        if (this._mediaRecorder && this._mediaRecorder.state !== 'inactive') {
+            this._mediaRecorder.stop();
+        }
+        this._teardown();
+    };
+
+    ChatVoiceInput.prototype._finish = function() {
+        if (this._mediaRecorder && this._mediaRecorder.state !== 'inactive') {
+            this._mediaRecorder.stop();
+        }
+        // _stop will send the audio
+    };
+
+    ChatVoiceInput.prototype._stop = function(stream) {
+        // Stop timer
+        if (this._timerInterval) {
+            clearInterval(this._timerInterval);
+            this._timerInterval = null;
+        }
+
+        // Stop all tracks
+        if (stream) {
+            stream.getTracks().forEach(function(t) { t.stop(); });
+        }
+
+        this._recording = false;
+
+        // If we have audio data, send it
+        if (this._chunks.length > 0) {
+            this._sendForTranscription();
+        } else {
+            this._teardown();
+        }
+    };
+
+    ChatVoiceInput.prototype._sendForTranscription = function() {
+        var self = this;
+        var blob = new Blob(this._chunks, { type: this._mediaRecorder.mimeType || 'audio/webm' });
+        this._chunks = [];
+
+        // Show loading state in panel
+        var loadingEl = this._panel && this._panel.querySelector('.umat-voice-controls');
+        if (loadingEl) {
+            loadingEl.innerHTML =
+                '<div class="umat-voice-loading">' +
+                    '<div class="umat-vw-spinner"></div>' +
+                    '<span>Transcribing\u2026</span>' +
+                '</div>';
+        }
+
+        var t0 = Date.now();
+        var formData = new FormData();
+        formData.append('audio', blob, 'voice_' + Date.now() + '.webm');
+        formData.append('sesskey', this.sesskey);
+
+        fetch(this.formUrl, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        }).then(function(resp) {
+            return resp.json();
+        }).then(function(data) {
+            var elapsed = Date.now() - t0;
+            console.log('[UMAT-Voice] Transcription took ' + elapsed + 'ms', data);
+            if (data.success && data.transcript) {
+                // Insert transcript into input
+                if (self.inp) {
+                    self.inp.value = data.transcript;
+                    self.inp.style.display = '';
+                    self.inp.focus();
+                    // Trigger input event so send button enables
+                    self.inp.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                self._teardown();
+            } else {
+                var msg = (data && data.message) || 'Transcription failed';
+                console.error('[UMAT-Voice] Server error:', msg);
+                self._showError(msg);
+                self._teardown();
+            }
+        })['catch'](function(err) {
+            console.error('[UMAT-Voice] Fetch error:', err);
+            self._showError('Could not reach transcription service.');
+            self._teardown();
+        });
+    };
+
+    ChatVoiceInput.prototype._showError = function(msg) {
+        // Briefly show error in the input area, then restore
+        if (this.inp) {
+            this.inp.style.display = '';
+            this.inp.value = '';
+            this.inp.placeholder = msg;
+            var inp = this.inp;
+            setTimeout(function() { inp.placeholder = 'Ask the AI tutor\u2026'; }, 4000);
+        }
+        this._teardown();
+    };
+
+    ChatVoiceInput.prototype._teardown = function() {
+        if (this._timerInterval) {
+            clearInterval(this._timerInterval);
+            this._timerInterval = null;
+        }
+        this._recording = false;
+        this._mediaRecorder = null;
+        this._chunks = [];
+
+        // Remove voice panel, restore input
+        if (this._panel && this._panel.parentNode) {
+            this._panel.parentNode.removeChild(this._panel);
+        }
+        this._panel = null;
+        if (this.inp) {
+            this.inp.style.display = '';
+        }
+    };
 
     // ─── Render material chips bar ─────────────────── //
     function _umatRenderMatsBar(barId, btnId, mats, onRemove) {
@@ -1290,8 +1526,7 @@ define([], function() {
                 '<div class="yt-actions">' +
                 '<button class="yt-btn yt-view-btn"><span class="material-symbols-outlined">visibility</span>View</button>' +
                 '<a class="yt-btn" href="' + _umatEsc(m.url || '#') + '" download="' + _umatEsc(m.filename || '') + '" onclick="event.stopPropagation()"><span class="material-symbols-outlined">download</span>Download</a>' +
-                '<button class="yt-btn yt-analysis-btn" style="display:none" data-analysed="false"><span class="material-symbols-outlined anal-status-dot">circle</span><span class="anal-text">Analyze</span></button>' +
-                '<button class="yt-btn yt-video-btn" data-video-status="none"><span class="material-symbols-outlined">videocam</span><span class="video-text">Gen Video</span></button>' +
+
                 '</div>' +
                 '</div>';
         }).join('');
@@ -1327,8 +1562,46 @@ define([], function() {
     }
 
     // ─── Video tiles (student Lectures tab) ────────── //
+    function showTranscriptModal(jobId, title) {
+        var ov = document.createElement('div');
+        ov.className = 'umat-cs-overlay';
+        ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);';
+        ov.innerHTML = '<div class="umat-cs-modal" style="max-width:700px;max-height:80vh;display:flex;flex-direction:column;">' +
+            '<div class="umat-cs-modal-hdr"><h3>' + _umatEsc(title || 'Transcript') + '</h3>' +
+            '<button class="umat-cs-close" type="button"><span class="material-symbols-outlined">close</span></button></div>' +
+            '<div id="umatshared-transcript-body" style="flex:1;overflow-y:auto;padding:16px;font-size:13px;line-height:1.6;white-space:pre-wrap;color:var(--u-ons);">' +
+            '<div style="text-align:center;padding:20px;"><span class="material-symbols-outlined" style="font-size:24px;color:var(--u-ol);">hourglass_empty</span>' +
+            '<p style="font-size:12px;color:var(--u-ol);">Loading transcript\u2026</p></div></div></div>';
+        document.body.appendChild(ov);
+        ov.querySelector('.umat-cs-close').addEventListener('click', function() { document.body.removeChild(ov); });
+        ov.addEventListener('click', function(e) { if (e.target === this) document.body.removeChild(ov); });
+
+        require(['core/ajax'], function(Ajax) {
+            Ajax.call([{ methodname: 'local_umat_ai_get_transcription', args: { job_id: jobId } }])[0]
+                .done(function(r) {
+                    var body = document.getElementById('umatshared-transcript-body');
+                    if (!body) return;
+                    if (r.success && r.transcript) {
+                        body.textContent = r.transcript;
+                    } else if (r.status === 'processing') {
+                        body.innerHTML = '<div style="text-align:center;padding:20px;">' +
+                            '<span class="material-symbols-outlined" style="font-size:24px;color:#d97706;">hourglass_empty</span>' +
+                            '<p style="font-size:12px;color:#d97706;">Transcription is still processing\u2026</p></div>';
+                    } else {
+                        body.innerHTML = '<div style="text-align:center;padding:20px;">' +
+                            '<span class="material-symbols-outlined" style="font-size:24px;color:var(--u-ter);">error</span>' +
+                            '<p style="font-size:12px;color:var(--u-ter);">' + _umatEsc(r.error || 'No transcript available') + '</p></div>';
+                    }
+                })
+                .fail(function() {
+                    var body = document.getElementById('umatshared-transcript-body');
+                    if (body) body.innerHTML = '<div style="text-align:center;padding:20px;"><p style="font-size:12px;color:var(--u-ter);">Could not load transcript.</p></div>';
+                });
+        });
+    }
+
     function renderVideoTiles(recs) {
-        var grid = document.getElementById('stu-lec-grid') || document.getElementById('ws-lib-lectures') || document.getElementById('ws-video-grid');
+        var grid = document.getElementById('stu-lec-grid') || document.getElementById('ws-lib-lectures') || document.getElementById('ws-video-grid') || document.getElementById('lec-lib-lectures');
         console.log('[UMAT-REC] renderVideoTiles', {gridId:grid?grid.id:'null', recsCount:recs?recs.length:0});
         if (!grid) return;
         if (recs && !Array.isArray(recs)) {
@@ -1343,7 +1616,17 @@ define([], function() {
         grid.innerHTML = recs.map(function(r, i) {
             var badge = r.duration ? '<span class="yt-badge">' + _umatEsc(r.duration) + '</span>' : '';
             var segsData = JSON.stringify(r.segments || []).replace(/'/g, '&#39;');
-            return '<div class="yt-tile" data-idx="' + i + '" data-url="' + _umatEsc(r.url || '') + '" data-title="' + _umatEsc(r.title || 'Lecture Recording') + '" data-segs=\'' + segsData + '\'>' +
+            var hasTranscript = r.has_transcript || (r.segments && r.segments.length > 0);
+            var recordingStatus = r.status || 'pending';
+            var transBtnHtml = '';
+            if (hasTranscript) {
+                transBtnHtml = '<button class="yt-btn yt-transcript-btn" data-session="' + _umatEsc(r.session_key || r.id || '') + '" onclick="event.stopPropagation()"><span class="material-symbols-outlined">subtitles</span>View Transcript</button>';
+            } else if (recordingStatus === 'transcribing' || recordingStatus === 'indexing') {
+                transBtnHtml = '<button class="yt-btn" disabled style="opacity:.6;"><span class="material-symbols-outlined">hourglass_top</span>Processing\u2026</button>';
+            } else {
+                transBtnHtml = '<button class="yt-btn yt-transcribe-btn" data-session="' + _umatEsc(r.session_key || r.id || '') + '" data-status="' + _umatEsc(recordingStatus) + '" onclick="event.stopPropagation()"><span class="material-symbols-outlined">mic</span>Transcribe</button>';
+            }
+            return '<div class="yt-tile" data-idx="' + i + '" data-url="' + _umatEsc(r.url || '') + '" data-title="' + _umatEsc(r.title || 'Lecture Recording') + '" data-segs=\'' + segsData + '\' data-has-transcript="' + (hasTranscript ? '1' : '0') + '" data-session-key="' + _umatEsc(r.session_key || r.id || '') + '">' +
                 '<div class="yt-thumb yt-bg-video">' +
                 '<span class="yt-thumb-icon material-symbols-outlined">play_circle</span>' +
                 '<div class="yt-play-ov"><span class="material-symbols-outlined">play_arrow</span></div>' +
@@ -1359,14 +1642,14 @@ define([], function() {
                 '</div>' +
                 '<div class="yt-actions">' +
                 '<button class="yt-btn" data-play="1" onclick="event.stopPropagation()"><span class="material-symbols-outlined">play_arrow</span>Play</button>' +
-                '<a class="yt-btn" href="' + _umatEsc(r.url || '#') + '" download onclick="event.stopPropagation()"><span class="material-symbols-outlined">download</span>Download</a>' +
+                transBtnHtml +
                 '</div>' +
                 '</div>';
         }).join('');
 
         grid.querySelectorAll('.yt-tile').forEach(function(tile) {
             tile.addEventListener('click', function(e) {
-                if (e.target.closest('a.yt-btn')) return;
+                if (e.target.closest('a.yt-btn') || e.target.closest('.yt-transcribe-btn') || e.target.closest('.yt-transcript-btn')) return;
                 e.preventDefault();
                 var segs = [];
                 try { segs = JSON.parse(tile.dataset.segs || '[]'); } catch (ex) {}
@@ -1384,6 +1667,61 @@ define([], function() {
                 e.stopPropagation();
                 tile.click();
             });
+            var transcribeBtn = tile.querySelector('.yt-transcribe-btn');
+            if (transcribeBtn) {
+                transcribeBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var btn = this;
+                    var sessionKey = btn.dataset.session;
+                    if (!sessionKey) return;
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="material-symbols-outlined">hourglass_top</span>Starting\u2026';
+                    require(['core/ajax'], function(Ajax) {
+                        Ajax.call([{ methodname: 'local_umat_ai_transcribe_recording', args: { session_id: sessionKey } }])[0]
+                            .done(function(r) {
+                                if (r.success) {
+                                    btn.innerHTML = '<span class="material-symbols-outlined">hourglass_top</span>Processing\u2026';
+                                    tile.dataset.hasTranscript = '0';
+                                    var pollInterval = setInterval(function() {
+                                        Ajax.call([{ methodname: 'local_umat_ai_get_transcription', args: { job_id: sessionKey } }])[0]
+                                            .done(function(pr) {
+                                                if (pr.success && pr.transcript) {
+                                                    clearInterval(pollInterval);
+                                                    btn.disabled = false;
+                                                    btn.className = 'yt-btn yt-transcript-btn';
+                                                    btn.innerHTML = '<span class="material-symbols-outlined">subtitles</span>View Transcript';
+                                                    tile.dataset.hasTranscript = '1';
+                                                } else if (pr.status === 'failed' || (pr.error && !pr.transcript)) {
+                                                    clearInterval(pollInterval);
+                                                    btn.disabled = false;
+                                                    btn.innerHTML = '<span class="material-symbols-outlined">mic</span>Transcribe';
+                                                }
+                                            })
+                                            .fail(function() { clearInterval(pollInterval); btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">mic</span>Transcribe'; });
+                                    }, 5000);
+                                } else {
+                                    btn.disabled = false;
+                                    btn.innerHTML = '<span class="material-symbols-outlined">mic</span>Transcribe';
+                                    require(['core/notification'], function(N) { N.error({ message: r.message || 'Transcription failed.' }); });
+                                }
+                            })
+                            .fail(function() {
+                                btn.disabled = false;
+                                btn.innerHTML = '<span class="material-symbols-outlined">mic</span>Transcribe';
+                                require(['core/notification'], function(N) { N.error({ message: 'Could not start transcription.' }); });
+                            });
+                    });
+                });
+            }
+            var transcriptBtn = tile.querySelector('.yt-transcript-btn');
+            if (transcriptBtn) {
+                transcriptBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var sessionKey = this.dataset.session;
+                    if (!sessionKey) return;
+                    showTranscriptModal(sessionKey, tile.dataset.title || 'Transcript');
+                });
+            }
         });
     }
 
@@ -1513,179 +1851,6 @@ define([], function() {
         });
     }
 
-    // ─── Material Analysis Status ───────────────────── //
-    function updateMaterialAnalysis(courseId) {
-        if (!courseId) return;
-        ajax('local_umat_ai_get_analysis_status', { courseid: courseId },
-            function (resp) {
-                var materials = resp.materials || [];
-                var lookup = {};
-                materials.forEach(function (m) {
-                    lookup[m.fileid] = m;
-                });
-                document.querySelectorAll('.yt-tile[data-fileid]').forEach(function (tile) {
-                    var fid = parseInt(tile.dataset.fileid);
-                    var info = lookup[fid];
-                    var btn = tile.querySelector('.yt-analysis-btn');
-                    if (!btn) return;
-                    if (!info) {
-                        btn.style.display = 'none';
-                        return;
-                    }
-                    btn.style.display = '';
-                    btn.dataset.materialId = info.material_id || 0;
-                    btn.dataset.analysed = info.is_analyzed ? 'true' : 'false';
-                    var dot = btn.querySelector('.anal-status-dot');
-                    var txt = btn.querySelector('.anal-text');
-                    if (info.is_analyzed) {
-                        dot.textContent = 'check_circle';
-                        dot.style.color = '#4caf50';
-                        txt.textContent = info.last_analysis ? (info.last_analysis.summary ? 'Analysis' : 'Analyzed') : 'Analyzed';
-                        btn.title = info.last_analysis && info.last_analysis.summary ? info.last_analysis.summary : 'Material has been analyzed';
-                        btn.onclick = function (e) {
-                            e.stopPropagation();
-                            // Show analysis modal / details (future)
-                        };
-                    } else {
-                        dot.textContent = 'radio_button_unchecked';
-                        dot.style.color = '#999';
-                        txt.textContent = 'Analyze';
-                        btn.title = 'Request AI analysis of this material';
-                        btn.onclick = function (e) {
-                            e.stopPropagation();
-                            var mid = parseInt(this.dataset.materialId);
-                            if (!mid) return;
-                            var self = this;
-                            var dot2 = self.querySelector('.anal-status-dot');
-                            var txt2 = self.querySelector('.anal-text');
-                            dot2.textContent = 'sync';
-                            dot2.style.color = '#ff9800';
-                            txt2.textContent = 'Analyzing\u2026';
-                            self.disabled = true;
-                            ajax('local_umat_ai_request_analysis', {
-                                courseid: courseId,
-                                material_id: mid,
-                                analysis_type: 'full_analysis',
-                                scope: '',
-                                force: false,
-                            }, function (res) {
-                                self.disabled = false;
-                                if (res.success) {
-                                    dot2.textContent = 'check_circle';
-                                    dot2.style.color = '#4caf50';
-                                    txt2.textContent = 'Analyzed';
-                                    self.dataset.analysed = 'true';
-                                } else {
-                                    dot2.textContent = 'error';
-                                    dot2.style.color = '#f44336';
-                                    txt2.textContent = 'Failed';
-                                    setTimeout(function () {
-                                        dot2.textContent = 'radio_button_unchecked';
-                                        dot2.style.color = '#999';
-                                        txt2.textContent = 'Analyze';
-                                    }, 3000);
-                                }
-                            });
-                        };
-                    }
-                });
-            },
-            function () { /* silently fail */ }
-        );
-    }
-
-    // ─── Video generation status ──────────────────── //
-    function updateVideoGenerationStatus(courseId) {
-        if (!courseId) return;
-        ajax('local_umat_ai_get_video_status', { courseid: courseId },
-            function (resp) {
-                var materials = resp.materials || [];
-                var lookup = {};
-                materials.forEach(function (m) { lookup[m.fileid] = m; });
-                document.querySelectorAll('.yt-tile').forEach(function (tile) {
-                    var btn = tile.querySelector('.yt-video-btn');
-                    if (!btn) return;
-                    var fileid = parseInt(tile.dataset.fileid) || 0;
-                    var info = lookup[fileid] || null;
-                    var mime = (tile.dataset.mime || '').toLowerCase();
-                    var isDoc = mime.indexOf('pdf') >= 0 || mime.indexOf('wordprocessingml') >= 0
-                        || mime.indexOf('presentationml') >= 0 || mime.indexOf('powerpoint') >= 0
-                        || mime.indexOf('msword') >= 0 || mime.indexOf('text/') === 0;
-                    if (!isDoc) { btn.style.display = 'none'; return; }
-                    btn.style.display = '';
-                    btn.dataset.fileid = fileid;
-                    var txt = btn.querySelector('.video-text');
-                    var ic = btn.querySelector('.material-symbols-outlined');
-                    var setQueuing = function(self) {
-                        ic.textContent = 'sync'; ic.style.color = '#ff9800';
-                        txt.textContent = 'Queuing...'; self.disabled = true;
-                    };
-                    var setGen = function(self) {
-                        ic.textContent = 'sync'; ic.style.color = '#ff9800';
-                        txt.textContent = 'Generating...'; self.disabled = true;
-                    };
-                    var setReady = function(self) {
-                        ic.textContent = 'check_circle'; ic.style.color = '#4caf50';
-                        txt.textContent = 'Watch'; self.disabled = false;
-                    };
-                    var setDefault = function(self) {
-                        ic.textContent = 'videocam'; ic.style.color = '';
-                        txt.textContent = 'Gen Video'; self.disabled = false;
-                    };
-                    var showError = function(self, msg) {
-                        ic.textContent = 'error'; ic.style.color = '#f44336';
-                        txt.textContent = msg || 'Failed';
-                        setTimeout(function() { setDefault(self); }, 3000);
-                    };
-                    if (info && info.has_video) {
-                        btn.title = 'View generated video';
-                        btn.onclick = function (e) {
-                            e.stopPropagation();
-                            if (info.video_url && window.umatMaterialViewer) {
-                                window.umatMaterialViewer.open('video', {
-                                    url: info.video_url,
-                                    name: 'AI-Generated Lecture Video',
-                                    downloadUrl: info.video_url,
-                                    mime: 'video/mp4'
-                                });
-                            } else if (info.video_url) {
-                                window.open(info.video_url, '_blank');
-                            }
-                        };
-                        setReady(btn);
-                    } else if (info && (info.job_status === 'processing' || info.job_status === 'queued')) {
-                        btn.title = 'Video is being generated';
-                        setGen(btn);
-                    } else {
-                        btn.title = 'Generate AI video from this material';
-                        btn.onclick = function (e) {
-                            e.stopPropagation();
-                            var self = this;
-                            setQueuing(self);
-                            ajax('local_umat_ai_request_video_generation', {
-                                courseid: courseId,
-                                fileid: fileid,
-                            }, function (res) {
-                                if (res.success) {
-                                    setGen(self);
-                                    self.title = 'Video generation queued';
-                                    setTimeout(function () {
-                                        if (typeof updateVideoGenerationStatus === 'function')
-                                            updateVideoGenerationStatus(courseId);
-                                    }, 5000);
-                                } else {
-                                    showError(self, res.message || 'Failed');
-                                }
-                            });
-                        };
-                        setDefault(btn);
-                    }
-                });
-            },
-            function () { /* silently fail */ }
-        );
-    }
-
     // ─── Exports ───────────────────────────────────── //
     return {
         // HTML escaping
@@ -1732,7 +1897,7 @@ define([], function() {
         getChatState: function() { return _chatState; },
 
         // Voice
-        _umatInitVoice: _umatInitVoice,
+        ChatVoiceInput: ChatVoiceInput,
 
         // Materials bar
         _umatRenderMatsBar: _umatRenderMatsBar,
@@ -1758,6 +1923,7 @@ define([], function() {
 
         // Renderers
         renderVideoTiles: renderVideoTiles,
+        showTranscriptModal: showTranscriptModal,
         renderCourses: renderCourses,
         renderLibrary: renderLibrary,
         renderLibTiles: renderLibTiles,
@@ -1772,10 +1938,6 @@ define([], function() {
         // AJAX
         ajax: ajax,
 
-        // Analysis
-        updateMaterialAnalysis: updateMaterialAnalysis,
 
-        // Video generation
-        updateVideoGenerationStatus: updateVideoGenerationStatus,
     };
 });

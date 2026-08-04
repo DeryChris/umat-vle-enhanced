@@ -12,6 +12,7 @@ question order and MC option order.
 """
 
 import io
+import logging
 import random
 import copy
 from typing import Any, Dict, List, Optional
@@ -24,10 +25,130 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn, nsdecls
 from docx.oxml import parse_xml
 
+logger = logging.getLogger(__name__)
+
 
 # ── Version seeds ──────────────────────────────────────────
 
 VERSION_SEEDS = {"A": 1001, "B": 2002, "C": 3003}
+
+
+# ── Normalization ──────────────────────────────────────────
+
+def _normalize_doc_settings(settings: Any) -> Dict[str, Any]:
+    """
+    Normalize doc_settings to ensure all nested fields have correct types.
+
+    PHP encodes empty JS objects {} as [] (JSON array). This function
+    detects and corrects such type mismatches at the API boundary.
+
+    Raises:
+        TypeError: If a critical field has an unfixable type mismatch.
+    """
+    if not isinstance(settings, dict):
+        logger.warning("[EXPORT] doc_settings is not a dict: type=%s, converting to dict", type(settings).__name__)
+        if isinstance(settings, list):
+            return {}
+        return {}
+
+    # Fix student_info_fields: must be dict, not list
+    sif = settings.get("student_info_fields")
+    if sif is not None and not isinstance(sif, dict):
+        logger.warning(
+            "[EXPORT] student_info_fields has wrong type: expected=dict, actual=%s. Converting to default.",
+            type(sif).__name__
+        )
+        if isinstance(sif, list) and len(sif) > 0:
+            # If it's a non-empty list, something is very wrong
+            logger.error("[EXPORT] student_info_fields is a non-empty list: %s. Using default.", _safe_summary(sif))
+        settings["student_info_fields"] = {"studentName": True, "studentId": True}
+
+    # Fix versions: must be list
+    versions = settings.get("versions")
+    if versions is not None:
+        if isinstance(versions, str):
+            settings["versions"] = [versions]
+        elif not isinstance(versions, list):
+            logger.warning("[EXPORT] versions has wrong type: %s, converting to list", type(versions).__name__)
+            settings["versions"] = ["A"]
+
+    # Fix boolean fields that might be wrong type
+    bool_fields = ["show_page_numbers", "show_marks", "show_student_fields"]
+    for field in bool_fields:
+        val = settings.get(field)
+        if val is not None and not isinstance(val, bool):
+            if isinstance(val, str):
+                settings[field] = val.lower() in ("true", "1", "yes")
+            elif isinstance(val, (int, float)):
+                settings[field] = bool(val)
+            else:
+                logger.warning("[EXPORT] %s has wrong type: %s, using True default", field, type(val).__name__)
+                settings[field] = True
+
+    # Fix numeric fields
+    numeric_fields = ["duration", "total_marks", "marks_per_question", "answer_spaces"]
+    for field in numeric_fields:
+        val = settings.get(field)
+        if val is not None and not isinstance(val, (int, float)):
+            try:
+                settings[field] = float(val) if "." in str(val) else int(val)
+            except (ValueError, TypeError):
+                logger.warning("[EXPORT] %s has non-numeric value: %s, using default", field, _safe_summary(val))
+                defaults = {"duration": 120, "total_marks": 100, "marks_per_question": 1, "answer_spaces": 0}
+                settings[field] = defaults.get(field, 0)
+
+    return settings
+
+
+# ── Logging helpers ────────────────────────────────────────
+
+def _safe_summary(value: Any, max_len: int = 100) -> str:
+    """Return a safe summary of a value for logging."""
+    if value is None:
+        return "None"
+    t = type(value).__name__
+    if isinstance(value, list):
+        return f"list(len={len(value)})"
+    if isinstance(value, dict):
+        return f"dict(keys={list(value.keys())[:5]})"
+    s = str(value)
+    if len(s) > max_len:
+        s = s[:max_len] + "..."
+    return f"{t}({s})"
+
+
+def _log_export_payload(
+    questions: List[Dict],
+    doc_settings: Dict,
+    export_type: str,
+    version: str,
+) -> None:
+    """Log structured export payload for debugging."""
+    logger.info("[EXPORT] Starting document generation")
+    logger.info("[EXPORT]   export_type=%s  version=%s", export_type, version)
+    logger.info("[EXPORT]   questions: %s", _safe_summary(questions))
+    logger.info("[EXPORT]   doc_settings keys: %s", list(doc_settings.keys()) if isinstance(doc_settings, dict) else _safe_summary(doc_settings))
+
+    # Log critical nested fields
+    critical_fields = [
+        "student_info_fields", "versions", "answer_spaces",
+        "marks_per_question", "show_marks", "show_page_numbers",
+    ]
+    for field in critical_fields:
+        if isinstance(doc_settings, dict) and field in doc_settings:
+            val = doc_settings[field]
+            logger.info("[EXPORT]   doc_settings.%s: type=%s value=%s", field, type(val).__name__, _safe_summary(val))
+
+    # Log each question's structure
+    for i, q in enumerate(questions[:3]):  # First 3 only
+        if isinstance(q, dict):
+            logger.info("[EXPORT]   question[%d]: type=%s keys=%s", i, type(q).__name__, list(q.keys()))
+            # Check options specifically
+            opts = q.get("options")
+            if opts is not None:
+                logger.info("[EXPORT]   question[%d].options: type=%s len=%s", i, type(opts).__name__, len(opts) if hasattr(opts, '__len__') else "N/A")
+        else:
+            logger.warning("[EXPORT]   question[%d]: UNEXPECTED TYPE=%s value=%s", i, type(q).__name__, _safe_summary(q))
 
 
 # ── Public API ─────────────────────────────────────────────
@@ -50,6 +171,12 @@ def generate_document(
     Returns:
         Raw bytes of the .docx file.
     """
+    # Structured logging before generation
+    _log_export_payload(questions, doc_settings, export_type, version)
+
+    # Normalize doc_settings at boundary
+    doc_settings = _normalize_doc_settings(doc_settings)
+
     rng = random.Random(VERSION_SEEDS.get(version, 1001))
 
     ordered = _apply_version_order(questions, version, rng)
@@ -224,7 +351,9 @@ def _add_thin_line(doc: Document):
 def _add_student_info(doc: Document, settings: Dict):
     fields_cfg = settings.get("student_info_fields", None)
 
-    if fields_cfg is None:
+    # Guard: PHP encodes empty JS objects as [] (list), not {} (dict)
+    # Also handle any non-dict type that might slip through
+    if not isinstance(fields_cfg, dict):
         if not settings.get("show_student_fields", True):
             return
         fields_cfg = {"studentName": True, "studentId": True}

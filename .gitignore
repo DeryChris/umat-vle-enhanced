@@ -249,3 +249,42 @@ docs/thesis documentation
 
 # LLM cache
 ai_service/.llm_cache
+
+# ============================================================
+# Runtime logs & scratch (never commit)
+# ============================================================
+moodle_cron_stderr.log
+moodle_cron_stdout.log
+ngrok_ai.log
+ngrok_moodle.log
+ngrok_output.txt
+ngrok_error.txt
+ai_service/.whisper_cost.json
+
+# ============================================================
+# Throwaway dev/debug scripts (root + moodle/)
+# ============================================================
+list_courses.php
+debug_config.php
+create_students.php
+reset_student_passwords.php
+moodle/add_title_field.php
+moodle/check_materials.php
+moodle/check_schema.php
+moodle/check_sessions*.php
+moodle/fix_recordings*.php
+moodle/fix_visibility.php
+moodle/test_api*.php
+moodle/test_db.php
+moodle/test_student.php
+moodle/tunnel_config.php
+
+.phase1_backup/
+Presentation_Structure.md
+Presentation_Slides.md
+Presentation_Slides_15.md
+Presentation_Outline.md
+Presentation_Final.md
+Performance_Metrics.md
+Performance_Metrics_Slide.md
+Implementation_and_Outcomes.md

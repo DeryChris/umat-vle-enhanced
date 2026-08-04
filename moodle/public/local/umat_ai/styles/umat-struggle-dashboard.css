@@ -513,3 +513,71 @@
   border-radius: var(--u-r12);
   background: #fff;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Phase 1 — data-provenance, honest-empty and error states
+   Added alongside the risk-model correction so the dashboard can state which
+   window it analysed, when it was computed, and when a figure is unavailable
+   rather than printing a misleading zero or percentage.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Analytics date range + last-updated strip, pinned above the stat tiles. */
+.ins-provenance {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  font-size: 11.5px;
+  color: var(--u-ol);
+  background: var(--u-sflo);
+  border: 1px solid var(--u-olv);
+  border-radius: var(--u-r8);
+}
+.ins-provenance .material-symbols-outlined { font-size: 15px; }
+.ins-provenance-sep { opacity: 0.5; }
+.ins-provenance-updated { font-weight: 600; }
+/* Data older than the refresh interval is flagged rather than shown silently. */
+.ins-provenance-stale { color: var(--u-warn); }
+
+/* Error state — visually distinct from "no data yet", which it used to
+   be indistinguishable from. */
+.ins-empty.ins-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--u-ter);
+}
+.ins-empty.ins-error .material-symbols-outlined { font-size: 17px; }
+
+/* Explanatory note under a card title. */
+.ins-card-note {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--u-ol);
+}
+
+/* A topic bar with no affected students shows the words, not a 0% fill. */
+.ins-heatmap-bar-empty {
+  width: 100% !important;
+  background: transparent !important;
+  border: 1px dashed var(--u-olv);
+  color: var(--u-ol);
+  font-style: italic;
+}
+.ins-heatmap-bar-empty .ins-heatmap-bar-val { color: var(--u-ol); }
+
+/* Secondary note under the question-activity comparison. */
+.ins-sparkline-note {
+  font-size: 10.5px;
+  opacity: 0.8;
+}
+
+/* Confidence badge is wider now that it reads "72% confidence". */
+.ins-confidence-badge { white-space: nowrap; }
+
+@media (max-width: 600px) {
+  .ins-provenance { font-size: 10.5px; }
+}
