@@ -613,10 +613,13 @@ async def generate_quiz(
 # ── Word Export ────────────────────────────────────────────
 
 class WordExportRequest(BaseModel):
-    questions:    List[Dict[str, Any]]
-    export_type:  str = "question_paper"
-    version:      str = "A"
-    doc_settings: Dict[str, Any] = Field(default_factory=dict)
+    # Permissive types: full validation happens in _validate_export_payload so we
+    # can return custom error codes (e.g. INVALID_EXPORT_PAYLOAD) instead of
+    # Pydantic's default 422 structure.
+    questions:    Any
+    export_type:  Any = "question_paper"
+    version:      Any = "A"
+    doc_settings: Any = Field(default_factory=dict)
 
 
 class WordExportResponse(BaseModel):
@@ -641,6 +644,18 @@ def _validate_export_payload(request: WordExportRequest) -> None:
                 "field": "questions",
                 "expected": "list",
                 "received": type(request.questions).__name__
+            }
+        )
+
+    # Reject empty questions list (no document can be generated without questions).
+    if len(request.questions) == 0:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "EMPTY_QUESTIONS",
+                "field": "questions",
+                "expected": "non-empty list",
+                "received": "empty list"
             }
         )
     

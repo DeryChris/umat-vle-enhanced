@@ -35,11 +35,17 @@ from core.transcription import (
     WHISPER_PRICING,
 )
 
-# Force reload settings with test env vars
+# Force reload settings with test env vars. We must also reload
+# core.transcription so its module-level `settings` binding picks up the
+# fresh cache (otherwise it keeps the copy made when another test module
+# imported config first, and the cloud path is skipped).
 import importlib
 import config as config_module
+import core.transcription as transcription_module
 importlib.reload(config_module)
-settings = get_settings()
+importlib.reload(transcription_module)
+from config import get_settings as _fresh_get_settings
+settings = _fresh_get_settings()
 
 SAMPLE_AUDIO_PATH = os.path.join(os.path.dirname(__file__), "fixtures", "test_audio.wav")
 
