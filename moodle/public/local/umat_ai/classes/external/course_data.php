@@ -265,9 +265,12 @@ class course_data extends \external_api {
         // --- FETCH BBB RECORDINGS FOR THIS COURSE ---
         $recordings = [];
         if ($cid > 0) {
+            // NOTE: 'title' is intentionally NOT selected here - the schema has no
+            // such column on umat_ai_sessions; display titles are derived from
+            // timecreated (see 'BBB Recording - ' below).
             $recs = $DB->get_records('umat_ai_sessions', [
                 'courseid' => $cid,
-            ], 'timecreated DESC', 'id,sessionid,courseid,title,recording_url,timecreated,status,studentvisible,resource_type,timemodified,transcript_json');
+            ], 'timecreated DESC', 'id,sessionid,courseid,recording_url,timecreated,status,studentvisible,resource_type,timemodified,transcript_json');
             foreach ($recs as $rec) {
                 // Skip recordings without a URL.
                 if (empty($rec->recording_url)) {

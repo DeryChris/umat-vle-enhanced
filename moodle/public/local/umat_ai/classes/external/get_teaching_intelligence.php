@@ -731,27 +731,55 @@ class get_teaching_intelligence extends \external_api {
     private static function build_recording_analytics($cid, $since, $enrolledCount = 0): array {
         global $DB;
 
-        $sessions = $DB->get_records_sql(
-            "SELECT s.id, s.sessionid, s.recording_url, s.title, s.duration_min,
-                    COUNT(DISTINCT v.id) AS view_count,
-                    AVG(v.watch_duration_min) AS avg_watch_duration,
-                    SUM(CASE WHEN v.watch_duration_min >= s.duration_min THEN 1 ELSE 0 END) AS completed_count
-               FROM {umat_ai_bbb_sessions} s
-               LEFT JOIN {umat_ai_bbb_views} v ON v.sessionid = s.sessionid AND v.courseid = s.courseid
-              WHERE s.courseid = :cid AND s.timecreated > :since
-              GROUP BY s.id, s.sessionid, s.recording_url, s.title, s.duration_min
-              ORDER BY s.timecreated DESC",
-            ['cid' => $cid, 'since' => $since]
-        );
+        // NOTE: The legacy {umat_ai_bbb_sessions}/{umat_ai_bbb_views} tables
+        // referenced by the original analytics suite were never part of the
+        // schema. Fall back to the real {umat_ai_sessions} table so the
+        // Teaching Intelligence dashboard never crashes; view tracking is
+        // unavailable (no bbb_views table), so those figures report 0.
+        $sessiontable = 'umat_ai_sessions';
+        if (!$DB->get_manager()->table_exists('umat_ai_bbb_sessions')) {
+            // Fallback: list recordings from the real sessions table. No view
+            // tracking exists (legacy bbb_views table is absent), so views and
+            // watch duration report 0 / NULL and completion uses the default.
+            $sessions = $DB->get_records_sql(
+                "SELECT s.id, s.sessionid, s.recording_url,
+                        NULL AS duration_min,
+                        0 AS view_count,
+                        NULL AS avg_watch_duration,
+                        0 AS completed_count
+                   FROM {umat_ai_sessions} s
+                  WHERE s.courseid = :cid AND s.timecreated > :since
+                    AND s.recording_url IS NOT NULL AND s.recording_url <> ''
+                  ORDER BY s.timecreated DESC",
+                ['cid' => $cid, 'since' => $since]
+            );
+        } else {
+            $sessions = $DB->get_records_sql(
+                "SELECT s.id, s.sessionid, s.recording_url, s.title, s.duration_min,
+                        COUNT(DISTINCT v.id) AS view_count,
+                        AVG(v.watch_duration_min) AS avg_watch_duration,
+                        SUM(CASE WHEN v.watch_duration_min >= s.duration_min THEN 1 ELSE 0 END) AS completed_count
+                   FROM {umat_ai_bbb_sessions} s
+                   LEFT JOIN {umat_ai_bbb_views} v ON v.sessionid = s.sessionid AND v.courseid = s.courseid
+                  WHERE s.courseid = :cid AND s.timecreated > :since
+                  GROUP BY s.id, s.sessionid, s.recording_url, s.title, s.duration_min
+                  ORDER BY s.timecreated DESC",
+                ['cid' => $cid, 'since' => $since]
+            );
+        }
 
-        // Count distinct students who watched any recording in this course
-        $distinctWatchers = (int) $DB->get_field_sql(
-            "SELECT COUNT(DISTINCT v.userid)
-               FROM {umat_ai_bbb_views} v
-               JOIN {umat_ai_bbb_sessions} s ON s.sessionid = v.sessionid AND s.courseid = v.courseid
-              WHERE v.courseid = :cid AND s.timecreated > :since",
-            ['cid' => $cid, 'since' => $since]
-        );
+        // Count distinct students who watched any recording in this course.
+        // Only possible when the legacy view-tracking tables exist.
+        $distinctWatchers = 0;
+        if ($DB->get_manager()->table_exists('umat_ai_bbb_views')) {
+            $distinctWatchers = (int) $DB->get_field_sql(
+                "SELECT COUNT(DISTINCT v.userid)
+                   FROM {umat_ai_bbb_views} v
+                   JOIN {umat_ai_bbb_sessions} s ON s.sessionid = v.sessionid AND s.courseid = v.courseid
+                  WHERE v.courseid = :cid AND s.timecreated > :since",
+                ['cid' => $cid, 'since' => $since]
+            );
+        }
 
         $result = [];
         foreach ($sessions as $sess) {
