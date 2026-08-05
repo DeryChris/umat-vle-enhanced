@@ -73,6 +73,62 @@ function local_umat_ai_is_student(int $courseid): bool {
 }
 
 /**
+ * Apply one SM-2 review step (canonical SuperMemo-2).
+ *
+ * Mirrors ai_service/core/spaced_repetition.py::sm2_update — keep both in sync.
+ *
+ * @param int   $quality     Self-assessment 0-5 (4-button UI maps again=1, hard=3, good=4, easy=5)
+ * @param float $ease        Current ease factor (default 2.5, floored at 1.3)
+ * @param int   $interval    Current interval in days (0 = never reviewed)
+ * @param int   $repetitions Current repetition count
+ * @return array ['ease' => float, 'interval' => int, 'repetitions' => int]
+ */
+function local_umat_ai_sm2_review(int $quality, float $ease = 2.5, int $interval = 0, int $repetitions = 0): array {
+    $quality = max(0, min(5, $quality));
+
+    // Ease factor update: EF' = EF + (0.1 - (5-q) * (0.08 + (5-q) * 0.02)), floored at 1.3.
+    $ease = max(1.3, $ease + (0.1 - (5 - $quality) * (0.08 + (5 - $quality) * 0.02)));
+
+    if ($quality < 3) {
+        // Lapse: repeat tomorrow, repetitions reset.
+        return ['ease' => $ease, 'interval' => 1, 'repetitions' => 0];
+    }
+
+    $reps = $repetitions + 1;
+    if ($reps === 1) {
+        $interval = 1;
+    } else if ($reps === 2) {
+        $interval = 6;
+    } else {
+        $interval = max(1, (int) round($interval * $ease));
+    }
+
+    return ['ease' => $ease, 'interval' => $interval, 'repetitions' => $reps];
+}
+
+/**
+ * Map a UI review button to the SM-2 quality score.
+ *
+ * @param string $button 'again'|'hard'|'good'|'easy'
+ * @return int|null Quality 1/3/4/5, or null when unknown.
+ */
+function local_umat_ai_sm2_button_quality(string $button): ?int {
+    $map = ['again' => 1, 'hard' => 3, 'good' => 4, 'easy' => 5];
+    return $map[strtolower($button)] ?? null;
+}
+
+/**
+ * Next review timestamp in epoch seconds for an interval (days).
+ *
+ * @param int $interval Interval in days
+ * @param int $now      Epoch reference time (defaults to time())
+ * @return int Epoch timestamp of the next due review
+ */
+function local_umat_ai_sm2_next_due(int $interval, int $now = 0): int {
+    return ($now ?: time()) + $interval * 86400;
+}
+
+/**
  * Base64url encode (JWT helper).
  *
  * @param string $data

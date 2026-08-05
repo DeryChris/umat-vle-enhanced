@@ -1305,3 +1305,147 @@ body.umat-body-lock{overflow:hidden;}
 
 .umat-ss-foot{padding:7px 12px;border-top:1px solid var(--u-olv);font-size:10px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--u-ol);background:var(--u-sflo);}
 
+/* ================= FLASHCARDS (M2 / F3 spaced repetition) ================= */
+.umat-fc-wrap{display:flex;flex-direction:column;gap:14px;padding:2px 2px 16px;flex:1;min-height:0;overflow-y:auto;}
+
+.umat-fc-stats{display:flex;gap:10px;}
+.umat-fc-stat{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:12px 8px;border-radius:var(--u-r12);background:var(--u-sflo);
+  border:1px solid var(--u-olv);
+}
+.umat-fc-stat-num{font-size:22px;font-weight:800;color:var(--u-p);line-height:1;}
+.umat-fc-stat-lbl{font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--u-ol);}
+
+.umat-fc-start-row{display:flex;justify-content:center;}
+.umat-fc-start-row .umat-btn-p{max-width:320px;width:100%;}
+
+/* Review mode */
+.umat-fc-review{display:flex;flex-direction:column;align-items:center;gap:12px;}
+.umat-fc-card{
+  width:100%;max-width:520px;height:260px;perspective:1200px;cursor:pointer;user-select:none;
+}
+.umat-fc-card-inner{
+  position:relative;width:100%;height:100%;transform-style:preserve-3d;
+  transition:transform .45s cubic-bezier(.2,.7,.3,1.1);
+}
+.umat-fc-card-inner.flipped{transform:rotateY(180deg);}
+.umat-fc-face{
+  position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  display:flex;flex-direction:column;gap:12px;padding:26px 24px;
+  border-radius:var(--u-r16);border:1px solid var(--u-olv);background:var(--u-sflo);
+  box-shadow:0 8px 24px rgba(0,0,0,.10);overflow-y:auto;
+}
+.umat-fc-front .umat-fc-topic{color:var(--u-p);}
+.umat-fc-back{transform:rotateY(180deg);background:var(--u-p);border-color:transparent;}
+.umat-fc-back .umat-fc-topic{color:rgba(255,255,255,.75);}
+.umat-fc-back .umat-fc-text{color:#fff;}
+.umat-fc-topic{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--u-ol);}
+.umat-fc-text{font-size:15px;line-height:1.55;color:var(--u-ons);overflow-wrap:break-word;}
+.umat-fc-flip-hint{font-size:11px;color:var(--u-ol);text-align:center;}
+
+/* Grade buttons (SM-2 four-button grading) */
+.umat-fc-actions{display:flex;gap:8px;width:100%;max-width:520px;flex-wrap:wrap;}
+.umat-fc-btn{
+  flex:1;min-width:90px;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:10px 6px;border:1px solid var(--u-olv);border-radius:var(--u-r12);
+  background:var(--u-sflo);color:var(--u-ons);cursor:pointer;font-family:inherit;
+  transition:transform .12s,box-shadow .12s;
+}
+.umat-fc-btn:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.12);}
+.umat-fc-btn:active{transform:translateY(0) scale(.98);}
+.umat-fc-btn-lbl{font-size:13px;font-weight:800;}
+.umat-fc-btn-sub{font-size:10px;color:var(--u-ol);font-weight:600;}
+.umat-fc-btn.fc-again{border-color:#ef4444;color:#ef4444;}
+.umat-fc-btn.fc-hard{border-color:#d97706;color:#d97706;}
+.umat-fc-btn.fc-good{border-color:var(--u-sec);color:var(--u-sec);}
+.umat-fc-btn.fc-easy{border-color:var(--u-p);color:var(--u-p);}
+.umat-fc-progress{font-size:11px;font-weight:700;color:var(--u-ol);letter-spacing:.5px;}
+
+/* Deck grid */
+.umat-fc-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;
+}
+.umat-fc-deck-item{
+  display:flex;flex-direction:column;gap:8px;padding:14px;
+  border-radius:var(--u-r12);border:1px solid var(--u-olv);background:var(--u-sflo);
+  transition:transform .12s,border-color .12s;
+}
+.umat-fc-deck-item:hover{transform:translateY(-2px);}
+.umat-fc-deck-item.umat-fc-deck-due{border-color:var(--u-p);box-shadow:0 0 0 1px var(--u-p) inset;}
+.umat-fc-deck-topic{font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--u-p);}
+.umat-fc-deck-front{font-size:12px;font-weight:600;line-height:1.4;color:var(--u-ons);overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}
+.umat-fc-deck-meta{margin-top:auto;}
+.umat-fc-deck-badge{
+  display:inline-block;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:800;
+  letter-spacing:.5px;text-transform:uppercase;color:#ef4444;background:rgba(239,68,68,.12);
+}
+.umat-fc-deck-badge.ok{color:var(--u-sec);background:rgba(22,163,74,.12);}
+
+/* ============ Flashcards — lecturer (generate + approve) ============ */
+.umat-btn-xs-r{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;background:var(--u-sflo);color:#ef4444;border:1px solid #ef4444;border-radius:var(--u-rp)}
+
+.umat-fc-lect-stats{display:flex;gap:8px;flex-wrap:wrap;padding:4px 0 14px;}
+.umat-fc-lect-chip{
+  display:inline-flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;font-weight:600;
+  border-radius:20px;border:1px solid var(--u-olv);background:var(--u-sflo);color:var(--u-ons);
+}
+.umat-fc-lect-chip b{color:var(--u-sec);font-size:13px;}
+.umat-fc-lect-chip.warn b{color:#d97706;}
+.umat-fc-lect-chip.muted b{color:var(--u-ol);}
+
+.umat-fc-lect-card{
+  border:1px solid var(--u-olv);border-radius:var(--u-r16);background:var(--u-sflo);
+  margin-bottom:14px;overflow:hidden;
+}
+.umat-fc-lect-hdr{
+  display:flex;align-items:center;gap:10px;padding:13px 16px;
+  border-bottom:1px solid var(--u-olv);background:var(--u-sfl);
+}
+.umat-fc-lect-hdr>.material-symbols-outlined{font-size:20px;color:var(--u-p);}
+.umat-fc-lect-hdr strong{display:block;font-size:13px;color:var(--u-ons);}
+.umat-fc-lect-hdr small{font-size:11px;color:var(--u-ol);line-height:1.4;}
+.umat-fc-lect-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px;}
+.umat-fc-lect-empty{padding:18px;text-align:center;font-size:12px;color:var(--u-ol);}
+
+.umat-fc-mat-list{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;}
+.umat-fc-mat-item{
+  display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--u-r8);
+  border:1px solid var(--u-olv);background:var(--u-sfl);font-size:12px;color:var(--u-ons);
+  cursor:pointer;transition:border-color .12s,background .12s;
+}
+.umat-fc-mat-item:hover{border-color:var(--u-p);}
+.umat-fc-mat-item input{accent-color:var(--u-p);}
+.umat-fc-mat-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.umat-fc-mat-tag{
+  flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+  color:#d97706;background:rgba(217,119,6,.12);padding:2px 7px;border-radius:20px;
+}
+.umat-fc-lect-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+.umat-fc-lect-row label{display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--u-ol);}
+.umat-fc-lect-row input,.umat-fc-lect-row select{
+  padding:7px 10px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:12px;
+  font-family:inherit;background:var(--u-sfl);color:var(--u-ons);outline:none;min-width:150px;
+}
+.umat-fc-lect-row input:focus,.umat-fc-lect-row select:focus{border-color:var(--u-p);}
+.umat-fc-lect-row .umat-btn-p{margin-left:auto;}
+.umat-fc-lect-msg{font-size:12px;color:var(--u-ol);min-height:18px;}
+.umat-fc-lect-msg-ok{color:var(--u-sec);font-weight:600;}
+.umat-fc-lect-msg-err{color:#ef4444;font-weight:600;}
+
+.umat-fc-approve-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.umat-fc-approve-bar .umat-fc-mat-item{flex:1;min-width:140px;}
+.umat-fc-pending-list{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;}
+.umat-fc-pending-item{
+  display:flex;gap:10px;padding:11px 12px;border-radius:var(--u-r10);
+  border:1px solid var(--u-olv);background:var(--u-sfl);cursor:pointer;transition:border-color .12s;
+}
+.umat-fc-pending-item:hover{border-color:var(--u-p);}
+.umat-fc-pending-item input{accent-color:var(--u-p);margin-top:3px;}
+.umat-fc-pending-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.umat-fc-pending-topic{font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--u-p);}
+.umat-fc-pending-front{font-size:12px;font-weight:700;color:var(--u-ons);line-height:1.4;}
+.umat-fc-pending-back{font-size:11px;color:var(--u-ol);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+
+
+

@@ -912,5 +912,51 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026080400, 'local', 'umat_ai');
     }
 
+    if ($oldversion < 2026080500) {
+        // M2 (F3 Spaced-Repetition Flashcards): deck + per-student review state.
+        // status: 0=pending lecturer approval, 1=approved (visible to students),
+        //         -1=rejected by lecturer.
+        $fc = new xmldb_table('umat_ai_flashcards');
+        if (!$dbman->table_exists($fc)) {
+            $fc->add_field('id',           XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $fc->add_field('courseid',     XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, null);
+            $fc->add_field('materialid',   XMLDB_TYPE_INTEGER, '10',  null, null,  null, null);
+            $fc->add_field('front',        XMLDB_TYPE_TEXT,    null,  null, XMLDB_NOTNULL,  null, null);
+            $fc->add_field('back',         XMLDB_TYPE_TEXT,    null,  null, XMLDB_NOTNULL,  null, null);
+            $fc->add_field('topic',        XMLDB_TYPE_CHAR,   '255', null, null,  null, '');
+            $fc->add_field('status',       XMLDB_TYPE_INTEGER, '1',  null, XMLDB_NOTNULL,  null, '0');
+            $fc->add_field('created_by',   XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, null);
+            $fc->add_field('approved_by',  XMLDB_TYPE_INTEGER, '10',  null, null,  null, null);
+            $fc->add_field('timecreated',  XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, '0');
+            $fc->add_field('timemodified', XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, '0');
+            $fc->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $fc->add_index('course_status', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'status']);
+            $fc->add_index('material',      XMLDB_INDEX_NOTUNIQUE, ['materialid']);
+            $dbman->create_table($fc);
+        }
+
+        // SM-2 review state — one row per student per card (unique constraint
+        // makes re-review an upsert).
+        $fr = new xmldb_table('umat_ai_flashcard_reviews');
+        if (!$dbman->table_exists($fr)) {
+            $fr->add_field('id',           XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $fr->add_field('userid',       XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, null);
+            $fr->add_field('flashcardid',  XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, null);
+            $fr->add_field('quality',      XMLDB_TYPE_INTEGER, '1',   null, XMLDB_NOTNULL,  null, '0');
+            $fr->add_field('ease',         XMLDB_TYPE_NUMBER,  '10,5', null, XMLDB_NOTNULL,  null, '2.5');
+            $fr->add_field('interval',     XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, '0');
+            $fr->add_field('repetitions',  XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, '0');
+            $fr->add_field('due_at',       XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, '0');
+            $fr->add_field('timereviewed', XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, '0');
+            $fr->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $fr->add_key('flashcard_fk', XMLDB_KEY_FOREIGN, ['flashcardid'], 'umat_ai_flashcards', ['id'], 'cascade');
+            $fr->add_index('user_flashcard', XMLDB_INDEX_UNIQUE, ['userid', 'flashcardid']);
+            $fr->add_index('user_due',       XMLDB_INDEX_NOTUNIQUE, ['userid', 'due_at']);
+            $dbman->create_table($fr);
+        }
+
+        upgrade_plugin_savepoint(true, 2026080500, 'local', 'umat_ai');
+    }
+
     return true;
 }

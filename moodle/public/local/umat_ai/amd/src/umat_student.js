@@ -2033,6 +2033,138 @@ switchToTab=function(name){
   _origSwitchToTab(name);
 };
 
+/* ---- FLASHCARDS TAB (M2 / F3 spaced repetition) ---- */
+var fcLoaded=false, fcDue=[], fcAll=[], fcIdx=0, fcReviewing=false;
+function _fcEl(id){return document.getElementById(id);}
+function _fcAjax(method,args){
+  return require(['core/ajax'],function(A){
+    return A.call([{methodname:method,args:args}])[0];
+  });
+}
+function _fcMsg(text){
+  var el=_fcEl('ws-fc-empty-text');
+  if(el)el.textContent=text;
+  var empty=_fcEl('ws-fc-empty');
+  if(empty)empty.style.display='flex';
+}
+function _fcStats(){
+  var due=_fcEl('ws-fc-due-count'),tot=_fcEl('ws-fc-total-count'),neu=_fcEl('ws-fc-new-count');
+  var dueCount=fcDue.length;
+  var newCount=0, i, c;
+  for(i=0;i<fcAll.length;i++){c=fcAll[i];if(!c.review)newCount++;}
+  if(due)due.textContent=dueCount;
+  if(tot)tot.textContent=fcAll.length;
+  if(neu)neu.textContent=newCount;
+  var start=_fcEl('ws-fc-start'),cnt=_fcEl('ws-fc-start-count');
+  if(start){start.style.display=dueCount>0&&!fcReviewing?'flex':'none';}
+  if(cnt)cnt.textContent=dueCount;
+}
+function _fcRenderGrid(){
+  var grid=_fcEl('ws-fc-grid');if(!grid)return;
+  var empty=_fcEl('ws-fc-empty');
+  if(!fcAll.length){grid.innerHTML='';if(empty)empty.style.display='flex';return;}
+  if(empty)empty.style.display='none';
+  var now=Math.floor(Date.now()/1000);
+  grid.innerHTML=fcAll.map(function(c){
+    var due=c.review&&c.review.due_at<=now;
+    return '<div class="umat-fc-deck-item'+(due?' umat-fc-deck-due':'')+'" data-id="'+c.id+'">'
+      +'<div class="umat-fc-deck-topic">'+_umatEsc(c.topic||'General')+'</div>'
+      +'<div class="umat-fc-deck-front">'+_umatEsc(c.front)+'</div>'
+      +'<div class="umat-fc-deck-meta"><span class="umat-fc-deck-badge'+(due?'':' ok')+'">'+(due?'due now':'learned')+'</span></div>'
+      +'</div>';
+  }).join('');
+}
+function _fcShowReview(){
+  fcReviewing=true;
+  var review=_fcEl('ws-fc-review'),start=_fcEl('ws-fc-start'),grid=_fcEl('ws-fc-grid');
+  if(review)review.style.display='block';
+  if(start)start.style.display='none';
+  if(grid)grid.style.display='none';
+}
+function _fcShowCard(i){
+  var c=fcDue[i];if(!c){_fcFinishReview();return;}
+  fcIdx=i;
+  var inner=_fcEl('ws-fc-card-inner');
+  if(inner)inner.classList.remove('flipped');
+  _fcEl('ws-fc-topic').textContent=c.topic||'General';
+  _fcEl('ws-fc-topic-back').textContent=c.topic||'General';
+  _fcEl('ws-fc-front').textContent=c.front;
+  _fcEl('ws-fc-back').textContent=c.back;
+  _fcEl('ws-fc-flip-hint').style.display='';
+  _fcEl('ws-fc-actions').style.display='none';
+  _fcEl('ws-fc-progress').textContent=(i+1)+' / '+fcDue.length;
+  _fcShowReview();
+}
+function _fcFinishReview(){
+  fcReviewing=false;
+  var review=_fcEl('ws-fc-review'),grid=_fcEl('ws-fc-grid'),hint=_fcEl('ws-fc-flip-hint');
+  if(review)review.style.display='none';
+  if(grid)grid.style.display='';
+  if(_fcEl('ws-fc-progress'))_fcEl('ws-fc-progress').textContent='';
+  if(hint){hint.style.display='';hint.textContent='Review complete — nice work!';}
+  _fcLoad();
+}
+function _fcGrade(grade){
+  var c=fcDue[fcIdx];if(!c||fcReviewing===false)return;
+  var btn=_fcEl('ws-fc-card');if(btn)btn.style.pointerEvents='none';
+  _fcAjax('local_umat_ai_submit_flashcard_review',{cardid:c.id,courseid:courseId,button:grade})
+    .done(function(r){
+      if(btn)btn.style.pointerEvents='';
+      if(r&&r.success){if(fcIdx+1<fcDue.length){_fcShowCard(fcIdx+1);}else{_fcFinishReview();}}
+      else{_fcMsg((r&&r.message)||'Review could not be saved.');if(btn)btn.style.pointerEvents='';}
+    })
+    .fail(function(){
+      if(btn)btn.style.pointerEvents='';
+      _fcMsg('Could not reach the server. Try again.');
+    });
+}
+function _fcLoad(){
+  if(!courseId){
+    _fcMsg('Select a course to view flashcards.');
+    _fcStats();
+    return;
+  }
+  _fcAjax('local_umat_ai_get_due_flashcards',{courseid:courseId,limit:100})
+    .done(function(due){
+      fcDue=(due&&due.cards)||[];
+      _fcAjax('local_umat_ai_get_flashcards',{courseid:courseId,status:1})
+        .done(function(all){
+          fcAll=(all&&all.cards)||[];
+          _fcStats();
+          _fcRenderGrid();
+        })
+        .fail(function(){_fcMsg('Could not load the deck.');});
+    })
+    .fail(function(){_fcMsg('Could not load due cards.');});
+}
+function _fcInit(){
+  fcLoaded=true;
+  var start=_fcEl('ws-fc-start');
+  if(start)start.addEventListener('click',function(){
+    if(!fcDue.length){_fcLoad();return;}
+    _fcShowCard(0);
+  });
+  var refresh=_fcEl('ws-fc-refresh');
+  if(refresh)refresh.addEventListener('click',function(){_fcLoad();});
+  var card=_fcEl('ws-fc-card');
+  if(card)card.addEventListener('click',function(){
+    if(!fcReviewing||fcDue.length===0)return;
+    var inner=_fcEl('ws-fc-card-inner');
+    var flipped=inner.classList.toggle('flipped');
+    _fcEl('ws-fc-flip-hint').style.display=flipped?'none':'';
+    _fcEl('ws-fc-actions').style.display=flipped?'flex':'none';
+  });
+  _fcEl('ws-fc-actions').querySelectorAll('.umat-fc-btn').forEach(function(b){
+    b.addEventListener('click',function(){_fcGrade(b.dataset.grade);});
+  });
+  _fcLoad();
+}
+var _origSwitchToTab2=switchToTab;
+switchToTab=function(name){
+  if(name==='flashcards'&&!fcLoaded){_fcInit();}
+  _origSwitchToTab2(name);
+};
+
 pollUnreadCount();
 var _stuBadgeTimer=setInterval(pollUnreadCount,30000);
 })();

@@ -448,6 +448,37 @@ $functions = [
         'type' => 'write', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
+    /* ---- Flashcards (M2 / F3 spaced repetition) ---- */
+    'local_umat_ai_generate_flashcards' => [
+        'classname'   => '\local_umat_ai\external\flashcards', 'methodname' => 'generate_flashcards',
+        'description' => 'Lecturer generates flashcards from indexed materials via the AI service',
+        'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:approveoutput',
+    ],
+    'local_umat_ai_approve_flashcards' => [
+        'classname'   => '\local_umat_ai\external\flashcards', 'methodname' => 'approve_flashcards',
+        'description' => 'Lecturer approves or rejects pending flashcards in bulk',
+        'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:approveoutput',
+    ],
+    'local_umat_ai_get_flashcards' => [
+        'classname'   => '\local_umat_ai\external\flashcards', 'methodname' => 'get_flashcards',
+        'description' => 'List flashcards for a course (students see approved cards only)',
+        'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewsummary',
+    ],
+    'local_umat_ai_get_due_flashcards' => [
+        'classname'   => '\local_umat_ai\external\flashcards', 'methodname' => 'get_due_flashcards',
+        'description' => 'Get the student\'s due flashcard review queue (SM-2)',
+        'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_submit_flashcard_review' => [
+        'classname'   => '\local_umat_ai\external\flashcards', 'methodname' => 'submit_review',
+        'description' => 'Student grades a flashcard (again/hard/good/easy) updating SM-2 state',
+        'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
 ];
 
 $services = [

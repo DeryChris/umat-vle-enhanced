@@ -97,6 +97,7 @@ JS;
             ['id' => 'ai-tutor',  'icon' => 'smart_toy',     'label' => 'AI Tutor',  'active' => false],
             ['id' => 'courses',   'icon' => 'menu_book',     'label' => 'My Courses','active' => false],
             ['id' => 'library',   'icon' => 'local_library', 'label' => 'Resource Materials', 'active' => false],
+            ['id' => 'flashcards','icon' => 'style',         'label' => 'Flashcards','active' => false],
             ['id' => 'my-notes',  'icon' => 'note_add',      'label' => 'My Notes',  'active' => false],
             ['id' => 'sessions',   'icon' => 'chat_bubble',   'label' => 'Sessions',   'active' => false],
             ['id' => 'report-issue', 'icon' => 'forum',      'label' => 'Student Issues','active' => false, 'badge' => 'responses'],
@@ -110,6 +111,7 @@ JS;
             ['id' => 'ai-tutor', 'icon' => 'smart_toy',   'label' => 'Tutor',    'active' => false],
             ['id' => 'courses',  'icon' => 'menu_book',   'label' => 'Courses',  'active' => false],
             ['id' => 'library',  'icon' => 'local_library','label' => 'Resource Materials', 'active' => false],
+            ['id' => 'flashcards','icon' => 'style',      'label' => 'Cards',    'active' => false],
             ['id' => 'my-notes', 'icon' => 'note_add',    'label' => 'Notes',    'active' => false],
             ['id' => 'sessions',   'icon' => 'chat_bubble', 'label' => 'Sessions',  'active' => false],
             ['id' => 'report-issue', 'icon' => 'forum',    'label' => 'Issues',    'active' => false, 'badge' => 'responses'],
@@ -521,6 +523,81 @@ JS;
             <button class="umat-issue-send-btn" id="ws-issue-send" type="button"><span class="material-symbols-outlined">send</span><span class="sr-only">Send</span></button>
           </div>
         </section>
+      </div>
+    </div>
+
+    <!-- FLASHCARDS TAB (M2 / F3 spaced repetition) -->
+    <div class="umat-tab-pane" data-tab="flashcards">
+      <div class="umat-content-hdr">
+        <h2><span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px;">style</span>Flashcards</h2>
+        <button class="umat-sb-new" id="ws-fc-refresh" type="button">
+          <span class="material-symbols-outlined">refresh</span>
+          <span>Refresh</span>
+        </button>
+      </div>
+      <div class="umat-fc-wrap" id="ws-fc-wrap">
+        <!-- Stats strip -->
+        <div class="umat-fc-stats">
+          <div class="umat-fc-stat">
+            <div class="umat-fc-stat-num" id="ws-fc-due-count">—</div>
+            <div class="umat-fc-stat-lbl">Due now</div>
+          </div>
+          <div class="umat-fc-stat">
+            <div class="umat-fc-stat-num" id="ws-fc-total-count">—</div>
+            <div class="umat-fc-stat-lbl">In deck</div>
+          </div>
+          <div class="umat-fc-stat">
+            <div class="umat-fc-stat-num" id="ws-fc-new-count">—</div>
+            <div class="umat-fc-stat-lbl">New</div>
+          </div>
+        </div>
+
+        <!-- Start review row (hidden until cards are due) -->
+        <div class="umat-fc-start-row">
+          <button class="umat-btn-p" id="ws-fc-start" type="button" style="display:none;justify-content:center;">
+            <span class="material-symbols-outlined" style="font-size:20px;">play_arrow</span>
+            Start Review (<span id="ws-fc-start-count">0</span> due)
+          </button>
+        </div>
+
+        <!-- Review mode (hidden until a review starts) -->
+        <div class="umat-fc-review" id="ws-fc-review" style="display:none;">
+          <div class="umat-fc-card" id="ws-fc-card" title="Click to flip">
+            <div class="umat-fc-card-inner" id="ws-fc-card-inner">
+              <div class="umat-fc-face umat-fc-front">
+                <div class="umat-fc-topic" id="ws-fc-topic"></div>
+                <div class="umat-fc-text" id="ws-fc-front"></div>
+              </div>
+              <div class="umat-fc-face umat-fc-back">
+                <div class="umat-fc-topic" id="ws-fc-topic-back"></div>
+                <div class="umat-fc-text" id="ws-fc-back"></div>
+              </div>
+            </div>
+          </div>
+          <div class="umat-fc-flip-hint" id="ws-fc-flip-hint">Click the card to reveal the answer</div>
+          <div class="umat-fc-actions" id="ws-fc-actions" style="display:none;">
+            <button class="umat-fc-btn fc-again" data-grade="again" type="button">
+              <span class="umat-fc-btn-lbl">Again</span><span class="umat-fc-btn-sub">Forgot</span>
+            </button>
+            <button class="umat-fc-btn fc-hard" data-grade="hard" type="button">
+              <span class="umat-fc-btn-lbl">Hard</span><span class="umat-fc-btn-sub">Struggled</span>
+            </button>
+            <button class="umat-fc-btn fc-good" data-grade="good" type="button">
+              <span class="umat-fc-btn-lbl">Good</span><span class="umat-fc-btn-sub">Recalled</span>
+            </button>
+            <button class="umat-fc-btn fc-easy" data-grade="easy" type="button">
+              <span class="umat-fc-btn-lbl">Easy</span><span class="umat-fc-btn-sub">Instant</span>
+            </button>
+          </div>
+          <div class="umat-fc-progress" id="ws-fc-progress"></div>
+        </div>
+
+        <!-- Deck grid (all approved cards) -->
+        <div class="umat-fc-grid" id="ws-fc-grid"></div>
+        <div class="umat-empty" id="ws-fc-empty" style="display:none;">
+          <span class="material-symbols-outlined">style</span>
+          <p id="ws-fc-empty-text">No flashcards yet — your lecturer will publish approved cards here.</p>
+        </div>
       </div>
     </div>
 
@@ -971,6 +1048,7 @@ HTML;
         <button class="umat-sb-item" data-lp="lec-quizgen" type="button" title="Quiz Generator"><span class="material-symbols-outlined">quiz</span><span class="umat-sb-item-lbl">Quiz Generator</span></button>
         <button class="umat-sb-item" data-lp="lec-courses" type="button" title="My Courses"><span class="material-symbols-outlined">menu_book</span><span class="umat-sb-item-lbl">My Courses</span></button>
         <button class="umat-sb-item" data-lp="lec-library" type="button" title="Resource Materials"><span class="material-symbols-outlined">local_library</span><span class="umat-sb-item-lbl">Resource Materials</span></button>
+        <button class="umat-sb-item" data-lp="lec-flashcards" type="button" title="Flashcards"><span class="material-symbols-outlined">style</span><span class="umat-sb-item-lbl">Flashcards</span></button>
         <button class="umat-sb-item" data-lp="lec-sessions" type="button" title="Sessions"><span class="material-symbols-outlined">history</span><span class="umat-sb-item-lbl">Sessions</span></button>
         <button class="umat-sb-item" data-lp="lec-issues" type="button" title="Student Issues"><span class="material-symbols-outlined">forum</span><span class="umat-sb-item-lbl">Student Issues</span><span class="umat-sb-badge" id="sb-badge-new-issues" style="display:none;margin-left:auto;background:var(--u-ter);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;line-height:14px;min-width:16px;text-align:center;"></span></button>
       </nav>
@@ -1168,6 +1246,19 @@ HTML;
         </div>
         {$rbViewHtml}
         <!-- Viewers (using shared material_viewer) -->
+      </div>
+
+      <!-- FLASHCARDS (LECTURER) — M2 / F3 generate + approve -->
+      <div class="umat-tab-pane" id="lec-flashcards" style="overflow-y:auto;">
+        <div class="umat-content-hdr">
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>style</span> Flashcards</h2>
+          <button class="umat-content-hdr-btn" id="lec-fc-refresh" type="button" title="Refresh">
+            <span class="material-symbols-outlined">refresh</span><span>Refresh</span>
+          </button>
+        </div>
+        <div id="lec-fc-body" style="padding:0 20px 20px;">
+          <div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading Flashcards…</p></div>
+        </div>
       </div>
 
       <!-- SESSIONS (LECTURER) -->
@@ -2116,9 +2207,131 @@ function loadPaneData(name){
   }
   if(name==='lec-quizgen')loadQuizGenUI();
   if(name==='lec-home')initHome();
+  if(name==='lec-flashcards')loadLecFlashcards();
 }
 /* Expose to window so AMD modules can delegate */
 window.loadPaneData=loadPaneData;
+
+/* ── Flashcards (M2 / F3) — generate + approval workflow ── */
+function loadLecFlashcards(){
+  var body=document.getElementById('lec-fc-body');if(!body)return;
+  if(!CID){body.innerHTML=_lecCourseAlert('flashcards');_lecWireAlertChips(body,function(cid){CID=cid;loadLecFlashcards();});return;}
+  body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading materials…</p></div>';
+  var done=function(mats,fcData){
+    var cards=fcData||[];
+    renderLecFlashcards(body,mats,cards);
+  };
+  var matsLoaded=function(r){
+    var mats=r.materials||[];
+    ajax('local_umat_ai_get_flashcards',{courseid:CID,status:9},function(fc){
+      done(mats,fc.cards||[]);
+    },function(){done(mats,[]);});
+  };
+  ajax('local_umat_ai_get_course_materials',{courseid:CID},matsLoaded,function(){
+    body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load materials.</p></div>';
+  });
+}
+function renderLecFlashcards(body,mats,cards){
+  var pending=cards.filter(function(c){return c.status===0;});
+  var approved=cards.filter(function(c){return c.status===1;});
+  var rejected=cards.filter(function(c){return c.status===-1;});
+  var indexedMats=(mats||[]).filter(function(m){return m.is_indexed||m.indexed;});
+  var selectable=indexedMats.length?indexedMats:mats;
+  var html='';
+  /* Summary chips */
+  html+='<div class="umat-fc-lect-stats">'
+    +'<span class="umat-fc-lect-chip"><b>'+approved.length+'</b> approved</span>'
+    +'<span class="umat-fc-lect-chip warn"><b>'+pending.length+'</b> pending</span>'
+    +'<span class="umat-fc-lect-chip muted"><b>'+rejected.length+'</b> rejected</span>'
+    +'</div>';
+  /* Generate card */
+  html+='<div class="umat-fc-lect-card">'
+    +'<div class="umat-fc-lect-hdr"><span class="material-symbols-outlined">auto_awesome</span><div><strong>Generate Flashcards</strong><small>AI builds cards strictly from the selected indexed materials (approval required before students see them).</small></div></div>'
+    +(selectable.length?'<div class="umat-fc-lect-body">'
+      +'<div class="umat-fc-mat-list" id="lec-fc-mats">'+selectable.map(function(m,i){
+          return '<label class="umat-fc-mat-item"><input type="checkbox" value="'+m.id+'"'+(i<3?' checked':'')+'>'
+            +'<span class="umat-fc-mat-name">'+esc(m.filename||m.name||'Material '+m.id)+'</span>'
+            +(m.is_indexed?'':'<span class="umat-fc-mat-tag">not indexed</span>')
+            +'</label>';
+        }).join('')+'</div>'
+      +'<div class="umat-fc-lect-row">'
+        +'<label>Topic label <input type="text" id="lec-fc-topic" placeholder="Optional — e.g. Week 1" maxlength="120"></label>'
+        +'<label>Cards <select id="lec-fc-count"><option value="5">5</option><option value="10" selected>10</option><option value="15">15</option><option value="20">20</option><option value="30">30</option></select></label>'
+        +'<button type="button" id="lec-fc-gen" class="umat-btn-p"><span class="material-symbols-outlined" style="font-size:18px;">auto_awesome</span>Generate</button>'
+      +'</div>'
+      +'<div class="umat-fc-lect-msg" id="lec-fc-msg"></div>'
+    +'</div>':'<div class="umat-fc-lect-empty">No course materials found. Upload materials to the course library first.</div>')
+    +'</div>';
+  /* Approval queue */
+  html+='<div class="umat-fc-lect-card">'
+    +'<div class="umat-fc-lect-hdr"><span class="material-symbols-outlined">fact_check</span><div><strong>Approval Queue ('+pending.length+')</strong><small>Review AI-generated cards and publish the ones students should study.</small></div></div>'
+    +(pending.length?'<div class="umat-fc-lect-body">'
+      +'<div class="umat-fc-approve-bar">'
+        +'<label class="umat-fc-mat-item" style="padding:6px 8px;"><input type="checkbox" id="lec-fc-selectall"> <span class="umat-fc-mat-name"><b>Select all</b></span></label>'
+        +'<button type="button" class="umat-btn-xs-p" id="lec-fc-approve"><span class="material-symbols-outlined" style="font-size:14px;">check</span>Approve</button>'
+        +'<button type="button" class="umat-btn-xs-r" id="lec-fc-reject"><span class="material-symbols-outlined" style="font-size:14px;">close</span>Reject</button>'
+      +'</div>'
+      +'<div class="umat-fc-pending-list">'+pending.map(function(c){
+          return '<label class="umat-fc-pending-item"><input type="checkbox" class="lec-fc-pick" value="'+c.id+'">'
+            +'<div class="umat-fc-pending-body"><div class="umat-fc-pending-topic">'+esc(c.topic||'General')+'</div>'
+            +'<div class="umat-fc-pending-front">'+esc(c.front)+'</div>'
+            +'<div class="umat-fc-pending-back">'+esc(c.back)+'</div></div></label>';
+        }).join('')+'</div>'
+      +'<div class="umat-fc-lect-msg" id="lec-fc-appr-msg"></div>'
+    +'</div>':'<div class="umat-fc-lect-empty">No flashcards awaiting approval.</div>')
+    +'</div>';
+  body.innerHTML=html;
+  /* Generate wiring */
+  var gen=document.getElementById('lec-fc-gen');
+  if(gen)gen.addEventListener('click',function(){
+    var ids=Array.prototype.slice.call(body.querySelectorAll('#lec-fc-mats input:checked')).map(function(i){return parseInt(i.value)||0;});
+    if(!ids.length){_lecFcMsg('lec-fc-msg','Select at least one material.','err');return;}
+    var count=parseInt(document.getElementById('lec-fc-count').value)||10;
+    var topic=(document.getElementById('lec-fc-topic').value||'').trim();
+    gen.disabled=true;gen.style.opacity='.55';
+    _lecFcMsg('lec-fc-msg','Generating '+count+' flashcards from '+ids.length+' material(s)…','');
+    ajax('local_umat_ai_generate_flashcards',{courseid:CID,material_ids:JSON.stringify(ids),count:count,topic_label:topic},function(r){
+      gen.disabled=false;gen.style.opacity='';
+      if(r&&r.success){_lecFcMsg('lec-fc-msg',r.message||'Cards generated.','ok');setTimeout(loadLecFlashcards,900);}
+      else{_lecFcMsg('lec-fc-msg',(r&&r.message)||'Generation failed.','err');}
+    },function(){
+      gen.disabled=false;gen.style.opacity='';
+      _lecFcMsg('lec-fc-msg','Could not reach the AI service.','err');
+    });
+  });
+  /* Select-all wiring */
+  var sa=document.getElementById('lec-fc-selectall');
+  if(sa)sa.addEventListener('change',function(){
+    body.querySelectorAll('.lec-fc-pick').forEach(function(cb){cb.checked=sa.checked;});
+  });
+  /* Approve / reject wiring */
+  var appr=document.getElementById('lec-fc-approve'),rej=document.getElementById('lec-fc-reject');
+  var act=function(btn,action){
+    if(!btn)return;
+    btn.addEventListener('click',function(){
+      var ids=Array.prototype.slice.call(body.querySelectorAll('.lec-fc-pick:checked')).map(function(i){return parseInt(i.value)||0;});
+      if(!ids.length){_lecFcMsg('lec-fc-appr-msg','Select flashcards first.','err');return;}
+      btn.disabled=true;
+      ajax('local_umat_ai_approve_flashcards',{courseid:CID,card_ids:JSON.stringify(ids),action:action},function(r){
+        btn.disabled=false;
+        _lecFcMsg('lec-fc-appr-msg',(r&&r.message)||'Done.','ok');
+        setTimeout(loadLecFlashcards,900);
+      },function(){
+        btn.disabled=false;
+        _lecFcMsg('lec-fc-appr-msg','Could not reach the server.','err');
+      });
+    });
+  };
+  act(appr,'approve');act(rej,'reject');
+  /* Refresh wiring */
+  var fr=document.getElementById('lec-fc-refresh');
+  if(fr)fr.addEventListener('click',loadLecFlashcards);
+}
+function _lecFcMsg(id,text,tone){
+  var el=document.getElementById(id);if(!el)return;
+  el.textContent=text;
+  el.className='umat-fc-lect-msg'+(tone==='err'?' umat-fc-lect-msg-err':(tone==='ok'?' umat-fc-lect-msg-ok':''));
+}
 
 /* Load panel (compact) data */
 function loadPanelData(){

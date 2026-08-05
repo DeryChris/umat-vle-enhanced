@@ -80,6 +80,16 @@
   .umat-issue-composer{padding:8px 10px max(8px,env(safe-area-inset-bottom));}
   .umat-issue-filters{grid-template-columns:1fr 1fr;padding:8px;}
   .umat-issue-filters label{grid-column:1/-1;}
+  /* Flashcards mobile */
+  .umat-fc-card{height:230px;}
+  .umat-fc-face{padding:20px 16px;}
+  .umat-fc-text{font-size:14px;}
+  .umat-fc-actions{max-width:420px;}
+  .umat-fc-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+  /* Flashcards lecturer mobile */
+  .umat-fc-lect-row{flex-direction:column;align-items:stretch;}
+  .umat-fc-lect-row input,.umat-fc-lect-row select{min-width:0;}
+  .umat-fc-lect-row .umat-btn-p{margin-left:0;justify-content:center;}
 }
 /* ---- Very small (< 380px) ---- */
 @media(max-width:380px){
