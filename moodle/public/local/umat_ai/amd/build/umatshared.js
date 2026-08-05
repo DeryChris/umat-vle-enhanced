@@ -1545,6 +1545,27 @@ define([], function() {
             });
         }
 
+        // AI Smart Search suggestions inside the drawer: typing >= 2 chars
+        // shows top AI-ranked matches; picking one selects that material.
+        var ssAnchor = d.querySelector('.umat-drawer-search-wrap');
+        if (searchInput && ssAnchor && typeof cfg.getCourseId === 'function') {
+            _umatSmartSearch(searchInput, {
+                getCourseId: cfg.getCourseId,
+                panelMode: 'attached',
+                panelParent: ssAnchor,
+                maxResults: 5,
+                onPick: function(cit) {
+                    var id = String(cit.material_id);
+                    var item = listEl ? listEl.querySelector('.umat-drawer-item[data-id="' + id + '"]') : null;
+                    if (item) {
+                        var cb = item.querySelector('input[type=checkbox]');
+                        if (cb && !cb.checked && toggleItem(id, true)) cb.checked = true;
+                        item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                }
+            });
+        }
+
         // Close on outside click
         document.addEventListener('click', function(e) {
             if (d.classList.contains('open') && !d.contains(e.target) && !ab.contains(e.target)) {
@@ -1989,6 +2010,181 @@ define([], function() {
         });
     }
 
+    // ─── Inline Smart Search (library + drawer bars) ─── //
+    // Attaches a debounced, AI-powered search dropdown directly to a text
+    // input. The dropdown is rendered INSIDE the overlay's DOM (never on
+    // document.body) so it sits above overlay content without escaping the
+    // overlay's stacking context (fixes the old modal rendering behind the
+    // overlay at z-index 50 while .umat-ov sits at 99998).
+    //
+    // opts:
+    //   getCourseId : function() -> int        current course id
+    //   onOpen      : function(cit, courseId)  default: _umatOpenCitation(...)
+    //   onPick      : function(cit, result, courseId)  custom pick handling (drawers)
+    //   minChars    : int (2)    debounce: int ms (350)   maxResults: int (6)
+    //   panelMode   : 'inline' | 'attached'    panelParent: element (attached mode)
+    function _umatSmartSearch(input, opts) {
+        opts = opts || {};
+        // Guard against double-wiring the same input (e.g. dashboard boot
+        // inline script + AMD module both calling us).
+        if (input && input._umatSsCtrl) return input._umatSsCtrl;
+        var getCourseId = opts.getCourseId || function() { return 0; };
+        var onOpen = opts.onOpen || function(cit, cid) {
+            _umatOpenCitation(cit.material_id, cit.title, cit.location, cid);
+        };
+        var onPick = opts.onPick || null;
+        var minChars = opts.minChars || 2;
+        var debounce = opts.debounce || 350;
+        var maxResults = opts.maxResults || 6;
+        var panelMode = opts.panelMode || 'inline';
+        var panelParent = opts.panelParent || null;
+
+        var wrap = null;
+        var panel = null;
+        var timer = null;
+        var seq = 0;
+        var open = false;
+
+        function ensurePanel() {
+            if (panel && panel.parentNode) return panel;
+            if (panelMode === 'attached' && panelParent) {
+                panel = document.createElement('div');
+                panel.className = 'umat-ss-panel umat-ss-panel-attached';
+                panelParent.appendChild(panel);
+            } else {
+                if (!wrap) {
+                    // Wrap the input so the dropdown can anchor absolutely below it
+                    // without disturbing the flex layout of the header actions.
+                    wrap = document.createElement('div');
+                    wrap.className = 'umat-ss-wrap';
+                    input.parentNode.insertBefore(wrap, input);
+                    wrap.appendChild(input);
+                }
+                panel = document.createElement('div');
+                panel.className = 'umat-ss-panel';
+                wrap.appendChild(panel);
+            }
+            // Keep focus on the input while interacting with the dropdown.
+            panel.addEventListener('mousedown', function(e) { e.preventDefault(); });
+            return panel;
+        }
+
+        function hide() {
+            if (panel) panel.classList.remove('open');
+            open = false;
+        }
+
+        function render(results, remaining, q) {
+            var p = ensurePanel();
+            p.innerHTML = '';
+            if (!results || !results.length) {
+                var empty = document.createElement('div');
+                empty.className = 'umat-ss-empty';
+                empty.innerHTML = '<span class="material-symbols-outlined">search_off</span>' +
+                    '<div>No AI matches for &ldquo;' + _Mesc(q) + '&rdquo;</div>' +
+                    '<small>Try different keywords &mdash; the list below still filters locally.</small>';
+                p.appendChild(empty);
+                p.classList.add('open');
+                open = true;
+                return;
+            }
+            var list = document.createElement('div');
+            list.className = 'umat-ss-list';
+            results.slice(0, maxResults).forEach(function(r) {
+                var cit = r.citation || {};
+                var item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'umat-ss-item';
+                var isSession = cit.source_type === 'session';
+                var title = cit.title || 'Course material';
+                var snippet = cit.snippet || r.chunk || '';
+                if (snippet.length > 130) snippet = snippet.slice(0, 130) + '…';
+                var meta = isSession ? 'Lecture recording · ' + (cit.location || '')
+                    : (cit.location || 'Course material') + (cit.chunk_index ? ' · p.' + cit.chunk_index : '');
+                item.innerHTML =
+                    '<span class="umat-ss-ic material-symbols-outlined">' + (isSession ? 'mic' : 'description') + '</span>' +
+                    '<span class="umat-ss-body">' +
+                        '<span class="umat-ss-title">' + _Mesc(title) + '</span>' +
+                        '<span class="umat-ss-snippet">' + _Mesc(snippet) + '</span>' +
+                        '<span class="umat-ss-meta">' + _Mesc(meta) + ' &middot; ' + Math.round((r.score || 0) * 100) + '% match</span>' +
+                    '</span>' +
+                    '<span class="umat-ss-open material-symbols-outlined">open_in_new</span>';
+                item.addEventListener('click', function() {
+                    hide();
+                    if (onPick) { onPick(cit, r, getCourseId()); } else { onOpen(cit, getCourseId()); }
+                });
+                list.appendChild(item);
+            });
+            var foot = document.createElement('div');
+            foot.className = 'umat-ss-foot';
+            foot.textContent = 'AI-powered course search' +
+                (remaining >= 0 ? ' · ' + remaining + ' searches left today' : ' · lecturer access');
+            p.appendChild(list);
+            p.appendChild(foot);
+            p.classList.add('open');
+            open = true;
+        }
+
+        function run(q) {
+            var cid = getCourseId();
+            if (!cid) { hide(); return; }
+            var myseq = ++seq;
+            var p = ensurePanel();
+            p.innerHTML = '<div class="umat-ss-loading"><span class="material-symbols-outlined">hourglass_top</span> Searching course materials…</div>';
+            p.classList.add('open');
+            open = true;
+            ajax('local_umat_ai_smart_search', { courseid: cid, query: q, material_ids: [] },
+                function(resp) {
+                    if (myseq !== seq) return; // stale response — ignore
+                    render(resp.results || [], resp.remaining, q);
+                },
+                function() {
+                    if (myseq !== seq) return;
+                    var p2 = ensurePanel();
+                    p2.innerHTML = '<div class="umat-ss-empty"><span class="material-symbols-outlined">error_outline</span>' +
+                        '<div>Smart search is unavailable</div><small>Check that the AI service is running.</small></div>';
+                    p2.classList.add('open');
+                    open = true;
+                }
+            );
+        }
+
+        if (input) {
+            input.addEventListener('input', function() {
+                var q = this.value.trim();
+                if (timer) clearTimeout(timer);
+                if (q.length < minChars) { hide(); return; }
+                timer = setTimeout(function() { run(q); }, debounce);
+            });
+            input.addEventListener('focus', function() {
+                if (this.value.trim().length >= minChars) run(this.value.trim());
+            });
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && open) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    hide();
+                } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && open) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var items = panel ? panel.querySelectorAll('.umat-ss-item') : [];
+                    if (items.length) (e.key === 'ArrowDown' ? items[0] : items[items.length - 1]).focus();
+                }
+            });
+            // Close when the user clicks anywhere outside the search widget.
+            document.addEventListener('click', function(e) {
+                if (!open) return;
+                var scope = wrap || panelParent;
+                if (scope && scope.contains(e.target)) return;
+                hide();
+            });
+        }
+
+        var ctrl = { close: hide, isOpen: function() { return open; } };
+        if (input) input._umatSsCtrl = ctrl;
+        return ctrl;
+    }
+
     // ─── Short-name aliases ────────────────────────── //
     var esc = _umatEsc;
     var fmtDuration = _umatFmtT;
@@ -2333,6 +2529,9 @@ define([], function() {
 
         // Scroll-to-bottom FAB
         _umatInitScrollToBottom: _umatInitScrollToBottom,
+
+        // Inline Smart Search (library + drawer bars)
+        _umatSmartSearch: _umatSmartSearch,
 
         // AJAX
         ajax: ajax,

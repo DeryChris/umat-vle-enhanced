@@ -44,6 +44,8 @@
   .umat-video-grid{grid-template-columns:1fr;padding:12px;}
   .umat-lib-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));padding:12px;}
   .umat-lib-search{flex:1 1 100%;order:10;margin:4px 0 0;}
+  .umat-ss-wrap{flex:1 1 100%;order:10;max-width:none;margin:4px 0 0;}
+  .umat-ss-panel{max-width:calc(100vw - 48px);}
   .umat-lib-section-hdr{flex-wrap:wrap;}
   .umat-courses-grid{grid-template-columns:1fr;padding:12px;}
   .umat-metrics-row{grid-template-columns:1fr 1fr;}

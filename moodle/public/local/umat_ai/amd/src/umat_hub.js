@@ -492,6 +492,13 @@ function loadLibrary(cid){
       if(vb)vb.addEventListener('click',function(e){e.stopPropagation();tile.click();});
     });
     var srch=document.getElementById('hub-lib-search');if(srch)srch.addEventListener('input',function(){var q=this.value.toLowerCase();g.querySelectorAll('.yt-tile').forEach(function(t){t.style.display=(!q||t.textContent.toLowerCase().includes(q))?'':'none';});});
+    /* Smart Search inline in the hub library search bar (2+ chars → AI dropdown) */
+    if(srch && typeof _umatSmartSearch==='function'){
+      _umatSmartSearch(srch,{
+        getCourseId:function(){return hubLibCourseId||0;},
+        maxResults:6
+      });
+    }
   },function(){console.error('[umat] hub loadLibrary failed');g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">error_outline</span><p>Could not load materials.</p></div>';});
 }
 function openHubLibPicker(){

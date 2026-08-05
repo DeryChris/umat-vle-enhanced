@@ -827,108 +827,10 @@ function openLecPlayer(url,name,segments){
   });
 }
 
-/* ---- SMART SEARCH (Lecturer Library) ---- */
-function _ssEnsureModalLec(){
-  var m=document.getElementById('lec-ss-ov');
-  if(m)return m;
-  m=document.createElement('div');
-  m.className='umat-cs-overlay';
-  m.id='lec-ss-ov';
-  m.innerHTML=
-    '<div class="umat-cs-modal" style="max-width:560px;">'+
-      '<div class="umat-cs-modal-hdr">'+
-        '<h3><span class="material-symbols-outlined">travel_explore</span>Smart Search</h3>'+
-        '<button class="umat-cs-close" id="lec-ss-close" type="button"><span class="material-symbols-outlined">close</span></button>'+
-      '</div>'+
-      '<div style="padding:16px;">'+
-        '<input type="text" id="lec-ss-input" placeholder="Search your course materials…" style="width:100%;padding:10px 14px;border:1px solid var(--u-olv);border-radius:var(--u-r8);font-size:13px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sfl);box-sizing:border-box;">'+
-        '<div id="lec-ss-status" style="display:none;margin-top:10px;font-size:12px;color:var(--u-o);"></div>'+
-        '<div id="lec-ss-results" style="margin-top:10px;max-height:50vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>'+
-      '</div>'+
-    '</div>';
-  document.body.appendChild(m);
-  var closeBtn=m.querySelector('#lec-ss-close');
-  closeBtn.addEventListener('click',function(){m.classList.remove('open');});
-  m.addEventListener('click',function(e){if(e.target===m)m.classList.remove('open');});
-  document.addEventListener('keydown',function(e){
-    if(e.key==='Escape'&&m.classList.contains('open'))m.classList.remove('open');
-  });
-  var input=m.querySelector('#lec-ss-input');
-  var debounce=null;
-  input.addEventListener('input',function(){
-    clearTimeout(debounce);
-    debounce=setTimeout(function(){_ssRunSearchLec(input.value);},350);
-  });
-  input.addEventListener('keydown',function(e){
-    if(e.key==='Enter'){clearTimeout(debounce);_ssRunSearchLec(input.value);}
-  });
-  return m;
-}
-function _ssOpenLec(){
-  var m=_ssEnsureModalLec();
-  m.classList.add('open');
-  var input=m.querySelector('#lec-ss-input');
-  input.value='';
-  input.focus();
-  m.querySelector('#lec-ss-results').innerHTML='<div class="umat-smart-search-hint"><span class="material-symbols-outlined">travel_explore</span><p>Search across your course materials. Results include the exact source, location and a snippet.</p></div>';
-  m.querySelector('#lec-ss-status').style.display='none';
-}
-function _ssRunSearchLec(q){
-  var statusEl=document.getElementById('lec-ss-status');
-  var resultsEl=document.getElementById('lec-ss-results');
-  if(!statusEl||!resultsEl)return;
-  q=(q||'').trim();
-  if(q.length<2){
-    statusEl.style.display='none';
-    resultsEl.innerHTML='<div class="umat-smart-search-hint"><span class="material-symbols-outlined">travel_explore</span><p>Type at least 2 characters to search.</p></div>';
-    return;
-  }
-  var courseId=lecLibCourseId||CID||0;
-  if(!courseId){
-    statusEl.style.display='block';
-    statusEl.innerHTML='<span class="material-symbols-outlined">warning</span>Select a course first to search its materials.';
-    resultsEl.innerHTML='';
-    return;
-  }
-  statusEl.style.display='block';
-  statusEl.innerHTML='<span class="umat-vw-spinner" style="width:14px;height:14px;border-width:2px;vertical-align:-2px;margin-right:6px;"></span>Searching course materials…';
-  resultsEl.innerHTML='';
-  ajax('local_umat_ai_smart_search',{courseid:courseId,query:q},function(r){
-    statusEl.style.display='none';
-    var results=(r&&r.results)||[];
-    if(!results.length){
-      resultsEl.innerHTML='<div class="umat-smart-search-hint"><span class="material-symbols-outlined">search_off</span><p>No matches found. Try different keywords.</p></div>';
-      return;
-    }
-    resultsEl.innerHTML=results.map(function(res){
-      var c=res.citation||{};
-      var loc=c.location?('<span class="umat-citation-loc">'+esc(c.location)+'</span>'):'';
-      var snippet=c.snippet?('<p class="umat-citation-snippet">'+esc(c.snippet)+'</p>'):'';
-      return '<div class="umat-smart-search-result" data-mid="'+(parseInt(c.material_id,10)||0)+'" data-title="'+esc(c.title||'')+'" data-loc="'+esc(c.location||'')+'">'+
-        '<div class="umat-citation-title"><span class="umat-citation-num">'+(parseInt(c.index,10)||0)+'</span>'+esc(c.title||'Source')+loc+'</div>'+
-        snippet+
-        '<div class="umat-smart-search-actions">'+
-          '<button class="umat-citation-open" type="button" data-mid="'+(parseInt(c.material_id,10)||0)+'" data-title="'+esc(c.title||'')+'" data-loc="'+esc(c.location||'')+'"><span class="material-symbols-outlined">open_in_new</span>Open</button>'+
-        '</div>'+
-      '</div>';
-    }).join('');
-    resultsEl.querySelectorAll('.umat-smart-search-result .umat-citation-open').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        _umatOpenCitation(parseInt(btn.dataset.mid,10)||0,btn.dataset.title||'',btn.dataset.loc||'',courseId);
-      });
-    });
-  },function(){
-    statusEl.style.display='none';
-    resultsEl.innerHTML='<div class="umat-smart-search-hint"><span class="material-symbols-outlined">error</span><p>Search failed. Check your connection and try again.</p></div>';
-  });
-}
-/* Wire Smart Search button (delegated: header is rebuilt per course) */
-var _lecLibHdrActions=document.getElementById('lec-lib-hdr-actions');
-if(_lecLibHdrActions){
-  _lecLibHdrActions.addEventListener('click',function(e){
-    if(e.target.closest('#lec-smart-search-btn'))_ssOpenLec();
-  });
-}
+/* ---- SMART SEARCH (Lecturer Library) ----
+   Replaced the old body-level modal (rendered behind the overlay). Smart
+   Search now lives inline in the lecturer library search bar via the shared
+   _umatSmartSearch helper (wired in overlay_helper.php). */
 
 /* Sessions — lecturer's own AI sessions only */
 var lecSessCourseId = 0;
@@ -2293,6 +2195,18 @@ document.addEventListener('keydown',function(e){
     if(el&&el.style.display==='flex')el.style.display='none';
   });
 });
+
+/* ── Smart Search inline in the lecturer library search bar ── */
+/* Wired here (not in the dashboard boot script) so the shared helper is
+   guaranteed to exist when the AMD module loads. 2+ characters triggers an
+   AI results dropdown below the input; the local name filter still runs. */
+var _lecLibSrch=document.getElementById('lec-lib-search');
+if(_lecLibSrch && typeof _umatSmartSearch==='function'){
+  _umatSmartSearch(_lecLibSrch,{
+    getCourseId:function(){return lecLibCourseId||CID||0;},
+    maxResults:6
+  });
+}
 
 })();
 }

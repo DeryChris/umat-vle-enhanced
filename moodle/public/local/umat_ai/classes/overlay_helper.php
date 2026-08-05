@@ -431,10 +431,7 @@ JS;
       <div class="umat-content-hdr">
         <h2>Course Library</h2>
         <div class="umat-lib-hdr-actions">
-          <input class="umat-lib-search" id="ws-lib-search" type="text" placeholder="Search recordings &amp; materials…" />
-          <button class="umat-smart-search-btn" id="ws-smart-search-btn" type="button" title="Smart Search across course materials">
-            <span class="material-symbols-outlined">travel_explore</span><span>Smart Search</span>
-          </button>
+          <input class="umat-lib-search" id="ws-lib-search" type="text" placeholder="Search recordings &amp; materials…" title="Type to filter locally — 2+ characters also runs AI Smart Search" />
         </div>
       </div>
       <!-- Lecture Recordings section -->
@@ -1094,8 +1091,7 @@ HTML;
             <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>local_library</span> Library</h2>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="lec-lib-hdr-actions">
               <button type="button" id="lec-upload-rec-btn" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid var(--u-p);border-radius:var(--u-rp);font-size:12px;font-weight:600;color:var(--u-p);background:var(--u-sflo);cursor:pointer;font-family:inherit;"><span class="material-symbols-outlined" umat-fs-15>upload_file</span>Upload File</button>
-              <input type="text" id="lec-lib-search" placeholder="Search materials…" class="umat-input-sm">
-              <button type="button" id="lec-smart-search-btn" class="umat-smart-search-btn" title="Smart Search across course materials"><span class="material-symbols-outlined" style="font-size:15px;">travel_explore</span>Smart Search</button>
+              <input type="text" id="lec-lib-search" placeholder="Search materials…" class="umat-input-sm" title="Type to filter locally — 2+ characters also runs AI Smart Search">
             </div>
           </div>
           <!-- Course selector (shown when multiple courses, hidden after selection) -->
@@ -2615,6 +2611,13 @@ function _lecUpSubmit(){
     var g=document.getElementById('lec-lib-grid');if(g)g.querySelectorAll('.yt-tile').forEach(function(t){t.style.display=(!q||t.textContent.toLowerCase().includes(q))?'':'none';});
     var rg=document.getElementById('lec-lib-lectures');if(rg)rg.querySelectorAll('.yt-tile').forEach(function(t){t.style.display=(!q||t.textContent.toLowerCase().includes(q))?'':'none';});
   });
+  /* Smart Search inline in the lecturer library search bar (2+ chars → AI dropdown) */
+  if(libSrch && typeof _umatSmartSearch==='function'){
+    _umatSmartSearch(libSrch,{
+      getCourseId:function(){return lecLibCourseId||CID||0;},
+      maxResults:6
+    });
+  }
 })();
 
 /* Sessions — with course overlay selector */
@@ -4184,6 +4187,13 @@ function loadLibrary(cid){
       if(vb)vb.addEventListener('click',function(e){e.stopPropagation();tile.click();});
     });
     var srch=document.getElementById('hub-lib-search');if(srch)srch.addEventListener('input',function(){var q=this.value.toLowerCase();g.querySelectorAll('.yt-tile').forEach(function(t){t.style.display=(!q||t.textContent.toLowerCase().includes(q))?'':'none';});});
+    /* Smart Search inline in the hub library search bar (2+ chars → AI dropdown) */
+    if(srch && typeof _umatSmartSearch==='function'){
+      _umatSmartSearch(srch,{
+        getCourseId:function(){return hubLibCourseId||0;},
+        maxResults:6
+      });
+    }
   },function(){console.error('[umat] hub overlay loadLibrary failed');g.innerHTML='<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">error_outline</span><p>Could not load materials.</p></div>';});
 }
 function openHubLibPicker(){
