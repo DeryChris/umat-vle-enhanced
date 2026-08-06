@@ -78,6 +78,176 @@ document.addEventListener('click',function(e){var f=e.target.closest('.umat-fab'
 JS;
     }
 
+    /**
+     * AI Tutor — Notebook-style three-panel workspace.
+     *
+     * Layout: topbar | [ left: session history | center: chat | right: Studio ].
+     * Rendered into the student workspace "AI Tutor" tab (mode = 'course') and the
+     * hub "AI Tutor" tab (mode = 'hub'). Wired by amd/src/ai_tutor.js and
+     * styled by styles/umat-ait-tutor.css (loaded via before_footer hook).
+     *
+     * @param string $mode      'course' (fixed course context) or 'hub' (cross-course selector).
+     * @param int    $courseid  Course id (0 in hub mode).
+     * @param string $courseName Course fullname ('' in hub mode).
+     */
+    public static function ai_tutor_workspace(string $mode, int $courseid, string $courseName, string $wwwroot, object $user, string $userData, string $platformName = 'UMaT'): string {
+        $safeName = htmlspecialchars($courseName, ENT_QUOTES, 'UTF-8');
+        $streamUrl = json_encode('/local/umat_ai/chat_stream.php');
+        $moodleSesskey = json_encode(sesskey());
+        $jsUD = $userData;
+
+        // Hub mode: pre-render course options from the cached userData so the
+        // selector works instantly without an extra web-service round-trip.
+        $courseOpts = '';
+        if ($mode === 'hub') {
+            $ud = json_decode($userData, true);
+            $courses = (is_array($ud) && !empty($ud['courses'])) ? $ud['courses'] : [];
+            foreach ($courses as $c) {
+                $cid = (int)($c['id'] ?? 0);
+                $short = htmlspecialchars((string)($c['shortname'] ?? ($c['fullname'] ?? 'Course')), ENT_QUOTES);
+                if ($cid) {
+                    $courseOpts .= '<option value="' . $cid . '">' . $short . '</option>';
+                }
+            }
+        }
+
+        $courseFixed = ($mode === 'course')
+            ? '<span class="ait-topbar-course" id="ait-course-fixed" title="' . $safeName . '">' . $safeName . '</span>'
+            : '';
+        $courseSel = ($mode === 'hub')
+            ? '<select id="ait-course-sel" class="ait-course-sel" aria-label="Course"><option value="0">All Courses</option>' . $courseOpts . '</select>'
+            : '';
+
+        return <<<HTML
+<!-- AI TUTOR (Notebook-style) — 3-panel workspace (left: sessions | center: chat | right: Studio) -->
+<div class="ait-root" id="ait-root" data-mode="{$mode}">
+  <div class="ait-topbar">
+    <button class="ait-ib" id="ait-toggle-left" type="button" title="Toggle session history" aria-label="Toggle session history"><span class="material-symbols-outlined">menu</span></button>
+    <div class="ait-brand"><span class="material-symbols-outlined">smart_toy</span><strong>AI Tutor</strong></div>
+    <div class="ait-topbar-right">
+      {$courseFixed}
+      {$courseSel}
+      <button class="ait-ib ait-ib-on" id="ait-toggle-studio" type="button" title="Toggle Studio" aria-label="Toggle Studio"><span class="material-symbols-outlined">auto_awesome</span></button>
+    </div>
+  </div>
+
+  <div class="ait-body">
+    <!-- LEFT: session history -->
+    <aside class="ait-left" id="ait-left" aria-label="Session history">
+      <div class="ait-left-hdr">
+        <span class="ait-left-title"><span class="material-symbols-outlined">history</span>Sessions</span>
+      </div>
+      <button class="ait-new-sess" id="ait-new-sess" type="button"><span class="material-symbols-outlined">add</span>New Session</button>
+      <div class="ait-search-wrap"><span class="material-symbols-outlined">search</span><input id="ait-sess-search" type="text" placeholder="Search sessions…" aria-label="Search sessions"></div>
+      <div class="ait-sess-list" id="ait-sess-list"><div class="ait-empty"><span class="material-symbols-outlined">hourglass_empty</span>Loading sessions…</div></div>
+    </aside>
+
+    <!-- CENTER: chat -->
+    <main class="ait-chat" id="ait-chat">
+      <div class="ait-msgs" id="ait-msgs"></div>
+      <div class="ait-chat-overlay">
+        <button class="ait-scroll-bottom" id="ait-scroll-bottom" type="button" title="Scroll to bottom"><span class="material-symbols-outlined">expand_more</span></button>
+        <div class="ait-inputbar">
+          <button class="ait-chatbar-btn" id="ait-attach-btn" type="button" title="Attach materials"><span class="material-symbols-outlined">add</span></button>
+          <textarea id="ait-input" placeholder="Ask anything about your studies…" rows="1" maxlength="900" aria-label="Message"></textarea>
+          <button class="ait-chatbar-btn" id="ait-mic-btn" type="button" title="Voice input"><span class="material-symbols-outlined">mic</span></button>
+          <button class="ait-send" id="ait-send" type="button" title="Send" aria-label="Send"><span class="material-symbols-outlined">arrow_upward</span></button>
+        </div>
+        <div class="umat-mat-bar" id="ait-mat-bar"></div>
+      </div>
+      <!-- Floating expand button — appears while the Studio panel is collapsed. -->
+      <button class="ait-reopen-studio" id="ait-reopen-studio" type="button" title="Expand Studio" aria-label="Expand Studio">
+        <span class="material-symbols-outlined">auto_awesome</span>
+      </button>
+    </main>
+
+    <!-- RIGHT: Studio -->
+    <aside class="ait-studio" id="ait-studio" aria-label="Studio tools">
+      <div class="ait-studio-hdr">
+        <span class="ait-studio-title"><span class="material-symbols-outlined">auto_awesome</span>Studio</span>
+        <button class="ait-ib" id="ait-studio-collapse" type="button" title="Collapse Studio"><span class="material-symbols-outlined">chevron_right</span></button>
+      </div>
+      <div class="ait-studio-body">
+        <div class="ait-studio-sec"><span class="material-symbols-outlined">auto_fix_high</span>Generate</div>
+        <button class="ait-tool-btn" id="ait-tool-quiz" type="button"><span class="material-symbols-outlined">quiz</span><span><strong>Create Quiz</strong><small>Practice questions from this conversation</small></span></button>
+        <button class="ait-tool-btn" id="ait-tool-fc" type="button"><span class="material-symbols-outlined">style</span><span><strong>Flashcards</strong><small>Spaced-repetition study cards</small></span></button>
+        <button class="ait-tool-btn" id="ait-tool-guide" type="button"><span class="material-symbols-outlined">menu_book</span><span><strong>Study Guide</strong><small>Structured revision notes</small></span></button>
+        <button class="ait-tool-btn" id="ait-tool-summary" type="button"><span class="material-symbols-outlined">summarize</span><span><strong>Summary</strong><small>Key takeaways at a glance</small></span></button>
+        <button class="ait-tool-btn" id="ait-tool-faq" type="button"><span class="material-symbols-outlined">question_answer</span><span><strong>FAQ</strong><small>Common questions with answers</small></span></button>
+
+        <div class="ait-studio-sec"><span class="material-symbols-outlined">workspaces</span>Your Studio</div>
+        <div class="ait-tabs" role="tablist" aria-label="Studio tabs">
+          <button class="ait-tab active" data-gtab="notes" type="button" role="tab">Notes</button>
+          <button class="ait-tab" data-gtab="reports" type="button" role="tab">Reports</button>
+          <button class="ait-tab" data-gtab="files" type="button" role="tab">Files</button>
+        </div>
+        <div class="ait-panes">
+          <div class="ait-pane active" id="ait-pane-notes">
+            <div class="ait-notes-toolbar">
+              <button class="ait-nt-btn-p" id="ait-note-new" type="button"><span class="material-symbols-outlined">add</span>New Note</button>
+              <input class="ait-note-search" id="ait-note-search" type="text" placeholder="Search notes…">
+            </div>
+            <div class="ait-notes-list" id="ait-notes-list"><div class="ait-empty"><span class="material-symbols-outlined">note_add</span>Loading notes…</div></div>
+            <div class="ait-note-editor" id="ait-note-editor" style="display:none;">
+              <div class="ait-note-editor-hdr">
+                <button class="ait-ib" id="ait-note-back" type="button" title="Back"><span class="material-symbols-outlined">arrow_back</span></button>
+                <input class="ait-note-title" id="ait-note-title" type="text" placeholder="Note title">
+                <button class="ait-ib" id="ait-note-pin" type="button" title="Pin note"><span class="material-symbols-outlined">push_pin</span></button>
+                <button class="ait-ib ait-nt-btn danger" id="ait-note-delete" type="button" title="Delete note"><span class="material-symbols-outlined">delete</span></button>
+              </div>
+              <div class="ait-note-readonly" id="ait-note-readonly"></div>
+              <textarea class="ait-note-edit" id="ait-note-edit" placeholder="Write your note…" style="display:none;"></textarea>
+              <div class="ait-note-editor-foot">
+                <button class="ait-nt-btn" id="ait-note-edit-toggle" type="button">Edit</button>
+                <button class="ait-nt-btn-p" id="ait-note-save" type="button">Save</button>
+              </div>
+            </div>
+          </div>
+          <div class="ait-pane" id="ait-pane-reports"><div class="ait-empty"><span class="material-symbols-outlined">monitoring</span>Loading reports…</div></div>
+          <div class="ait-pane" id="ait-pane-files"><div class="ait-empty"><span class="material-symbols-outlined">folder_open</span>Loading files…</div></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Mobile 3-tab navigation -->
+  <div class="ait-mtabs" id="ait-mtabs" role="tablist">
+    <button class="ait-mtab active" data-gmtab="chat" type="button"><span class="material-symbols-outlined">chat_bubble</span>Chat</button>
+    <button class="ait-mtab" data-gmtab="sessions" type="button"><span class="material-symbols-outlined">history</span>Sessions</button>
+    <button class="ait-mtab" data-gmtab="studio" type="button"><span class="material-symbols-outlined">auto_awesome</span>Studio</button>
+  </div>
+
+  <div class="ait-toast" id="ait-toast"></div>
+</div>
+
+<!-- Attach materials drawer (AI Tutor workspace) -->
+<div class="umat-attach-drawer umat-drawer-enhanced" id="ait-attach-drawer">
+  <div class="umat-drawer-hdr">
+    <div class="umat-drawer-hdr-left">
+      <span class="material-symbols-outlined" style="font-size:17px;color:var(--u-p);">attach_file</span>
+      <h4>Select Materials</h4>
+      <span class="umat-drawer-count" id="ait-drawer-count">0 selected</span>
+    </div>
+    <div class="umat-drawer-hdr-actions">
+      <button class="umat-drawer-clear-btn" id="ait-drawer-clear" type="button">Clear</button>
+      <button class="umat-drawer-close-btn" id="ait-drawer-close" type="button"><span class="material-symbols-outlined">close</span></button>
+    </div>
+  </div>
+  <div class="umat-drawer-search-wrap">
+    <span class="material-symbols-outlined umat-drawer-search-icon">search</span>
+    <input type="text" id="ait-drawer-search" placeholder="Search materials…">
+  </div>
+  <div class="umat-drawer-cats" id="ait-drawer-cats"></div>
+  <div class="umat-drawer-recent" id="ait-drawer-recent"></div>
+  <div class="umat-drawer-list" id="ait-drawer-list"><div class="umat-drawer-loading"><div class="umat-vw-spinner"></div><span>Loading materials&hellip;</span></div></div>
+  <div class="umat-drawer-foot">
+    <span class="umat-drawer-foot-info">Select materials for AI</span>
+    <button class="umat-drawer-confirm" id="ait-drawer-confirm" type="button"><span class="material-symbols-outlined">check</span> Use Selected</button>
+  </div>
+</div>
+HTML;
+    }
+
 
     public static function student_overlay(int $courseid, string $courseName, string $wwwroot, object $user, string $userData, string $platformName = 'UMaT'): string {
         $safePlatform = htmlspecialchars($platformName, ENT_QUOTES);
@@ -117,6 +287,9 @@ JS;
             ['id' => 'report-issue', 'icon' => 'forum',    'label' => 'Issues',    'active' => false, 'badge' => 'responses'],
         ];
         $stuMobTabs = self::glassmorph_tab_bar($stuGlassTabs, 'sb-tab', 'stu-glass-tabs');
+
+        // AI Tutor (Notebook-style, 3-panel: sessions | chat | Studio).
+        $aiTutorPanel = self::ai_tutor_workspace('course', $courseid, $courseName, $wwwroot, $user, $userData, $platformName);
 
         return <<<HTML
 
@@ -336,85 +509,9 @@ JS;
       </div>
     </div>
 
-    <!-- AI TUTOR TAB -->
+    <!-- AI TUTOR TAB (Notebook-style 3-panel: sessions | chat | Studio) -->
     <div class="umat-tab-pane" data-tab="ai-tutor" style="position:relative;">
-      <div class="umat-content-hdr">
-        <h2>AI Tutor</h2>
-      </div>
-      <div style="display:flex;flex:1;overflow:hidden;position:relative;">
-        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;">
-          <div id="ws-chips">
-            <button class="umat-chip" data-q="Explain the key concept discussed in the most recent lecture." type="button">Explain key concept</button>
-            <button class="umat-chip" data-q="Can you compare this topic with what was covered earlier in the course?" type="button">Compare topics</button>
-            <button class="umat-chip" data-q="Create a practice quiz on this week's material." type="button">Practice quiz</button>
-            <button class="umat-chip" data-q="What are the most common exam questions for this topic?" type="button">Exam prep</button>
-          </div>
-          <div class="umat-msgs" id="ws-msgs">
-            <div class="umat-msg-ai" data-msg-id="msg_0" data-msg-role="ai">
-              <div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>
-              <div class="umat-msg-ai-wrap">
-                <div class="umat-msg-lbl">AI TUTOR</div>
-                <div class="umat-bubble-ai"><p>Welcome to your AI Tutor for <strong>{$safeName}</strong>! I can reference your selected course materials for precise answers. Use the attachment button to select specific materials, or ask me anything!</p></div>
-              </div>
-            </div>
-          </div>
-          <div class="umat-attach-drawer umat-drawer-enhanced" id="ws-attach-drawer">
-            <div class="umat-drawer-hdr">
-              <div class="umat-drawer-hdr-left">
-                <span class="material-symbols-outlined" style="font-size:17px;color:var(--u-p);">attach_file</span>
-                <h4>Select Materials</h4>
-                <span class="umat-drawer-count" id="ws-drawer-count">0 selected</span>
-              </div>
-              <div class="umat-drawer-hdr-actions">
-                <button class="umat-drawer-clear-btn" id="ws-drawer-clear" type="button">Clear</button>
-                <button class="umat-drawer-close-btn" id="ws-drawer-close" type="button"><span class="material-symbols-outlined">close</span></button>
-              </div>
-            </div>
-            <div class="umat-drawer-search-wrap">
-              <span class="material-symbols-outlined umat-drawer-search-icon">search</span>
-              <input type="text" id="ws-drawer-search" placeholder="Search materials…">
-            </div>
-            <div class="umat-drawer-cats" id="ws-drawer-cats"></div>
-            <div class="umat-drawer-recent" id="ws-drawer-recent"></div>
-            <div class="umat-drawer-list" id="ws-drawer-list"><div class="umat-drawer-loading"><div class="umat-vw-spinner"></div><span>Loading materials&hellip;</span></div></div>
-            <div class="umat-drawer-foot">
-              <span class="umat-drawer-foot-info">Select materials for AI</span>
-              <button class="umat-drawer-confirm" id="ws-drawer-confirm" type="button"><span class="material-symbols-outlined">check</span> Use Selected</button>
-            </div>
-          </div>
-        </div>
-        <div class="umat-msg-nav" id="ws-msg-nav"></div>
-      </div>
-      <div class="umat-chat-overlay">
-        <button class="umat-scroll-bottom" id="ws-scroll-bottom" type="button"><span class="material-symbols-outlined">expand_more</span></button>
-        <div class="umat-chatbar">
-          <button class="umat-chatbar-btn" id="ws-attach-btn" type="button"><span class="material-symbols-outlined">add</span></button>
-          <textarea id="ws-input" class="umat-chatbar-input" placeholder="Ask AI about this course…" rows="1" maxlength="900"></textarea>
-          <button class="umat-chatbar-btn" id="ws-mic-btn" type="button" title="Voice input"><span class="material-symbols-outlined">mic</span></button>
-          <button class="umat-chatbar-send" id="ws-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
-        </div>
-        <div class="umat-mat-bar" id="ws-mat-bar"></div>
-      </div>
-      <!-- QUIZ PANE (overlays chat when active) -->
-      <div class="umat-quiz-pane" id="ws-quiz-pane" style="display:none;">
-        <div class="umat-quiz-topbar">
-          <button class="umat-quiz-back" id="ws-quiz-back" type="button" title="Back to chat"><span class="material-symbols-outlined">arrow_back</span></button>
-          <div class="umat-quiz-title" id="ws-quiz-title">Quiz</div>
-          <span id="ws-quiz-total" style="display:none;"></span>
-          <div class="umat-quiz-circle" id="ws-quiz-circle"></div>
-        </div>
-        <div class="umat-quiz-body" id="ws-quiz-body"></div>
-        <div class="umat-quiz-score" id="ws-quiz-score" style="display:none;">
-          <div class="umat-quiz-score-ic"><span class="material-symbols-outlined" id="ws-quiz-score-icon">emoji_events</span></div>
-          <div class="umat-quiz-score-num" id="ws-quiz-score-num">0</div>
-          <div class="umat-quiz-score-lbl" id="ws-quiz-score-lbl">correct</div>
-          <div class="umat-quiz-score-sub" id="ws-quiz-score-sub"></div>
-          <div class="umat-quiz-score-bar"><div class="umat-quiz-score-fill" id="ws-quiz-score-fill"></div></div>
-          <button class="umat-quiz-retry" id="ws-quiz-retry" type="button"><span class="material-symbols-outlined">refresh</span>Try Again</button>
-          <button class="umat-quiz-review" id="ws-quiz-review" type="button"><span class="material-symbols-outlined">rate_review</span>Review Answers</button>
-          <button class="umat-quiz-close" id="ws-quiz-close-pane" type="button"><span class="material-symbols-outlined">chat</span>Back to Chat</button>
-        </div>
-      </div>
+      {$aiTutorPanel}
     </div>
 
     <!-- MY COURSES TAB -->
@@ -526,7 +623,7 @@ JS;
       </div>
     </div>
 
-    <!-- FLASHCARDS TAB (M2 / F3 spaced repetition) -->
+    <!-- FLASHCARDS TAB (M2 / F3 spaced repetition — private self-service deck) -->
     <div class="umat-tab-pane" data-tab="flashcards">
       <div class="umat-content-hdr">
         <h2><span class="material-symbols-outlined" style="vertical-align:middle;margin-right:6px;">style</span>Flashcards</h2>
@@ -536,6 +633,26 @@ JS;
         </button>
       </div>
       <div class="umat-fc-wrap" id="ws-fc-wrap">
+
+        <!-- Generate section — students build their own private deck from course materials -->
+        <div class="umat-fc-gen-card" id="ws-fc-gen-card">
+          <div class="umat-fc-gen-hdr">
+            <span class="material-symbols-outlined">auto_awesome</span>
+            <div><strong>Generate Flashcards</strong><small>AI builds study cards from your course materials — your private deck, visible only to you.</small></div>
+          </div>
+          <div class="umat-fc-gen-body">
+            <div class="umat-fc-mat-list" id="ws-fc-mats">
+              <div class="umat-fc-gen-loading"><div class="umat-vw-spinner"></div><span>Loading materials…</span></div>
+            </div>
+            <div class="umat-fc-lect-row">
+              <label>Topic label <input type="text" id="ws-fc-topic-inp" placeholder="Optional — e.g. Week 1" maxlength="120"></label>
+              <label>Cards <select id="ws-fc-count"><option value="5">5</option><option value="10" selected>10</option><option value="15">15</option><option value="20">20</option><option value="30">30</option></select></label>
+              <button type="button" id="ws-fc-gen" class="umat-btn-p"><span class="material-symbols-outlined" style="font-size:18px;">auto_awesome</span>Generate</button>
+            </div>
+            <div class="umat-fc-lect-msg" id="ws-fc-gen-msg"></div>
+          </div>
+        </div>
+
         <!-- Stats strip -->
         <div class="umat-fc-stats">
           <div class="umat-fc-stat">
@@ -560,17 +677,24 @@ JS;
           </button>
         </div>
 
-        <!-- Review mode (hidden until a review starts) -->
+        <!-- Review mode — poker-style card (hidden until a review starts) -->
         <div class="umat-fc-review" id="ws-fc-review" style="display:none;">
-          <div class="umat-fc-card" id="ws-fc-card" title="Click to flip">
-            <div class="umat-fc-card-inner" id="ws-fc-card-inner">
-              <div class="umat-fc-face umat-fc-front">
-                <div class="umat-fc-topic" id="ws-fc-topic"></div>
-                <div class="umat-fc-text" id="ws-fc-front"></div>
+          <div class="umat-fc-poker" id="ws-fc-card" title="Click to flip" role="button" tabindex="0">
+            <div class="umat-fc-poker-inner" id="ws-fc-card-inner">
+              <div class="umat-fc-poker-face umat-fc-poker-front">
+                <div class="umat-fc-poker-corner umat-fc-corner-tl"><span id="ws-fc-topic" class="umat-fc-corner-rank"></span><span class="umat-fc-corner-suit">?</span></div>
+                <div class="umat-fc-poker-center">
+                  <div class="umat-fc-poker-chip">FLASHCARD</div>
+                  <div class="umat-fc-text" id="ws-fc-front"></div>
+                </div>
+                <div class="umat-fc-poker-corner umat-fc-corner-br"><span id="ws-fc-topic-back" class="umat-fc-corner-rank"></span><span class="umat-fc-corner-suit">?</span></div>
               </div>
-              <div class="umat-fc-face umat-fc-back">
-                <div class="umat-fc-topic" id="ws-fc-topic-back"></div>
-                <div class="umat-fc-text" id="ws-fc-back"></div>
+              <div class="umat-fc-poker-face umat-fc-poker-back">
+                <div class="umat-fc-poker-back-pattern"></div>
+                <div class="umat-fc-poker-center">
+                  <div class="umat-fc-poker-chip">ANSWER</div>
+                  <div class="umat-fc-text" id="ws-fc-back"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -592,11 +716,11 @@ JS;
           <div class="umat-fc-progress" id="ws-fc-progress"></div>
         </div>
 
-        <!-- Deck grid (all approved cards) -->
+        <!-- Deck grid — poker-style mini cards -->
         <div class="umat-fc-grid" id="ws-fc-grid"></div>
         <div class="umat-empty" id="ws-fc-empty" style="display:none;">
           <span class="material-symbols-outlined">style</span>
-          <p id="ws-fc-empty-text">No flashcards yet — your lecturer will publish approved cards here.</p>
+          <p id="ws-fc-empty-text">No flashcards yet — pick your materials above and generate your own deck!</p>
         </div>
       </div>
     </div>
@@ -610,6 +734,11 @@ JS;
 
 <script>
 (function(){var f=document.getElementById('umat-stu-fab');if(!f)return;var L=false;var o=document.getElementById('stu-cp-ov');f.addEventListener('click',function(){if(o&&window.innerWidth>=640)o.classList.add('open');if(L)return;L=true;require(['local_umat_ai/umat_student'],function(m){m.init({courseId:{$jsCid},courseName:{$jsName},userData:{$jsUD},streamUrl:{$streamUrl},moodleSesskey:{$moodleSesskey}});});});})();
+</script>
+
+<script>
+/* AI Tutor (Notebook-style 3-panel workspace inside the AI Tutor tab) — lazy boot with the overlay. */
+(function(){var f=document.getElementById('umat-stu-fab');if(!f)return;var L=false;f.addEventListener('click',function(){if(L)return;L=true;require(['local_umat_ai/ai_tutor'],function(m){m.init({mode:'course',courseId:{$jsCid},courseName:{$jsName},userData:{$jsUD},streamUrl:{$streamUrl},moodleSesskey:{$moodleSesskey}});});});})();
 </script>
 HTML;
     }
@@ -1048,7 +1177,6 @@ HTML;
         <button class="umat-sb-item" data-lp="lec-quizgen" type="button" title="Quiz Generator"><span class="material-symbols-outlined">quiz</span><span class="umat-sb-item-lbl">Quiz Generator</span></button>
         <button class="umat-sb-item" data-lp="lec-courses" type="button" title="My Courses"><span class="material-symbols-outlined">menu_book</span><span class="umat-sb-item-lbl">My Courses</span></button>
         <button class="umat-sb-item" data-lp="lec-library" type="button" title="Resource Materials"><span class="material-symbols-outlined">local_library</span><span class="umat-sb-item-lbl">Resource Materials</span></button>
-        <button class="umat-sb-item" data-lp="lec-flashcards" type="button" title="Flashcards"><span class="material-symbols-outlined">style</span><span class="umat-sb-item-lbl">Flashcards</span></button>
         <button class="umat-sb-item" data-lp="lec-sessions" type="button" title="Sessions"><span class="material-symbols-outlined">history</span><span class="umat-sb-item-lbl">Sessions</span></button>
         <button class="umat-sb-item" data-lp="lec-issues" type="button" title="Student Issues"><span class="material-symbols-outlined">forum</span><span class="umat-sb-item-lbl">Student Issues</span><span class="umat-sb-badge" id="sb-badge-new-issues" style="display:none;margin-left:auto;background:var(--u-ter);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;line-height:14px;min-width:16px;text-align:center;"></span></button>
       </nav>
@@ -1246,19 +1374,6 @@ HTML;
         </div>
         {$rbViewHtml}
         <!-- Viewers (using shared material_viewer) -->
-      </div>
-
-      <!-- FLASHCARDS (LECTURER) — M2 / F3 generate + approve -->
-      <div class="umat-tab-pane" id="lec-flashcards" style="overflow-y:auto;">
-        <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>style</span> Flashcards</h2>
-          <button class="umat-content-hdr-btn" id="lec-fc-refresh" type="button" title="Refresh">
-            <span class="material-symbols-outlined">refresh</span><span>Refresh</span>
-          </button>
-        </div>
-        <div id="lec-fc-body" style="padding:0 20px 20px;">
-          <div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading Flashcards…</p></div>
-        </div>
       </div>
 
       <!-- SESSIONS (LECTURER) -->
@@ -2207,131 +2322,9 @@ function loadPaneData(name){
   }
   if(name==='lec-quizgen')loadQuizGenUI();
   if(name==='lec-home')initHome();
-  if(name==='lec-flashcards')loadLecFlashcards();
 }
 /* Expose to window so AMD modules can delegate */
 window.loadPaneData=loadPaneData;
-
-/* ── Flashcards (M2 / F3) — generate + approval workflow ── */
-function loadLecFlashcards(){
-  var body=document.getElementById('lec-fc-body');if(!body)return;
-  if(!CID){body.innerHTML=_lecCourseAlert('flashcards');_lecWireAlertChips(body,function(cid){CID=cid;loadLecFlashcards();});return;}
-  body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">hourglass_empty</span><p>Loading materials…</p></div>';
-  var done=function(mats,fcData){
-    var cards=fcData||[];
-    renderLecFlashcards(body,mats,cards);
-  };
-  var matsLoaded=function(r){
-    var mats=r.materials||[];
-    ajax('local_umat_ai_get_flashcards',{courseid:CID,status:9},function(fc){
-      done(mats,fc.cards||[]);
-    },function(){done(mats,[]);});
-  };
-  ajax('local_umat_ai_get_course_materials',{courseid:CID},matsLoaded,function(){
-    body.innerHTML='<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>Could not load materials.</p></div>';
-  });
-}
-function renderLecFlashcards(body,mats,cards){
-  var pending=cards.filter(function(c){return c.status===0;});
-  var approved=cards.filter(function(c){return c.status===1;});
-  var rejected=cards.filter(function(c){return c.status===-1;});
-  var indexedMats=(mats||[]).filter(function(m){return m.is_indexed||m.indexed;});
-  var selectable=indexedMats.length?indexedMats:mats;
-  var html='';
-  /* Summary chips */
-  html+='<div class="umat-fc-lect-stats">'
-    +'<span class="umat-fc-lect-chip"><b>'+approved.length+'</b> approved</span>'
-    +'<span class="umat-fc-lect-chip warn"><b>'+pending.length+'</b> pending</span>'
-    +'<span class="umat-fc-lect-chip muted"><b>'+rejected.length+'</b> rejected</span>'
-    +'</div>';
-  /* Generate card */
-  html+='<div class="umat-fc-lect-card">'
-    +'<div class="umat-fc-lect-hdr"><span class="material-symbols-outlined">auto_awesome</span><div><strong>Generate Flashcards</strong><small>AI builds cards strictly from the selected indexed materials (approval required before students see them).</small></div></div>'
-    +(selectable.length?'<div class="umat-fc-lect-body">'
-      +'<div class="umat-fc-mat-list" id="lec-fc-mats">'+selectable.map(function(m,i){
-          return '<label class="umat-fc-mat-item"><input type="checkbox" value="'+m.id+'"'+(i<3?' checked':'')+'>'
-            +'<span class="umat-fc-mat-name">'+esc(m.filename||m.name||'Material '+m.id)+'</span>'
-            +(m.is_indexed?'':'<span class="umat-fc-mat-tag">not indexed</span>')
-            +'</label>';
-        }).join('')+'</div>'
-      +'<div class="umat-fc-lect-row">'
-        +'<label>Topic label <input type="text" id="lec-fc-topic" placeholder="Optional — e.g. Week 1" maxlength="120"></label>'
-        +'<label>Cards <select id="lec-fc-count"><option value="5">5</option><option value="10" selected>10</option><option value="15">15</option><option value="20">20</option><option value="30">30</option></select></label>'
-        +'<button type="button" id="lec-fc-gen" class="umat-btn-p"><span class="material-symbols-outlined" style="font-size:18px;">auto_awesome</span>Generate</button>'
-      +'</div>'
-      +'<div class="umat-fc-lect-msg" id="lec-fc-msg"></div>'
-    +'</div>':'<div class="umat-fc-lect-empty">No course materials found. Upload materials to the course library first.</div>')
-    +'</div>';
-  /* Approval queue */
-  html+='<div class="umat-fc-lect-card">'
-    +'<div class="umat-fc-lect-hdr"><span class="material-symbols-outlined">fact_check</span><div><strong>Approval Queue ('+pending.length+')</strong><small>Review AI-generated cards and publish the ones students should study.</small></div></div>'
-    +(pending.length?'<div class="umat-fc-lect-body">'
-      +'<div class="umat-fc-approve-bar">'
-        +'<label class="umat-fc-mat-item" style="padding:6px 8px;"><input type="checkbox" id="lec-fc-selectall"> <span class="umat-fc-mat-name"><b>Select all</b></span></label>'
-        +'<button type="button" class="umat-btn-xs-p" id="lec-fc-approve"><span class="material-symbols-outlined" style="font-size:14px;">check</span>Approve</button>'
-        +'<button type="button" class="umat-btn-xs-r" id="lec-fc-reject"><span class="material-symbols-outlined" style="font-size:14px;">close</span>Reject</button>'
-      +'</div>'
-      +'<div class="umat-fc-pending-list">'+pending.map(function(c){
-          return '<label class="umat-fc-pending-item"><input type="checkbox" class="lec-fc-pick" value="'+c.id+'">'
-            +'<div class="umat-fc-pending-body"><div class="umat-fc-pending-topic">'+esc(c.topic||'General')+'</div>'
-            +'<div class="umat-fc-pending-front">'+esc(c.front)+'</div>'
-            +'<div class="umat-fc-pending-back">'+esc(c.back)+'</div></div></label>';
-        }).join('')+'</div>'
-      +'<div class="umat-fc-lect-msg" id="lec-fc-appr-msg"></div>'
-    +'</div>':'<div class="umat-fc-lect-empty">No flashcards awaiting approval.</div>')
-    +'</div>';
-  body.innerHTML=html;
-  /* Generate wiring */
-  var gen=document.getElementById('lec-fc-gen');
-  if(gen)gen.addEventListener('click',function(){
-    var ids=Array.prototype.slice.call(body.querySelectorAll('#lec-fc-mats input:checked')).map(function(i){return parseInt(i.value)||0;});
-    if(!ids.length){_lecFcMsg('lec-fc-msg','Select at least one material.','err');return;}
-    var count=parseInt(document.getElementById('lec-fc-count').value)||10;
-    var topic=(document.getElementById('lec-fc-topic').value||'').trim();
-    gen.disabled=true;gen.style.opacity='.55';
-    _lecFcMsg('lec-fc-msg','Generating '+count+' flashcards from '+ids.length+' material(s)…','');
-    ajax('local_umat_ai_generate_flashcards',{courseid:CID,material_ids:JSON.stringify(ids),count:count,topic_label:topic},function(r){
-      gen.disabled=false;gen.style.opacity='';
-      if(r&&r.success){_lecFcMsg('lec-fc-msg',r.message||'Cards generated.','ok');setTimeout(loadLecFlashcards,900);}
-      else{_lecFcMsg('lec-fc-msg',(r&&r.message)||'Generation failed.','err');}
-    },function(){
-      gen.disabled=false;gen.style.opacity='';
-      _lecFcMsg('lec-fc-msg','Could not reach the AI service.','err');
-    });
-  });
-  /* Select-all wiring */
-  var sa=document.getElementById('lec-fc-selectall');
-  if(sa)sa.addEventListener('change',function(){
-    body.querySelectorAll('.lec-fc-pick').forEach(function(cb){cb.checked=sa.checked;});
-  });
-  /* Approve / reject wiring */
-  var appr=document.getElementById('lec-fc-approve'),rej=document.getElementById('lec-fc-reject');
-  var act=function(btn,action){
-    if(!btn)return;
-    btn.addEventListener('click',function(){
-      var ids=Array.prototype.slice.call(body.querySelectorAll('.lec-fc-pick:checked')).map(function(i){return parseInt(i.value)||0;});
-      if(!ids.length){_lecFcMsg('lec-fc-appr-msg','Select flashcards first.','err');return;}
-      btn.disabled=true;
-      ajax('local_umat_ai_approve_flashcards',{courseid:CID,card_ids:JSON.stringify(ids),action:action},function(r){
-        btn.disabled=false;
-        _lecFcMsg('lec-fc-appr-msg',(r&&r.message)||'Done.','ok');
-        setTimeout(loadLecFlashcards,900);
-      },function(){
-        btn.disabled=false;
-        _lecFcMsg('lec-fc-appr-msg','Could not reach the server.','err');
-      });
-    });
-  };
-  act(appr,'approve');act(rej,'reject');
-  /* Refresh wiring */
-  var fr=document.getElementById('lec-fc-refresh');
-  if(fr)fr.addEventListener('click',loadLecFlashcards);
-}
-function _lecFcMsg(id,text,tone){
-  var el=document.getElementById(id);if(!el)return;
-  el.textContent=text;
-  el.className='umat-fc-lect-msg'+(tone==='err'?' umat-fc-lect-msg-err':(tone==='ok'?' umat-fc-lect-msg-ok':''));
-}
 
 /* Load panel (compact) data */
 function loadPanelData(){
@@ -3525,6 +3518,9 @@ HTML;
         ];
         $hubMobTabs = self::glassmorph_tab_bar($hubGlassTabs, 'hp', 'hub-glass-tabs');
 
+        // AI Tutor (Notebook-style, 3-panel: sessions | chat | Studio) — cross-course mode.
+        $hubAiTutorPanel = self::ai_tutor_workspace('hub', 0, '', $wwwroot, $user, $userData, $platformName);
+
         return <<<HTML
 <!-- ============================================================
      HUB FAB + OVERLAY (non-course pages — students only)
@@ -3614,64 +3610,9 @@ HTML;
         </div>
       </div>
 
-      <!-- AI TUTOR -->
+      <!-- AI TUTOR (Notebook-style 3-panel: sessions | chat | Studio) -->
       <div class="umat-tab-pane" id="hub-tutor" style="position:relative;">
-        <div class="umat-content-hdr">
-          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>smart_toy</span> General AI Tutor</h2>
-          <select id="hub-course-sel" style="padding:6px 11px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:12px;outline:none;font-family:inherit;color:var(--u-ons);background:var(--u-sfl);max-width:min(200px,45vw);">
-            <option value="0">All Courses</option>
-          </select>
-        </div>
-        <div style="display:flex;flex:1;overflow:hidden;">
-          <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;">
-            <div class="umat-msgs" id="hub-msgs" style="padding-bottom:80px;">
-              <div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div>
-                <div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI TUTOR</div>
-                  <div class="umat-bubble-ai"><p>Hello! I'm your cross-course AI tutor. Ask me anything about your engineering studies or campus inquiries. Select a course above to get course-specific answers! 🎓</p></div>
-                  <div class="umat-chips-row">
-                    <button class="umat-chip" data-q="What are the main differences between open-pit and underground mining?" type="button">Mining methods</button>
-                    <button class="umat-chip" data-q="Explain the Mohr-Coulomb failure criterion." type="button">Rock mechanics</button>
-                    <button class="umat-chip" data-q="How does electrical impedance affect circuit design?" type="button">Circuit theory</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="umat-chat-overlay">
-              <button class="umat-scroll-bottom" id="hub-scroll-bottom" type="button"><span class="material-symbols-outlined">expand_more</span></button>
-              <div class="umat-chatbar">
-                <button class="umat-chatbar-btn" id="hub-attach-btn" type="button"><span class="material-symbols-outlined">add</span></button>
-                <textarea id="hub-input" class="umat-chatbar-input" placeholder="Ask anything about your courses…" rows="1" maxlength="900"></textarea>
-                <button class="umat-chatbar-btn" id="hub-mic-btn" type="button" title="Voice input"><span class="material-symbols-outlined">mic</span></button>
-                <button class="umat-chatbar-send" id="hub-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
-              </div>
-              <div class="umat-mat-bar" id="hub-mat-bar"></div>
-            </div>
-          </div>
-        </div>
-        <div class="umat-attach-drawer umat-drawer-enhanced" id="hub-attach-drawer">
-          <div class="umat-drawer-hdr">
-            <div class="umat-drawer-hdr-left">
-              <span class="material-symbols-outlined" style="font-size:17px;color:var(--u-p);">attach_file</span>
-              <h4>Select Materials</h4>
-              <span class="umat-drawer-count" id="hub-drawer-count">0 selected</span>
-            </div>
-            <div class="umat-drawer-hdr-actions">
-              <button class="umat-drawer-clear-btn" id="hub-drawer-clear" type="button">Clear</button>
-              <button class="umat-drawer-close-btn" id="hub-drawer-close" type="button"><span class="material-symbols-outlined">close</span></button>
-            </div>
-          </div>
-          <div class="umat-drawer-search-wrap">
-            <span class="material-symbols-outlined umat-drawer-search-icon">search</span>
-            <input type="text" id="hub-drawer-search" placeholder="Search materials…">
-          </div>
-          <div class="umat-drawer-cats" id="hub-drawer-cats"></div>
-          <div class="umat-drawer-recent" id="hub-drawer-recent"></div>
-          <div class="umat-drawer-list" id="hub-drawer-list"><div class="umat-drawer-loading"><div class="umat-vw-spinner"></div><span>Select a course first.</span></div></div>
-          <div class="umat-drawer-foot">
-            <span class="umat-drawer-foot-info">Select materials for AI</span>
-            <button class="umat-drawer-confirm" id="hub-drawer-confirm" type="button"><span class="material-symbols-outlined">check</span> Use Selected</button>
-          </div>
-        </div>
+        {$hubAiTutorPanel}
       </div>
 
       <!-- LECTURES -->
@@ -4457,6 +4398,11 @@ _umatInitEsc([
 </script>
 <script>
 (function(){var f=document.getElementById('hub-fab');if(!f){if(window._hubBoot)window._hubBoot();return;}var L=false;var o=document.getElementById('hub-ov');f.addEventListener('click',function(){if(o)o.classList.add('open');if(L)return;L=true;if(window._hubBoot){window._hubBoot();window._hubBoot=null;}require(['local_umat_ai/umat_hub'],function(m){m.init({userData:{$jsUD},userId:{$uid},streamUrl:{$streamUrl},moodleSesskey:{$moodleSesskey}});});});})();
+</script>
+
+<script>
+/* AI Tutor (Notebook-style 3-panel workspace inside the hub AI Tutor tab) — lazy boot with the hub. */
+(function(){var f=document.getElementById('hub-fab');if(!f)return;var L=false;f.addEventListener('click',function(){if(L)return;L=true;require(['local_umat_ai/ai_tutor'],function(m){m.init({mode:'hub',courseId:0,courseName:'',userData:{$jsUD},userId:{$uid},streamUrl:{$streamUrl},moodleSesskey:{$moodleSesskey}});});});})();
 </script>
 HTML;
     }

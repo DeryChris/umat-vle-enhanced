@@ -45,9 +45,11 @@ class before_footer {
             $ocv = filemtime(__DIR__ . '/../../styles/umat-overlay.css');
             $rcv = filemtime(__DIR__ . '/../../styles/umat-responsive.css');
             $gnv = filemtime(__DIR__ . '/../../styles/umat-glassmorph-nav.css');
+            $aiv = filemtime(__DIR__ . '/../../styles/umat-ai-tutor.css');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-overlay.css?v=' . $ocv . '">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-responsive.css?v=' . $rcv . '">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-glassmorph-nav.css?v=' . $gnv . '">');
+            $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-ai-tutor.css?v=' . $aiv . '">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-viewers.css">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-notes.css">');
             $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-dashboard.css?v=' . filemtime(__DIR__ . '/../../styles/umat-dashboard.css') . '">');
