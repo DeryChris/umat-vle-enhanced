@@ -260,6 +260,7 @@
   margin-bottom: var(--la-gap);
 }
 .la-grid-secondary { grid-template-columns: 1fr; }
+.la-grid-duo { grid-template-columns: 1fr; }
 .la-chart { width: 100%; height: 240px; }
 
 /* ── INSIGHTS (NLG cards) ────────────────────────────────────────── */
@@ -478,24 +479,24 @@
 /* ── RESPONSIVE: ≥768px (tablet) ─────────────────────────────────── */
 @media (min-width: 768px) {
   .la-grid { grid-template-columns: repeat(2, 1fr); }
+  .la-grid-duo { grid-template-columns: repeat(2, 1fr); }
   .la-grid-secondary { grid-template-columns: repeat(2, 1fr); }
   .la-insight-list { grid-template-columns: repeat(2, 1fr); }
   .la-priority-list { grid-template-columns: repeat(2, 1fr); }
   .la-chart { height: 280px; }
   .la-kpi-strip { grid-template-columns: repeat(5, 1fr); }
-  .la-card-students { grid-column: span 1; }
 }
 
 /* ── RESPONSIVE: ≥1200px (desktop) ───────────────────────────────── */
 @media (min-width: 1200px) {
-  /* 5 tracks so all four main cards sit on ONE row: performance trend,
-     risk donut (widened), topic heatmap, and the at-risk students list
-     (spanning the last two tracks). The old 4-track grid left the 4th
-     track empty next to the Topic Struggle card because the student list
-     (span 2) could not fit and wrapped to the next row. */
-  .la-grid { grid-template-columns: 1.3fr 1.5fr 1.3fr 1fr 1fr; }
-  .la-card-students { grid-column: span 2; }
-  .la-grid-secondary { grid-template-columns: repeat(4, 1fr); }
+  /* Three full-width rows:
+       1) charts  — Performance trend | Risk donut | Topic heatmap (3 equal cards)
+       2) students — At-Risk Students | What Students Are Asking (2 equal cards)
+       3) secondary — Quiz analytics | Recording engagement | Resource engagement
+     Each row spans 100% of the dashboard width; no empty tracks. */
+  .la-grid { grid-template-columns: repeat(3, 1fr); }
+  .la-grid-duo { grid-template-columns: repeat(2, 1fr); }
+  .la-grid-secondary { grid-template-columns: repeat(3, 1fr); }
   .la-chart { height: 300px; }
 }
 

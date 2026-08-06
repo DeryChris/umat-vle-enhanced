@@ -7,9 +7,9 @@
       2. KPI strip         – 5 KPI cards (students, at-risk, quiz avg, active, questions)
       3. NLG insights      – natural-language insight cards (AI or template generated)
       4. Priority actions  – what needs attention right now
-      5. Main grid         – Performance trend (ECharts line) | Risk donut
-                            – Topic struggle heatmap (ECharts)    | At-risk students
-      6. Secondary grid    – Common questions | Quiz analytics | Recordings | Resources
+      5. Charts row        – Performance trend (ECharts line) | Risk donut | Topic heatmap
+      6. Students row      – At-risk students | What Students Are Asking
+      7. Secondary row     – Quiz analytics | Recording engagement | Resource engagement
       (NLQ removed: "Ask About Your Students" now lives in the Ask AI Assistant FAB)
 
     All content is rendered by the AMD module (local_umat_ai/lecturer_analytics)
@@ -75,7 +75,7 @@
     <div class="la-skeleton la-skeleton-block" data-skel="priority"></div>
   </section>
 
-  <!-- ═══════════════════ MAIN GRID (charts + students) ═══════════════════ -->
+  <!-- ═══════════════════ CHARTS ROW (3 cards) ═══════════════════ -->
   <section class="la-grid">
     <!-- Performance trend -->
     <div class="la-card la-card-chart" id="la-card-trend">
@@ -112,7 +112,10 @@
       </div>
       <div class="la-skeleton la-skeleton-chart" data-skel="topics"></div>
     </div>
+  </section>
 
+  <!-- ═══════════════════ STUDENTS ROW (2 cards) ═══════════════════ -->
+  <section class="la-grid la-grid-duo">
     <!-- At-risk students -->
     <div class="la-card la-card-students" id="la-card-students">
       <div class="la-card-header">
@@ -132,10 +135,7 @@
       </div>
       <div class="la-skeleton la-skeleton-students" data-skel="students"></div>
     </div>
-  </section>
 
-  <!-- ═══════════════════ SECONDARY GRID ═══════════════════ -->
-  <section class="la-grid la-grid-secondary">
     <!-- Common questions -->
     <div class="la-card" id="la-card-questions">
       <div class="la-card-header">
@@ -145,7 +145,10 @@
         <div class="la-question-list" id="la-common-questions"></div>
       </div>
     </div>
+  </section>
 
+  <!-- ═══════════════════ SECONDARY ROW (3 cards) ═══════════════════ -->
+  <section class="la-grid la-grid-secondary">
     <!-- Quiz analytics -->
     <div class="la-card" id="la-card-quiz">
       <div class="la-card-header">
