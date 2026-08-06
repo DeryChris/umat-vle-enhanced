@@ -301,17 +301,68 @@ define([
 
     /* ── Charts (ECharts) ───────────────────────────────────────────── */
 
+    function chartFallback(el, msg) {
+        if (!el) return;
+        // Dispose any half-initialized instance so a later retry can re-init.
+        var id = el.id;
+        if (state.charts[id]) {
+            try { state.charts[id].dispose(); } catch (e) { /* noop */ }
+            delete state.charts[id];
+        }
+        el.innerHTML = '<div class="la-empty">' + msg + '</div>';
+    }
+
+    function chartsVisible() {
+        // The dashboard may auto-init before the lecturer opens the Insights
+        // pane; echarts.init on a display:none container can fail. Detect the
+        // visibility of the host pane so rendering can be deferred.
+        var host = byId('la-dashboard');
+        if (host && host.offsetParent === null) return false;
+        var pane = document.getElementById('lec-insights');
+        if (pane && pane.offsetParent === null) return false;
+        return true;
+    }
+
+    function watchVisibility(retries) {
+        // Re-render charts once the pane becomes visible (poll-based; no
+        // dependency on a specific tab framework).
+        var waited = 0;
+        var iv = setInterval(function() {
+            waited += 1;
+            if (chartsVisible()) {
+                clearInterval(iv);
+                renderCharts(state.data || {});
+            } else if (waited > (retries || 60)) {
+                clearInterval(iv);
+            }
+        }, 500);
+    }
+
     function renderCharts(data) {
         EChartsPromise.then(function(echarts) {
-            renderTrendChart(echarts, data.performance_trend || {});
-            renderRiskChart(echarts, data.risk_distribution || {});
-            renderTopicChart(echarts, data.topic_struggle || {});
+            if (!chartsVisible()) {
+                // Defer until the pane is actually shown, then re-render.
+                watchVisibility();
+                return;
+            }
+            // Each chart is rendered independently: a failure in one must
+            // never blank the others or masquerade as a library failure.
+            var chartErrors = [];
+            try { renderTrendChart(echarts, data.performance_trend || {}); }
+            catch (e) { chartErrors.push('performance_trend: ' + e.message); chartFallback(byId('la-performance-chart'), 'Chart could not be rendered.'); }
+            try { renderRiskChart(echarts, data.risk_distribution || {}); }
+            catch (e) { chartErrors.push('risk_distribution: ' + e.message); chartFallback(byId('la-risk-chart'), 'Chart could not be rendered.'); }
+            try { renderTopicChart(echarts, data.topic_struggle || {}); }
+            catch (e) { chartErrors.push('topic_struggle: ' + e.message); chartFallback(byId('la-topic-heatmap'), 'Chart could not be rendered.'); }
+            if (chartErrors.length) {
+                console.warn('[umat] chart render error(s):', chartErrors);
+            }
             scheduleResize();
-        }).catch(function() {
-            // ECharts unavailable: show readable fallbacks in chart areas.
+        }).catch(function(err) {
+            // ECharts library itself unavailable: show readable fallbacks.
+            console.warn('[umat] ECharts library unavailable:', err && err.message);
             ['la-performance-chart', 'la-risk-chart', 'la-topic-heatmap'].forEach(function(id) {
-                var el = byId(id);
-                if (el) el.innerHTML = '<div class="la-empty">Chart library unavailable. See the cards below for data.</div>';
+                chartFallback(byId(id), 'Chart library unavailable. See the cards below for data.');
             });
         });
     }
