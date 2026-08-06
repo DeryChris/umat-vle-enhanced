@@ -83,6 +83,7 @@ class before_footer {
                     $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-viewers.css?v=' . filemtime(__DIR__ . '/../../styles/umat-viewers.css') . '">');
                     $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-cs-overlay.css?v=' . filemtime(__DIR__ . '/../../styles/umat-cs-overlay.css') . '">');
                     $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-yt-grid.css?v=' . filemtime(__DIR__ . '/../../styles/umat-yt-grid.css') . '">');
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-lecturer-analytics.css?v=' . filemtime(__DIR__ . '/../../styles/umat-lecturer-analytics.css') . '">');
                     $hook->add_html(\local_umat_ai\overlay_helper::lecturer_overlay($courseid, $courseName, $wwwroot, $USER, $userData, $platformName));
                 } elseif ($isStudent && get_config('local_umat_ai','enable_student_fab')) {
                     $userData = \local_umat_ai\user_data::preload_user_data($USER->id, $wwwroot);
@@ -103,6 +104,7 @@ class before_footer {
                     $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-viewers.css?v=' . filemtime(__DIR__ . '/../../styles/umat-viewers.css') . '">');
                     $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-cs-overlay.css?v=' . filemtime(__DIR__ . '/../../styles/umat-cs-overlay.css') . '">');
                     $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-yt-grid.css?v=' . filemtime(__DIR__ . '/../../styles/umat-yt-grid.css') . '">');
+                    $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-lecturer-analytics.css?v=' . filemtime(__DIR__ . '/../../styles/umat-lecturer-analytics.css') . '">');
                     $hook->add_html(\local_umat_ai\overlay_helper::lecturer_overlay(0, 'All Courses', $wwwroot, $USER, $userData, $platformName));
                 } elseif (get_config('local_umat_ai','enable_hub_fab')) {
                     $userData = \local_umat_ai\user_data::preload_user_data($USER->id,$wwwroot);

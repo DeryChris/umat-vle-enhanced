@@ -887,8 +887,10 @@ HTML;
         $lecMobTabs = self::glassmorph_tab_bar($lecGlassTabs, 'lp', 'lec-glass-tabs');
 
         global $OUTPUT;
-        // Use analytics_dashboard template (5-zone What→So What→Now What layout)
-        $analyticsDashboardHtml = $OUTPUT->render_from_template('local_umat_ai/analytics_dashboard', []);
+        // Redesigned card-grid dashboard (glassmorphism + Material hybrid).
+        // Replaces the legacy analytics_dashboard / struggle_dashboard templates;
+        // all sections are rendered by the local_umat_ai/lecturer_analytics AMD module.
+        $analyticsDashboardHtml = $OUTPUT->render_from_template('local_umat_ai/lecturer_analytics_redesign', []);
 
         return <<<HTML
 <!-- ============================================================
@@ -1226,7 +1228,7 @@ HTML;
           <div style="display:flex;gap:6px;align-items:center;">
             <button class="umat-content-hdr-btn" id="ins-cs-btn" type="button" title="Select course"><span class="material-symbols-outlined">menu_book</span><span id="ins-cs-label">All Courses</span></button>
             <span class="umat-pill pill-info" id="ins-mode-badge">AI-powered insights</span>
-            <button class="umat-content-hdr-btn ins-topbar-refresh" id="ins-refresh-btn" type="button" aria-label="Refresh insights" title="Refresh insights" onclick="if(window.analyticsDashboard)window.analyticsDashboard.init(resolveInsightsCid());">
+            <button class="umat-content-hdr-btn ins-topbar-refresh" id="ins-refresh-btn" type="button" aria-label="Refresh insights" title="Refresh insights" onclick="if(window.lecturerAnalytics)window.lecturerAnalytics.refresh();else if(window.analyticsDashboard)window.analyticsDashboard.init(resolveInsightsCid());">
               <span class="material-symbols-outlined" id="ins-refresh-icon">refresh</span>
             </button>
           </div>
@@ -1638,8 +1640,10 @@ if(typeof _umatAppendUser!=='function'){
 if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('lcp-msgs');
 if(typeof _umatInitScrollToBottom==='function')_umatInitScrollToBottom('ws-msgs');
 
-/* Load analytics_dashboard AMD module (fault-tolerant, max 30 retries) */
-!function loadAnalyticsDash(c){c=c||0;if(c>30)return;typeof require==='function'?require(['local_umat_ai/analytics_dashboard'],function(d){window.analyticsDashboard=d;var el=document.querySelector('.umat-insights-pane');if(el&&el.getAttribute('data-courseid'))window.analyticsDashboard.init(parseInt(el.getAttribute('data-courseid')));},function(){setTimeout(function(){loadAnalyticsDash(c+1);},1000);}):setTimeout(function(){loadAnalyticsDash(c+1);},50);}();
+/* Load lecturer_analytics AMD module (fault-tolerant, max 30 retries).
+   The module mirrors itself on window.analyticsDashboard so the legacy
+   fallback chain (switchPane / loadPaneData) keeps working unchanged. */
+!function loadAnalyticsDash(c){c=c||0;if(c>30)return;typeof require==='function'?require(['local_umat_ai/lecturer_analytics'],function(d){window.lecturerAnalytics=d;window.analyticsDashboard=d;var el=document.getElementById('la-dashboard');if(el&&el.getAttribute('data-courseid'))window.lecturerAnalytics.init(parseInt(el.getAttribute('data-courseid')));},function(){setTimeout(function(){loadAnalyticsDash(c+1);},1000);}):setTimeout(function(){loadAnalyticsDash(c+1);},50);}();
 
 
 /* ─── LECTURER COURSE TILES ────────────────── */
@@ -2195,10 +2199,11 @@ function switchPane(name){
   else if(name==='lec-insights'){
     /* Re-entry. Both dashboard inits de-duplicate identical in-flight and
        recently-completed requests themselves, so returning to the tab no
-       longer costs an API call. Prefer the unified analytics dashboard (which
-       renders the struggle zones) and fall back to the standalone struggle
-       dashboard when the analytics module is unavailable. */
-    if(window.analyticsDashboard)window.analyticsDashboard.init(resolveInsightsCid());
+       longer costs an API call. Prefer the redesigned lecturer analytics
+       dashboard (which renders the struggle zones) and fall back to the
+       standalone struggle dashboard when the module is unavailable. */
+    if(window.lecturerAnalytics){window.lecturerAnalytics.init(resolveInsightsCid());}
+    else if(window.analyticsDashboard)window.analyticsDashboard.init(resolveInsightsCid());
     else if(window.struggleDashboard)window.struggleDashboard.init(resolveInsightsCid());
     else loadInsights(resolveInsightsCid());
   }
@@ -2304,19 +2309,21 @@ function loadPaneData(name){
   if(name==='lec-issues')initLecturerIssues();
   if(name==='lec-insights'){
     populateInsightsCourseSel();
-    /* Prefer the unified analytics dashboard (renders the struggle zones and
-       de-duplicates in-flight requests). Fall back to the standalone struggle
-       dashboard, then the legacy loader. */
-    if(window.analyticsDashboard){window.analyticsDashboard.init(resolveInsightsCid());}
+    /* Prefer the redesigned lecturer analytics dashboard (renders the struggle
+       zones and de-duplicates in-flight requests). Fall back to the standalone
+       struggle dashboard, then the legacy loader. */
+    if(window.lecturerAnalytics){window.lecturerAnalytics.init(resolveInsightsCid());}
+    else if(window.analyticsDashboard){window.analyticsDashboard.init(resolveInsightsCid());}
     else if(window.struggleDashboard){window.struggleDashboard.init(resolveInsightsCid());}
     else{
       var insWait=0;
       var insPoll=setInterval(function(){
-        if(window.analyticsDashboard){clearInterval(insPoll);window.analyticsDashboard.init(resolveInsightsCid());}
+        if(window.lecturerAnalytics){clearInterval(insPoll);window.lecturerAnalytics.init(resolveInsightsCid());}
+        else if(window.analyticsDashboard){clearInterval(insPoll);window.analyticsDashboard.init(resolveInsightsCid());}
         else if(window.struggleDashboard){clearInterval(insPoll);window.struggleDashboard.init(resolveInsightsCid());}
         else if(++insWait>60){clearInterval(insPoll);
-          var el=document.getElementById('ins-student-list');
-          if(el)el.innerHTML='<div class="ins-empty">Insights could not load. Please refresh the page.</div>';}
+          var el=document.getElementById('la-student-list')||document.getElementById('ins-student-list');
+          if(el)el.innerHTML='<div class="la-empty">Insights could not load. Please refresh the page.</div>';}
       },250);
     }
   }
@@ -3165,7 +3172,8 @@ function populateInsightsCourseSel(){
       document.getElementById('ins-cs-ov').classList.remove('open');
       var labelEl=document.getElementById('ins-cs-label');
       if(labelEl)labelEl.textContent=insCid?(this.querySelector('.umat-cs-item-name')?.textContent||'Course'):'All Courses';
-      if(window.analyticsDashboard)window.analyticsDashboard.init(insCid);
+      if(window.lecturerAnalytics)window.lecturerAnalytics.init(insCid);
+      else if(window.analyticsDashboard)window.analyticsDashboard.init(insCid);
       else loadInsights(insCid);
     });
   });
@@ -3188,15 +3196,20 @@ function loadInsights(cid){
   insCid=cid||0;
   var csLabel=document.getElementById('ins-course-label');
   if(csLabel)csLabel.textContent=cid?':':'';
-  // Delegate to analyticsDashboard AMD module if loaded, otherwise poll for it
-  if(window.analyticsDashboard && typeof window.analyticsDashboard.init==='function'){
+  // Delegate to lecturerAnalytics AMD module if loaded, otherwise poll for it
+  if(window.lecturerAnalytics && typeof window.lecturerAnalytics.init==='function'){
+    window.lecturerAnalytics.init(cid||0);
+  } else if(window.analyticsDashboard && typeof window.analyticsDashboard.init==='function'){
     window.analyticsDashboard.init(cid||0);
   } else {
     // AMD module not yet loaded — poll briefly, then give up
     var poll=0;
     var iv=setInterval(function(){
       poll++;
-      if(window.analyticsDashboard && typeof window.analyticsDashboard.init==='function'){
+      if(window.lecturerAnalytics && typeof window.lecturerAnalytics.init==='function'){
+        clearInterval(iv);
+        window.lecturerAnalytics.init(cid||0);
+      } else if(window.analyticsDashboard && typeof window.analyticsDashboard.init==='function'){
         clearInterval(iv);
         window.analyticsDashboard.init(cid||0);
       } else if(poll>20){

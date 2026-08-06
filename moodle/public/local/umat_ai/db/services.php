@@ -448,6 +448,15 @@ $functions = [
         'type' => 'write', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
+
+    /* ─── Lecturer Analytics Dashboard (consolidated) ─── */
+    'local_umat_ai_get_analytics_data' => [
+        'classname'   => '\local_umat_ai\external\analytics_data', 'methodname' => 'analytics_data',
+        'description' => 'Consolidated analytics for the redesigned lecturer dashboard: KPIs, health, priority actions, trend, risk, topic struggle, recordings, resources and NLG insights',
+        'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+
     /* ---- Flashcards (M2 / F3 spaced repetition) ---- */
     'local_umat_ai_generate_flashcards' => [
         'classname'   => '\local_umat_ai\external\flashcards', 'methodname' => 'generate_flashcards',

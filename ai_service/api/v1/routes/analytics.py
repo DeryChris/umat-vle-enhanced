@@ -1499,3 +1499,230 @@ async def teaching_intelligence(
     except Exception as e:
         logger.error(f"Teaching intelligence error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ════════════════════════════════════════════════════════════
+# POST /api/v1/analytics/insights — Natural-language insights
+# (Lecturer Analytics Dashboard redesign — NLG layer)
+#
+# Generates 3-5 conversational, action-oriented insights for a
+# lecturer from aggregate analytics data. LLM-first (Option A),
+# with a deterministic template fallback (Option B) so the
+# dashboard still renders insights when the LLM is unavailable.
+# ════════════════════════════════════════════════════════════
+
+class AnalyticsInsightAction(BaseModel):
+    label: str = ""
+    url: str = ""
+
+
+class AnalyticsInsight(BaseModel):
+    type: str                # at_risk / quiz_drop / no_engagement /
+                             # improvement / topic_struggle / recordings
+    priority: str = "medium" # high / medium / low
+    text: str
+    action: AnalyticsInsightAction = AnalyticsInsightAction()
+
+
+class AnalyticsInsightsRequest(BaseModel):
+    course_id: int
+    days: int = 30
+    course_name: str = ""
+    enrolled_students: int = 0
+    at_risk_count: int = 0
+    failing_count: int = 0
+    quiz_avg: float = 0.0
+    quiz_trend_pct: float = 0.0
+    engagement_rate: float = 0.0
+    active_students: int = 0
+    struggling_topics: list = []       # [{name, struggle_score, affected}]
+    common_questions: list = []        # [{question, ask_count}]
+    recording_completion: float = 0.0  # 0-100
+    insight_types: list = []           # optional filter; empty = all
+
+
+class AnalyticsInsightsResponse(BaseModel):
+    insights: List[AnalyticsInsight]
+    generated_by: str = "llm"          # "llm" | "templates"
+
+
+ANALYTICS_INSIGHTS_PROMPT = """You are a warm, practical teaching assistant writing for a busy university lecturer. Based on the analytics data below, write 3-5 natural-language insights.
+
+RULES:
+1. Plain conversational English. NO jargon: no "metrics", "thresholds", "coefficient", "percentile", "Δ". Talk like a helpful colleague.
+2. Every claim must include the exact numbers from the data.
+3. Every insight must end with a concrete suggested action ("Consider...", "A quick reminder could help", "It may be worth reviewing...").
+4. Do not invent facts or students that are not in the data.
+5. If a data field is zero or empty, skip that topic entirely.
+
+INSIGHT TYPES (use whichever apply; output at least 2):
+- at_risk: "{{count}} students are struggling — they've scored below 50% on recent quizzes. Consider reaching out to check if they need extra support."
+- quiz_drop: triggered when quiz_trend_pct < -10 — "Quiz averages dropped {{x}}% this week. A practice session or recap might help."
+- no_engagement: triggered when engagement_rate < 50 or active_students is low — "Only {{x}}% of students have engaged this period. A quick reminder could help."
+- improvement: triggered when quiz_trend_pct > 10 — "Great news! Class scores improved by {{x}}%."
+- topic_struggle: for each struggling topic — "Students are struggling with '{{topic}}' — {{affected}} students scored below 50%. Consider reviewing this material."
+- recordings: triggered when recording_completion < 40 — "Only {{x}}% of students are finishing recordings. Adding timestamps or checkpoints could help."
+
+DATA:
+{data_json}
+
+OUTPUT STRICT JSON (no markdown, no code fences):
+{{
+  "insights": [
+    {{
+      "type": "at_risk",
+      "priority": "high",
+      "text": "<conversational paragraph with exact numbers and a suggested action>",
+      "action": {{"label": "View Students", "url": "/local/umat_ai/hub.php?courseid={course_id}&tab=students&filter=at_risk"}}
+    }}
+  ]
+}}
+"""
+
+
+def _generate_template_insights(req: AnalyticsInsightsRequest) -> List[AnalyticsInsight]:
+    """Deterministic template fallback (Option B) — mirrors the LLM prompt's
+    insight types so both paths produce the same shape."""
+    insights: List[AnalyticsInsight] = []
+    types = set(req.insight_types) if req.insight_types else None
+
+    def want(t: str) -> bool:
+        return types is None or t in types
+
+    if want("at_risk") and req.at_risk_count > 0:
+        insights.append(AnalyticsInsight(
+            type="at_risk", priority="high",
+            text=(
+                f"{req.at_risk_count} students are struggling right now — they've scored "
+                "below 50% on recent quizzes. Consider reaching out to check if they need "
+                "extra support."
+            ),
+            action=AnalyticsInsightAction(
+                label="View Students",
+                url=f"/local/umat_ai/hub.php?courseid={req.course_id}&tab=students&filter=at_risk",
+            ),
+        ))
+
+    if want("quiz_drop") and req.quiz_trend_pct < -10:
+        insights.append(AnalyticsInsight(
+            type="quiz_drop", priority="high",
+            text=(
+                f"Quiz averages dropped {abs(req.quiz_trend_pct):.0f}% this week. This might "
+                "be a good time to review the material or offer a practice session."
+            ),
+            action=AnalyticsInsightAction(label="Review Quizzes", url=f"/local/umat_ai/hub.php?courseid={req.course_id}&tab=quizgen"),
+        ))
+
+    if want("improvement") and req.quiz_trend_pct > 10:
+        insights.append(AnalyticsInsight(
+            type="improvement", priority="low",
+            text=(
+                f"Great news! Class scores improved by {req.quiz_trend_pct:.0f}% this week. "
+                "Keep up the momentum!"
+            ),
+        ))
+
+    if want("no_engagement") and req.engagement_rate > 0 and req.engagement_rate < 50:
+        insights.append(AnalyticsInsight(
+            type="no_engagement", priority="medium",
+            text=(
+                f"Only {req.engagement_rate:.0f}% of students have engaged with the new "
+                "material yet. A quick reminder could help."
+            ),
+        ))
+
+    if want("topic_struggle"):
+        for topic in (req.struggling_topics or [])[:3]:
+            name = topic.get("name", "this topic")
+            affected = int(topic.get("affected", 0))
+            score = float(topic.get("struggle_score", 0))
+            if score < 60 or affected > 0:
+                insights.append(AnalyticsInsight(
+                    type="topic_struggle",
+                    priority="medium" if score >= 60 else "high",
+                    text=(
+                        f"Students are struggling with '{name}' — {affected or 'several'} "
+                        "students scored below 50%. Consider reviewing this material or "
+                        "offering extra practice problems."
+                    ),
+                    action=AnalyticsInsightAction(
+                        label="View Topics",
+                        url=f"/local/umat_ai/hub.php?courseid={req.course_id}&tab=insights",
+                    ),
+                ))
+
+    if want("recordings") and req.recording_completion > 0 and req.recording_completion < 40:
+        insights.append(AnalyticsInsight(
+            type="recordings", priority="medium",
+            text=(
+                f"Only {req.recording_completion:.0f}% of students are finishing the "
+                "recordings. Adding timestamps or interactive checkpoints could help."
+            ),
+        ))
+
+    return insights[:6]
+
+
+@router.post("/api/v1/analytics/insights", response_model=AnalyticsInsightsResponse)
+async def analytics_insights(
+    request: AnalyticsInsightsRequest,
+    _ = Depends(verify_token),
+):
+    """Generate conversational, action-oriented insights for the lecturer
+    dashboard. Falls back to deterministic templates when the LLM is
+    unavailable or returns invalid output."""
+    try:
+        data = {
+            "course_id": request.course_id,
+            "course_name": request.course_name,
+            "enrolled_students": request.enrolled_students,
+            "at_risk_count": request.at_risk_count,
+            "failing_count": request.failing_count,
+            "quiz_avg": request.quiz_avg,
+            "quiz_trend_pct": request.quiz_trend_pct,
+            "engagement_rate": request.engagement_rate,
+            "active_students": request.active_students,
+            "struggling_topics": request.struggling_topics[:6],
+            "common_questions": request.common_questions[:6],
+            "recording_completion": request.recording_completion,
+        }
+
+        # Option A: LLM-first, wrapped so any failure drops to templates.
+        try:
+            prompt = ANALYTICS_INSIGHTS_PROMPT.format(
+                data_json=json.dumps(data, indent=2),
+                course_id=request.course_id,
+            )
+            result = _call_llm(prompt, max_chars=6144)
+            parsed = _parse_llm_json(result)
+
+            insights = []
+            for item in parsed.get("insights", []):
+                text = str(item.get("text", "")).strip()
+                if not text:
+                    continue
+                action = item.get("action") or {}
+                insights.append(AnalyticsInsight(
+                    type=str(item.get("type", "general")),
+                    priority=str(item.get("priority", "medium")),
+                    text=text,
+                    action=AnalyticsInsightAction(
+                        label=str(action.get("label", "View Details")),
+                        url=str(action.get("url", "")),
+                    ),
+                ))
+            if insights:
+                return AnalyticsInsightsResponse(insights=insights[:6], generated_by="llm")
+
+            logger.info("Insights LLM returned no items; using template fallback")
+        except Exception as e:
+            logger.warning(f"Insights LLM path failed ({e}); using template fallback")
+
+        # Option B: deterministic templates.
+        return AnalyticsInsightsResponse(
+            insights=_generate_template_insights(request),
+            generated_by="templates",
+        )
+    except Exception as e:
+        logger.error(f"Analytics insights error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

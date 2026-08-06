@@ -1,0 +1,203 @@
+{{!
+    Template: local/umat_ai/templates/lecturer_analytics_redesign.mustache
+    Lecturer Analytics Dashboard — Redesign v2 (glassmorphism + Material hybrid).
+
+    Layout (mobile-first, priority above the fold):
+      1. Nav bar           – course selector, refresh, export
+      2. KPI strip         – 5 KPI cards (students, at-risk, quiz avg, active, questions)
+      3. NLG insights      – natural-language insight cards (AI or template generated)
+      4. Priority actions  – what needs attention right now
+      5. Main grid         – Performance trend (ECharts line) | Risk donut
+                            – Topic struggle heatmap (ECharts)    | At-risk students
+      6. Secondary grid    – Common questions | Quiz analytics | Recordings | Resources
+      7. NLQ bar           – "Ask about your students"
+
+    All content is rendered by the AMD module (local_umat_ai/lecturer_analytics)
+    from the consolidated API (local_umat_ai_get_analytics_data).
+
+    Context (provided by JS): courseid, coursefullname
+}}
+<div class="la-dashboard" id="la-dashboard" data-courseid="{{{courseid}}}">
+
+  <!-- ═══════════════════ NAV BAR ═══════════════════ -->
+  <nav class="la-nav">
+    <div class="la-nav-brand">
+      <span class="material-symbols-outlined">analytics</span>
+      <span>Course Analytics</span>
+      <span class="la-nav-course" id="la-course-label"></span>
+    </div>
+    <div class="la-nav-filters">
+      <button class="la-btn la-btn-icon" id="la-refresh-btn" type="button" title="Refresh data" aria-label="Refresh data">
+        <span class="material-symbols-outlined" id="la-refresh-icon">refresh</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════ KPI STRIP ═══════════════════ -->
+  <section class="la-kpi-strip" id="la-kpi-strip" aria-label="Course key indicators">
+    <div class="la-skeleton la-skeleton-kpi" data-skel="kpi"></div>
+    <div class="la-skeleton la-skeleton-kpi" data-skel="kpi"></div>
+    <div class="la-skeleton la-skeleton-kpi" data-skel="kpi"></div>
+    <div class="la-skeleton la-skeleton-kpi" data-skel="kpi"></div>
+    <div class="la-skeleton la-skeleton-kpi" data-skel="kpi"></div>
+  </section>
+
+  <!-- ═══════════════════ EXECUTIVE BRIEFING ═══════════════════ -->
+  <section class="la-briefing" id="la-briefing">
+    <div class="la-briefing-grade" id="la-briefing-grade">
+      <span class="la-grade-letter" id="la-grade-letter">—</span>
+      <span class="la-grade-label">Health</span>
+    </div>
+    <div class="la-briefing-text">
+      <p class="la-briefing-summary" id="la-briefing-summary">Loading executive summary…</p>
+      <p class="la-briefing-reco" id="la-briefing-reco"></p>
+    </div>
+    <div class="la-skeleton la-skeleton-brief" data-skel="brief"></div>
+  </section>
+
+  <!-- ═══════════════════ NLG INSIGHTS ═══════════════════ -->
+  <section class="la-insights" id="la-insights" aria-label="AI insights">
+    <h3 class="la-section-title">
+      <span class="material-symbols-outlined">auto_awesome</span>
+      What Needs Your Attention
+      <span class="la-pill" id="la-insights-source">AI-generated</span>
+    </h3>
+    <div class="la-insight-list" id="la-insight-list"></div>
+  </section>
+
+  <!-- ═══════════════════ PRIORITY ACTIONS ═══════════════════ -->
+  <section class="la-priority" id="la-priority">
+    <h3 class="la-section-title">
+      <span class="material-symbols-outlined">flag</span>
+      Priority Actions
+    </h3>
+    <div class="la-priority-list" id="la-priority-list"></div>
+    <div class="la-skeleton la-skeleton-block" data-skel="priority"></div>
+  </section>
+
+  <!-- ═══════════════════ MAIN GRID (charts + students) ═══════════════════ -->
+  <section class="la-grid">
+    <!-- Performance trend -->
+    <div class="la-card la-card-chart" id="la-card-trend">
+      <div class="la-card-header">
+        <h3><span class="material-symbols-outlined">show_chart</span> Performance Trend</h3>
+        <span class="la-trend-caption" id="la-trend-caption"></span>
+      </div>
+      <div class="la-card-body">
+        <div class="la-chart" id="la-performance-chart" role="img" aria-label="Class performance trend"></div>
+      </div>
+      <div class="la-skeleton la-skeleton-chart" data-skel="trend"></div>
+    </div>
+
+    <!-- Risk distribution donut -->
+    <div class="la-card la-card-chart" id="la-card-risk">
+      <div class="la-card-header">
+        <h3><span class="material-symbols-outlined">pie_chart</span> Risk Distribution</h3>
+        <span class="la-legend-dots" id="la-risk-legend"></span>
+      </div>
+      <div class="la-card-body">
+        <div class="la-chart" id="la-risk-chart" role="img" aria-label="Student risk distribution"></div>
+      </div>
+      <div class="la-skeleton la-skeleton-chart" data-skel="risk"></div>
+    </div>
+
+    <!-- Topic struggle heatmap -->
+    <div class="la-card la-card-chart" id="la-card-topics">
+      <div class="la-card-header">
+        <h3><span class="material-symbols-outlined">grid_on</span> Topic Struggle</h3>
+        <span class="la-trend-caption">Struggle score by topic</span>
+      </div>
+      <div class="la-card-body">
+        <div class="la-chart" id="la-topic-heatmap" role="img" aria-label="Topic struggle heatmap"></div>
+      </div>
+      <div class="la-skeleton la-skeleton-chart" data-skel="topics"></div>
+    </div>
+
+    <!-- At-risk students -->
+    <div class="la-card la-card-students" id="la-card-students">
+      <div class="la-card-header">
+        <h3><span class="material-symbols-outlined">groups</span> At-Risk Students
+          <span class="la-badge" id="la-at-risk-count">0</span>
+        </h3>
+        <div class="la-filter-row" id="la-filters">
+          <button class="la-chip la-chip-active" data-filter="all" type="button">All</button>
+          <button class="la-chip" data-filter="critical" type="button">Critical</button>
+          <button class="la-chip" data-filter="warning" type="button">Warning</button>
+        </div>
+      </div>
+      <div class="la-card-body">
+        <div class="la-student-list" id="la-student-list">
+          <div class="la-empty">No student data loaded yet.</div>
+        </div>
+      </div>
+      <div class="la-skeleton la-skeleton-students" data-skel="students"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ SECONDARY GRID ═══════════════════ -->
+  <section class="la-grid la-grid-secondary">
+    <!-- Common questions -->
+    <div class="la-card" id="la-card-questions">
+      <div class="la-card-header">
+        <h3><span class="material-symbols-outlined">question_answer</span> What Students Are Asking</h3>
+      </div>
+      <div class="la-card-body">
+        <div class="la-question-list" id="la-common-questions"></div>
+      </div>
+    </div>
+
+    <!-- Quiz analytics -->
+    <div class="la-card" id="la-card-quiz">
+      <div class="la-card-header">
+        <h3><span class="material-symbols-outlined">quiz</span> Quiz Analytics</h3>
+      </div>
+      <div class="la-card-body">
+        <div class="la-quiz-analytics" id="la-quiz-analytics"></div>
+      </div>
+    </div>
+
+    <!-- Recording analytics -->
+    <div class="la-card" id="la-card-recordings">
+      <div class="la-card-header">
+        <h3><span class="material-symbols-outlined">play_circle</span> Recording Engagement</h3>
+      </div>
+      <div class="la-card-body">
+        <div class="la-recording-list" id="la-recording-analytics"></div>
+      </div>
+    </div>
+
+    <!-- Resource analytics -->
+    <div class="la-card" id="la-card-resources">
+      <div class="la-card-header">
+        <h3><span class="material-symbols-outlined">school</span> Resource Engagement</h3>
+      </div>
+      <div class="la-card-body">
+        <div class="la-resource-list" id="la-resource-analytics"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ NLQ BAR ═══════════════════ -->
+  <section class="la-nlq" id="la-nlq">
+    <h3 class="la-section-title">
+      <span class="material-symbols-outlined">smart_toy</span>
+      Ask About Your Students
+    </h3>
+    <div class="la-nlq-bar">
+      <input type="text" class="la-nlq-input" id="la-nlq-input"
+        placeholder="e.g. Which topics are hardest? Who is falling behind?" aria-label="Ask about your students" />
+      <button class="la-btn la-btn-primary la-nlq-btn" id="la-nlq-btn" type="button">
+        <span class="material-symbols-outlined">search</span>
+      </button>
+    </div>
+    <div class="la-nlq-response" id="la-nlq-response" style="display:none;"></div>
+  </section>
+
+  <!-- ═══════════════════ ERROR / EMPTY STATES ═══════════════════ -->
+  <div class="la-error" id="la-error" style="display:none;">
+    <span class="material-symbols-outlined">error_outline</span>
+    <span id="la-error-text">Failed to load analytics data.</span>
+    <button class="la-btn la-btn-outline" id="la-error-retry" type="button">Retry</button>
+  </div>
+
+</div>

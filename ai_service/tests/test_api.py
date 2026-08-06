@@ -373,3 +373,88 @@ def test_build_citations_section_fallback():
         max_citations=6,
     )
     assert cites[0].location == "Section 4"
+
+
+# ════════════════════════════════════════════════════════════
+# Lecturer Analytics Dashboard — NLG insights endpoint
+# ════════════════════════════════════════════════════════════
+
+def test_analytics_insights_auth_required():
+    """Insights endpoint rejects invalid bearer tokens."""
+    resp = client.post("/api/v1/analytics/insights", json={
+        "course_id": 1,
+        "at_risk_count": 3,
+        "quiz_trend_pct": -12,
+    }, headers={"Authorization": "Bearer wrong-token"})
+    assert resp.status_code in (401, 403)
+
+
+def test_analytics_insights_template_fallback():
+    """LLM failure falls back to deterministic templates with correct shape."""
+    from unittest.mock import patch
+
+    with patch("api.v1.routes.analytics._call_llm", side_effect=Exception("Gemini down")):
+        resp = client.post("/api/v1/analytics/insights", json={
+            "course_id": 7,
+            "course_name": "Banking Operations",
+            "enrolled_students": 40,
+            "at_risk_count": 3,
+            "failing_count": 1,
+            "quiz_avg": 52.0,
+            "quiz_trend_pct": -12.0,
+            "engagement_rate": 35.0,
+            "active_students": 14,
+            "struggling_topics": [
+                {"name": "Payment Systems", "struggle_score": 45.0, "affected": 16},
+                {"name": "Banking Ops", "struggle_score": 70.0, "affected": 4},
+            ],
+            "common_questions": [{"question": "Explain clearing", "ask_count": 9}],
+            "recording_completion": 25.0,
+            "insight_types": [],
+        }, headers=HEADERS)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["generated_by"] == "templates"
+    insights = data["insights"]
+    types = {i["type"] for i in insights}
+    # at_risk + quiz_drop + no_engagement + topic_struggle + recordings all trigger.
+    assert {"at_risk", "quiz_drop", "no_engagement", "topic_struggle", "recordings"} <= types
+    # Text is conversational with numbers, action carries URL where present.
+    at_risk = next(i for i in insights if i["type"] == "at_risk")
+    assert "3 students" in at_risk["text"]
+    assert at_risk["action"]["label"] == "View Students"
+    assert "courseid=7" in at_risk["action"]["url"]
+
+
+def test_analytics_insights_llm_path():
+    """Valid LLM JSON uses the LLM-generated insights."""
+    from unittest.mock import patch
+
+    fake = ('{"insights": [{"type": "at_risk", "priority": "high", '
+            '"text": "Three students are falling behind on quizzes. Consider a check-in.", '
+            '"action": {"label": "View", "url": "/x"}}]}')
+    with patch("api.v1.routes.analytics._call_llm", return_value=fake):
+        resp = client.post("/api/v1/analytics/insights", json={
+            "course_id": 3,
+            "at_risk_count": 3,
+            "quiz_trend_pct": 0,
+        }, headers=HEADERS)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["generated_by"] == "llm"
+    assert data["insights"][0]["type"] == "at_risk"
+    assert data["insights"][0]["action"]["label"] == "View"
+
+
+def test_analytics_insights_llm_empty_json_falls_back():
+    """LLM returning no insights falls back to templates."""
+    from unittest.mock import patch
+
+    with patch("api.v1.routes.analytics._call_llm", return_value='{"insights": []}'):
+        resp = client.post("/api/v1/analytics/insights", json={
+            "course_id": 4,
+            "at_risk_count": 2,
+            "quiz_trend_pct": -15,
+        }, headers=HEADERS)
+    assert resp.status_code == 200
+    assert resp.json()["generated_by"] == "templates"

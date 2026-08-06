@@ -814,9 +814,14 @@ class get_teaching_intelligence extends \external_api {
         $result = [];
 
         foreach ($materials as $mat) {
+            // NOTE: The umat_ai_material_progress schema exposes progress_pct
+            // and time_spent_sec only - there is no "downloads" or
+            // "reading_time_min" column. Downloads are proxied by engaged
+            // students (progress_pct > 0) and reading time converted from
+            // seconds to minutes. Field names are kept for the API contract.
             $downloads = (int) $DB->count_records_select(
                 'umat_ai_material_progress',
-                'courseid = :cid AND materialid = :mid AND downloads > 0',
+                'courseid = :cid AND materialid = :mid AND progress_pct > 0',
                 ['cid' => $cid, 'mid' => $mat->id]
             );
             $uniqueViewers = (int) $DB->get_field_sql(
@@ -824,11 +829,11 @@ class get_teaching_intelligence extends \external_api {
                   WHERE courseid = :cid AND materialid = :mid",
                 ['cid' => $cid, 'mid' => $mat->id]
             );
-            $avgReadingTime = (float) $DB->get_field_sql(
-                "SELECT AVG(reading_time_min) FROM {umat_ai_material_progress}
+            $avgReadingTime = (float) ($DB->get_field_sql(
+                "SELECT AVG(time_spent_sec) FROM {umat_ai_material_progress}
                   WHERE courseid = :cid AND materialid = :mid",
                 ['cid' => $cid, 'mid' => $mat->id]
-            ) ?: 0.0;
+            ) ?: 0.0) / 60.0;
 
             $neverOpened = max(0, $enrolledCount - $uniqueViewers);
 
