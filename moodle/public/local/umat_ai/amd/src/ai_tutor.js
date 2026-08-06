@@ -85,15 +85,74 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
             var LS_TAB = 'ait-active-tab';
             var LS_SID = 'ait-last-session-id';
             var LS_CID = 'ait-last-course-id';
+            var LS_WIDTHS = 'ait-panel-widths';
             function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
             function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+            /* ── Resizable panels ──────────────────────────────────────── */
+            (function initResizable() {
+                var div1 = document.getElementById('ait-div-1');
+                var div2 = document.getElementById('ait-div-2');
+                var leftEl = document.getElementById('ait-left');
+                var studioEl = document.getElementById('ait-studio');
+                if (!div1 || !div2 || !leftEl || !studioEl) return;
+
+                // Restore saved widths
+                var saved = lsGet(LS_WIDTHS);
+                if (saved) {
+                    try {
+                        var w = JSON.parse(saved);
+                        if (w.left && w.left > 180) { leftEl.style.flexBasis = w.left + 'px'; leftEl.style.width = w.left + 'px'; }
+                        if (w.studio && w.studio > 180) { studioEl.style.flexBasis = w.studio + 'px'; studioEl.style.width = w.studio + 'px'; }
+                    } catch (e) {}
+                }
+
+                function startDrag(div, target, side, ev) {
+                    var startX = ev.clientX;
+                    var startW = parseInt(target.style.width) || (side === 'left' ? 262 : 330);
+                    // Disable transitions during drag for instant feedback
+                    target.style.transition = 'none';
+
+                    function onMove(e) {
+                        e.preventDefault();
+                        var dx = e.clientX - startX;
+                        var newW = side === 'left' ? startW + dx : startW - dx;
+                        newW = Math.max(200, Math.min(600, newW));
+                        target.style.flexBasis = newW + 'px';
+                        target.style.width = newW + 'px';
+                    }
+                    function onUp() {
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                        document.removeEventListener('selectstart', preventSelect);
+                        div.classList.remove('dragging');
+                        root.classList.remove('resizing');
+                        // Re-enable transitions
+                        target.style.transition = '';
+                        // Save widths
+                        lsSet(LS_WIDTHS, JSON.stringify({
+                            left: parseInt(leftEl.style.width) || 262,
+                            studio: parseInt(studioEl.style.width) || 330
+                        }));
+                    }
+                    function preventSelect(e) { e.preventDefault(); }
+                    div.classList.add('dragging');
+                    root.classList.add('resizing');
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                    document.addEventListener('selectstart', preventSelect);
+                }
+                div1.addEventListener('mousedown', function(e) { e.preventDefault(); startDrag(div1, leftEl, 'left', e); });
+                div2.addEventListener('mousedown', function(e) { e.preventDefault(); startDrag(div2, studioEl, 'right', e); });
+            })();
 
             /* ── Session state ──────────────────────────────────────────── */
             var sessKey = lsGet(LS_SID) || 'ait_' + Math.random().toString(36).substr(2, 18);
             var selMat = [];
             var activeCID = FIXED_CID || parseInt(lsGet(LS_CID) || '0') || 0;
-            var lastTool = null; // 'quiz' | 'guide' | 'summary' | 'faq'
-            var busy = false;
+                var lastTool = null; // 'quiz' | 'guide' | 'summary' | 'faq'
+                var busy = false;
+                var lastSrcCount = 0; // sources reported in the stream meta event
 
             /* ── Rate limit (10 questions / minute, mirroring Moodle) ──── */
             var qTimes = [];
@@ -242,7 +301,9 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                     sendBtnId: 'ait-send',
                     sendInputId: 'ait-input',
                     typingId: tid,
-                    onMeta: function() {},
+                    onMeta: function(meta) {
+                        lastSrcCount = (meta && meta.sources && meta.sources.length) || 0;
+                    },
                     onDone: function() {
                         S._umatHideTyping(tid);
                         busy = false;
@@ -251,14 +312,30 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                         lsSet(LS_SID, sessKey);
                         lsSet(LS_CID, String(cid));
                         // Post-answer behaviours.
-                        var lastAi = msgs.querySelector('.umat-msg-ai:last-child .umat-ai-content');
+                        // NOTE: streamed AI bubbles render content inside
+                        // .umat-ai-stream-content (umatshared), while static
+                        // bubbles use .umat-ai-content — query the bubble so
+                        // both live answers and resumed history work.
+                        var lastAi = msgs.querySelector('.umat-msg-ai:last-child .umat-bubble-ai');
                         var text = lastAi ? lastAi.innerText : '';
                         if (lastTool === 'quiz') {
                             var quiz = extractQuiz(text);
-                            if (quiz) renderQuizCard(quiz);
+                            if (quiz) {
+                                var srcCount = lastSrcCount;
+                                var meta = (srcCount ? srcCount + ' sources' : '') + (cid ? ' · ' + (FIXED_CNAME || '') : '');
+                                addOutputCard('quiz', quiz.title || 'Practice Quiz', meta.trim(), quiz);
+                                openQuizSubView(quiz, quiz.title || 'Practice Quiz');
+                                toast('Quiz generated — opening in Studio.');
+                            } else {
+                                // Stream finished but no quiz JSON — drop the placeholder.
+                                removeGeneratingCard();
+                                toast('Quiz could not be generated. Please try again.');
+                            }
                             lastTool = null;
                         } else if (lastTool) {
                             var tName = (lastTool === 'guide') ? 'Study Guide' : (lastTool === 'summary') ? 'Summary' : 'FAQ';
+                            var tTitle = tName;
+                            addOutputCard(lastTool, tTitle, text ? text.substring(0, 60) + '…' : '', null);
                             appendToolActions(tName, text);
                             lastTool = null;
                         } else {
@@ -272,6 +349,9 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                         sendBtn.removeAttribute('aria-busy');
                         if (chatControl) chatControl.sync();
                         if (err && err.error === 'rate_limit') qTimes.pop();
+                        // Tool streams failed — remove the generating placeholder.
+                        if (pendingTool) { removeGeneratingCard(); }
+                        lastTool = null;
                     }
                 });
             }
@@ -394,6 +474,190 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                 msgs.scrollTop = msgs.scrollHeight;
             }
 
+            /* ── Studio output list ──────────────────────────────────────── */
+            var outputItems = [];
+            var outputListEl = document.getElementById('ait-studio-outputs');
+            var pendingTool = null; // type of tool currently generating
+
+            function addGeneratingCard(tool) {
+                pendingTool = tool;
+                var names = { quiz: 'Creating Quiz', guide: 'Creating Study Guide', summary: 'Creating Summary', faq: 'Creating FAQ', flashcards: 'Creating Flashcards' };
+                outputItems.unshift({ id: 'gen_' + tool, type: tool, title: names[tool] || 'Generating…', meta: 'Streaming…', data: null, time: Date.now(), generating: true });
+                renderOutputList();
+            }
+
+            function addOutputCard(type, title, meta, data) {
+                pendingTool = null;
+                // Replace the generating placeholder if present.
+                for (var i = 0; i < outputItems.length; i++) {
+                    if (outputItems[i].id === 'gen_' + type) { outputItems.splice(i, 1); break; }
+                }
+                var item = { id: Date.now(), type: type, title: title, meta: meta || '', data: data, time: Date.now() };
+                outputItems.unshift(item);
+                renderOutputList();
+                return item;
+            }
+
+            function removeGeneratingCard() {
+                // Called when the stream fails — drop the placeholder so the
+                // Studio does not show a card that can never complete.
+                pendingTool = null;
+                for (var i = outputItems.length - 1; i >= 0; i--) {
+                    if (outputItems[i].generating) { outputItems.splice(i, 1); }
+                }
+                renderOutputList();
+            }
+
+            function renderOutputList() {
+                if (!outputListEl) return;
+                if (!outputItems.length) {
+                    outputListEl.innerHTML = '';
+                    return;
+                }
+                outputListEl.innerHTML = outputItems.map(function(item) {
+                    if (item.generating) {
+                        return '<div class="ait-output-generating" data-id="' + item.id + '">' +
+                            '<span class="material-symbols-outlined">hourglass_top</span>' +
+                            '<div class="ait-output-generating-info"><div class="ait-output-generating-title">' + esc(item.title) +
+                            '<span class="ait-output-generating-dots"><span></span><span></span><span></span></span></div>' +
+                            '<div class="ait-output-card-meta">Streaming…</div></div></div>';
+                    }
+                    var icon = item.type === 'quiz' ? 'quiz' : item.type === 'flashcards' ? 'style' : item.type === 'guide' ? 'menu_book' : item.type === 'summary' ? 'summarize' : 'description';
+                    var timeAgo = S._umatTimeAgo ? S._umatTimeAgo(item.time) : '';
+                    return '<div class="ait-output-card" data-id="' + item.id + '" data-type="' + item.type + '">' +
+                        '<span class="material-symbols-outlined">' + icon + '</span>' +
+                        '<div class="ait-output-card-info"><div class="ait-output-card-title">' + esc(item.title) + '</div>' +
+                        '<div class="ait-output-card-meta">' + esc(item.meta) + (timeAgo ? ' · ' + esc(timeAgo) : '') + '</div></div>' +
+                        '<button class="ait-output-card-menu" type="button" title="More"><span class="material-symbols-outlined">more_vert</span></button></div>';
+                }).join('');
+                outputListEl.querySelectorAll('.ait-output-card').forEach(function(card) {
+                    card.addEventListener('click', function(e) {
+                        if (e.target.closest('.ait-output-card-menu')) return;
+                        var id = parseInt(card.dataset.id);
+                        var item = outputItems.find(function(x) { return x.id === id; });
+                        if (item && item.type === 'quiz' && item.data) {
+                            openQuizSubView(item.data, item.title);
+                        }
+                    });
+                });
+            }
+
+            /* ── Studio sub-view (quiz inline) ────────────────────────────── */
+            var subviewEl = document.getElementById('ait-studio-subview');
+            var subviewContent = document.getElementById('ait-subview-content');
+            var studioBody = document.querySelector('.ait-studio-body');
+            var bcBack = document.getElementById('ait-bc-back');
+            var bcTitle = document.getElementById('ait-bc-title');
+
+            function openSubView(title) {
+                if (subviewEl) subviewEl.style.display = 'flex';
+                if (studioBody) studioBody.style.display = 'none';
+                if (bcTitle) bcTitle.textContent = title;
+            }
+            function closeSubView() {
+                if (subviewEl) subviewEl.style.display = 'none';
+                if (studioBody) studioBody.style.display = '';
+            }
+            if (bcBack) bcBack.addEventListener('click', closeSubView);
+
+            function openQuizSubView(quiz, title) {
+                openSubView(title || quiz.title || 'Quiz');
+                if (!subviewContent) return;
+
+                var idx = 0, correct = 0, answered = false, total = quiz.questions.length;
+
+                function buildDots() {
+                    var dots = '';
+                    for (var i = 0; i < total; i++) {
+                        dots += '<span class="ait-subview-quiz-dot' + (i < idx ? ' done' : '') + (i === idx ? ' current' : '') + '"></span>';
+                    }
+                    return dots;
+                }
+
+                function renderQ() {
+                    if (idx >= total) {
+                        var pct = Math.round(correct / total * 100);
+                        var msg = pct >= 80 ? 'Excellent work!' : (pct >= 50 ? 'Good effort — keep practising!' : 'Keep reviewing — you will get there!');
+                        subviewContent.innerHTML =
+                            '<div class="ait-subview-quiz-result">' +
+                            '<div class="ait-subview-quiz-result-icon"><span class="material-symbols-outlined">' + (pct >= 50 ? 'emoji_events' : 'school') + '</span></div>' +
+                            '<div class="ait-subview-quiz-result-score">' + correct + ' / ' + total + '</div>' +
+                            '<div class="ait-subview-quiz-result-msg">' + msg + '</div>' +
+                            '<div style="margin-top:16px;"><button class="ait-subview-quiz-next" id="ait-sv-quiz-retry" type="button">Try Again</button></div></div>' +
+                            '<div class="ait-subview-feedback"><button class="ait-subview-fb-btn" type="button"><span class="material-symbols-outlined">thumb_up</span>Good content</button>' +
+                            '<button class="ait-subview-fb-btn" type="button"><span class="material-symbols-outlined">thumb_down</span>Bad content</button></div>';
+                        var retry = subviewContent.querySelector('#ait-sv-quiz-retry');
+                        if (retry) retry.addEventListener('click', function() { idx = 0; correct = 0; renderQ(); });
+                        saveSVQuizAttempt(quiz, total, correct);
+                        return;
+                    }
+                    var q = quiz.questions[idx];
+                    answered = false;
+                    subviewContent.innerHTML =
+                        '<div class="ait-subview-quiz-hdr"><span class="material-symbols-outlined">quiz</span><h3>' + esc(quiz.title) + '</h3></div>' +
+                        '<div class="ait-subview-quiz-progress"><span class="ait-subview-quiz-counter">' + (idx + 1) + ' / ' + total + '</span><div class="ait-subview-quiz-dots">' + buildDots() + '</div></div>' +
+                        '<div class="ait-subview-quiz-q">' + esc(q.q) + '</div>' +
+                        '<div class="ait-subview-quiz-opts">' + (q.options || []).map(function(op, i) {
+                            return '<button class="ait-subview-quiz-opt" data-i="' + i + '" type="button">' + esc(op) + '</button>';
+                        }).join('') + '</div>' +
+                        '<button class="ait-subview-quiz-hint" id="ait-sv-hint" type="button"><span class="material-symbols-outlined">lightbulb</span>Hint<span class="material-symbols-outlined">expand_more</span></button>' +
+                        '<div class="ait-subview-quiz-hint-text" id="ait-sv-hint-text">' + esc(q.explanation || 'No hint available.') + '</div>' +
+                        '<div class="ait-subview-quiz-foot"><span class="ait-subview-quiz-score">Question ' + (idx + 1) + ' of ' + total + '</span>' +
+                        '<button class="ait-subview-quiz-next" id="ait-sv-next" type="button" disabled>Next</button></div>' +
+                        '<div class="ait-subview-feedback"><button class="ait-subview-fb-btn" type="button"><span class="material-symbols-outlined">thumb_up</span>Good content</button>' +
+                        '<button class="ait-subview-fb-btn" type="button"><span class="material-symbols-outlined">thumb_down</span>Bad content</button></div>';
+
+                    // Hint toggle
+                    var hintBtn = subviewContent.querySelector('#ait-sv-hint');
+                    var hintText = subviewContent.querySelector('#ait-sv-hint-text');
+                    if (hintBtn && hintText) hintBtn.addEventListener('click', function() { hintText.classList.toggle('show'); });
+
+                    // Option selection
+                    subviewContent.querySelectorAll('.ait-subview-quiz-opt').forEach(function(btn) {
+                        btn.addEventListener('click', function() {
+                            if (answered) return;
+                            answered = true;
+                            var chosen = q.options[parseInt(btn.dataset.i)];
+                            var isCorrect = String(chosen).trim().toLowerCase() === String(q.answer).trim().toLowerCase() ||
+                                String(chosen).trim().toLowerCase().indexOf(String(q.answer).trim().toLowerCase().charAt(0) + ')') === 0;
+                            if (!isCorrect && /^[A-Da-d]\)/.test(String(q.answer).trim()) && /^[A-Da-d]\)/.test(String(chosen).trim())) {
+                                isCorrect = String(chosen).trim().charAt(0).toUpperCase() === String(q.answer).trim().charAt(0).toUpperCase();
+                            }
+                            if (isCorrect) correct++;
+                            subviewContent.querySelectorAll('.ait-subview-quiz-opt').forEach(function(b) {
+                                b.disabled = true;
+                                var txt = q.options[parseInt(b.dataset.i)];
+                                var bIsAns = String(txt).trim().toLowerCase() === String(q.answer).trim().toLowerCase() ||
+                                    (String(txt).trim().charAt(0).toUpperCase() === String(q.answer).trim().charAt(0).toUpperCase() && /^[A-Da-d]\)/.test(String(q.answer).trim()));
+                                if (b === btn) b.classList.add(isCorrect ? 'correct' : 'wrong');
+                                if (bIsAns && !isCorrect) b.classList.add('correct');
+                            });
+                            var exp = subviewContent.querySelector('#ait-sv-hint-text');
+                            if (exp) { exp.textContent = (isCorrect ? '✓ Correct! ' : '✗ Not quite. ') + (q.explanation || ''); exp.classList.add('show'); }
+                            var next = subviewContent.querySelector('#ait-sv-next');
+                            if (next) next.disabled = false;
+                        });
+                    });
+                    var next = subviewContent.querySelector('#ait-sv-next');
+                    if (next) next.addEventListener('click', function() { idx++; renderQ(); });
+                }
+
+                function saveSVQuizAttempt(quiz, total, correct) {
+                    var cid = currentCID();
+                    if (!cid) return;
+                    Ajax.call([{
+                        methodname: 'local_umat_ai_save_quiz_attempt',
+                        args: {
+                            courseid: cid, quiztitle: quiz.title, total: total, correct: correct,
+                            score: Math.round(correct / total * 100),
+                            details: JSON.stringify(quiz.questions.map(function(q) { return { q: q.q, answer: q.answer, chosen: null }; }))
+                        }
+                    }])[0].fail(function() {});
+                }
+
+                renderQ();
+            }
+
             /* ── Studio tools ──────────────────────────────────────────── */
             var TOOL_PROMPTS = {
                 quiz: {
@@ -439,6 +703,7 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                 }
                 var t = TOOL_PROMPTS[tool];
                 if (!t) return;
+                addGeneratingCard(tool); // Streaming indicator card in Studio
                 sendQ(t.prompt, { isTool: true, tool: tool });
             }
 
@@ -925,6 +1190,10 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
             });
             var noteSearch = document.getElementById('ait-note-search');
             if (noteSearch) noteSearch.addEventListener('input', renderNotes);
+
+            /* ── Add note button (fixed at bottom of Studio) ─────────────── */
+            var addNoteBtn = document.getElementById('ait-add-note-btn');
+            if (addNoteBtn) addNoteBtn.addEventListener('click', function() { openNoteEditor(null, true); });
 
             /* ── Boot ─────────────────────────────────────────────────── */
             loadSessions();

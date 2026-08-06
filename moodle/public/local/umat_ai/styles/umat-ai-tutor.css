@@ -28,6 +28,10 @@
   height:var(--ait-hd); flex:0 0 var(--ait-hd);
   display:flex; align-items:center; gap:6px;
   padding:0 10px;
+  /* Keep the right-side controls (Studio toggle) clear of the overlay's
+     floating close button (.umat-ov-close-btn), which sits on top of the
+     topbar's right corner. */
+  padding-right:48px;
   background:var(--u-sfl);
   border-bottom:1px solid var(--u-olv);
   z-index:5;
@@ -58,18 +62,34 @@
 .ait-ib.ait-ib-on{ background:var(--u-secc); color:var(--u-p); }
 
 /* ── Body: 3 columns ────────────────────────────────────────────────── */
-.ait-body{ flex:1; display:flex; min-height:0; position:relative; }
+.ait-body{ flex:1; display:flex; min-height:0; position:relative; padding:12px 14px; gap:14px; }
+
+/* ── Resizable dividers ────────────────────────────────────────────── */
+.ait-divider{
+  flex:0 0 12px; width:12px; cursor:col-resize;
+  background:transparent; position:relative; z-index:2;
+  transition:background .15s;
+  /* Wider invisible hit area for easier grabbing */
+  margin:0 -2px;
+}
+.ait-divider::after{
+  content:''; position:absolute; top:15%; bottom:15%; left:50%; transform:translateX(-50%);
+  width:2px; border-radius:2px; background:var(--u-olv); transition:background .15s, width .15s;
+}
+.ait-divider:hover::after{ background:var(--u-p); width:3px; }
+.ait-divider.dragging::after{ background:var(--u-p); width:3px; }
+.ait-body.resizing *{ cursor:col-resize!important; user-select:none!important; }
 
 /* ── Left: session history ──────────────────────────────────────────── */
 .ait-left{
   flex:0 0 262px; width:262px;
   display:flex; flex-direction:column; min-height:0;
   background:var(--u-sfl);
-  border-right:1px solid var(--u-olv);
+  border-radius:12px;
   transition:flex-basis .22s ease, width .22s ease, opacity .18s ease;
   overflow:hidden;
 }
-.ait-root.left-closed .ait-left{ flex-basis:0; width:0; opacity:0; border-right:none; }
+.ait-root.left-closed .ait-left{ flex-basis:0; width:0; opacity:0; border-radius:0; }
 .ait-left-hdr{
   display:flex; align-items:center; justify-content:space-between;
   padding:12px 12px 8px; flex:0 0 auto;
@@ -134,7 +154,7 @@
 .ait-sess-del .material-symbols-outlined{ font-size:15px; }
 
 /* ── Center: chat ───────────────────────────────────────────────────── */
-.ait-chat{ flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; position:relative; }
+.ait-chat{ flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; position:relative; border-radius:12px; overflow:hidden; }
 .ait-msgs{
   flex:1; overflow-y:auto; padding:16px 22px 24px;
   display:flex; flex-direction:column; gap:14px;
@@ -279,11 +299,11 @@
   flex:0 0 330px; width:330px;
   display:flex; flex-direction:column; min-height:0;
   background:var(--u-sfl);
-  border-left:1px solid var(--u-olv);
+  border-radius:12px;
   transition:flex-basis .22s ease, width .22s ease, opacity .18s ease;
   overflow:hidden;
 }
-.ait-root.studio-closed .ait-studio{ flex-basis:0; width:0; opacity:0; border-left:none; }
+.ait-root.studio-closed .ait-studio{ flex-basis:0; width:0; opacity:0; border-radius:0; }
 .ait-studio-hdr{
   display:flex; align-items:center; justify-content:space-between;
   padding:12px 14px 8px; flex:0 0 auto;
@@ -291,7 +311,147 @@
 .ait-studio-title{ display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; }
 .ait-studio-title .material-symbols-outlined{ font-size:17px; color:var(--u-p); }
 
-.ait-studio-body{ flex:1; overflow-y:auto; padding:0 12px 16px; }
+.ait-studio-body{ flex:1; overflow-y:auto; padding:0 12px 16px; position:relative; }
+
+/* ── Studio output list ────────────────────────────────────────────── */
+.ait-studio-outputs{ margin:8px 0; display:flex; flex-direction:column; gap:6px; }
+.ait-output-card{
+  display:flex; align-items:center; gap:9px; padding:9px 11px;
+  border:1px solid var(--u-olv); border-radius:10px; background:var(--u-sbg);
+  cursor:pointer; transition:border-color .13s, background .13s;
+}
+.ait-output-card:hover{ border-color:var(--u-p); background:var(--u-secc); }
+.ait-output-card .material-symbols-outlined{ font-size:18px; color:var(--u-p); flex:0 0 auto; }
+.ait-output-card-info{ flex:1; min-width:0; }
+.ait-output-card-title{ font-size:12px; font-weight:600; color:var(--u-ons); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ait-output-card-meta{ font-size:10px; color:var(--u-ol); margin-top:1px; }
+.ait-output-card-menu{
+  flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+  width:24px; height:24px; border:none; border-radius:6px; background:transparent;
+  color:var(--u-ol); cursor:pointer;
+}
+.ait-output-card-menu:hover{ background:var(--u-secc); color:var(--u-ons); }
+.ait-output-card-menu .material-symbols-outlined{ font-size:15px; }
+
+/* Generating card (streaming indicator) */
+.ait-output-generating{
+  display:flex; align-items:center; gap:9px; padding:9px 11px;
+  border:1px solid var(--u-p); border-radius:10px; background:var(--u-secc);
+}
+.ait-output-generating .material-symbols-outlined{ font-size:18px; color:var(--u-p); animation:ait-pulse 1.5s ease infinite; }
+@keyframes ait-pulse{ 0%,100%{opacity:1}50%{opacity:.4} }
+.ait-output-generating-info{ flex:1; min-width:0; }
+.ait-output-generating-title{ font-size:12px; font-weight:600; color:var(--u-p); }
+.ait-output-generating-dots{ display:inline-flex; gap:3px; margin-left:6px; }
+.ait-output-generating-dots span{ width:4px; height:4px; border-radius:50%; background:var(--u-p); animation:ait-dot 1.2s ease infinite; }
+.ait-output-generating-dots span:nth-child(2){ animation-delay:.2s; }
+.ait-output-generating-dots span:nth-child(3){ animation-delay:.4s; }
+@keyframes ait-dot{ 0%,100%{opacity:1;transform:translateY(0)}50%{opacity:.3;transform:translateY(-3px)} }
+
+/* ── Studio sub-view (quiz/flashcard inline) ───────────────────────── */
+.ait-studio-subview{
+  position:absolute; inset:0; background:var(--u-sfl);
+  display:flex; flex-direction:column; z-index:10;
+}
+.ait-breadcrumb{
+  display:flex; align-items:center; gap:4px;
+  padding:10px 14px; flex:0 0 auto;
+  border-bottom:1px solid var(--u-olv);
+}
+.ait-bc-back{
+  display:inline-flex; align-items:center; gap:2px;
+  padding:4px 8px; border:none; border-radius:6px; background:transparent;
+  color:var(--u-p); font-size:12px; font-weight:600; font-family:inherit; cursor:pointer;
+  transition:background .13s;
+}
+.ait-bc-back:hover{ background:var(--u-secc); }
+.ait-bc-back .material-symbols-outlined{ font-size:16px; }
+.ait-bc-sep{ color:var(--u-ol); display:flex; align-items:center; }
+.ait-bc-sep .material-symbols-outlined{ font-size:16px; }
+.ait-bc-title{ font-size:12px; font-weight:600; color:var(--u-ons); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+.ait-subview-content{ flex:1; overflow-y:auto; padding:14px; }
+
+/* Quiz in sub-view */
+.ait-subview-quiz-hdr{
+  display:flex; align-items:center; gap:8px; margin-bottom:12px;
+}
+.ait-subview-quiz-hdr h3{ flex:1; margin:0; font-size:15px; font-weight:700; }
+.ait-subview-quiz-hdr .material-symbols-outlined{ color:var(--u-p); font-size:22px; }
+.ait-subview-quiz-meta{ font-size:11px; color:var(--u-ol); margin-bottom:16px; }
+.ait-subview-quiz-progress{ display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.ait-subview-quiz-counter{ font-size:12px; font-weight:700; color:var(--u-ol); }
+.ait-subview-quiz-dots{ display:flex; gap:4px; }
+.ait-subview-quiz-dot{ width:7px; height:7px; border-radius:50%; background:var(--u-olv); }
+.ait-subview-quiz-dot.done{ background:var(--u-p); }
+.ait-subview-quiz-dot.current{ background:var(--u-p); box-shadow:0 0 0 3px var(--u-secc); }
+
+.ait-subview-quiz-q{ font-size:13px; font-weight:600; line-height:1.55; margin-bottom:14px; color:var(--u-ons); }
+.ait-subview-quiz-opts{ display:flex; flex-direction:column; gap:7px; }
+.ait-subview-quiz-opt{
+  text-align:left; padding:10px 13px; border-radius:10px; border:1px solid var(--u-olv);
+  background:var(--u-sfl); color:var(--u-ons); font-size:12.5px; font-family:inherit;
+  cursor:pointer; transition:border-color .12s, background .12s;
+}
+.ait-subview-quiz-opt:hover:not(:disabled){ border-color:var(--u-p); background:var(--u-secc); }
+.ait-subview-quiz-opt:disabled{ cursor:default; opacity:.75; }
+.ait-subview-quiz-opt.correct{ border-color:#22c55e; background:rgba(34,197,94,.12); color:#16a34a; font-weight:600; }
+.ait-subview-quiz-opt.wrong{ border-color:#ef4444; background:rgba(239,68,68,.1); color:#dc2626; }
+.ait-subview-quiz-exp{ margin-top:10px; font-size:12px; color:var(--u-ol); line-height:1.55; }
+
+.ait-subview-quiz-hint{
+  display:inline-flex; align-items:center; gap:4px;
+  padding:6px 12px; border:1px solid var(--u-olv); border-radius:8px;
+  background:var(--u-sbg); color:var(--u-ons); font-size:11.5px; font-weight:600; font-family:inherit;
+  cursor:pointer; transition:border-color .13s; margin-top:10px;
+}
+.ait-subview-quiz-hint:hover{ border-color:var(--u-p); color:var(--u-p); }
+.ait-subview-quiz-hint .material-symbols-outlined{ font-size:14px; }
+.ait-subview-quiz-hint-text{ margin-top:8px; font-size:12px; color:var(--u-ol); line-height:1.55; display:none; }
+.ait-subview-quiz-hint-text.show{ display:block; }
+
+.ait-subview-quiz-foot{ display:flex; align-items:center; gap:8px; padding:12px 0; border-top:1px solid var(--u-olv); margin-top:12px; }
+.ait-subview-quiz-score{ font-size:12px; font-weight:700; color:var(--u-p); }
+.ait-subview-quiz-next{
+  margin-left:auto; padding:7px 16px; border:none; border-radius:999px;
+  background:var(--u-p); color:#fff; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer;
+  transition:filter .13s;
+}
+.ait-subview-quiz-next:hover{ filter:brightness(1.1); }
+.ait-subview-quiz-next:disabled{ opacity:.45; cursor:default; }
+
+/* Quiz result screen */
+.ait-subview-quiz-result{ text-align:center; padding:24px 12px; }
+.ait-subview-quiz-result-icon{
+  width:52px; height:52px; margin:0 auto 12px; border-radius:16px;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,#00873d,#22c55e); color:#fff;
+}
+.ait-subview-quiz-result-icon .material-symbols-outlined{ font-size:26px; }
+.ait-subview-quiz-result-score{ font-size:28px; font-weight:800; color:var(--u-p); }
+.ait-subview-quiz-result-msg{ font-size:12.5px; color:var(--u-ol); margin-top:4px; }
+
+/* Good/Bad feedback buttons */
+.ait-subview-feedback{ display:flex; gap:6px; padding:10px 0; border-top:1px solid var(--u-olv); margin-top:12px; }
+.ait-subview-fb-btn{
+  display:inline-flex; align-items:center; gap:5px;
+  padding:6px 12px; border:1px solid var(--u-olv); border-radius:8px;
+  background:var(--u-sbg); color:var(--u-ol); font-size:11.5px; font-weight:600; font-family:inherit;
+  cursor:pointer; transition:border-color .13s, color .13s;
+}
+.ait-subview-fb-btn:hover{ border-color:var(--u-p); color:var(--u-p); }
+.ait-subview-fb-btn .material-symbols-outlined{ font-size:14px; }
+
+/* ── Add note fixed button ──────────────────────────────────────────── */
+.ait-add-note{
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  padding:10px 16px; margin:12px 0 0;
+  border:1px solid var(--u-olv); border-radius:12px;
+  background:var(--u-sbg); color:var(--u-ons); font-size:12.5px; font-weight:600; font-family:inherit;
+  cursor:pointer; transition:border-color .13s, background .13s; flex:0 0 auto;
+}
+.ait-add-note:hover{ border-color:var(--u-p); background:var(--u-secc); color:var(--u-p); }
+.ait-add-note .material-symbols-outlined{ font-size:17px; }
 .ait-studio-sec{
   font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.07em;
   color:var(--u-ol); margin:14px 2px 8px;
@@ -460,15 +620,17 @@
 @media (max-width:760px){
   /* mobile: 3-tab navigation */
   .ait-mtabs{ display:flex; }
-  .ait-body{ overflow:hidden; }
+  .ait-body{ overflow:hidden; padding:0; }
+  .ait-divider{ display:none; }
   .ait-left{
     position:absolute; left:0; top:0; bottom:0; width:min(300px,85vw);
-    z-index:8; box-shadow:0 0 30px rgba(0,0,0,.25);
+    z-index:8; box-shadow:0 0 30px rgba(0,0,0,.25); border-radius:0;
   }
   .ait-studio{
     position:absolute; right:0; top:0; bottom:0; width:min(340px,88vw);
-    z-index:8; box-shadow:0 0 30px rgba(0,0,0,.25);
+    z-index:8; box-shadow:0 0 30px rgba(0,0,0,.25); border-radius:0;
   }
+  .ait-chat{ border-radius:0; }
   /* default mobile view: chat; sessions/studio shown via .mt-* */
   .ait-root:not(.mt-sessions):not(.mt-studio) .ait-left,
   .ait-root:not(.mt-studio) .ait-studio{ display:none; }

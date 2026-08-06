@@ -142,6 +142,9 @@ JS;
       <div class="ait-sess-list" id="ait-sess-list"><div class="ait-empty"><span class="material-symbols-outlined">hourglass_empty</span>Loading sessions…</div></div>
     </aside>
 
+    <!-- Resizable divider: sessions ↔ chat -->
+    <div class="ait-divider" id="ait-div-1" role="separator" aria-label="Resize sessions/chat"></div>
+
     <!-- CENTER: chat -->
     <main class="ait-chat" id="ait-chat">
       <div class="ait-msgs" id="ait-msgs"></div>
@@ -161,6 +164,9 @@ JS;
       </button>
     </main>
 
+    <!-- Resizable divider: chat ↔ studio -->
+    <div class="ait-divider" id="ait-div-2" role="separator" aria-label="Resize chat/studio"></div>
+
     <!-- RIGHT: Studio -->
     <aside class="ait-studio" id="ait-studio" aria-label="Studio tools">
       <div class="ait-studio-hdr">
@@ -174,6 +180,9 @@ JS;
         <button class="ait-tool-btn" id="ait-tool-guide" type="button"><span class="material-symbols-outlined">menu_book</span><span><strong>Study Guide</strong><small>Structured revision notes</small></span></button>
         <button class="ait-tool-btn" id="ait-tool-summary" type="button"><span class="material-symbols-outlined">summarize</span><span><strong>Summary</strong><small>Key takeaways at a glance</small></span></button>
         <button class="ait-tool-btn" id="ait-tool-faq" type="button"><span class="material-symbols-outlined">question_answer</span><span><strong>FAQ</strong><small>Common questions with answers</small></span></button>
+
+        <!-- Studio output list -->
+        <div class="ait-studio-outputs" id="ait-studio-outputs"></div>
 
         <div class="ait-studio-sec"><span class="material-symbols-outlined">workspaces</span>Your Studio</div>
         <div class="ait-tabs" role="tablist" aria-label="Studio tabs">
@@ -206,6 +215,21 @@ JS;
           <div class="ait-pane" id="ait-pane-reports"><div class="ait-empty"><span class="material-symbols-outlined">monitoring</span>Loading reports…</div></div>
           <div class="ait-pane" id="ait-pane-files"><div class="ait-empty"><span class="material-symbols-outlined">folder_open</span>Loading files…</div></div>
         </div>
+
+        <!-- Add note fixed button -->
+        <button class="ait-add-note" id="ait-add-note-btn" type="button"><span class="material-symbols-outlined">note_add</span>Add note</button>
+      </div>
+
+      <!-- Studio sub-view (quiz/flashcard inline) -->
+      <div class="ait-studio-subview" id="ait-studio-subview" style="display:none;">
+        <div class="ait-breadcrumb" id="ait-breadcrumb">
+          <button class="ait-bc-back" id="ait-bc-back" type="button">
+            <span class="material-symbols-outlined">chevron_left</span>Studio
+          </button>
+          <span class="ait-bc-sep"><span class="material-symbols-outlined">chevron_right</span></span>
+          <span class="ait-bc-title" id="ait-bc-title"></span>
+        </div>
+        <div class="ait-subview-content" id="ait-subview-content"></div>
       </div>
     </aside>
   </div>
