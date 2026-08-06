@@ -150,9 +150,8 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
             var sessKey = lsGet(LS_SID) || 'ait_' + Math.random().toString(36).substr(2, 18);
             var selMat = [];
             var activeCID = FIXED_CID || parseInt(lsGet(LS_CID) || '0') || 0;
-                var lastTool = null; // 'quiz' | 'guide' | 'summary' | 'faq'
-                var busy = false;
-                var lastSrcCount = 0; // sources reported in the stream meta event
+            var busy = false;
+            var lastSrcCount = 0; // sources reported in the stream meta event
 
             /* ── Rate limit (10 questions / minute, mirroring Moodle) ──── */
             var qTimes = [];
@@ -251,19 +250,6 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                 msgs.scrollTop = msgs.scrollHeight;
             }
 
-            /* ── Tool output → "Save to Notes" action ──────────────────── */
-            function appendToolActions(title, text) {
-                var row = document.createElement('div');
-                row.className = 'ait-tool-actions';
-                row.innerHTML = '<button class="ait-tool-btn-sm" id="ait-save-note-btn" type="button"><span class="material-symbols-outlined">note_add</span>Save to Notes</button>';
-                msgs.appendChild(row);
-                msgs.scrollTop = msgs.scrollHeight;
-                var btn = document.getElementById('ait-save-note-btn');
-                if (btn) btn.addEventListener('click', function() {
-                    openNoteEditor({ id: 0, title: title, content: text, pinned: 0 }, true);
-                });
-            }
-
             /* ── Chat send ─────────────────────────────────────────────── */
             function sendQ(q, opts) {
                 opts = opts || {};
@@ -278,7 +264,6 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                 busy = true;
                 sendBtn.setAttribute('aria-busy', 'true');
                 sendBtn.disabled = true;
-                if (opts.isTool) lastTool = opts.tool || null;
 
                 var ctx = q;
                 if (selMat.length) {
@@ -311,36 +296,10 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                         if (chatControl) chatControl.sync();
                         lsSet(LS_SID, sessKey);
                         lsSet(LS_CID, String(cid));
-                        // Post-answer behaviours.
-                        // NOTE: streamed AI bubbles render content inside
-                        // .umat-ai-stream-content (umatshared), while static
-                        // bubbles use .umat-ai-content — query the bubble so
-                        // both live answers and resumed history work.
-                        var lastAi = msgs.querySelector('.umat-msg-ai:last-child .umat-bubble-ai');
-                        var text = lastAi ? lastAi.innerText : '';
-                        if (lastTool === 'quiz') {
-                            var quiz = extractQuiz(text);
-                            if (quiz) {
-                                var srcCount = lastSrcCount;
-                                var meta = (srcCount ? srcCount + ' sources' : '') + (cid ? ' · ' + (FIXED_CNAME || '') : '');
-                                addOutputCard('quiz', quiz.title || 'Practice Quiz', meta.trim(), quiz);
-                                openQuizSubView(quiz, quiz.title || 'Practice Quiz');
-                                toast('Quiz generated — opening in Studio.');
-                            } else {
-                                // Stream finished but no quiz JSON — drop the placeholder.
-                                removeGeneratingCard();
-                                toast('Quiz could not be generated. Please try again.');
-                            }
-                            lastTool = null;
-                        } else if (lastTool) {
-                            var tName = (lastTool === 'guide') ? 'Study Guide' : (lastTool === 'summary') ? 'Summary' : 'FAQ';
-                            var tTitle = tName;
-                            addOutputCard(lastTool, tTitle, text ? text.substring(0, 60) + '…' : '', null);
-                            appendToolActions(tName, text);
-                            lastTool = null;
-                        } else {
-                            appendSuggestions();
-                        }
+                        // NOTE: tool generation (quiz/guide/summary/faq) no
+                        // longer runs through the chat panel — see runTool().
+                        // Plain Q&A only lands here.
+                        appendSuggestions();
                         refreshSessions();
                     },
                     onError: function(err) {
@@ -349,9 +308,6 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                         sendBtn.removeAttribute('aria-busy');
                         if (chatControl) chatControl.sync();
                         if (err && err.error === 'rate_limit') qTimes.pop();
-                        // Tool streams failed — remove the generating placeholder.
-                        if (pendingTool) { removeGeneratingCard(); }
-                        lastTool = null;
                     }
                 });
             }
@@ -364,13 +320,38 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                 try {
                     var o = JSON.parse(m[0]);
                     if (o.questions && o.questions.length) {
-                        return { title: o.quiz_title || 'Practice Quiz', questions: o.questions };
+                        return { title: o.quiz_title || o.title || 'Practice Quiz', questions: o.questions };
                     }
                 } catch (e) {}
                 return null;
             }
 
+            /* Normalize quiz payloads from any source (LLM JSON, quiz_data SSE
+             * event, history) into the renderer's expected shape. Real LLM
+             * output varies — questions may use `question`/`text`/`prompt`
+             * instead of `q`, `choices` instead of `options`, etc. Without
+             * this the question text would render empty (only the options
+             * show), which users reported as "I only see the answers". */
+            function normalizeQuiz(quiz) {
+                if (!quiz || !quiz.questions || !quiz.questions.length) return quiz;
+                quiz.questions = quiz.questions.map(function(qo) {
+                    if (!qo || typeof qo !== 'object') {
+                        return { q: String(qo || ''), options: [], answer: '', explanation: '' };
+                    }
+                    return {
+                        q: qo.q || qo.question || qo.Question || qo.text || qo.prompt || qo.question_text || qo.query || '',
+                        options: qo.options || qo.choices || qo.Options || qo.Choices || qo.options_list || qo.answers || [],
+                        answer: qo.answer || qo.correct_answer || qo.correct || qo.Answer || qo.Correct || '',
+                        explanation: qo.explanation || qo.explain || qo.reason || qo.hint || qo.Explanation || ''
+                    };
+                });
+                if (!quiz.title) quiz.title = quiz.quiz_title || 'Practice Quiz';
+                return quiz;
+            }
+
             function renderQuizCard(quiz) {
+                quiz = normalizeQuiz(quiz);
+                if (!quiz) return;
                 var card = document.createElement('div');
                 card.className = 'ait-quiz-card';
                 var idx = 0, correct = 0, answered = false, total = quiz.questions.length;
@@ -510,11 +491,25 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
 
             function renderOutputList() {
                 if (!outputListEl) return;
-                if (!outputItems.length) {
-                    outputListEl.innerHTML = '';
+                // Generated items first, then DB notes (pinned first) — all in
+                // one list, each card tagged with a category chip.
+                var items = outputItems.slice();
+                if (notes.length) {
+                    notes.slice().sort(function(a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0); })
+                        .forEach(function(n) {
+                            items.push({
+                                id: 'note_' + n.id, type: 'note', title: n.title || 'Untitled',
+                                meta: 'Note' + (S._umatTimeAgo ? ' · ' + S._umatTimeAgo(n.timemodified) : ''),
+                                data: n, time: n.timemodified || Date.now()
+                            });
+                        });
+                }
+                if (!items.length) {
+                    outputListEl.innerHTML = '<div class="ait-empty" style="padding:16px 6px;"><span class="material-symbols-outlined">auto_awesome</span>Generated content will appear here.</div>';
                     return;
                 }
-                outputListEl.innerHTML = outputItems.map(function(item) {
+                var chipMap = { quiz: 'Quiz', note: 'Note', guide: 'Study Guide', summary: 'Summary', faq: 'FAQ', flashcards: 'Flashcards' };
+                outputListEl.innerHTML = items.map(function(item) {
                     if (item.generating) {
                         return '<div class="ait-output-generating" data-id="' + item.id + '">' +
                             '<span class="material-symbols-outlined">hourglass_top</span>' +
@@ -522,10 +517,11 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                             '<span class="ait-output-generating-dots"><span></span><span></span><span></span></span></div>' +
                             '<div class="ait-output-card-meta">Streaming…</div></div></div>';
                     }
-                    var icon = item.type === 'quiz' ? 'quiz' : item.type === 'flashcards' ? 'style' : item.type === 'guide' ? 'menu_book' : item.type === 'summary' ? 'summarize' : 'description';
+                    var icon = item.type === 'quiz' ? 'quiz' : item.type === 'note' ? 'note' : item.type === 'flashcards' ? 'style' : item.type === 'guide' ? 'menu_book' : item.type === 'summary' ? 'summarize' : 'question_answer';
                     var timeAgo = S._umatTimeAgo ? S._umatTimeAgo(item.time) : '';
                     return '<div class="ait-output-card" data-id="' + item.id + '" data-type="' + item.type + '">' +
                         '<span class="material-symbols-outlined">' + icon + '</span>' +
+                        '<span class="ait-out-chip">' + (chipMap[item.type] || 'Item') + '</span>' +
                         '<div class="ait-output-card-info"><div class="ait-output-card-title">' + esc(item.title) + '</div>' +
                         '<div class="ait-output-card-meta">' + esc(item.meta) + (timeAgo ? ' · ' + esc(timeAgo) : '') + '</div></div>' +
                         '<button class="ait-output-card-menu" type="button" title="More"><span class="material-symbols-outlined">more_vert</span></button></div>';
@@ -533,13 +529,176 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                 outputListEl.querySelectorAll('.ait-output-card').forEach(function(card) {
                     card.addEventListener('click', function(e) {
                         if (e.target.closest('.ait-output-card-menu')) return;
-                        var id = parseInt(card.dataset.id);
-                        var item = outputItems.find(function(x) { return x.id === id; });
-                        if (item && item.type === 'quiz' && item.data) {
-                            openQuizSubView(item.data, item.title);
-                        }
+                        var id = card.dataset.id;
+                        var item = items.find(function(x) { return String(x.id) === String(id); });
+                        if (item) openCardItem(item);
+                    });
+                    card.querySelector('.ait-output-card-menu').addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        var id = card.dataset.id;
+                        var item = items.find(function(x) { return String(x.id) === String(id); });
+                        if (item) showCardMenu(card, item);
                     });
                 });
+            }
+
+            /* Open an output card — always INSIDE the Studio panel (chat and
+             * sessions stay visible beside it). */
+            function openCardItem(item) {
+                if (!item || !item.data) return;
+                if (item.type === 'quiz') {
+                    openQuizSubView(item.data, item.title);
+                } else if (item.type === 'note') {
+                    openNoteSubView(item.data, false);
+                } else if (item.type === 'flashcards') {
+                    openFlashcardsSubView(item);
+                } else if (item.type === 'guide' || item.type === 'summary' || item.type === 'faq') {
+                    openContentSubView(item.title, item.data.text, item);
+                }
+            }
+
+            /* ── Card overflow menu (⋮) ────────────────────────────────── */
+            var cardMenuEl = null;
+            var cardMenuCtx = null;
+            function hideCardMenu() { if (cardMenuEl) cardMenuEl.remove(); cardMenuEl = null; cardMenuCtx = null; }
+            function showCardMenu(card, item) {
+                hideCardMenu();
+                var host = studioBody || document.body;
+                cardMenuEl = document.createElement('div');
+                cardMenuEl.className = 'ait-card-menu';
+                cardMenuCtx = item;
+                var rows = [];
+                rows.push(menuRow('open_in_new', 'Open', function() { hideCardMenu(); openCardItem(item); }));
+                if (item.type === 'note') {
+                    rows.push(menuRow('edit', 'Edit', function() { hideCardMenu(); openNoteSubView(item.data, true); }));
+                    rows.push(menuRow(item.data.pinned ? 'push_pin' : 'push_pin', item.data.pinned ? 'Unpin' : 'Pin note', function() { hideCardMenu(); toggleNotePin(item); }));
+                    rows.push(menuSep());
+                    rows.push(menuRow('delete', 'Delete note', function() { hideCardMenu(); deleteNoteById(item.data); }, true));
+                } else if (item.type === 'guide' || item.type === 'summary' || item.type === 'faq') {
+                    rows.push(menuRow('note_add', 'Save to Notes', function() { hideCardMenu(); openNoteSubView({ id: 0, title: item.title, content: item.data.text, pinned: 0 }, true); }));
+                    rows.push(menuSep());
+                    rows.push(menuRow('delete', 'Remove', function() { hideCardMenu(); removeOutputItem(item); }, true));
+                } else {
+                    rows.push(menuSep());
+                    rows.push(menuRow('delete', 'Remove', function() { hideCardMenu(); removeOutputItem(item); }, true));
+                }
+                cardMenuEl.innerHTML = rows.map(function(r) { return r.html; }).join('');
+                // Attach each row's click handler — rows are plain HTML, so
+                // they were previously unclickable (menu did nothing).
+                var rowFns = rows.map(function(r) { return r.fn; }).filter(Boolean);
+                cardMenuEl.querySelectorAll('button[data-act]').forEach(function(btn, i) {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        rowFns[i]();
+                    });
+                });
+                host.appendChild(cardMenuEl);
+                var r = card.getBoundingClientRect(), h = host.getBoundingClientRect();
+                var mw = 172, mh = cardMenuEl.offsetHeight || 120;
+                cardMenuEl.style.left = Math.max(0, Math.min(r.right - mw - h.left, h.width - mw - 6)) + 'px';
+                cardMenuEl.style.top = Math.max(0, Math.min(r.top - h.top, h.height - mh - 6)) + 'px';
+                setTimeout(function() {
+                    document.addEventListener('click', hideCardMenu, { once: true });
+                }, 0);
+            }
+            function menuRow(icon, label, fn, danger) {
+                return { html: '<button type="button" class="' + (danger ? 'danger' : '') + '" data-act="' + esc(label) + '"><span class="material-symbols-outlined">' + icon + '</span>' + esc(label) + '</button>', fn: fn };
+            }
+            function menuSep() { return { html: '<div class="ait-card-menu-sep"></div>', fn: null }; }
+            function removeOutputItem(item) {
+                // Persisted cards are deleted server-side — confirm once so a
+                // misclick cannot wipe a saved quiz/guide/faq forever.
+                if (item.persisted && !confirm('Remove this from Studio? It will be deleted permanently.')) return;
+                outputItems = outputItems.filter(function(x) { return String(x.id) !== String(item.id); });
+                deletePersistedOutput(item);
+                renderOutputList();
+                toast('Removed from Studio.');
+            }
+            function deleteNoteById(note) {
+                if (!note || !note.id) return;
+                if (!confirm('Delete this note?')) return;
+                Ajax.call([{ methodname: 'local_umat_ai_delete_note', args: { noteid: note.id } }])[0]
+                    .done(function() { toast('Note deleted.'); loadNotes(); })
+                    .fail(function() { toast('Failed to delete note.'); });
+            }
+            function toggleNotePin(item) {
+                var n = item.data;
+                var payload = {
+                    noteid: n.id, courseid: currentCID(),
+                    title: n.title || 'Untitled note', content: n.content || '',
+                    pinned: n.pinned ? 0 : 1, tags: []
+                };
+                Ajax.call([{ methodname: 'local_umat_ai_save_note', args: payload }])[0]
+                    .done(function(r) { toast(r.saved ? (n.pinned ? 'Note unpinned.' : 'Note pinned.') : 'Could not update note.'); loadNotes(); })
+                    .fail(function() { toast('Failed to update note.'); });
+            }
+
+            /* ── Studio output persistence ────────────────────────────────
+             * Generated cards (quiz / guide / summary / faq / flashcards) are
+             * saved to umat_ai_studio_outputs so they survive a refresh and a
+             * re-login — they stay in the Studio until the student removes
+             * them via the ⋮ menu. */
+            function persistOutput(item, payloadObj) {
+                var cid = currentCID();
+                if (!cid || !item || !item.type) return;
+                try {
+                    Ajax.call([{
+                        methodname: 'local_umat_ai_save_studio_output',
+                        args: {
+                            courseid: cid,
+                            type: item.type,
+                            title: String(item.title || '').substr(0, 250),
+                            payload: JSON.stringify(payloadObj || {})
+                        }
+                    }])[0].done(function(r) {
+                        if (r && r.outputid) { item.persisted = true; item.oid = r.outputid; }
+                    }).fail(function() {});
+                } catch (e) {}
+            }
+            function deletePersistedOutput(item) {
+                if (!item || !item.oid) return;
+                Ajax.call([{ methodname: 'local_umat_ai_delete_studio_output', args: { outputid: item.oid } }])[0]
+                    .fail(function() { toast('Could not delete saved item.'); });
+            }
+            /* Restore persisted cards at boot. Quizzes and flashcard decks
+             * dedupe by title (a re-generated card replaces the old one);
+             * content cards (guide/summary/faq) always restore — each is a
+             * distinct generation. */
+            function loadPersistedOutputs() {
+                var cid = currentCID();
+                if (!cid) return;
+                Ajax.call([{ methodname: 'local_umat_ai_get_studio_outputs', args: { courseid: cid } }])[0]
+                    .done(function(r) {
+                        var list = (r && r.outputs) || [];
+                        if (!list.length) return;
+                        var seen = {};
+                        outputItems.forEach(function(x) { seen[x.type + '::' + x.title] = true; });
+                        var changed = false;
+                        list.slice().reverse().forEach(function(o) {
+                            var type = o.type || '', title = o.title || '';
+                            var data = null;
+                            try { data = JSON.parse(o.payload || '{}'); } catch (e) { data = null; }
+                            var item = null;
+                            if (type === 'quiz') {
+                                if (!data || !data.quiz) return;
+                                if (seen['quiz::' + title]) return;
+                                item = { id: 'st_' + o.id, type: 'quiz', title: title, meta: 'Saved', data: data.quiz, time: o.timecreated, persisted: true, oid: o.id };
+                            } else if (type === 'guide' || type === 'summary' || type === 'faq') {
+                                if (!data || typeof data.text !== 'string') return;
+                                item = { id: 'st_' + o.id, type: type, title: title, meta: 'Saved', data: { text: data.text }, time: o.timecreated, persisted: true, oid: o.id };
+                            } else if (type === 'flashcards') {
+                                if (seen['flashcards::' + title]) return;
+                                item = { id: 'st_' + o.id, type: 'flashcards', title: title, meta: (data && data.count ? data.count + ' cards' : ''), data: { topic: (data && data.topic) || '', count: (data && data.count) || 0 }, time: o.timecreated, persisted: true, oid: o.id };
+                            }
+                            if (item) {
+                                seen[type + '::' + title] = true;
+                                outputItems.unshift(item);
+                                changed = true;
+                            }
+                        });
+                        if (changed) renderOutputList();
+                    })
+                    .fail(function() {});
             }
 
             /* ── Studio sub-view (quiz inline) ────────────────────────────── */
@@ -561,6 +720,8 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
             if (bcBack) bcBack.addEventListener('click', closeSubView);
 
             function openQuizSubView(quiz, title) {
+                quiz = normalizeQuiz(quiz);
+                if (!quiz) return;
                 openSubView(title || quiz.title || 'Quiz');
                 if (!subviewContent) return;
 
@@ -684,27 +845,313 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
 
             function runTool(tool) {
                 if (tool === 'flashcards') {
-                    if (MODE === 'course') {
-                        var tabBtn = document.querySelector('.umat-ov [data-sb-tab="flashcards"]') ||
-                            document.querySelector('[data-sb-tab="flashcards"]');
-                        if (tabBtn) { tabBtn.click(); toast('Opened Flashcards — generate cards from your materials.'); }
-                        return;
-                    }
-                    var cid = currentCID();
-                    if (cid) {
-                        toast('Opening the course workspace to use Flashcards…');
-                        setTimeout(function() {
-                            window.location.href = WWW + '/course/view.php?id=' + cid;
-                        }, 900);
+                    // Centred 970x485 config overlay (materials, count, topic)
+                    // — generation results appear as a card in the Studio.
+                    openFlashcardOverlay();
+                    return;
+                }
+                if (tool === 'report') { openReportsSubView(); return; }
+                var t = TOOL_PROMPTS[tool];
+                if (!t) return;
+                startStudioGen(tool, t.prompt);
+            }
+
+            /* ── Studio-only generation (never touches the chat panel) ─── */
+            function startStudioGen(tool, prompt) {
+                var cid = currentCID();
+                if (!cid) {
+                    toast(MODE === 'hub' ? 'Select a course first.' : 'No course selected.');
+                    return;
+                }
+                // Realtime feedback: streaming card appears instantly.
+                addGeneratingCard(tool);
+                var acc = '';
+                var quizPayload = null;
+                var form = new FormData();
+                form.append('sesskey', moodleSesskey);
+                form.append('courseid', String(cid));
+                form.append('question', prompt);
+                form.append('session_key', sessKey);
+                form.append('material_ids', JSON.stringify(selMat.map(function(m) { return m.id; })));
+                fetch(streamUrl, { method: 'POST', body: form, credentials: 'same-origin' })
+                    .then(function(res) {
+                        if (!res.ok || !res.body) throw new Error('Stream unavailable');
+                        return consumeSse(res, function(ev, p) {
+                            if (ev === 'meta') {
+                                lastSrcCount = (p && p.sources && p.sources.length) || 0;
+                            } else if (ev === 'token') {
+                                acc += (p && p.text) || '';
+                            } else if (ev === 'quiz_data') {
+                                quizPayload = p && p.quiz;
+                            } else if (ev === 'done') {
+                                finishStudioGen(tool, acc, quizPayload);
+                            } else if (ev === 'error') {
+                                failStudioGen(tool);
+                            }
+                        });
+                    })
+                    .catch(function() { failStudioGen(tool); });
+            }
+
+            /* Minimal SSE consumer (mirrors umatshared's parser). */
+            function consumeSse(response, onBlock) {
+                var reader = response.body.getReader();
+                var decoder = new TextDecoder();
+                var buffer = '';
+                function pump() {
+                    return reader.read().then(function(result) {
+                        if (result.done) return;
+                        buffer += decoder.decode(result.value, { stream: true });
+                        var parts = buffer.split('\n\n');
+                        buffer = parts.pop() || '';
+                        parts.forEach(function(block) {
+                            var ev = 'message', data = '';
+                            block.split('\n').forEach(function(line) {
+                                if (line.indexOf('event:') === 0) ev = line.slice(6).trim();
+                                else if (line.indexOf('data:') === 0) data = line.slice(5).trim();
+                            });
+                            if (!data) return;
+                            try { onBlock(ev, JSON.parse(data)); } catch (e) {}
+                        });
+                        return pump();
+                    });
+                }
+                return pump();
+            }
+
+            function finishStudioGen(tool, text, quizPayload) {
+                if (tool === 'quiz') {
+                    var quiz = quizPayload || extractQuiz(text);
+                    if (quiz) {
+                        var qMeta = (lastSrcCount ? lastSrcCount + ' sources' : '') + (activeCID ? ' · ' + (FIXED_CNAME || '') : '');
+                        var card = addOutputCard('quiz', quiz.title || 'Practice Quiz', qMeta.trim(), quiz);
+                        persistOutput(card, { quiz: quiz });
+                        openQuizSubView(quiz, quiz.title || 'Practice Quiz');
+                        toast('Quiz generated — opening in Studio.');
                     } else {
-                        toast('Select a course first to use Flashcards.');
+                        removeGeneratingCard();
+                        toast('Quiz could not be generated. Please try again.');
                     }
                     return;
                 }
-                var t = TOOL_PROMPTS[tool];
-                if (!t) return;
-                addGeneratingCard(tool); // Streaming indicator card in Studio
-                sendQ(t.prompt, { isTool: true, tool: tool });
+                var tName = (tool === 'guide') ? 'Study Guide' : (tool === 'summary') ? 'Summary' : 'FAQ';
+                var meta = (lastSrcCount ? lastSrcCount + ' sources' : '') + (activeCID ? ' · ' + (FIXED_CNAME || '') : '');
+                var card = addOutputCard(tool, tName, meta.trim(), { text: text });
+                persistOutput(card, { text: text });
+                openContentSubView(tName, text, card);
+                toast(tName + ' generated.');
+            }
+
+            function failStudioGen(tool) {
+                removeGeneratingCard();
+                toast('Generation failed. Please try again.');
+            }
+
+            /* Document sub-view for Study Guide / Summary / FAQ */
+            function openContentSubView(title, text, card) {
+                openSubView(title);
+                if (!subviewContent) return;
+                subviewContent.innerHTML =
+                    '<div class="ait-sv-content">' + S._umatFormatAI(text) + '</div>' +
+                    '<div class="ait-sv-actions">' +
+                    '<button class="ait-tool-btn-sm" id="ait-sv-save-note" type="button"><span class="material-symbols-outlined">note_add</span>Save to Notes</button>' +
+                    '</div>';
+                var save = subviewContent.querySelector('#ait-sv-save-note');
+                if (save) save.addEventListener('click', function() {
+                    openNoteSubView({ id: 0, title: title, content: text, pinned: 0 }, true);
+                });
+            }
+
+            /* ── Flashcards: 970x485 centred config overlay ────────────── */
+            var fcModal = document.getElementById('ait-fc-modal');
+            // The overlay lives inside a YUI panel whose transforms make
+            // position:fixed behave like absolute — the dialog would sit
+            // off-centre. Re-mount the modal on <body> so it truly centres.
+            if (fcModal && fcModal.parentElement !== document.body) {
+                document.body.appendChild(fcModal);
+            }
+            var fcMatsEl = document.getElementById('ait-fc-mats');
+            var fcMsgEl = document.getElementById('ait-fc-msg');
+
+            function openFlashcardOverlay() {
+                var cid = currentCID();
+                if (!cid) {
+                    toast(MODE === 'hub' ? 'Select a course first.' : 'No course selected.');
+                    return;
+                }
+                if (!fcModal) return;
+                fcModal.style.display = 'flex';
+                fcModal.setAttribute('aria-hidden', 'false');
+                if (fcMsgEl) fcMsgEl.textContent = '';
+                loadFlashcardMaterials(cid);
+            }
+            function closeFlashcardOverlay() {
+                if (fcModal) { fcModal.style.display = 'none'; fcModal.setAttribute('aria-hidden', 'true'); }
+            }
+            function loadFlashcardMaterials(cid) {
+                if (!fcMatsEl) return;
+                fcMatsEl.innerHTML = '<div class="ait-fc-loading"><span class="material-symbols-outlined">hourglass_empty</span>Loading materials…</div>';
+                Ajax.call([{ methodname: 'local_umat_ai_get_course_materials', args: { courseid: cid } }])[0]
+                    .done(function(r) {
+                        var mats = (r && r.materials) || [];
+                        var indexed = mats.filter(function(m) { return m.is_indexed || m.indexed; });
+                        var selectable = indexed.length ? indexed : mats;
+                        if (!selectable.length) {
+                            fcMatsEl.innerHTML = '<div class="ait-fc-empty"><span class="material-symbols-outlined">folder_off</span>No course materials found — upload materials to the course library first.</div>';
+                            return;
+                        }
+                        fcMatsEl.innerHTML = selectable.map(function(m, i) {
+                            var isVid = String(m.mimetype || '').indexOf('video') !== -1;
+                            return '<label class="ait-fc-mat"><input type="checkbox" value="' + m.id + '"' + (i < 3 ? ' checked' : '') + '>' +
+                                '<span class="material-symbols-outlined">' + (isVid ? 'play_circle' : 'description') + '</span>' +
+                                '<span class="ait-fc-mat-name" title="' + esc(m.filename || m.name || '') + '">' + esc(m.filename || m.name || 'Material ' + m.id) + '</span>' +
+                                (m.is_indexed ? '' : '<span class="ait-fc-mat-tag">not indexed</span>') +
+                                '</label>';
+                        }).join('');
+                    })
+                    .fail(function() {
+                        fcMatsEl.innerHTML = '<div class="ait-fc-empty"><span class="material-symbols-outlined">cloud_off</span>Could not load materials. Try again.</div>';
+                    });
+            }
+            function generateFlashcards() {
+                var cid = currentCID();
+                var ids = Array.prototype.slice.call(fcMatsEl.querySelectorAll('input:checked')).map(function(i) { return parseInt(i.value) || 0; });
+                if (!ids.length) {
+                    if (fcMsgEl) { fcMsgEl.textContent = 'Select at least one material.'; fcMsgEl.className = 'ait-fc-msg err'; }
+                    return;
+                }
+                var count = parseInt((document.getElementById('ait-fc-count') || {}).value) || 10;
+                var topic = ((document.getElementById('ait-fc-topic') || {}).value || '').trim();
+                var genBtn = document.getElementById('ait-fc-gen');
+                if (genBtn) genBtn.disabled = true;
+                if (fcMsgEl) { fcMsgEl.textContent = 'Generating ' + count + ' flashcards from ' + ids.length + ' material(s)…'; fcMsgEl.className = 'ait-fc-msg'; }
+                Ajax.call([{
+                    methodname: 'local_umat_ai_generate_flashcards',
+                    args: { courseid: cid, material_ids: JSON.stringify(ids), count: count, topic_label: topic }
+                }])[0]
+                    .done(function(r) {
+                        if (genBtn) genBtn.disabled = false;
+                        if (r && r.success) {
+                            var made = r.generated || r.count || count;
+                            var card = addOutputCard('flashcards', topic || 'Flashcards', made + ' cards', { topic: topic || '', count: made });
+                            persistOutput(card, { topic: topic || '', count: made });
+                            closeFlashcardOverlay();
+                            toast(r.message || 'Flashcards generated.');
+                        } else {
+                            if (fcMsgEl) { fcMsgEl.textContent = (r && r.message) || 'Generation failed.'; fcMsgEl.className = 'ait-fc-msg err'; }
+                        }
+                    })
+                    .fail(function() {
+                        if (genBtn) genBtn.disabled = false;
+                        if (fcMsgEl) { fcMsgEl.textContent = 'Could not reach the AI service.'; fcMsgEl.className = 'ait-fc-msg err'; }
+                    });
+            }
+
+            /* ── Flashcards review inside the Studio sub-view ──────────── */
+            function openFlashcardsSubView(item) {
+                openSubView((item && item.title) || 'Flashcards');
+                if (!subviewContent) return;
+                var cid = currentCID();
+                if (!cid) { subviewContent.innerHTML = '<div class="ait-empty">Select a course first.</div>'; return; }
+                subviewContent.innerHTML = '<div class="ait-empty"><span class="material-symbols-outlined">hourglass_empty</span>Loading deck…</div>';
+                Ajax.call([{ methodname: 'local_umat_ai_get_flashcards', args: { courseid: cid } }])[0]
+                    .done(function(r) {
+                        var cards = (r && r.cards) || [];
+                        if (!cards.length) {
+                            subviewContent.innerHTML = '<div class="ait-empty"><span class="material-symbols-outlined">style</span>No flashcards yet — use the Flashcards button to generate a deck.</div>';
+                            return;
+                        }
+                        renderFlashcardsReview(cards);
+                    })
+                    .fail(function() {
+                        subviewContent.innerHTML = '<div class="ait-empty">Could not load the deck. Try again.</div>';
+                    });
+            }
+            function renderFlashcardsReview(cards) {
+                var idx = 0, flipped = false;
+                subviewContent.innerHTML =
+                    '<div class="ait-sv-fc">' +
+                    '<div class="ait-sv-fc-toolbar"><span class="ait-sv-fc-title">Deck review</span><span class="ait-sv-fc-progress" id="ait-sv-fc-progress">1 / ' + cards.length + '</span></div>' +
+                    '<div class="umat-fc-poker" id="ait-sv-fc-card" role="button" tabindex="0" title="Click to flip">' +
+                    '<div class="umat-fc-poker-inner" id="ait-sv-fc-inner">' +
+                    '<div class="umat-fc-poker-face umat-fc-poker-front">' +
+                    '<div class="umat-fc-poker-corner umat-fc-corner-tl"><span class="umat-fc-corner-rank" id="ait-sv-fc-rank">' + esc(cards[0].topic || '') + '</span><span class="umat-fc-corner-suit">?</span></div>' +
+                    '<div class="umat-fc-poker-center"><div class="umat-fc-poker-chip">FLASHCARD</div><div class="umat-fc-text" id="ait-sv-fc-front"></div></div>' +
+                    '<div class="umat-fc-poker-corner umat-fc-corner-br"><span class="umat-fc-corner-rank">' + esc(cards[0].topic || '') + '</span><span class="umat-fc-corner-suit">?</span></div>' +
+                    '</div>' +
+                    '<div class="umat-fc-poker-face umat-fc-poker-back">' +
+                    '<div class="umat-fc-poker-back-pattern"></div>' +
+                    '<div class="umat-fc-poker-center"><div class="umat-fc-poker-chip">ANSWER</div><div class="umat-fc-text" id="ait-sv-fc-back"></div></div>' +
+                    '</div>' +
+                    '</div></div>' +
+                    '<div class="ait-sv-fc-hint" id="ait-sv-fc-hint">Click the card to reveal the answer</div>' +
+                    '<div class="ait-sv-fc-actions" id="ait-sv-fc-actions" style="display:none;">' +
+                    '<button class="umat-fc-btn fc-again" data-grade="again" type="button"><span class="umat-fc-btn-lbl">Again</span><span class="umat-fc-btn-sub">Forgot</span></button>' +
+                    '<button class="umat-fc-btn fc-hard" data-grade="hard" type="button"><span class="umat-fc-btn-lbl">Hard</span><span class="umat-fc-btn-sub">Struggled</span></button>' +
+                    '<button class="umat-fc-btn fc-good" data-grade="good" type="button"><span class="umat-fc-btn-lbl">Good</span><span class="umat-fc-btn-sub">Recalled</span></button>' +
+                    '<button class="umat-fc-btn fc-easy" data-grade="easy" type="button"><span class="umat-fc-btn-lbl">Easy</span><span class="umat-fc-btn-sub">Instant</span></button>' +
+                    '</div>' +
+                    '<div class="ait-sv-fc-nav" style="display:flex;justify-content:center;gap:6px;margin-top:8px;">' +
+                    '<button class="ait-nt-btn" id="ait-sv-fc-prev" type="button">Prev</button>' +
+                    '<button class="ait-nt-btn" id="ait-sv-fc-next" type="button">Next</button>' +
+                    '</div></div>';
+
+                function renderCard(i) {
+                    var c = cards[i];
+                    if (!c) return;
+                    idx = i; flipped = false;
+                    var inner = subviewContent.querySelector('#ait-sv-fc-inner');
+                    if (inner) inner.classList.remove('flipped');
+                    var rank = subviewContent.querySelector('#ait-sv-fc-rank');
+                    if (rank) rank.textContent = c.topic || '';
+                    var f = subviewContent.querySelector('#ait-sv-fc-front');
+                    if (f) f.textContent = c.front || '';
+                    var b = subviewContent.querySelector('#ait-sv-fc-back');
+                    if (b) b.textContent = c.back || '';
+                    var hint = subviewContent.querySelector('#ait-sv-fc-hint');
+                    if (hint) { hint.textContent = 'Click the card to reveal the answer'; hint.style.display = ''; }
+                    var acts = subviewContent.querySelector('#ait-sv-fc-actions');
+                    if (acts) acts.style.display = 'none';
+                    var prog = subviewContent.querySelector('#ait-sv-fc-progress');
+                    if (prog) prog.textContent = (i + 1) + ' / ' + cards.length;
+                }
+                var card = subviewContent.querySelector('#ait-sv-fc-card');
+                if (card) card.addEventListener('click', function() {
+                    if (!cards[idx]) return;
+                    var inner = subviewContent.querySelector('#ait-sv-fc-inner');
+                    flipped = inner.classList.toggle('flipped');
+                    var hint = subviewContent.querySelector('#ait-sv-fc-hint');
+                    if (hint) hint.style.display = flipped ? 'none' : '';
+                    var acts = subviewContent.querySelector('#ait-sv-fc-actions');
+                    if (acts) acts.style.display = flipped ? 'flex' : 'none';
+                });
+                subviewContent.querySelectorAll('#ait-sv-fc-actions .umat-fc-btn').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        var c = cards[idx];
+                        if (!c) return;
+                        var gradeBtn = btn;
+                        gradeBtn.disabled = true;
+                        Ajax.call([{
+                            methodname: 'local_umat_ai_submit_flashcard_review',
+                            args: { cardid: c.id, courseid: currentCID(), button: btn.dataset.grade }
+                        }])[0]
+                            .done(function() {
+                                gradeBtn.disabled = false;
+                                if (idx + 1 < cards.length) { renderCard(idx + 1); }
+                                else {
+                                    subviewContent.innerHTML =
+                                        '<div class="ait-sv-fc-done"><span class="material-symbols-outlined">emoji_events</span>' +
+                                        '<h3>Review complete</h3><p>' + cards.length + ' card(s) reviewed — nice work! Come back soon for more.</p></div>';
+                                }
+                            })
+                            .fail(function() { gradeBtn.disabled = false; });
+                    });
+                });
+                var prev = subviewContent.querySelector('#ait-sv-fc-prev');
+                if (prev) prev.addEventListener('click', function() { if (idx > 0) renderCard(idx - 1); });
+                var next = subviewContent.querySelector('#ait-sv-fc-next');
+                if (next) next.addEventListener('click', function() { if (idx + 1 < cards.length) renderCard(idx + 1); });
+                renderCard(0);
             }
 
             /* ── Sessions panel ────────────────────────────────────────── */
@@ -814,90 +1261,116 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                 return { text: text, quiz: null };
             }
 
-            /* ── Notes (Studio) ────────────────────────────────────────── */
+            /* ── Notes (Studio output cards + sub-view editor) ─────────── */
             var notes = [];
             var currentNote = null;
             var editing = false;
-            var notesList = document.getElementById('ait-notes-list');
-            var noteEditor = document.getElementById('ait-note-editor');
-            var noteReadonly = document.getElementById('ait-note-readonly');
-            var noteEdit = document.getElementById('ait-note-edit');
-            var noteTitle = document.getElementById('ait-note-title');
 
             function loadNotes() {
                 var cid = currentCID();
                 Ajax.call([{ methodname: 'local_umat_ai_get_notes', args: { courseid: cid } }])[0]
                     .done(function(r) {
                         notes = r.notes || [];
-                        renderNotes();
+                        renderOutputList();
                     })
-                    .fail(function() {
-                        if (notesList) notesList.innerHTML = '<div class="ait-empty"><span class="material-symbols-outlined">error_outline</span>Could not load notes.</div>';
-                    });
+                    .fail(function() {});
             }
             function noteSnippet(content) {
                 var t = String(content || '');
                 t = t.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
                 return t.length > 90 ? t.substr(0, 90) + '…' : t;
             }
-            function renderNotes() {
-                var q = (document.getElementById('ait-note-search').value || '').toLowerCase();
-                var list = notes.filter(function(n) {
-                    return !q || ((n.title || '') + ' ' + noteSnippet(n.content)).toLowerCase().indexOf(q) !== -1;
-                });
-                list.sort(function(a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0); });
-                if (!list.length) {
-                    notesList.innerHTML = '<div class="ait-empty"><span class="material-symbols-outlined">note_add</span>No notes yet. Create one or save a study guide!</div>';
-                    return;
-                }
-                notesList.innerHTML = list.map(function(n) {
-                    return '<div class="ait-note-card' + (n.pinned ? ' pinned' : '') + '" data-id="' + n.id + '">' +
-                        '<div class="ait-note-card-hdr">' + (n.pinned ? '<span class="material-symbols-outlined">push_pin</span>' : '') +
-                        '<strong>' + esc(n.title || 'Untitled') + '</strong></div>' +
-                        '<div class="ait-note-card-prev">' + esc(noteSnippet(n.content)) + '</div>' +
-                        '<div class="ait-note-card-time"><span class="material-symbols-outlined">schedule</span>' + esc(S._umatTimeAgo ? S._umatTimeAgo(n.timemodified) : '') + '</div>' +
-                        '</div>';
-                }).join('');
-                notesList.querySelectorAll('.ait-note-card').forEach(function(c) {
-                    c.addEventListener('click', function() {
-                        var n = null;
-                        notes.forEach(function(x) { if (x.id === parseInt(c.dataset.id)) n = x; });
-                        if (n) openNoteEditor(n, false);
-                    });
-                });
-            }
 
-            function openNoteEditor(note, startEditing) {
+            /* Notes open in the Studio sub-view (breadcrumb: Studio › title). */
+            function openNoteSubView(note, startEdit) {
                 currentNote = note || { id: 0, title: '', content: '', pinned: 0 };
-                editing = !!startEditing;
+                editing = !!startEdit;
+                openSubView(currentNote.id ? (currentNote.title || 'Note') : 'New Note');
+                if (!subviewContent) return;
+                subviewContent.innerHTML =
+                    '<div class="ait-note-editor">' +
+                    '<div class="ait-note-editor-hdr">' +
+                    '<input class="ait-note-title" id="ait-note-title" type="text" placeholder="Note title" value="' + esc(currentNote.title || '') + '">' +
+                    '<button class="ait-ib" id="ait-note-pin" type="button" title="Pin note"><span class="material-symbols-outlined">push_pin</span></button>' +
+                    '<button class="ait-ib ait-nt-btn danger" id="ait-note-delete" type="button" title="Delete note"><span class="material-symbols-outlined">delete</span></button>' +
+                    '</div>' +
+                    '<div class="ait-note-readonly" id="ait-note-readonly"></div>' +
+                    '<div class="ait-note-tb" id="ait-note-tb">' +
+                    '<button type="button" data-cmd="bold" title="Bold"><strong>B</strong></button>' +
+                    '<button type="button" data-cmd="italic" title="Italic"><em>I</em></button>' +
+                    '<button type="button" data-cmd="underline" title="Underline"><u>U</u></button>' +
+                    '<span class="ait-note-tb-sep"></span>' +
+                    '<button type="button" data-cmd="insertUnorderedList" title="Bullet list"><span class="material-symbols-outlined">format_list_bulleted</span></button>' +
+                    '<button type="button" data-cmd="insertOrderedList" title="Numbered list"><span class="material-symbols-outlined">format_list_numbered</span></button>' +
+                    '<span class="ait-note-tb-sep"></span>' +
+                    '<button type="button" data-cmd="formatBlock" data-val="h3" title="Heading"><span class="material-symbols-outlined">title</span></button>' +
+                    '<button type="button" data-cmd="formatBlock" data-val="blockquote" title="Quote"><span class="material-symbols-outlined">format_quote</span></button>' +
+                    '</div>' +
+                    '<div class="ait-note-edit" id="ait-note-edit" contenteditable="true" data-placeholder="Write your note…"></div>' +
+                    '<div class="ait-note-editor-foot">' +
+                    '<button class="ait-nt-btn" id="ait-note-edit-toggle" type="button">' + (editing ? 'Cancel Edit' : 'Edit') + '</button>' +
+                    '<button class="ait-nt-btn-p" id="ait-note-save" type="button">Save</button>' +
+                    '</div>' +
+                    '</div>';
+                var ro = subviewContent.querySelector('#ait-note-readonly');
+                var ed = subviewContent.querySelector('#ait-note-edit');
                 if (currentNote.content && currentNote.content.indexOf('<') !== -1) {
-                    // Legacy HTML content — render as-is (scripts stripped).
+                    // Legacy/rich HTML content — render as-is (scripts stripped).
                     var tmp = document.createElement('div');
                     tmp.innerHTML = currentNote.content;
                     tmp.querySelectorAll('script,style,iframe').forEach(function(el) { el.remove(); });
-                    noteReadonly.innerHTML = tmp.innerHTML;
+                    ro.innerHTML = tmp.innerHTML;
                 } else {
-                    noteReadonly.innerHTML = S._umatFormatAI(currentNote.content || '<em>Empty note</em>');
+                    ro.innerHTML = S._umatFormatAI(currentNote.content || '<em>Empty note</em>');
                 }
-                noteTitle.value = currentNote.title || '';
-                noteEdit.value = currentNote.content || '';
-                var pinBtn = document.getElementById('ait-note-pin');
-                if (pinBtn) pinBtn.classList.toggle('ait-ib-on', !!currentNote.pinned);
-                noteReadonly.style.display = editing ? 'none' : '';
-                noteEdit.style.display = editing ? '' : 'none';
-                document.getElementById('ait-note-edit-toggle').textContent = editing ? 'Cancel Edit' : 'Edit';
-                notesList.style.display = 'none';
-                noteEditor.style.display = 'flex';
+                ed.innerHTML = currentNote.content || '';
+                var pin = subviewContent.querySelector('#ait-note-pin');
+                pin.classList.toggle('ait-ib-on', !!currentNote.pinned);
+                ro.style.display = editing ? 'none' : '';
+                var tb = subviewContent.querySelector('#ait-note-tb');
+                ed.style.display = editing ? '' : 'none';
+                if (tb) tb.style.display = editing ? '' : 'none';
+                if (editing) ed.focus();
+                /* Formatting toolbar — execCommand keeps it simple and
+                 * reliable across browsers; mousedown is prevented so the
+                 * editor's selection is preserved when clicking a tool. */
+                if (tb) tb.querySelectorAll('button[data-cmd]').forEach(function(btn) {
+                    btn.addEventListener('mousedown', function(e) { e.preventDefault(); });
+                    btn.addEventListener('click', function() {
+                        try {
+                            document.execCommand(btn.dataset.cmd, false, btn.dataset.val || null);
+                        } catch (err) {}
+                        ed.focus();
+                    });
+                });
+                var tgl = subviewContent.querySelector('#ait-note-edit-toggle');
+                tgl.addEventListener('click', function() {
+                    editing = !editing;
+                    ro.style.display = editing ? 'none' : '';
+                    ed.style.display = editing ? '' : 'none';
+                    if (tb) tb.style.display = editing ? '' : 'none';
+                    this.textContent = editing ? 'Cancel Edit' : 'Edit';
+                    if (editing) { ed.innerHTML = currentNote.content || ''; ed.focus(); }
+                });
+                subviewContent.querySelector('#ait-note-save').addEventListener('click', saveNote);
+                pin.addEventListener('click', function() {
+                    currentNote.pinned = currentNote.pinned ? 0 : 1;
+                    this.classList.toggle('ait-ib-on', !!currentNote.pinned);
+                    saveNote();
+                });
+                subviewContent.querySelector('#ait-note-delete').addEventListener('click', deleteNote);
             }
             function closeNoteEditor() {
-                noteEditor.style.display = 'none';
-                notesList.style.display = '';
+                closeSubView();
                 currentNote = null;
                 editing = false;
+                loadNotes();
             }
             function saveNote() {
-                var title = noteTitle.value.trim() || 'Untitled note';
-                var content = editing ? noteEdit.value : currentNote.content;
+                var titleEl = subviewContent.querySelector('#ait-note-title');
+                var editEl = subviewContent.querySelector('#ait-note-edit');
+                var title = (titleEl ? titleEl.value : '').trim() || 'Untitled note';
+                var content = editing ? (editEl ? editEl.innerHTML : '') : currentNote.content;
                 var cid = currentCID();
                 var payload = {
                     noteid: currentNote.id || 0,
@@ -911,7 +1384,6 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                     .done(function(r) {
                         toast(r.saved ? 'Note saved.' : 'Could not save note.');
                         closeNoteEditor();
-                        loadNotes();
                     })
                     .fail(function() { toast('Failed to save note.'); });
             }
@@ -922,16 +1394,16 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                     .done(function() {
                         toast('Note deleted.');
                         closeNoteEditor();
-                        loadNotes();
                     })
                     .fail(function() { toast('Failed to delete note.'); });
             }
 
-            /* ── Reports (Studio) ──────────────────────────────────────── */
-            function loadReports() {
-                var pane = document.getElementById('ait-pane-reports');
+            /* ── Reports (Studio sub-view) ─────────────────────────────── */
+            function openReportsSubView() {
+                openSubView('Reports');
+                if (!subviewContent) return;
                 var cid = currentCID();
-                pane.innerHTML = '<div class="ait-empty"><span class="material-symbols-outlined">hourglass_empty</span>Loading reports…</div>';
+                subviewContent.innerHTML = '<div class="ait-empty"><span class="material-symbols-outlined">hourglass_empty</span>Loading reports…</div>';
                 var stats = { sessions: 0, cards: 0, due: 0, attempts: 0, best: null };
 
                 function render() {
@@ -945,7 +1417,7 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                     } else {
                         attemptsHtml = '<div class="ait-empty" style="padding:14px;"><span class="material-symbols-outlined">quiz</span>No quiz attempts yet — try the "Create Quiz" tool!</div>';
                     }
-                    pane.innerHTML =
+                    subviewContent.innerHTML =
                         '<div class="ait-rep-cards">' +
                         '<div class="ait-rep-card"><div class="ait-rep-num">' + stats.sessions + '</div><div class="ait-rep-lbl">Sessions</div></div>' +
                         '<div class="ait-rep-card"><div class="ait-rep-num">' + stats.cards + '</div><div class="ait-rep-lbl">Flashcards</div></div>' +
@@ -969,49 +1441,6 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                         stats.best = r.attempts || [];
                         render();
                     }).fail(function() { render(); });
-            }
-
-            /* ── Files (Studio) ────────────────────────────────────────── */
-            function loadFiles() {
-                var pane = document.getElementById('ait-pane-files');
-                var cid = currentCID();
-                if (!cid) {
-                    pane.innerHTML = '<div class="ait-empty"><span class="material-symbols-outlined">folder_open</span>' + (MODE === 'hub' ? 'Select a course above to browse its materials.' : 'No course selected.') + '</div>';
-                    return;
-                }
-                pane.innerHTML = '<div class="ait-empty"><span class="material-symbols-outlined">hourglass_empty</span>Loading files…</div>';
-                Ajax.call([{ methodname: 'local_umat_ai_get_course_materials', args: { courseid: cid } }])[0]
-                    .done(function(r) {
-                        var mats = r.materials || [];
-                        if (!mats.length) {
-                            pane.innerHTML = '<div class="ait-empty"><span class="material-symbols-outlined">folder_open</span>No materials uploaded for this course yet.</div>';
-                            return;
-                        }
-                        pane.innerHTML = mats.map(function(m) {
-                            var mime = m.mimetype || '';
-                            var icon = S._umatFileTypeIcon ? S._umatFileTypeIcon(mime) : 'description';
-                            return '<div class="ait-file-item" data-url="' + esc(m.url || '') + '" data-name="' + esc(m.filename || m.name || 'Material') + '" data-mime="' + esc(mime) + '">' +
-                                '<span class="material-symbols-outlined">' + esc(icon) + '</span>' +
-                                '<div style="min-width:0;flex:1;"><div class="ait-file-item-name">' + esc(m.filename || m.name || 'Material') + '</div>' +
-                                '<div class="ait-file-item-meta">' + esc(m.type || 'Course material') + '</div></div>' +
-                                '<span class="material-symbols-outlined" style="font-size:16px;color:var(--u-ol);">open_in_new</span></div>';
-                        }).join('');
-                        pane.querySelectorAll('.ait-file-item').forEach(function(f) {
-                            f.addEventListener('click', function() {
-                                var url = f.dataset.url, name = f.dataset.name, mime = f.dataset.mime;
-                                if (!url) return;
-                                if (window.umatMaterialViewer) {
-                                    var kind = mime.indexOf('video') !== -1 ? 'video' : (mime.indexOf('image') !== -1 ? 'image' : 'pdf');
-                                    window.umatMaterialViewer.open(kind, { url: url, name: name, downloadUrl: url });
-                                } else {
-                                    window.open(url, '_blank');
-                                }
-                            });
-                        });
-                    })
-                    .fail(function() {
-                        pane.innerHTML = '<div class="ait-empty"><span class="material-symbols-outlined">error_outline</span>Could not load materials.</div>';
-                    });
             }
 
             /* ── Wiring ────────────────────────────────────────────────── */
@@ -1127,20 +1556,6 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                 setMobileTab(lsGet(LS_TAB) || 'chat');
             }
 
-            /* studio tabs */
-            document.querySelectorAll('.ait-tabs .ait-tab').forEach(function(b) {
-                b.addEventListener('click', function() {
-                    document.querySelectorAll('.ait-tabs .ait-tab').forEach(function(x) { x.classList.remove('active'); });
-                    b.classList.add('active');
-                    document.querySelectorAll('.ait-pane').forEach(function(p) { p.classList.remove('active'); });
-                    var pane = document.getElementById('ait-pane-' + b.dataset.gtab);
-                    if (pane) pane.classList.add('active');
-                    if (b.dataset.gtab === 'reports') loadReports();
-                    if (b.dataset.gtab === 'files') loadFiles();
-                    if (b.dataset.gtab === 'notes') loadNotes();
-                });
-            });
-
             /* course selector (hub mode) */
             if (courseSel && MODE === 'hub') {
                 courseSel.addEventListener('change', function() {
@@ -1149,7 +1564,12 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                         activeCID = v;
                         lsSet(LS_CID, String(v));
                     }
+                    // Studio cards are per-course: drop the previous course's
+                    // items and restore the newly selected course's ones.
+                    outputItems = [];
                     loadSessions();
+                    loadNotes();
+                    loadPersistedOutputs();
                 });
             }
 
@@ -1159,6 +1579,10 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
             document.getElementById('ait-tool-guide').addEventListener('click', function() { runTool('guide'); });
             document.getElementById('ait-tool-summary').addEventListener('click', function() { runTool('summary'); });
             document.getElementById('ait-tool-faq').addEventListener('click', function() { runTool('faq'); });
+            // Report tool button was removed in the "Your Studio" redesign —
+            // guard it so a missing element can't kill the rest of init().
+            var toolReport = document.getElementById('ait-tool-report');
+            if (toolReport) toolReport.addEventListener('click', function() { runTool('report'); });
 
             /* new session */
             document.getElementById('ait-new-sess').addEventListener('click', newSession);
@@ -1167,37 +1591,28 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
             var sessSearch = document.getElementById('ait-sess-search');
             if (sessSearch) sessSearch.addEventListener('input', function() { renderSessions(); });
 
-            /* notes wiring */
-            document.getElementById('ait-note-new').addEventListener('click', function() { openNoteEditor(null, true); });
-            document.getElementById('ait-note-back').addEventListener('click', closeNoteEditor);
-            document.getElementById('ait-note-edit-toggle').addEventListener('click', function() {
-                editing = !editing;
-                noteReadonly.style.display = editing ? 'none' : '';
-                noteEdit.style.display = editing ? '' : 'none';
-                this.textContent = editing ? 'Cancel Edit' : 'Edit';
-                if (editing) {
-                    noteEdit.value = currentNote ? (currentNote.content || '') : noteEdit.value;
-                    noteEdit.focus();
-                }
-            });
-            document.getElementById('ait-note-save').addEventListener('click', saveNote);
-            document.getElementById('ait-note-delete').addEventListener('click', deleteNote);
-            document.getElementById('ait-note-pin').addEventListener('click', function() {
-                if (!currentNote) return;
-                currentNote.pinned = currentNote.pinned ? 0 : 1;
-                this.classList.toggle('ait-ib-on', !!currentNote.pinned);
-                saveNote();
-            });
-            var noteSearch = document.getElementById('ait-note-search');
-            if (noteSearch) noteSearch.addEventListener('input', renderNotes);
-
-            /* ── Add note button (fixed at bottom of Studio) ─────────────── */
+            /* ── Add note button (floating at bottom of Studio) ────────── */
             var addNoteBtn = document.getElementById('ait-add-note-btn');
-            if (addNoteBtn) addNoteBtn.addEventListener('click', function() { openNoteEditor(null, true); });
+            if (addNoteBtn) addNoteBtn.addEventListener('click', function() { openNoteSubView(null, true); });
+
+            /* ── Flashcards overlay wiring ─────────────────────────────── */
+            var fcCloseBtn = document.getElementById('ait-fc-close');
+            var fcCancelBtn = document.getElementById('ait-fc-cancel');
+            var fcGenBtn = document.getElementById('ait-fc-gen');
+            if (fcCloseBtn) fcCloseBtn.addEventListener('click', closeFlashcardOverlay);
+            if (fcCancelBtn) fcCancelBtn.addEventListener('click', closeFlashcardOverlay);
+            if (fcModal) fcModal.querySelectorAll('[data-ait-fc-close]').forEach(function(el) {
+                el.addEventListener('click', closeFlashcardOverlay);
+            });
+            if (fcGenBtn) fcGenBtn.addEventListener('click', generateFlashcards);
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && fcModal && fcModal.style.display === 'flex') closeFlashcardOverlay();
+            });
 
             /* ── Boot ─────────────────────────────────────────────────── */
             loadSessions();
             loadNotes();
+            loadPersistedOutputs();
             var savedSid = lsGet(LS_SID);
             if (savedSid) {
                 resumeSession(savedSid, activeCID, FIXED_CNAME);

@@ -958,5 +958,29 @@ function xmldb_local_umat_ai_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026080500, 'local', 'umat_ai');
     }
 
+    // 2026080605 — Persisted Studio outputs: AI-generated quiz / guide /
+    // summary / FAQ / flashcard cards survive refresh and re-login until the
+    // student removes them. Notes use their own umat_ai_notes table.
+    if ($oldversion < 2026080605) {
+        $so = new xmldb_table('umat_ai_studio_outputs');
+        if (!$dbman->table_exists($so)) {
+            $so->add_field('id',           XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $so->add_field('userid',       XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, null);
+            $so->add_field('courseid',     XMLDB_TYPE_INTEGER, '10',  null, XMLDB_NOTNULL,  null, null);
+            $so->add_field('output_type',  XMLDB_TYPE_CHAR,   '20',  null, XMLDB_NOTNULL,  null, 'quiz');
+            $so->add_field('title',        XMLDB_TYPE_CHAR,   '255', null, XMLDB_NOTNULL,  null, '');
+            $so->add_field('payload',      XMLDB_TYPE_TEXT,   null,  null, null,  null, null);
+            $so->add_field('timecreated',  XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL,  null, '0');
+            $so->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL,  null, '0');
+            $so->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $so->add_key('user_fk', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id'], 'cascade');
+            $so->add_index('user_course_type', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid', 'output_type']);
+            $so->add_index('user_course_title', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid', 'title']);
+            $dbman->create_table($so);
+        }
+
+        upgrade_plugin_savepoint(true, 2026080605, 'local', 'umat_ai');
+    }
+
     return true;
 }

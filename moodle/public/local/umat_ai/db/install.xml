@@ -566,5 +566,26 @@
       </INDEXES>
     </TABLE>
 
+    <TABLE NAME="umat_ai_studio_outputs" COMMENT="Persisted Studio panel cards (AI-generated quizzes, guides, summaries, FAQs, flashcard decks) — survive refresh/re-login until the student removes them">
+      <FIELDS>
+        <FIELD NAME="id"           TYPE="int"  LENGTH="10"  NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid"       TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="courseid"     TYPE="int"  LENGTH="10"  NOTNULL="true"/>
+        <FIELD NAME="output_type"  TYPE="char" LENGTH="20"  NOTNULL="true" DEFAULT="quiz"/>
+        <FIELD NAME="title"        TYPE="char" LENGTH="255" NOTNULL="true" DEFAULT=""/>
+        <FIELD NAME="payload"      TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="timecreated"  TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timemodified" TYPE="int"  LENGTH="10"  NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="user_fk" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id" ONDELETE="cascade"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="user_course_type"  UNIQUE="false" FIELDS="userid,courseid,output_type"/>
+        <INDEX NAME="user_course_title" UNIQUE="false" FIELDS="userid,courseid,title"/>
+      </INDEXES>
+    </TABLE>
+
   </TABLES>
 </XMLDB>

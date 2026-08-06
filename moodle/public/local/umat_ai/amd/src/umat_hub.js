@@ -614,6 +614,9 @@ if(newBtn2)newBtn2.addEventListener('click',function(){newSession();switchPane('
 /* ESC: close nested-first, root-last */
 _umatInitEsc([
   {id:'hub-attach-drawer',isOpen:function(e){return e.classList.contains('open');},close:function(e){e.classList.remove('open');}},
+  // AI Tutor chat drawer — before hub-ov so ESC closes the drawer without
+  // also closing the whole hub overlay.
+  {id:'ait-attach-drawer',isOpen:function(e){return e.classList.contains('open');},close:function(e){e.classList.remove('open');}},
   {id:'hub-ov',isOpen:function(e){return e.classList.contains('open');},close:function(e){e.classList.remove('open');}}
 ]);
 

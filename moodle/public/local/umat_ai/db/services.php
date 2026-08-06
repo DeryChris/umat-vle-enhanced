@@ -488,6 +488,26 @@ $functions = [
         'type' => 'write', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
+
+    /* ---- Persisted Studio outputs (survive refresh/re-login) ---- */
+    'local_umat_ai_save_studio_output' => [
+        'classname'   => '\local_umat_ai\external\studio_outputs', 'methodname' => 'save_output',
+        'description' => 'Persist a generated Studio card (quiz/guide/summary/faq/flashcards) for the current user',
+        'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_get_studio_outputs' => [
+        'classname'   => '\local_umat_ai\external\studio_outputs', 'methodname' => 'get_outputs',
+        'description' => 'List the user\'s persisted Studio cards for a course',
+        'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
+    'local_umat_ai_delete_studio_output' => [
+        'classname'   => '\local_umat_ai\external\studio_outputs', 'methodname' => 'delete_output',
+        'description' => 'Remove one of the user\'s persisted Studio cards',
+        'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
 ];
 
 $services = [
