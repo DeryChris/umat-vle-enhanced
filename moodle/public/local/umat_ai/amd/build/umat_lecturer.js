@@ -1672,6 +1672,19 @@ if(miniSend)miniSend.addEventListener('click',function(){
 });
 if(miniIn)miniIn.addEventListener('keypress',function(e){if(e.key==='Enter'){e.preventDefault();if(miniSend)miniSend.click();}});
 
+/* Quick student prompts ("Ask About Your Students" chips — the dashboard
+   NLQ bar was removed; the FAB mini panel is now the single entry point).
+   Clicking a chip fills the input and sends it through the normal flow. */
+var miniChips=document.getElementById('lec-mini-chips');
+if(miniChips)miniChips.addEventListener('click',function(e){
+  var chip=e.target.closest('[data-q]');
+  if(!chip)return;
+  var q=(chip.getAttribute('data-q')||'').trim();
+  if(!q)return;
+  if(miniIn)miniIn.value=q;
+  if(miniSend)miniSend.click();
+});
+
 /* Init home on overlay open */
 initHome();
 document.getElementById('lec-home-date').textContent=(function(){var d=new Date();return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});})();

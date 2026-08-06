@@ -10,7 +10,7 @@
       5. Main grid         – Performance trend (ECharts line) | Risk donut
                             – Topic struggle heatmap (ECharts)    | At-risk students
       6. Secondary grid    – Common questions | Quiz analytics | Recordings | Resources
-      7. NLQ bar           – "Ask about your students"
+      (NLQ removed: "Ask About Your Students" now lives in the Ask AI Assistant FAB)
 
     All content is rendered by the AMD module (local_umat_ai/lecturer_analytics)
     from the consolidated API (local_umat_ai_get_analytics_data).
@@ -175,22 +175,6 @@
         <div class="la-resource-list" id="la-resource-analytics"></div>
       </div>
     </div>
-  </section>
-
-  <!-- ═══════════════════ NLQ BAR ═══════════════════ -->
-  <section class="la-nlq" id="la-nlq">
-    <h3 class="la-section-title">
-      <span class="material-symbols-outlined">smart_toy</span>
-      Ask About Your Students
-    </h3>
-    <div class="la-nlq-bar">
-      <input type="text" class="la-nlq-input" id="la-nlq-input"
-        placeholder="e.g. Which topics are hardest? Who is falling behind?" aria-label="Ask about your students" />
-      <button class="la-btn la-btn-primary la-nlq-btn" id="la-nlq-btn" type="button">
-        <span class="material-symbols-outlined">search</span>
-      </button>
-    </div>
-    <div class="la-nlq-response" id="la-nlq-response" style="display:none;"></div>
   </section>
 
   <!-- ═══════════════════ ERROR / EMPTY STATES ═══════════════════ -->

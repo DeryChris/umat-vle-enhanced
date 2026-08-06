@@ -11,7 +11,8 @@
  *   5. Charts           – ECharts: performance line, risk donut, topic heatmap
  *   6. At-risk students – filterable student cards (all / critical / warning)
  *   7. Secondary grid   – common questions, quiz, recordings, resources
- *   8. NLQ bar          – streaming "Ask About Your Students" via umatshared
+ *   (The NLQ bar was removed — "Ask About Your Students" lives in the
+ *   Ask AI Assistant FAB mini panel, wired in umat_lecturer.js.)
  *
  * Progressive rendering: every section renders as soon as its data is
  * available; skeleton placeholders are removed per-section.
@@ -22,20 +23,15 @@
  */
 define([
     'core/ajax',
-    'core/config',
-    'core/str',
-    'local_umat_ai/umatshared',
     'local_umat_ai/echarts'
-], function(Ajax, Config, Str, Shared, EChartsPromise) {
+], function(Ajax, EChartsPromise) {
     'use strict';
 
     var cid = 0;
-    var streamCfg = null;
     var state = {
         data: null,
         filter: 'all',
         charts: {},          // elementId -> echarts instance
-        nlqStream: null,
         inFlight: false,
         lastLoaded: 0,
         students: []
@@ -108,26 +104,6 @@ define([
         if (trend === 'up' || trend === 'improving' || trend === 'increasing') return 'arrow_upward';
         if (trend === 'down' || trend === 'declining' || trend === 'decreasing' || trend === 'worsening') return 'arrow_downward';
         return 'trending_flat';
-    }
-
-    /* ── Stream config for NLQ (chat_stream.php) ───────────────────── */
-
-    function resolveStreamCfg() {
-        if (streamCfg) return streamCfg;
-        var url = '';
-        var sesskey = '';
-        try {
-            sesskey = Config.sesskey || (typeof M !== 'undefined' && M.cfg ? M.cfg.sesskey : '') || '';
-        } catch (e) { sesskey = ''; }
-        if (window._umatChatStream && typeof window._umatChatStream === 'object' && window._umatChatStream.url) {
-            streamCfg = { url: window._umatChatStream.url, sesskey: window._umatChatStream.sesskey || sesskey };
-            return streamCfg;
-        }
-        try {
-            url = (Config.wwwroot || (typeof M !== 'undefined' && M.cfg ? M.cfg.wwwroot : '')) + '/local/umat_ai/chat_stream.php';
-        } catch (e) { url = '/local/umat_ai/chat_stream.php'; }
-        streamCfg = { url: url, sesskey: sesskey };
-        return streamCfg;
     }
 
     /* ── Data loading (deduped, like the struggle dashboard) ───────── */
@@ -762,45 +738,6 @@ define([
         }).join('');
     }
 
-    /* ── NLQ (streaming, via umatshared) ────────────────────────────── */
-
-    function submitNLQ() {
-        var input = byId('la-nlq-input');
-        var response = byId('la-nlq-response');
-        if (!input || !response) return;
-        var q = input.value.trim();
-        if (!q) return;
-        if (!cid) {
-            response.style.display = 'block';
-            response.innerHTML = '<div class="la-empty">Select a course first.</div>';
-            return;
-        }
-        if (state.nlqStream && state.nlqStream.abort) state.nlqStream.abort();
-
-        var cfg = resolveStreamCfg();
-        response.style.display = 'block';
-        input.disabled = true;
-
-        state.nlqStream = Shared._umatStreamInline({
-            url: cfg.url,
-            sesskey: cfg.sesskey,
-            courseid: cid,
-            question: q,
-            session_key: 'la_nlq_' + cid,
-            targetId: 'la-nlq-response',
-            onDone: function() {
-                state.nlqStream = null;
-                input.disabled = false;
-            },
-            onError: function(err) {
-                state.nlqStream = null;
-                input.disabled = false;
-                response.innerHTML = '<div class="la-empty">' +
-                    esc(err && err.message ? err.message : 'AI service unavailable. Please try again.') + '</div>';
-            }
-        });
-    }
-
     /* ── Events ─────────────────────────────────────────────────────── */
 
     function bindEvents() {
@@ -818,14 +755,6 @@ define([
         });
         var retry = byId('la-error-retry');
         if (retry) retry.addEventListener('click', function() { loadData(true); });
-        var nlqBtn = byId('la-nlq-btn');
-        if (nlqBtn) nlqBtn.addEventListener('click', submitNLQ);
-        var nlqInput = byId('la-nlq-input');
-        if (nlqInput) {
-            nlqInput.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') { e.preventDefault(); submitNLQ(); }
-            });
-        }
         // Student quick actions: reveal the student's suggestion.
         document.addEventListener('click', function(e) {
             var btn = e.target.closest('[data-qact]');
@@ -872,9 +801,6 @@ define([
             courseId = cfg.courseId;
         }
         cid = parseInt(courseId, 10) || 0;
-        if (cfg && cfg.streamUrl) {
-            streamCfg = { url: cfg.streamUrl, sesskey: cfg.moodleSesskey || '' };
-        }
         if (!cid) return;
         loadData(false);
     }
@@ -891,7 +817,6 @@ define([
         init: init,
         refresh: refresh,
         setFilter: setFilter,
-        submitNLQ: submitNLQ,
         resize: resizeCharts
     };
 

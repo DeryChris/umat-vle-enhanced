@@ -239,6 +239,21 @@ class get_struggle_dashboard_data extends \external_api {
             'userid, risk_score, last_active'
         );
 
+        // Students only — the metrics table can still hold staff rows until
+        // the aggregation task re-runs after the role filter was added there.
+        $studentctx = \context_course::instance($cid, IGNORE_MISSING);
+        if ($studentctx) {
+            $valid = local_umat_ai_student_only(
+                array_fill_keys(array_map('intval', array_column($metrics, 'userid')), 1),
+                $studentctx
+            );
+            foreach ($metrics as $key => $m) {
+                if (!isset($valid[(int) $m->userid])) {
+                    unset($metrics[$key]);
+                }
+            }
+        }
+
         $students = [];
         foreach ($metrics as $m) {
             if ($m->risk_score < 40) continue;

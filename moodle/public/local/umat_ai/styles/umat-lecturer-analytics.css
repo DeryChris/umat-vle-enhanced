@@ -437,39 +437,6 @@
 .la-item-meta b { color: var(--la-ink); }
 .la-item-reco { font-size: 10.5px; margin: 5px 0 0; color: var(--la-warn-fg); }
 
-/* ── NLQ BAR ─────────────────────────────────────────────────────── */
-.la-nlq-bar {
-  display: flex;
-  gap: 8px;
-  background: var(--la-card-bg);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--la-card-bd);
-  border-radius: 12px;
-  padding: 8px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-}
-.la-nlq-input {
-  flex: 1;
-  border: none;
-  outline: none;
-  background: transparent;
-  font: 500 13px/1 'Inter', sans-serif;
-  color: var(--la-ink);
-  padding: 8px 10px;
-  min-width: 0;
-}
-.la-nlq-input::placeholder { color: var(--la-ink-soft); }
-.la-nlq-response {
-  margin-top: 10px;
-  background: #fff;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 12px;
-  padding: 12px 14px;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
 /* ── SKELETON LOADING ────────────────────────────────────────────── */
 .la-skeleton {
   background: var(--la-shimmer);
@@ -521,7 +488,12 @@
 
 /* ── RESPONSIVE: ≥1200px (desktop) ───────────────────────────────── */
 @media (min-width: 1200px) {
-  .la-grid { grid-template-columns: 1.6fr 1fr 1.6fr 1fr; }
+  /* 5 tracks so all four main cards sit on ONE row: performance trend,
+     risk donut (widened), topic heatmap, and the at-risk students list
+     (spanning the last two tracks). The old 4-track grid left the 4th
+     track empty next to the Topic Struggle card because the student list
+     (span 2) could not fit and wrapped to the next row. */
+  .la-grid { grid-template-columns: 1.3fr 1.5fr 1.3fr 1fr 1fr; }
   .la-card-students { grid-column: span 2; }
   .la-grid-secondary { grid-template-columns: repeat(4, 1fr); }
   .la-chart { height: 300px; }
@@ -532,3 +504,29 @@
   .la-skeleton { animation: none; }
   .la-card, .la-kpi-card, .la-btn { transition: none; }
 }
+
+/* ── Ask AI Assistant mini panel: quick student prompts ─────────────
+   "Ask About Your Students" moved from the dashboard NLQ bar into the
+   AI FAB mini panel (overlay_helper.php #lec-mini-chips). */
+.umat-ai-mini-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 14px 0;
+  flex-shrink: 0;
+}
+.umat-ai-mini-chip {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--u-p, #006b2f);
+  background: rgba(0, 107, 47, 0.07);
+  border: 1px solid rgba(0, 107, 47, 0.18);
+  border-radius: 9999px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.umat-ai-mini-chip:hover { background: rgba(0, 107, 47, 0.14); transform: translateY(-1px); }
+.umat-ai-mini-chip:active { transform: scale(0.96); }

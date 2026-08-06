@@ -1460,10 +1460,17 @@ HTML;
         <button id="lec-ai-mini-close" class="umat-ai-glass-mini-close" type="button" aria-label="Close"><span class="material-symbols-outlined">close</span></button>
       </div>
       <div class="umat-msgs umat-ai-glass-mini-msgs" id="lec-mini-msgs">
-        <div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI ASSISTANT</div><div class="umat-bubble-ai"><p>Ask me about your course analytics, student patterns, or teaching recommendations.</p></div></div></div>
+        <div class="umat-msg-ai"><div class="umat-msg-ai-ic"><span class="material-symbols-outlined">smart_toy</span></div><div class="umat-msg-ai-wrap"><div class="umat-msg-lbl">AI ASSISTANT</div><div class="umat-bubble-ai"><p>Ask about your students — who is falling behind, which topics are hardest, or who needs help.</p></div></div></div>
+      </div>
+      <!-- Quick student prompts ("Ask About Your Students" lives here now —
+           the dashboard NLQ bar was removed; chips wired in umat_lecturer.js) -->
+      <div class="umat-ai-mini-chips" id="lec-mini-chips">
+        <button type="button" class="umat-ai-mini-chip" data-q="Which students are falling behind?">Who is falling behind?</button>
+        <button type="button" class="umat-ai-mini-chip" data-q="Which topics are hardest for the class?">Hardest topics?</button>
+        <button type="button" class="umat-ai-mini-chip" data-q="Summarise the at-risk students and what to do for each.">At-risk summary</button>
       </div>
       <div class="umat-chatbar">
-        <textarea id="lec-mini-input" class="umat-chatbar-input" placeholder="Ask about analytics…" rows="1"></textarea>
+        <textarea id="lec-mini-input" class="umat-chatbar-input" placeholder="Ask about your students…" rows="1"></textarea>
         <button class="umat-chatbar-send" id="lec-mini-send" type="button"><span class="material-symbols-outlined">arrow_upward</span></button>
       </div>
     </div>

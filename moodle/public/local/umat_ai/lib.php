@@ -73,6 +73,39 @@ function local_umat_ai_is_student(int $courseid): bool {
 }
 
 /**
+ * Reduce a list of enrolled users to those holding a role with the
+ * 'student' archetype in the given course context.
+ *
+ * get_enrolled_users()/enrol_get_course_users() also return admins and
+ * lecturers when they hold a capability (e.g. local/umat_ai:chatwithai) or
+ * are simply enrolled — without this filter the lecturer and site admin
+ * show up in the at-risk students list and the NLQ student dataset.
+ *
+ * Roles assigned in parent contexts (category/system) count as well.
+ * Falls back to the full list when no student-archetype assignment is
+ * found, so unusual role setups do not silently blank the student views.
+ *
+ * @param array $users User list keyed by user id (get_enrolled_users shape).
+ * @param \context $context Course context.
+ * @return array The same list, reduced to student-role users.
+ */
+function local_umat_ai_student_only(array $users, \context $context): array {
+    if (empty($users)) {
+        return $users;
+    }
+    $students = [];
+    foreach (get_archetype_roles('student') as $role) {
+        // parentcontexts = true: also pick up roles assigned at category or
+        // system level; only active enrolments are considered by default.
+        $students += get_role_users($role->id, $context, true, 'u.id', 'u.id');
+    }
+    if (empty($students)) {
+        return $users;
+    }
+    return array_intersect_key($users, $students);
+}
+
+/**
  * Apply one SM-2 review step (canonical SuperMemo-2).
  *
  * Mirrors ai_service/core/spaced_repetition.py::sm2_update — keep both in sync.

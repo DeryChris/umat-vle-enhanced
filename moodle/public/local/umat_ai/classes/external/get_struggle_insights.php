@@ -349,7 +349,12 @@ class get_struggle_insights extends \external_api {
         // ──────────────────────────────────────────────────────────────
         // 6. Compute per-topic struggle scores
         // ──────────────────────────────────────────────────────────────
-        $enrolledCount = (int) count_enrolled_users($context, '', 0, true);
+        // Students only — count_enrolled_users() includes staff enrolments,
+        // which skewed the Students KPI, the at-risk share, topic/section
+        // percentages and every "X of N students" summary with the lecturer
+        // and admin. Same filter as the at-risk list below.
+        $enrolledCount = count(local_umat_ai_student_only(
+            get_enrolled_users($context, '', 0, 'u.id', null, 0, 0, true), $context));
         $uniqueStudents = count($studentQuestions);
         $topicMatrix = [];
         $maxTopicQ = 1;
@@ -835,6 +840,11 @@ class get_struggle_insights extends \external_api {
             $enrolledUsers = get_enrolled_users($context, '', 0,
                 'u.id, u.firstname, u.lastname, u.email', null, 0, 0, true);
         }
+
+        // Students only — get_enrolled_users() also returns admins and
+        // lecturers who hold the chat capability, which made the site admin
+        // and the lecturer themselves appear in the at-risk students card.
+        $enrolledUsers = local_umat_ai_student_only($enrolledUsers, $context);
 
         // One shared course context for the whole batch — this is what keeps
         // scoring N students from issuing N copies of the same course queries.

@@ -37,6 +37,11 @@ class query_student_insights extends \external_api {
 
         $students = \get_enrolled_users($context, 'local/umat_ai:chatwithai', 0, 'u.id, u.firstname, u.lastname, u.email');
 
+        // Students only — same rationale as the at-risk list: staff hold the
+        // chat capability, so without this filter the NLQ answers (and the
+        // student dataset sent to the AI service) would include the lecturer.
+        $students = local_umat_ai_student_only($students, $context);
+
         $riskFilter = '';
         if ($risk === 'at_risk') {
             $riskFilter = 'AND risk_score >= 60';

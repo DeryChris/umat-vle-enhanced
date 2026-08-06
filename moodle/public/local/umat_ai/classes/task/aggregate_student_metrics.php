@@ -57,6 +57,18 @@ class aggregate_student_metrics extends \core\task\scheduled_task {
                 continue;
             }
 
+            // Students only — enrol_get_course_users() also returns admins
+            // and lecturers enrolled in the course, which polluted the
+            // metrics table (and every UI reading it: at-risk lists, NLQ,
+            // struggle dashboard) with staff rows.
+            $studentctx = \context_course::instance($cid, IGNORE_MISSING);
+            if ($studentctx) {
+                $enrolled = local_umat_ai_student_only($enrolled, $studentctx);
+                if (empty($enrolled)) {
+                    continue;
+                }
+            }
+
             $metrics = [];
 
             // Shared course facts, fetched once instead of once per student.
