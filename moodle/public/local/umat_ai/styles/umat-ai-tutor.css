@@ -11,6 +11,11 @@
    (--u-p, --u-pb, --u-sec, --u-secc, --u-sfl, --u-olv, ...). */
 :root{
   --ait-hd: 46px;                   /* AI Tutor topbar height             */
+  /* --u-sbg is referenced throughout this file but was never defined
+     anywhere, so every panel silently fell back to TRANSPARENT (visible
+     on body-mounted elements like the flashcards dialog). Define it as a
+     solid surface here so nothing renders see-through. */
+  --u-sbg: #f7fbf3;
 }
 
 /* ── Root shell ─────────────────────────────────────────────────────── */
@@ -84,12 +89,17 @@
 .ait-left{
   flex:0 0 262px; width:262px;
   display:flex; flex-direction:column; min-height:0;
+  /* min-width:0 lets the panel truly collapse (flex-basis/width:0 below)
+     so the chat column expands to take the freed space. */
+  min-width:0;
   background:var(--u-sfl);
   border-radius:12px;
   transition:flex-basis .22s ease, width .22s ease, opacity .18s ease;
   overflow:hidden;
 }
 .ait-root.left-closed .ait-left{ flex-basis:0; width:0; opacity:0; border-radius:0; }
+/* Hide the divider next to a collapsed panel — no dead strip, chat fills. */
+.ait-root.left-closed #ait-div-1{ display:none; }
 .ait-left-hdr{
   display:flex; align-items:center; justify-content:space-between;
   padding:12px 12px 8px; flex:0 0 auto;
@@ -163,7 +173,14 @@
 .ait-msgs::-webkit-scrollbar-thumb{ background:var(--u-olv); border-radius:3px; }
 
 /* re-use existing message styles inside the AI Tutor chat */
-.ait-msgs .umat-msg-ai, .ait-msgs .umat-msg-user{ max-width:780px; }
+/* Message rows fill the whole chat column. When the Studio panel is
+   collapsed the freed space is genuinely used by the conversation — no
+   blank strip where the panel used to be. */
+.ait-msgs .umat-msg-ai, .ait-msgs .umat-msg-user{ max-width:100%; }
+/* Bubbles scale with the space available: they widen on big panels and
+   shrink on narrow ones, always keeping a readable line length. */
+.ait-msgs .umat-bubble-ai{ max-width:min(92%, 860px); }
+.ait-msgs .umat-bubble-user{ max-width:min(560px, 80%); }
 .ait-msgs .umat-bubble-ai{
   background:var(--u-sfl); border:1px solid var(--u-olv); border-radius:4px 18px 18px 18px;
 }
@@ -171,6 +188,36 @@
   background:var(--u-p); border-radius:18px 4px 18px 18px; color:#fff;
 }
 .ait-msgs .umat-msg-lbl{ color:var(--u-p); }
+
+/* Streaming bubble: breathing glow + sweeping shimmer + blinking caret so
+   the live answer clearly reads as "in progress". */
+.ait-msgs .umat-bubble-ai.is-streaming{
+  position:relative; overflow:hidden;
+  animation:ait-stream-breathe 2.2s ease-in-out infinite;
+}
+.ait-msgs .umat-bubble-ai.is-streaming::before{
+  content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+  background:linear-gradient(115deg, transparent 30%, rgba(0,107,47,.07) 46%, rgba(0,107,47,.15) 50%, rgba(0,107,47,.07) 54%, transparent 70%);
+  background-size:250% 100%;
+  animation:ait-stream-sweep 2.6s linear infinite;
+}
+.ait-msgs .umat-bubble-ai.is-streaming .umat-ai-stream-content::after{
+  content:' '; display:inline-block; width:7px; height:1.05em; margin-left:3px;
+  border-radius:999px; background:var(--u-p); vertical-align:-.18em;
+  animation:ait-caret 1s steps(2,start) infinite;
+}
+@keyframes ait-stream-sweep{
+  0%{ background-position:120% 0; }
+  100%{ background-position:-20% 0; }
+}
+@keyframes ait-stream-breathe{
+  0%,100%{ box-shadow:0 14px 38px rgba(0,53,128,.055), 0 0 0 0 rgba(0,107,47,.10); }
+  50%{ box-shadow:0 14px 38px rgba(0,53,128,.08), 0 0 0 6px rgba(0,107,47,.05); }
+}
+@keyframes ait-caret{
+  0%,49%{ opacity:1; }
+  50%,100%{ opacity:0; }
+}
 
 .ait-welcome{ text-align:center; padding:28px 12px 8px; max-width:640px; align-self:center; }
 .ait-welcome-ic{
@@ -298,12 +345,18 @@
 .ait-studio{
   flex:0 0 330px; width:330px;
   display:flex; flex-direction:column; min-height:0;
+  /* min-width:0 — see .ait-left note (collapse must free space for chat). */
+  min-width:0;
+  position:relative; /* anchor for the absolute sub-view — keeps quiz/note/
+                        flashcard sub-views INSIDE the Studio panel only, so
+                        the chat and sessions panels stay visible beside it. */
   background:var(--u-sfl);
   border-radius:12px;
   transition:flex-basis .22s ease, width .22s ease, opacity .18s ease;
   overflow:hidden;
 }
 .ait-root.studio-closed .ait-studio{ flex-basis:0; width:0; opacity:0; border-radius:0; }
+.ait-root.studio-closed #ait-div-2{ display:none; }
 .ait-studio-hdr{
   display:flex; align-items:center; justify-content:space-between;
   padding:12px 14px 8px; flex:0 0 auto;
@@ -314,14 +367,15 @@
 .ait-studio-body{ flex:1; overflow-y:auto; padding:0 12px 16px; position:relative; }
 
 /* ── Studio output list ────────────────────────────────────────────── */
-.ait-studio-outputs{ margin:8px 0; display:flex; flex-direction:column; gap:6px; }
+.ait-studio-outputs{ margin:6px 0 0; display:flex; flex-direction:column; gap:6px; }
 .ait-output-card{
-  display:flex; align-items:center; gap:9px; padding:9px 11px;
+  display:flex; align-items:center; gap:8px; padding:9px 11px;
   border:1px solid var(--u-olv); border-radius:10px; background:var(--u-sbg);
   cursor:pointer; transition:border-color .13s, background .13s;
+  position:relative; /* anchor for the ⋮ overflow menu */
 }
 .ait-output-card:hover{ border-color:var(--u-p); background:var(--u-secc); }
-.ait-output-card .material-symbols-outlined{ font-size:18px; color:var(--u-p); flex:0 0 auto; }
+.ait-output-card > .material-symbols-outlined{ font-size:17px; color:var(--u-p); flex:0 0 auto; }
 .ait-output-card-info{ flex:1; min-width:0; }
 .ait-output-card-title{ font-size:12px; font-weight:600; color:var(--u-ons); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ait-output-card-meta{ font-size:10px; color:var(--u-ol); margin-top:1px; }
@@ -332,6 +386,36 @@
 }
 .ait-output-card-menu:hover{ background:var(--u-secc); color:var(--u-ons); }
 .ait-output-card-menu .material-symbols-outlined{ font-size:15px; }
+
+/* Card overflow menu (⋮) — floating dropdown anchored to the card */
+.ait-card-menu{
+  position:absolute; z-index:40; min-width:172px;
+  background:var(--u-sbg); border:1px solid var(--u-olv); border-radius:10px;
+  box-shadow:0 10px 28px rgba(0,0,0,.16); padding:5px;
+  display:flex; flex-direction:column; gap:1px;
+}
+.ait-card-menu button{
+  display:flex; align-items:center; gap:8px; width:100%;
+  padding:7px 9px; border:none; border-radius:7px; background:transparent;
+  font-size:12px; font-weight:600; color:var(--u-ons); font-family:inherit;
+  cursor:pointer; text-align:left;
+}
+.ait-card-menu button:hover{ background:var(--u-secc); }
+.ait-card-menu button .material-symbols-outlined{ font-size:15px; color:var(--u-ol); }
+.ait-card-menu button.danger{ color:#dc2626; }
+.ait-card-menu button.danger .material-symbols-outlined{ color:#dc2626; }
+.ait-card-menu-sep{ height:1px; background:var(--u-olv); margin:3px 4px; }
+
+/* Category chip — indicates what kind of generated content a card holds. */
+.ait-out-chip{
+  flex:0 0 auto;
+  font-size:8.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+  padding:2.5px 6px; border-radius:5px;
+  background:var(--u-secc); color:var(--u-p); border:1px solid var(--u-olv);
+}
+.ait-output-card[data-type="note"] .ait-out-chip{ background:rgba(245,158,11,.12); color:#b45309; border-color:rgba(245,158,11,.35); }
+.ait-output-card[data-type="guide"] .ait-out-chip{ background:rgba(59,130,246,.12); color:#2563eb; border-color:rgba(59,130,246,.35); }
+.ait-output-card[data-type="faq"] .ait-out-chip{ background:rgba(139,92,246,.12); color:#7c3aed; border-color:rgba(139,92,246,.35); }
 
 /* Generating card (streaming indicator) */
 .ait-output-generating{
@@ -371,6 +455,15 @@
 .ait-bc-title{ font-size:12px; font-weight:600; color:var(--u-ons); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 .ait-subview-content{ flex:1; overflow-y:auto; padding:14px; }
+
+/* Document view for Study Guide / Summary / FAQ sub-views */
+.ait-sv-content{ font-size:12.5px; line-height:1.65; color:var(--u-ons); }
+.ait-sv-content h1,.ait-sv-content h2,.ait-sv-content h3{ font-size:14px; margin:14px 0 6px; color:var(--u-ons); }
+.ait-sv-content ul,.ait-sv-content ol{ padding-left:18px; margin:6px 0; }
+.ait-sv-content code{ background:var(--u-secc); padding:1px 5px; border-radius:5px; font-size:11.5px; }
+.ait-sv-content blockquote{ margin:8px 0; padding:6px 12px; border-left:3px solid var(--u-p); background:var(--u-secc); border-radius:0 8px 8px 0; }
+.ait-sv-content strong{ color:var(--u-ons); }
+.ait-sv-actions{ display:flex; gap:6px; padding:12px 0 4px; border-top:1px solid var(--u-olv); margin-top:14px; }
 
 /* Quiz in sub-view */
 .ait-subview-quiz-hdr{
@@ -442,55 +535,45 @@
 .ait-subview-fb-btn:hover{ border-color:var(--u-p); color:var(--u-p); }
 .ait-subview-fb-btn .material-symbols-outlined{ font-size:14px; }
 
-/* ── Add note fixed button ──────────────────────────────────────────── */
+/* ── Add note — centred, floating over the content at the bottom ────── */
 .ait-add-note{
+  position:sticky; bottom:10px; z-index:3;
   display:flex; align-items:center; justify-content:center; gap:6px;
-  padding:10px 16px; margin:12px 0 0;
-  border:1px solid var(--u-olv); border-radius:12px;
-  background:var(--u-sbg); color:var(--u-ons); font-size:12.5px; font-weight:600; font-family:inherit;
-  cursor:pointer; transition:border-color .13s, background .13s; flex:0 0 auto;
+  margin:14px auto 2px; padding:9px 24px; width:fit-content;
+  border:1px solid var(--u-p); border-radius:999px;
+  background:var(--u-sbg); color:var(--u-p); font-size:12.5px; font-weight:700; font-family:inherit;
+  cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.16);
+  transition:background .13s, transform .1s;
 }
-.ait-add-note:hover{ border-color:var(--u-p); background:var(--u-secc); color:var(--u-p); }
+.ait-add-note:hover{ background:var(--u-secc); }
+.ait-add-note:active{ transform:scale(.97); }
 .ait-add-note .material-symbols-outlined{ font-size:17px; }
-.ait-studio-sec{
-  font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.07em;
-  color:var(--u-ol); margin:14px 2px 8px;
-  display:flex; align-items:center; gap:6px;
+/* ── Studio action grid (2-up compact tools, ~60px tall) ─────────────── */
+.ait-tool-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(145px,1fr));
+  gap:8px;
 }
-.ait-studio-sec .material-symbols-outlined{ font-size:14px; }
-
 .ait-tool-btn{
-  display:flex; align-items:center; gap:11px; width:100%;
-  padding:10px 12px; margin-bottom:6px; border:1px solid var(--u-olv); border-radius:12px;
+  display:flex; align-items:center; gap:8px;
+  min-height:60px; padding:8px 10px;
+  border:1px solid var(--u-olv); border-radius:12px;
   background:var(--u-sbg); color:var(--u-ons); text-align:left; cursor:pointer;
   font-family:inherit; transition:border-color .13s, background .13s, transform .1s;
 }
 .ait-tool-btn:hover{ border-color:var(--u-p); background:var(--u-secc); transform:translateY(-1px); }
 .ait-tool-btn .material-symbols-outlined{
-  width:36px; height:36px; flex:0 0 36px; border-radius:10px;
+  width:32px; height:32px; flex:0 0 32px; border-radius:9px;
   display:inline-flex; align-items:center; justify-content:center;
-  background:var(--u-secc); color:var(--u-p); font-size:19px;
+  background:var(--u-secc); color:var(--u-p); font-size:17px;
 }
-.ait-tool-btn strong{ display:block; font-size:12.5px; }
-.ait-tool-btn small{ display:block; font-size:11px; color:var(--u-ol); margin-top:1px; }
+.ait-tool-btn strong{ display:block; font-size:12px; line-height:1.25; }
 
-.ait-tabs{
-  display:flex; gap:4px; padding:4px; margin-top:12px;
-  background:var(--u-sbg); border:1px solid var(--u-olv); border-radius:12px;
+/* Fine horizontal divider between the action buttons and the content cards. */
+.ait-studio-rule{
+  border:0; border-top:1px solid var(--u-olv);
+  margin:12px 2px 10px;
 }
-.ait-tab{
-  flex:1; padding:7px 4px; border:none; border-radius:9px; background:transparent;
-  color:var(--u-ol); font-size:11.5px; font-weight:600; font-family:inherit; cursor:pointer;
-  transition:background .13s, color .13s;
-}
-.ait-tab.active{ background:var(--u-p); color:#fff; }
-
-.ait-panes{ margin-top:10px; }
-.ait-pane{ display:none; }
-.ait-pane.active{ display:block; }
-
-/* Studio: Notes */
-.ait-notes-toolbar{ display:flex; gap:6px; margin-bottom:8px; }
 .ait-nt-btn-p{
   flex:0 0 auto; display:inline-flex; align-items:center; gap:5px;
   padding:7px 12px; border:none; border-radius:9px;
@@ -503,26 +586,6 @@
   background:var(--u-sbg); color:var(--u-ons); font-size:11.5px; font-weight:600; font-family:inherit; cursor:pointer;
 }
 .ait-nt-btn:hover{ border-color:var(--u-p); color:var(--u-p); }
-.ait-note-search{
-  flex:1; min-width:0; padding:7px 10px; border:1px solid var(--u-olv); border-radius:9px;
-  background:var(--u-sbg); color:var(--u-ons); font-size:11.5px; font-family:inherit; outline:none;
-}
-.ait-note-search:focus{ border-color:var(--u-p); }
-
-.ait-notes-list{ display:flex; flex-direction:column; gap:6px; }
-.ait-note-card{
-  border:1px solid var(--u-olv); border-radius:11px; background:var(--u-sbg);
-  padding:9px 11px; cursor:pointer; transition:border-color .13s, background .13s;
-}
-.ait-note-card:hover{ border-color:var(--u-p); background:var(--u-secc); }
-.ait-note-card.pinned{ border-left:3px solid var(--u-p); }
-.ait-note-card-hdr{ display:flex; align-items:center; gap:6px; margin-bottom:3px; }
-.ait-note-card-hdr strong{
-  flex:1; min-width:0; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-.ait-note-card-hdr .material-symbols-outlined{ font-size:13px; color:var(--u-p); }
-.ait-note-card-prev{ font-size:11px; color:var(--u-ol); line-height:1.45; }
-.ait-note-card-time{ font-size:10px; color:var(--u-ol); margin-top:4px; display:flex; align-items:center; gap:4px; }
 
 .ait-note-editor{ display:flex; flex-direction:column; gap:8px; }
 .ait-note-editor-hdr{ display:flex; align-items:center; gap:6px; }
@@ -539,12 +602,33 @@
 .ait-note-readonly h1,.ait-note-readonly h2,.ait-note-readonly h3{ font-size:14px; margin:10px 0 4px; }
 .ait-note-readonly ul,.ait-note-readonly ol{ padding-left:18px; margin:6px 0; }
 .ait-note-readonly code{ background:var(--u-secc); padding:1px 5px; border-radius:5px; font-size:11.5px; }
+.ait-note-readonly blockquote{ margin:6px 0; padding:4px 10px; border-left:3px solid var(--u-p); background:var(--u-secc); border-radius:0 6px 6px 0; }
+.ait-note-readonly a{ color:var(--u-p); }
+
+/* Rich-text toolbar + contenteditable body (formatting tools) */
+.ait-note-tb{
+  display:flex; align-items:center; gap:2px; flex-wrap:wrap;
+  padding:6px 8px; border:1px solid var(--u-olv); border-bottom:none;
+  border-radius:10px 10px 0 0; background:var(--u-sfl);
+}
+.ait-note-tb button{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:27px; height:25px; padding:0 5px; border:none; border-radius:6px;
+  background:transparent; color:var(--u-ons); font-size:12.5px; cursor:pointer; font-family:inherit;
+}
+.ait-note-tb button:hover{ background:var(--u-secc); color:var(--u-p); }
+.ait-note-tb button .material-symbols-outlined{ font-size:15px; }
+.ait-note-tb-sep{ width:1px; height:15px; background:var(--u-olv); margin:0 4px; }
 .ait-note-edit{
-  min-height:160px; max-height:340px; resize:vertical;
-  padding:11px 13px; border:1px solid var(--u-olv); border-radius:11px;
+  min-height:160px; max-height:340px; overflow-y:auto;
+  padding:11px 13px; border:1px solid var(--u-olv); border-radius:0 0 10px 10px;
   background:var(--u-sbg); color:var(--u-ons); font-size:12.5px; line-height:1.6; font-family:inherit; outline:none;
 }
-.ait-note-edit:focus{ border-color:var(--u-p); }
+.ait-note-edit[contenteditable]:focus{ border-color:var(--u-p); }
+.ait-note-edit h1,.ait-note-edit h2,.ait-note-edit h3{ font-size:14px; margin:8px 0 4px; color:var(--u-ons); }
+.ait-note-edit ul,.ait-note-edit ol{ padding-left:18px; margin:6px 0; }
+.ait-note-edit blockquote{ margin:6px 0; padding:4px 10px; border-left:3px solid var(--u-p); background:var(--u-secc); border-radius:0 6px 6px 0; }
+.ait-note-edit:empty::before{ content:attr(data-placeholder); color:var(--u-ol); }
 .ait-note-editor-foot{ display:flex; justify-content:flex-end; gap:6px; }
 .ait-nt-btn.danger{ border-color:rgba(239,68,68,.4); color:#ef4444; }
 .ait-nt-btn.danger:hover{ background:rgba(239,68,68,.1); border-color:#ef4444; }
@@ -566,20 +650,6 @@
 .ait-rep-bar{ height:5px; border-radius:3px; background:var(--u-olv); margin-top:7px; overflow:hidden; }
 .ait-rep-bar i{ display:block; height:100%; background:linear-gradient(90deg,#00873d,#22c55e); border-radius:3px; }
 .ait-rep-meta{ font-size:10px; color:var(--u-ol); margin-top:5px; }
-
-/* Studio: Files */
-.ait-file-item{
-  display:flex; align-items:center; gap:9px; padding:8px 10px; margin-bottom:5px;
-  border:1px solid var(--u-olv); border-radius:10px; background:var(--u-sbg);
-  cursor:pointer; transition:border-color .13s;
-}
-.ait-file-item:hover{ border-color:var(--u-p); }
-.ait-file-item .material-symbols-outlined{ font-size:18px; color:var(--u-p); }
-.ait-file-item-name{
-  flex:1; min-width:0; font-size:11.5px; font-weight:600;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-.ait-file-item-meta{ font-size:10px; color:var(--u-ol); }
 
 .ait-empty{
   text-align:center; padding:26px 12px; color:var(--u-ol); font-size:11.5px; line-height:1.6;
@@ -641,4 +711,99 @@
   .ait-msgs{ padding:14px 14px 18px; }
   .ait-chat-overlay{ padding:0 12px 10px; }
   .ait-topbar-course{ display:none; }
+}
+
+/* ═══ Flashcards generator overlay (970x485 centred config dialog) ═════ */
+.ait-fc-modal{
+  position:fixed; inset:0; z-index:999999; /* above the YUI panel (body-mounted) */
+  display:flex; align-items:center; justify-content:center;
+}
+.ait-fc-backdrop{ position:absolute; inset:0; background:rgba(8,18,8,.5); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+.ait-fc-dialog{
+  position:relative; width:970px; max-width:calc(100vw - 32px);
+  height:485px; max-height:calc(100vh - 32px);
+  /* Solid, opaque surface — the old var(--u-sbg) was never defined and
+     resolved to transparent, showing page content through the dialog. */
+  background:#ffffff; background-color:#ffffff;
+  border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.28);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.ait-fc-hdr{
+  display:flex; align-items:center; gap:10px; padding:15px 18px;
+  border-bottom:1px solid var(--u-olv); flex:0 0 auto;
+}
+.ait-fc-hdr > .material-symbols-outlined{ font-size:22px; color:var(--u-p); }
+.ait-fc-hdr-txt{ flex:1; display:flex; flex-direction:column; }
+.ait-fc-hdr-txt strong{ font-size:14px; color:var(--u-ons); }
+.ait-fc-hdr-txt small{ font-size:11px; color:var(--u-ol); }
+.ait-fc-body{ flex:1; overflow-y:auto; padding:14px 18px; display:flex; flex-direction:column; gap:12px; }
+.ait-fc-sec-lbl{ font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--u-ol); }
+.ait-fc-mats{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:7px; }
+.ait-fc-mat{
+  display:flex; align-items:center; gap:8px; padding:8px 10px;
+  border:1px solid var(--u-olv); border-radius:9px; cursor:pointer;
+  font-size:12px; background:var(--u-sfl); color:var(--u-ons); transition:border-color .13s;
+}
+.ait-fc-mat:hover{ border-color:var(--u-p); }
+.ait-fc-mat input{ accent-color:var(--u-p); margin:0; }
+.ait-fc-mat .material-symbols-outlined{ font-size:16px; color:var(--u-ol); flex:0 0 auto; }
+.ait-fc-mat-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ait-fc-mat-tag{ font-size:9px; color:#b45309; border:1px solid rgba(245,158,11,.4); padding:1px 5px; border-radius:999px; flex:0 0 auto; }
+.ait-fc-cfg{ display:flex; gap:16px; flex-wrap:wrap; }
+.ait-fc-cfg label{ display:flex; flex-direction:column; gap:4px; font-size:11px; font-weight:700; color:var(--u-ol); }
+.ait-fc-cfg input,.ait-fc-cfg select{
+  font-family:inherit; font-size:12.5px; padding:7px 9px;
+  border:1px solid var(--u-olv); border-radius:8px; background:var(--u-sfl);
+  color:var(--u-ons); min-width:210px; outline:none;
+}
+.ait-fc-cfg input:focus,.ait-fc-cfg select:focus{ border-color:var(--u-p); }
+.ait-fc-msg{ font-size:12px; color:var(--u-ol); min-height:16px; font-weight:600; }
+.ait-fc-msg.err{ color:#dc2626; }
+.ait-fc-msg.ok{ color:var(--u-sec); }
+.ait-fc-loading,.ait-fc-empty{ display:flex; align-items:center; gap:8px; color:var(--u-ol); font-size:12px; padding:8px 2px; }
+.ait-fc-foot{
+  flex:0 0 auto; display:flex; justify-content:flex-end; gap:8px;
+  padding:12px 18px; border-top:1px solid var(--u-olv);
+}
+
+/* ═══ Flashcard review inside the Studio sub-view ═══ */
+.ait-sv-fc-toolbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.ait-sv-fc-toolbar .ait-sv-fc-title{ font-size:12px; font-weight:700; color:var(--u-ons); }
+.ait-sv-fc-progress{ font-size:12px; font-weight:800; color:var(--u-p); }
+.ait-sv-fc-hint{ font-size:11.5px; color:var(--u-ol); text-align:center; margin-top:8px; }
+.ait-sv-fc-actions{ display:flex; gap:7px; justify-content:center; margin-top:10px; }
+.ait-sv-fc-actions .umat-fc-btn{ padding:8px 16px; border-radius:10px; }
+.ait-sv-fc-done{ text-align:center; padding:26px 12px; }
+.ait-sv-fc-done .material-symbols-outlined{ font-size:34px; color:var(--u-p); }
+.ait-sv-fc-done h3{ margin:8px 0 4px; font-size:15px; color:var(--u-ons); }
+.ait-sv-fc-done p{ font-size:12px; color:var(--u-ol); margin:0; }
+/* Compact poker card inside the 330px Studio panel */
+.ait-sv-fc .umat-fc-poker{ width:250px; height:180px; margin:8px auto 0; }
+.ait-sv-fc .umat-fc-poker-center .umat-fc-text{ font-size:13px; padding:0 14px; }
+
+/* ═══ Attach materials drawer (chat panel) ═══
+   The drawer markup lives inside #ait-chat-overlay. It carries BOTH
+   .umat-attach-drawer (top:0 drop-down) and .umat-drawer-enhanced
+   (top:100% rise-up) — conflicting class rules. These ID-scoped rules make
+   the behaviour deterministic regardless of stylesheet load order:
+   the drawer rises from just above the input bar and stays clipped inside
+   the chat panel (#ait-chat is position:relative + overflow:hidden).
+   Closed = pushed down below the panel edge AND visibility:hidden (the
+   translate alone leaves a partial strip visible inside the panel, which
+   would cover the attach button); .open = risen into view above the input
+   bar. The visibility transition delays hiding so the slide-out is smooth. */
+#ait-attach-drawer{
+  top:auto; bottom:100%; left:0; right:0; z-index:15;
+  max-height:min(360px, 55vh);
+  border-radius:var(--u-r12) var(--u-r12) 0 0;
+  background:var(--u-sflo,#fff);
+  box-shadow:0 -8px 28px rgba(0,0,0,.14);
+  transform:translateY(100%);
+  visibility:hidden;
+  transition:transform .3s cubic-bezier(.4,0,.2,1), visibility 0s linear .3s;
+}
+#ait-attach-drawer.open{
+  transform:translateY(0);
+  visibility:visible;
+  transition:transform .3s cubic-bezier(.4,0,.2,1), visibility 0s;
 }

@@ -984,9 +984,23 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                 fcModal.setAttribute('aria-hidden', 'false');
                 if (fcMsgEl) fcMsgEl.textContent = '';
                 loadFlashcardMaterials(cid);
+                // Move focus into the dialog while it is visible (aria-hidden
+                // is false here, so no a11y conflict) — restore it on close.
+                var fcClose = document.getElementById('ait-fc-close');
+                if (fcClose) fcClose.focus();
             }
             function closeFlashcardOverlay() {
-                if (fcModal) { fcModal.style.display = 'none'; fcModal.setAttribute('aria-hidden', 'true'); }
+                if (!fcModal) return;
+                // Move focus OUT of the modal BEFORE hiding it — otherwise the
+                // browser logs "Blocked aria-hidden ... descendant retained
+                // focus" (focus must not live inside an aria-hidden ancestor).
+                if (document.activeElement && fcModal.contains(document.activeElement)) {
+                    var trig = document.getElementById('ait-tool-fc');
+                    if (trig) trig.focus();
+                    else document.activeElement.blur();
+                }
+                fcModal.style.display = 'none';
+                fcModal.setAttribute('aria-hidden', 'true');
             }
             function loadFlashcardMaterials(cid) {
                 if (!fcMatsEl) return;
