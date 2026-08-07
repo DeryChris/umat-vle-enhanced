@@ -345,23 +345,52 @@ class VectorStoreManager:
     ) -> List[Tuple[str, dict]]:
         """Retrieve documents from ChromaDB by metadata filter without similarity search.
 
-        Uses collection.get() instead of collection.query() — no embedding needed.
+        Uses collection.get() instead of collection.query() - no embedding needed.
         Useful for fetching all chunks belonging to a specific material_id.
+
+        Cross-collection fallback: after a provider switch (e.g. OpenRouter ->
+        Gemini) materials may live in a different collection with a different
+        embedding dimension. Because this method never embeds anything, it is
+        safe to search EVERY candidate collection (generic + provider-scoped +
+        legacy names) until matching documents are found, so historical index
+        data remains usable for flashcards / material-text retrieval.
         """
-        try:
-            collection = self._resolve_collection(course_id)
-        except Exception:
-            return []
+        client = get_chroma_client()
+        name = self.get_collection_name(course_id)
 
-        results = collection.get(
-            where=where_filter,
-            limit=limit,
-            include=["documents", "metadatas"],
-        )
+        # Try order: generic -> provider-scoped -> legacy names.
+        candidates = [f"course_{course_id}", name]
+        candidates += [f"course_{course_id}_openrouter", f"course_{course_id}_openai", f"course_{course_id}_local"]
 
-        documents = results.get("documents", []) or []
-        metadatas = results.get("metadatas", []) or []
-        return list(zip(documents, metadatas))
+        seen = set()
+        for candidate in candidates:
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            try:
+                collection = client.get_collection(name=candidate)
+            except Exception:
+                continue
+            try:
+                results = collection.get(
+                    where=where_filter,
+                    limit=limit,
+                    include=["documents", "metadatas"],
+                )
+            except Exception as e:
+                logger.warning(f"get_documents_by_filter failed on '{candidate}': {e}")
+                continue
+
+            documents = results.get("documents", []) or []
+            metadatas = results.get("metadatas", []) or []
+            if documents:
+                logger.info(
+                    "get_documents_by_filter: %d doc(s) from collection '%s' (course %s)",
+                    len(documents), candidate, course_id,
+                )
+                return list(zip(documents, metadatas))
+
+        return []
 
     def delete_course_documents(self, course_id: int, source_filter: str = None):
         """Remove indexed documents for a course (or specific source file)."""
