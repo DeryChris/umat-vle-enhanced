@@ -97,7 +97,8 @@
   transition:flex-basis .22s ease, width .22s ease, opacity .18s ease;
   overflow:hidden;
 }
-.ait-root.left-closed .ait-left{ flex-basis:0; width:0; opacity:0; border-radius:0; }
+/* !important wins over inline flex-basis/width written by divider drag (see ai_tutor.js resize). */
+.ait-root.left-closed .ait-left{ flex-basis:0 !important; width:0 !important; opacity:0; border-radius:0; }
 /* Hide the divider next to a collapsed panel — no dead strip, chat fills. */
 .ait-root.left-closed #ait-div-1{ display:none; }
 .ait-left-hdr{
@@ -355,7 +356,9 @@
   transition:flex-basis .22s ease, width .22s ease, opacity .18s ease;
   overflow:hidden;
 }
-.ait-root.studio-closed .ait-studio{ flex-basis:0; width:0; opacity:0; border-radius:0; }
+/* !important: divider drag writes inline flex-basis/width on .ait-studio, which
+   would otherwise beat this rule and leave an invisible (opacity:0) dead strip. */
+.ait-root.studio-closed .ait-studio{ flex-basis:0 !important; width:0 !important; opacity:0; border-radius:0; }
 .ait-root.studio-closed #ait-div-2{ display:none; }
 .ait-studio-hdr{
   display:flex; align-items:center; justify-content:space-between;
