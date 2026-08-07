@@ -890,6 +890,92 @@
 }
 .umat-vw-pptx-fs-btn span.material-symbols-outlined { font-size: 16px; }
 
+/* ─── Silurus WASM viewer nav bar (DOCX / PPTX) ─── */
+.umat-vw-silurus-bar {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: rgba(15, 23, 42, .72);
+  border-radius: 999px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  z-index: 3;
+}
+.umat-vw-silurus-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  cursor: pointer;
+  transition: background .15s;
+  font-family: inherit;
+}
+.umat-vw-silurus-btn:hover { background: rgba(255,255,255,.28); }
+.umat-vw-silurus-btn span.material-symbols-outlined { font-size: 20px; }
+.umat-vw-silurus-counter {
+  min-width: 64px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Silurus WASM canvas centering (DOCX / PPTX) ─── */
+.umat-vw-silurus-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow: auto;
+  /* No padding here: the JS fit helper (SILURUS_FIT_PAD) leaves the breathing
+     room, and a padded content box used to overflow the fitted page, which
+     clipped the top of DOCX pages. */
+}
+/* silurus wraps the canvas in its own positioned div — make that a flex box
+   so the canvas's own margin:auto can center it on both axes. */
+.umat-vw-silurus-wrap > * {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+}
+.umat-vw-docx-canvas,
+.umat-vw-pptx-canvas {
+  display: block;
+  /* margin:auto centers the canvas while it fits AND keeps overflowing
+     content reachable when zoomed in (auto margins collapse to 0, so the
+     scroll starts at the top-left instead of clipping it). */
+  margin: auto;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 18px rgba(0, 0, 0, .28);
+}
+/* Zoom % label + separator in the silurus nav bar */
+.umat-vw-silurus-pct {
+  min-width: 46px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.umat-vw-silurus-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: rgba(255, 255, 255, .18);
+}
+
 /* Fullscreen mode */
 .umat-vw-pptx-main.umat-vw-pptx-fs {
   position: fixed;

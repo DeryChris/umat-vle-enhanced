@@ -1651,6 +1651,27 @@ define([], function() {
     }
 
     // ─── Shared material tile renderer ─────────────── //
+
+    // Build the material_thumb.php URL for office/PDF files (LibreOffice
+    // renders a real first-page preview; the icon stays as the fallback).
+    function _umatThumbSrc(mime, url) {
+        mime = (mime || '').toLowerCase();
+        var office = mime.indexOf('pdf') !== -1 ||
+            mime.indexOf('wordprocessingml') !== -1 ||
+            mime.indexOf('msword') !== -1 ||
+            mime.indexOf('presentationml') !== -1 ||
+            mime.indexOf('ms-powerpoint') !== -1 ||
+            mime.indexOf('spreadsheetml') !== -1 ||
+            mime.indexOf('ms-excel') !== -1;
+        if (!office || !url) return '';
+        var a = document.createElement('a');
+        a.href = url;
+        var parts = a.pathname.split('/');
+        var idx = parts.indexOf('local');
+        var root = idx > 0 ? parts.slice(0, idx).join('/') : '';
+        return a.origin + root + '/local/umat_ai/material_thumb.php?url=' + encodeURIComponent(url);
+    }
+
     function _renderYtMaterials(mats, g, pfx, courseId) {
         if (!mats || !mats.length) {
             g.innerHTML = '<div class="umat-empty" style="grid-column:1/-1;"><span class="material-symbols-outlined">folder_open</span><p>No materials found for this course.</p></div>';
@@ -1670,9 +1691,12 @@ define([], function() {
             else if (m.page_count && m.page_count > 0) badge = '<span class="yt-badge">' + m.page_count + ' pp</span>';
             else badge = '<span class="yt-badge">' + ext + '</span>';
             var sz = (Math.round((m.filesize || 0) / 1024)) + 'KB';
+            var thumbSrc = _umatThumbSrc(mime, m.url || '');
+            var thumbImg = thumbSrc ? '<img class="yt-thumb-img" data-matthumb="1" src="' + thumbSrc + '" alt="" loading="lazy" onerror="this.remove()">' : '';
             return                 '<div class="yt-tile" data-url="' + _umatEsc(m.url || '') + '" data-name="' + _umatEsc(m.filename || '') + '" data-mime="' + _umatEsc(mime) + '" data-fileid="' + (m.id || 0) + '" data-courseid="' + (courseId || '') + '">' +
                 '<div class="yt-thumb ' + bg + '">' +
                 '<span class="yt-thumb-icon material-symbols-outlined">' + ic + '</span>' +
+                thumbImg +
                 '<div class="yt-play-ov"><span class="material-symbols-outlined">' + playIcon + '</span></div>' +
                 badge +
                 '</div>' +

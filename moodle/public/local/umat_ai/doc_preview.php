@@ -131,9 +131,38 @@ function resolve_pluginfile_url_simple(string $url): ?array {
         }
     }
 
-    // Try Moodle file API first
+    // Try Moodle file API first — strict match on the URL's itemid.
     $fs = get_file_storage();
     $file = $fs->get_file($contextid, $component, $filearea, $itemid, $filepath, $filename);
+    if (!$file) {
+        // Fallback 1: common variations — the URL itemid may not match the
+        // stored itemid (files are stored with itemid = courseid on push).
+        $variations = [
+            [$itemid, '/'],
+            [0, '/'],
+            [$itemid, $filepath],
+        ];
+        foreach ($variations as [$tryItem, $tryPath]) {
+            $file = $fs->get_file($contextid, $component, $filearea, $tryItem, $tryPath, $filename);
+            if ($file) {
+                break;
+            }
+        }
+    }
+    if (!$file) {
+        // Fallback 2: search every file in this context's filearea for a
+        // matching filename, whatever itemid/filepath it lives at.
+        $allfiles = $fs->get_area_files($contextid, $component, $filearea, false, 'id, filename, contenthash, timecreated', 'filename');
+        foreach ($allfiles as $f) {
+            if (isset($f['filename']) && $f['filename'] === $filename) {
+                $file = $fs->get_file_by_hashname($f['contenthash']);
+                if ($file) {
+                    break;
+                }
+            }
+        }
+    }
+
     if ($file) {
         $hash = $file->get_contenthash();
         $filedir = dirname($file->get_content()) . '/' . substr($hash, 0, 2) . '/' . substr($hash, 2, 2) . '/' . $hash;

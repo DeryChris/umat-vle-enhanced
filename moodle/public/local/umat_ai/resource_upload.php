@@ -26,10 +26,9 @@ try {
         exit;
     }
 
-    // Only admins / users with lecturer-level access can upload.
+    // Only users with resource bank access can upload.
     $sysctx = \context_system::instance();
-    if (!has_capability('local/umat_ai:adminpanel', $sysctx) &&
-        !has_capability('local/umat_ai:viewanalytics', $sysctx)) {
+    if (!has_capability('local/umat_ai:manageresources', $sysctx)) {
         // Fallback: check if user has lecturer role anywhere.
         $isLecturer = $DB->record_exists_sql(
             "SELECT 1 FROM {role_assignments} ra

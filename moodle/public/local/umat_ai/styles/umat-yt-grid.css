@@ -47,6 +47,16 @@
 .umat-ov .yt-tile:hover .yt-thumb {
   box-shadow: 0 8px 28px rgba(0,0,0,.28);
 }
+/* Real rendered preview (material_thumb.php) — sits above the icon,
+   falls back to the icon via onerror removal */
+.umat-ov .yt-thumb-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+}
 /* Type-based backgrounds */
 .umat-ov .yt-bg-video  { background: linear-gradient(150deg, #071a12 0%, #103826 100%); }
 .umat-ov .yt-bg-pdf    { background: linear-gradient(150deg, #3b0000 0%, #7f1d1d 100%); }

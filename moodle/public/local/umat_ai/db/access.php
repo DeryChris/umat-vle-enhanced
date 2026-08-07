@@ -82,4 +82,15 @@ $capabilities = [
             'manager' => CAP_ALLOW,
         ],
     ],
+
+    // Manage private resource bank — upload, create folders, delete, push to course (lecturers only).
+    'local/umat_ai:manageresources' => [
+        'captype'      => 'write',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes'   => [
+            'editingteacher' => CAP_ALLOW,
+            'teacher'        => CAP_ALLOW,
+            'manager'        => CAP_ALLOW,
+        ],
+    ],
 ];

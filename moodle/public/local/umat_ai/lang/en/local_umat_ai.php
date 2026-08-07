@@ -10,6 +10,7 @@ $string['umat_ai:chatwithai']    = 'Chat with the AI assistant';
 $string['umat_ai:reportissue']   = 'Report and discuss private course issues';
 $string['umat_ai:viewanalytics'] = 'View lecturer analytics dashboard';
 $string['umat_ai:adminpanel']    = 'Access the admin control panel (system level)';
+$string['umat_ai:manageresources'] = 'Manage private resource bank (upload, folders, delete, push)';
 
 /* ---- General ---- */
 $string['ai_assistant']          = 'UMaT AI Assistant';

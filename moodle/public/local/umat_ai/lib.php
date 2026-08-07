@@ -381,6 +381,8 @@ function local_umat_ai_pluginfile($course, $cm, \context $context, $filearea, $a
     }
 
     if ($filearea === 'materials') {
+        // URL format: /pluginfile.php/{contextid}/local_umat_ai/materials/{itemid}/{path}{filename}
+        $itemid = (int)array_shift($args);
         $filename = array_pop($args);
         $filepath = $args ? '/' . implode('/', $args) . '/' : '/';
 
@@ -388,7 +390,22 @@ function local_umat_ai_pluginfile($course, $cm, \context $context, $filearea, $a
         require_capability('local/umat_ai:chatwithai', $coursecontext);
 
         $fs = get_file_storage();
-        $file = $fs->get_file($context->id, 'local_umat_ai', 'materials', 0, $filepath, $filename);
+        $file = $fs->get_file($context->id, 'local_umat_ai', 'materials', $itemid, $filepath, $filename);
+        if (!$file) {
+            // Files may be stored with itemid = 0 (course_upload.php / materials.php)
+            // or itemid = courseid (RB push_to_course) — try both variants.
+            $file = $fs->get_file($context->id, 'local_umat_ai', 'materials', 0, $filepath, $filename);
+        }
+        if (!$file) {
+            // Final fallback: match by filename across every itemid in this course context.
+            $candidates = $fs->get_area_files($context->id, 'local_umat_ai', 'materials', false, 'id', false);
+            foreach ($candidates as $cand) {
+                if (!$cand->is_directory() && $cand->get_filename() === $filename) {
+                    $file = $cand;
+                    break;
+                }
+            }
+        }
         if (!$file) {
             return false;
         }

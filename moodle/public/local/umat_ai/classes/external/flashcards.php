@@ -2,9 +2,11 @@
 /**
  * External API: Spaced-repetition flashcards (M2 / F3).
  *
- * Workflow: lecturer generates cards via the AI service (status=pending) →
- * lecturer approves/rejects (status=1 / -1) → students review approved cards
- * through the SM-2 loop (get_due_flashcards + submit_review).
+ * Self-service workflow: any enrolled student generates their OWN private
+ * deck via the AI service (cards are active immediately — no approval flow).
+ * Each user only ever sees and reviews cards they created themselves
+ * (created_by = user id), through the SM-2 loop
+ * (get_due_flashcards + submit_review).
  *
  * @package    local_umat_ai
  * @copyright  2026 UMaT
@@ -21,25 +23,18 @@ require_once(__DIR__ . '/../../lib.php'); // SM-2 helpers + service config.
 class flashcards extends \external_api {
 
     /**
-     * Shared guard: resolve the course context and verify enrolment/role.
+     * Shared guard: resolve the course context and verify enrolment.
      *
-     * @param int    $courseid
-     * @param string $who 'student' or 'lecturer'
+     * @param int $courseid
      * @return \context_course
      */
-    protected static function require_course_access(int $courseid, string $who = 'student'): \context_course {
+    protected static function require_course_access(int $courseid): \context_course {
         $context = \context_course::instance($courseid);
         self::validate_context($context);
-
-        if ($who === 'lecturer') {
-            require_capability('local/umat_ai:viewanalytics', $context);
-        } else {
-            require_capability('local/umat_ai:viewsummary', $context);
-            if (!is_enrolled($context)) {
-                throw new \moodle_exception('You must be enrolled in this course to access flashcards.');
-            }
+        require_capability('local/umat_ai:chatwithai', $context);
+        if (!is_enrolled($context)) {
+            throw new \moodle_exception('You must be enrolled in this course to access flashcards.');
         }
-
         return $context;
     }
 
@@ -58,7 +53,7 @@ class flashcards extends \external_api {
     }
 
     // ------------------------------------------------------------------ //
-    // generate_flashcards — lecturer → AI service → pending cards          //
+    // generate_flashcards — enrolled user → AI service → private cards    //
     // ------------------------------------------------------------------ //
 
     public static function generate_flashcards_parameters() {
@@ -80,8 +75,8 @@ class flashcards extends \external_api {
             'topic_label'  => $topic_label,
         ]);
 
-        $context = self::require_course_access((int) $params['courseid'], 'lecturer');
-        require_capability('local/umat_ai:approveoutput', $context);
+        // Self-service: any enrolled user may generate their own private deck.
+        self::require_course_access((int) $params['courseid']);
 
         $matids = self::parse_ids($params['material_ids']);
         if (empty($matids)) {
@@ -100,7 +95,7 @@ class flashcards extends \external_api {
                 'material_ids' => $matids,
                 'count'        => $count,
                 'topic_label'  => (string) $params['topic_label'],
-                'role'         => 'lecturer',
+                'role'         => 'student',
             ]),
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: application/json',
@@ -141,7 +136,7 @@ class flashcards extends \external_api {
                 'front'        => $front,
                 'back'         => $back,
                 'topic'        => \core_text::substr(trim((string) ($card['topic'] ?? $params['topic_label'] ?? '')), 0, 255),
-                'status'       => 0, // pending lecturer approval
+                'status'       => 1, // private deck — active immediately, no approval
                 'created_by'   => (int) $USER->id,
                 'approved_by'  => 0,
                 'timecreated'  => $now,
@@ -160,7 +155,7 @@ class flashcards extends \external_api {
             'success' => !empty($saved),
             'cards'   => $saved,
             'total'   => count($saved),
-            'message' => count($saved) . ' flashcard(s) generated and awaiting approval.',
+            'message' => count($saved) . ' flashcard(s) added to your private deck.',
         ];
     }
 
@@ -181,89 +176,13 @@ class flashcards extends \external_api {
     }
 
     // ------------------------------------------------------------------ //
-    // approve_flashcards — lecturer bulk approve / reject                  //
-    // ------------------------------------------------------------------ //
-
-    public static function approve_flashcards_parameters() {
-        return new \external_function_parameters([
-            'courseid' => new \external_value(PARAM_INT, 'Course ID'),
-            'card_ids' => new \external_value(PARAM_RAW, 'JSON array of flashcard IDs'),
-            'action'   => new \external_value(PARAM_ALPHA, 'approve or reject'),
-        ]);
-    }
-
-    public static function approve_flashcards($courseid, $card_ids, $action) {
-        global $DB, $USER;
-
-        $params = self::validate_parameters(self::approve_flashcards_parameters(), [
-            'courseid' => $courseid,
-            'card_ids' => $card_ids,
-            'action'   => $action,
-        ]);
-
-        $context = self::require_course_access((int) $params['courseid'], 'lecturer');
-        require_capability('local/umat_ai:approveoutput', $context);
-
-        $ids = self::parse_ids($params['card_ids']);
-        if (empty($ids)) {
-            return ['approved' => 0, 'rejected' => 0, 'message' => 'No flashcards selected.'];
-        }
-
-        $valid = ($params['action'] === 'approve' ? 1 : ($params['action'] === 'reject' ? -1 : null));
-        if ($valid === null) {
-            return ['approved' => 0, 'rejected' => 0, 'message' => 'Invalid action.'];
-        }
-
-        // Only touch cards that belong to this course and are still pending.
-        // Named params so they merge cleanly with :courseid / :status below.
-        [$insql, $inparams] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED);
-        $inparams['courseid'] = (int) $params['courseid'];
-        $inparams['status'] = 0;
-
-        $cards = $DB->get_records_select(
-            'umat_ai_flashcards',
-            "courseid = :courseid AND status = :status AND id $insql",
-            $inparams
-        );
-        if (empty($cards)) {
-            return ['approved' => 0, 'rejected' => 0, 'message' => 'No pending flashcards match the selection.'];
-        }
-
-        $now = time();
-        foreach ($cards as $card) {
-            $DB->set_field('umat_ai_flashcards', 'status', $valid, ['id' => $card->id]);
-            $DB->set_field('umat_ai_flashcards', 'approved_by', $USER->id, ['id' => $card->id]);
-            $DB->set_field('umat_ai_flashcards', 'timemodified', $now, ['id' => $card->id]);
-        }
-
-        $count = count($cards);
-        $message = $valid === 1
-            ? $count . ' flashcard(s) approved and now visible to students.'
-            : $count . ' flashcard(s) rejected.';
-
-        return [
-            'approved' => $valid === 1 ? $count : 0,
-            'rejected' => $valid === -1 ? $count : 0,
-            'message'  => $message,
-        ];
-    }
-
-    public static function approve_flashcards_returns() {
-        return new \external_single_structure([
-            'approved' => new \external_value(PARAM_INT, 'Number approved'),
-            'rejected' => new \external_value(PARAM_INT, 'Number rejected'),
-            'message'  => new \external_value(PARAM_TEXT, 'Feedback message'),
-        ]);
-    }
-
-    // ------------------------------------------------------------------ //
-    // get_flashcards — deck listing (student: approved only)               //
+    // get_flashcards — the user's own private deck listing                 //
     // ------------------------------------------------------------------ //
 
     public static function get_flashcards_parameters() {
         return new \external_function_parameters([
             'courseid' => new \external_value(PARAM_INT, 'Course ID'),
-            'status'   => new \external_value(PARAM_INT, 'Filter: 0 pending, 1 approved, -1 rejected, 9 all (lecturer only)', VALUE_DEFAULT, 1),
+            'status'   => new \external_value(PARAM_INT, 'Legacy status filter (ignored — deck is private)', VALUE_DEFAULT, 1),
         ]);
     }
 
@@ -275,30 +194,17 @@ class flashcards extends \external_api {
             'status'   => $status,
         ]);
 
-        $context = self::require_course_access((int) $params['courseid'], 'student');
+        self::require_course_access((int) $params['courseid']);
 
-        $islecturer = has_capability('local/umat_ai:viewanalytics', $context);
-        $status = (int) $params['status'];
-
-        // Students can only ever see approved cards regardless of the filter.
-        if (!$islecturer) {
-            $status = 1;
-        } else if ($status === 9) {
-            $status = null; // lecturer requested all statuses
-        }
-
-        if ($status === null) {
-            $cards = $DB->get_records('umat_ai_flashcards', ['courseid' => (int) $params['courseid']], 'timecreated ASC');
-        } else {
-            $cards = $DB->get_records('umat_ai_flashcards', ['courseid' => (int) $params['courseid'], 'status' => $status], 'timecreated ASC');
-        }
+        // Private deck: only cards this user generated for this course.
+        $cards = $DB->get_records('umat_ai_flashcards', [
+            'courseid'  => (int) $params['courseid'],
+            'created_by'=> (int) $USER->id,
+        ], 'timecreated ASC');
 
         $out = [];
         foreach ($cards as $card) {
-            $review = null;
-            if ((int) $card->status === 1) {
-                $review = $DB->get_record('umat_ai_flashcard_reviews', ['userid' => (int) $USER->id, 'flashcardid' => (int) $card->id]);
-            }
+            $review = $DB->get_record('umat_ai_flashcard_reviews', ['userid' => (int) $USER->id, 'flashcardid' => (int) $card->id]);
             $out[] = [
                 'id'           => (int) $card->id,
                 'front'        => $card->front,
@@ -345,7 +251,7 @@ class flashcards extends \external_api {
     }
 
     // ------------------------------------------------------------------ //
-    // get_due_flashcards — student review queue (SM-2 due cards)            //
+    // get_due_flashcards — user review queue (SM-2 due cards from own deck)//
     // ------------------------------------------------------------------ //
 
     public static function get_due_flashcards_parameters() {
@@ -363,13 +269,13 @@ class flashcards extends \external_api {
             'limit'    => $limit,
         ]);
 
-        $context = self::require_course_access((int) $params['courseid'], 'student');
-        require_capability('local/umat_ai:chatwithai', $context);
+        self::require_course_access((int) $params['courseid']);
 
         $limit = max(1, min(100, (int) $params['limit']));
         $now = time();
+        $uid = (int) $USER->id;
 
-        // Approved cards with no review row (new) or with due_at in the past.
+        // Cards the user created themselves with no review row (new) or with due_at in the past.
         $sql = "SELECT f.id, f.front, f.back, f.topic, f.materialid,
                        COALESCE(r.ease, 2.5)     AS ease,
                        COALESCE(r.interval, 0)   AS interval,
@@ -379,12 +285,12 @@ class flashcards extends \external_api {
                   FROM {umat_ai_flashcards} f
              LEFT JOIN {umat_ai_flashcard_reviews} r
                     ON r.flashcardid = f.id AND r.userid = :uid
-                 WHERE f.courseid = :cid AND f.status = 1
+                 WHERE f.courseid = :cid AND f.created_by = :uid AND f.status = 1
                    AND (r.id IS NULL OR r.due_at <= :now)
               ORDER BY COALESCE(r.due_at, 0) ASC, f.id ASC
                  LIMIT " . $limit;
 
-        $rows = $DB->get_records_sql($sql, ['uid' => (int) $USER->id, 'cid' => (int) $params['courseid'], 'now' => $now]);
+        $rows = $DB->get_records_sql($sql, ['uid' => $uid, 'cid' => (int) $params['courseid'], 'now' => $now]);
 
         $cards = [];
         foreach ($rows as $row) {
@@ -426,7 +332,7 @@ class flashcards extends \external_api {
     }
 
     // ------------------------------------------------------------------ //
-    // submit_review — student grades a card (SM-2 state transition)         //
+    // submit_review — user grades one of their own cards (SM-2 transition) //
     // ------------------------------------------------------------------ //
 
     public static function submit_review_parameters() {
@@ -446,22 +352,22 @@ class flashcards extends \external_api {
             'button'   => $button,
         ]);
 
-        $context = self::require_course_access((int) $params['courseid'], 'student');
-        require_capability('local/umat_ai:chatwithai', $context);
+        self::require_course_access((int) $params['courseid']);
 
         $quality = \local_umat_ai_sm2_button_quality($params['button']);
         if ($quality === null) {
             return ['success' => false, 'message' => 'Invalid review button.', 'next_due_at' => 0];
         }
 
-        // Card must exist, belong to this course and be approved.
+        // Card must exist, belong to this course and be one of the user's own cards.
         $card = $DB->get_record('umat_ai_flashcards', [
-            'id'       => (int) $params['cardid'],
-            'courseid' => (int) $params['courseid'],
-            'status'   => 1,
+            'id'         => (int) $params['cardid'],
+            'courseid'   => (int) $params['courseid'],
+            'created_by' => (int) $USER->id,
+            'status'     => 1,
         ]);
         if (!$card) {
-            return ['success' => false, 'message' => 'Flashcard not found or not approved.', 'next_due_at' => 0];
+            return ['success' => false, 'message' => 'Flashcard not found.', 'next_due_at' => 0];
         }
 
         $review = $DB->get_record('umat_ai_flashcard_reviews', [

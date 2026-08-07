@@ -46,15 +46,18 @@ class TestAuth:
         response = client.post("/api/v1/flashcards/generate", json=_payload())
         assert response.status_code == 403
 
-    def test_student_role_forbidden(self):
-        with patch("api.v1.routes.flashcards._resolve_context") as mock_ctx:
+    def test_student_role_allowed(self):
+        # Self-service: students may generate cards; the role gate was removed.
+        with patch("api.v1.routes.flashcards._resolve_context", return_value="chunks") as mock_ctx, \
+             patch("api.v1.routes.flashcards._lecturer_llm") as mock_llm:
+            mock_llm.generate_assessment = AsyncMock(return_value=GOOD_CARDS_JSON)
             response = client.post(
                 "/api/v1/flashcards/generate",
                 json=_payload(role="student"),
                 headers=HEADERS,
             )
-            assert response.status_code == 403
-            mock_ctx.assert_not_called()
+        assert response.status_code == 200
+        mock_ctx.assert_called_once()
 
 
 class TestGenerate:

@@ -13,7 +13,7 @@ $plugin->component = 'local_umat_ai';
 // Moodle caches AMD modules by plugin version, so this must increase
 // whenever amd/build changes or the dashboard will keep serving the
 // previous JavaScript.
-$plugin->version   = 2026080606;
+$plugin->version   = 2026080607;
 $plugin->requires  = 2023100900;
 $plugin->maturity  = MATURITY_BETA;
-$plugin->release   = '2.5.0';
+$plugin->release   = '2.5.1';

@@ -21,6 +21,14 @@ class overlay_helper {
                 . $badge . '</button>';
         }
         $safeLabel = htmlspecialchars($newBtnLabel, ENT_QUOTES);
+        // "New Session" quick action — only rendered when a label is given.
+        // (AI Tutor has its own New Session button inside the workspace.)
+        $newBtn = ($newBtnLabel === '') ? '' : <<<HTML
+    <button class="umat-sb-new" id="sb-new-btn" type="button">
+        <span class="material-symbols-outlined">add</span>
+        <span class="umat-sb-new-lbl">{$safeLabel}</span>
+    </button>
+HTML;
         return <<<HTML
 <div class="umat-sb">
     <div class="umat-sb-head">
@@ -35,10 +43,7 @@ class overlay_helper {
     </div>
     <nav class="umat-sb-nav">{$tabHtml}</nav>
     <div class="umat-sb-divider"></div>
-    <button class="umat-sb-new" id="sb-new-btn" type="button">
-        <span class="material-symbols-outlined">add</span>
-        <span class="umat-sb-new-lbl">{$safeLabel}</span>
-    </button>
+    {$newBtn}
     <div class="umat-sb-foot">
         <button class="umat-sb-item" type="button" onclick="window.location.href='{$logUrl}'">
             <span class="material-symbols-outlined">logout</span><span class="umat-sb-item-lbl">Sign Out</span>
@@ -56,7 +61,7 @@ HTML;
 /* Mobile nav: slide-to-hide + indicator pill */
 document.querySelectorAll('.umat-glass-tabs').forEach(function(nav){var pill=document.createElement('div');pill.className='umat-glass-pill';nav.appendChild(pill);function mv(){var a=nav.querySelector('.umat-glass-tab.active');if(!a)return;var nr=nav.getBoundingClientRect(),tr=a.getBoundingClientRect();pill.style.left=(tr.left-nr.left)+'px';pill.style.width=tr.width+'px';}mv();nav.addEventListener('click',function(e){if(e.target.closest('.umat-glass-tab'))setTimeout(mv,30);});window.addEventListener('resize',mv);});
 /* Thumbnail loader */
-window.loadYtThumbnails=window.loadYtThumbnails||function(g){if(!g)return;g.querySelectorAll('.yt-tile[data-url]').forEach(function(tile){var th=tile.querySelector('.yt-thumb');if(!th||th._td)return;th._td=1;var url=tile.dataset.url||'',mime=(tile.dataset.mime||'').toLowerCase();if(!url)return;function hi(){var ic=th.querySelector('.yt-thumb-icon');if(ic)ic.style.display='none';}if(mime.includes('image')){var img=document.createElement('img');img.className='yt-thumb-img';img.loading='lazy';img.src=url;th.appendChild(img);hi();}else if(mime.includes('video')){var v=document.createElement('video');v.src=url;v.preload='metadata';v.muted=true;v.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:12px;';v.addEventListener('loadedmetadata',function(){v.currentTime=Math.min(2,v.duration*0.1);});v.addEventListener('seeked',function(){hi();th.appendChild(v);});v.load();}else if(mime.includes('pdf')){var lo=document.createElement('div');lo.className='yt-thumb-loading';th.appendChild(lo);hi();(function(){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';s.onload=function(){window.pdfjsLib&&(window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',pdfjsLib.getDocument(url).promise.then(function(p){return p.getPage(1);}).then(function(pg){var vp=pg.getViewport({scale:1}),sc=Math.min(th.offsetWidth/vp.width,th.offsetHeight/vp.height)||1,vp2=pg.getViewport({scale:sc}),c=document.createElement('canvas');c.className='yt-thumb-canvas';c.width=vp2.width;c.height=vp2.height;lo.remove();th.appendChild(c);pg.render({canvasContext:c.getContext('2d'),viewport:vp2});}).catch(function(){lo.remove();}));};s.onerror=function(){lo.remove();};document.head.appendChild(s);})();}else if(mime.includes('presentation')||mime.includes('powerpoint')){var _eu;try{_eu=encodeURIComponent(decodeURIComponent(url))}catch(e){_eu=encodeURIComponent(url)}var a1=document.createElement('a');a1.href=url;var _pi=a1.pathname.indexOf('/pluginfile.php');var b1=a1.origin+(_pi>=0?a1.pathname.substring(0,_pi):'');var i1=document.createElement('img');i1.className='yt-thumb-img';i1.loading='lazy';i1.onerror=function(){try{th.removeChild(i1)}catch(e){}var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';for(var i=0;i<4;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl)}th.appendChild(dv)};i1.src=b1+'/local/umat_ai/pptx_render.php?action=slide&url='+_eu+'&slide=1';th.appendChild(i1);hi();}else if(mime.includes('word')||mime.includes('document')||mime.includes('spreadsheet')||mime.includes('excel')){var _eu2;try{_eu2=encodeURIComponent(decodeURIComponent(url))}catch(e){_eu2=encodeURIComponent(url)}var lo2=document.createElement('div');lo2.className='yt-thumb-loading';th.appendChild(lo2);hi();var a2=document.createElement('a');a2.href=url;var _pi2=a2.pathname.indexOf('/pluginfile.php');var b2=a2.origin+(_pi2>=0?a2.pathname.substring(0,_pi2):'');var t2=mime.includes('spreadsheet')||mime.includes('excel')?'xlsx':'docx';fetch(b2+'/local/umat_ai/doc_preview.php?url='+_eu2+'&type='+t2).then(function(r){return r.json();}).then(function(d){lo2.remove();var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';if(d.lines&&d.lines.length){d.lines.slice(0,7).forEach(function(l){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';var txt=typeof l==='string'?l:(Array.isArray(l)?l.filter(Boolean).join(' | '):'');dl.textContent=txt.substring(0,65)||'\u00a0';dv.appendChild(dl);});}else{for(var i=0;i<4;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl);}}th.appendChild(dv);}).catch(function(){lo2.remove();var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';for(var i=0;i<4;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl);}th.appendChild(dv);});}else if(mime.includes('audio')){var aw=document.createElement('div');aw.className='yt-thumb-audio-wav';for(var i=0;i<12;i++){var bar=document.createElement('span');aw.appendChild(bar);}th.appendChild(aw);hi();}});};
+window.loadYtThumbnails=window.loadYtThumbnails||function(g){if(!g)return;g.querySelectorAll('.yt-tile[data-url]').forEach(function(tile){var th=tile.querySelector('.yt-thumb');if(!th||th._td)return;th._td=1;if(th.querySelector('.yt-thumb-img[data-matthumb]'))return;var url=tile.dataset.url||'',mime=(tile.dataset.mime||'').toLowerCase();if(!url)return;function hi(){var ic=th.querySelector('.yt-thumb-icon');if(ic)ic.style.display='none';}if(mime.includes('image')){var img=document.createElement('img');img.className='yt-thumb-img';img.loading='lazy';img.src=url;th.appendChild(img);hi();}else if(mime.includes('video')){var v=document.createElement('video');v.src=url;v.preload='metadata';v.muted=true;v.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:12px;';v.addEventListener('loadedmetadata',function(){v.currentTime=Math.min(2,v.duration*0.1);});v.addEventListener('seeked',function(){hi();th.appendChild(v);});v.load();}else if(mime.includes('pdf')){var lo=document.createElement('div');lo.className='yt-thumb-loading';th.appendChild(lo);hi();(function(){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';s.onload=function(){window.pdfjsLib&&(window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',pdfjsLib.getDocument(url).promise.then(function(p){return p.getPage(1);}).then(function(pg){var vp=pg.getViewport({scale:1}),sc=Math.min(th.offsetWidth/vp.width,th.offsetHeight/vp.height)||1,vp2=pg.getViewport({scale:sc}),c=document.createElement('canvas');c.className='yt-thumb-canvas';c.width=vp2.width;c.height=vp2.height;lo.remove();th.appendChild(c);pg.render({canvasContext:c.getContext('2d'),viewport:vp2});}).catch(function(){lo.remove();}));};s.onerror=function(){lo.remove();};document.head.appendChild(s);})();}else if(mime.includes('presentation')||mime.includes('powerpoint')){var _eu;try{_eu=encodeURIComponent(decodeURIComponent(url))}catch(e){_eu=encodeURIComponent(url)}var a1=document.createElement('a');a1.href=url;var _pi=a1.pathname.indexOf('/pluginfile.php');var b1=a1.origin+(_pi>=0?a1.pathname.substring(0,_pi):'');var i1=document.createElement('img');i1.className='yt-thumb-img';i1.loading='lazy';i1.onerror=function(){try{th.removeChild(i1)}catch(e){}var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';for(var i=0;i<4;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl)}th.appendChild(dv)};i1.src=b1+'/local/umat_ai/pptx_render.php?action=slide&url='+_eu+'&slide=1';th.appendChild(i1);hi();}else if(mime.includes('word')||mime.includes('document')||mime.includes('spreadsheet')||mime.includes('excel')){var _eu2;try{_eu2=encodeURIComponent(decodeURIComponent(url))}catch(e){_eu2=encodeURIComponent(url)}var lo2=document.createElement('div');lo2.className='yt-thumb-loading';th.appendChild(lo2);hi();var a2=document.createElement('a');a2.href=url;var _pi2=a2.pathname.indexOf('/pluginfile.php');var b2=a2.origin+(_pi2>=0?a2.pathname.substring(0,_pi2):'');var t2=mime.includes('spreadsheet')||mime.includes('excel')?'xlsx':'docx';fetch(b2+'/local/umat_ai/doc_preview.php?url='+_eu2+'&type='+t2).then(function(r){return r.json();}).then(function(d){lo2.remove();var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';if(d.lines&&d.lines.length){d.lines.slice(0,7).forEach(function(l){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';var txt=typeof l==='string'?l:(Array.isArray(l)?l.filter(Boolean).join(' | '):'');dl.textContent=txt.substring(0,65)||'\u00a0';dv.appendChild(dl);});}else{for(var i=0;i<4;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl);}}th.appendChild(dv);}).catch(function(){lo2.remove();var dv=document.createElement('div');dv.className='yt-thumb-doc-preview';for(var i=0;i<4;i++){var dl=document.createElement('div');dl.className='yt-thumb-doc-line';dv.appendChild(dl);}th.appendChild(dv);});}else if(mime.includes('audio')){var aw=document.createElement('div');aw.className='yt-thumb-audio-wav';for(var i=0;i<12;i++){var bar=document.createElement('span');aw.appendChild(bar);}th.appendChild(aw);hi();}});};
 new MutationObserver(function(ms){ms.forEach(function(m){if(m.target.classList&&m.target.classList.contains('yt-grid'))window.loadYtThumbnails(m.target);m.addedNodes.forEach(function(n){if(n.nodeType!==1)return;if(n.classList&&n.classList.contains('yt-grid'))window.loadYtThumbnails(n);var gs=n.querySelectorAll&&n.querySelectorAll('.yt-grid');if(gs&&gs.length)gs.forEach(function(g){window.loadYtThumbnails(g);});});});}).observe(document.body,{childList:true,subtree:true});
 /* AJAX cache (5-min TTL for analytics/struggle) */
 if(typeof ajax==='function'&&!window._ajaxCached){window._ajaxCached=1;var _ac={},_at={};window._origAjax=ajax;window.ajax=function(m,a,d,f){if(m.includes('analytics')||m.includes('struggle')){var k=m+':'+JSON.stringify(a),n=Date.now();if(_ac[k]&&n-_at[k]<300000){setTimeout(function(){d(_ac[k]);},0);return;}_origAjax(m,a,function(r){_ac[k]=r;_at[k]=Date.now();d(r);},f);}else _origAjax(m,a,d,f);};}
@@ -157,6 +162,35 @@ JS;
           <button class="ait-send" id="ait-send" type="button" title="Send" aria-label="Send"><span class="material-symbols-outlined">arrow_upward</span></button>
         </div>
         <div class="umat-mat-bar" id="ait-mat-bar"></div>
+
+        <!-- Attach materials drawer — contained INSIDE the chat panel (its
+             parent is position:relative). Rises from above the input bar so
+             the composer stays visible; closable via the ✕ button, ESC, or
+             clicking outside (wired in umatshared.js / ai_tutor.js). -->
+        <div class="umat-attach-drawer umat-drawer-enhanced" id="ait-attach-drawer">
+          <div class="umat-drawer-hdr">
+            <div class="umat-drawer-hdr-left">
+              <span class="material-symbols-outlined" style="font-size:17px;color:var(--u-p);">attach_file</span>
+              <h4>Select Materials</h4>
+              <span class="umat-drawer-count" id="ait-drawer-count">0 selected</span>
+            </div>
+            <div class="umat-drawer-hdr-actions">
+              <button class="umat-drawer-clear-btn" id="ait-drawer-clear" type="button">Clear</button>
+              <button class="umat-drawer-close-btn" id="ait-drawer-close" type="button"><span class="material-symbols-outlined">close</span></button>
+            </div>
+          </div>
+          <div class="umat-drawer-search-wrap">
+            <span class="material-symbols-outlined umat-drawer-search-icon">search</span>
+            <input type="text" id="ait-drawer-search" placeholder="Search materials…">
+          </div>
+          <div class="umat-drawer-cats" id="ait-drawer-cats"></div>
+          <div class="umat-drawer-recent" id="ait-drawer-recent"></div>
+          <div class="umat-drawer-list" id="ait-drawer-list"><div class="umat-drawer-loading"><div class="umat-vw-spinner"></div><span>Loading materials&hellip;</span></div></div>
+          <div class="umat-drawer-foot">
+            <span class="umat-drawer-foot-info">Select materials for AI</span>
+            <button class="umat-drawer-confirm" id="ait-drawer-confirm" type="button"><span class="material-symbols-outlined">check</span> Use Selected</button>
+          </div>
+        </div>
       </div>
       <!-- Floating expand button — appears while the Studio panel is collapsed. -->
       <button class="ait-reopen-studio" id="ait-reopen-studio" type="button" title="Expand Studio" aria-label="Expand Studio">
@@ -174,49 +208,24 @@ JS;
         <button class="ait-ib" id="ait-studio-collapse" type="button" title="Collapse Studio"><span class="material-symbols-outlined">chevron_right</span></button>
       </div>
       <div class="ait-studio-body">
-        <div class="ait-studio-sec"><span class="material-symbols-outlined">auto_fix_high</span>Generate</div>
-        <button class="ait-tool-btn" id="ait-tool-quiz" type="button"><span class="material-symbols-outlined">quiz</span><span><strong>Create Quiz</strong><small>Practice questions from this conversation</small></span></button>
-        <button class="ait-tool-btn" id="ait-tool-fc" type="button"><span class="material-symbols-outlined">style</span><span><strong>Flashcards</strong><small>Spaced-repetition study cards</small></span></button>
-        <button class="ait-tool-btn" id="ait-tool-guide" type="button"><span class="material-symbols-outlined">menu_book</span><span><strong>Study Guide</strong><small>Structured revision notes</small></span></button>
-        <button class="ait-tool-btn" id="ait-tool-summary" type="button"><span class="material-symbols-outlined">summarize</span><span><strong>Summary</strong><small>Key takeaways at a glance</small></span></button>
-        <button class="ait-tool-btn" id="ait-tool-faq" type="button"><span class="material-symbols-outlined">question_answer</span><span><strong>FAQ</strong><small>Common questions with answers</small></span></button>
+        <!-- Action grid: 6 compact tools (2 columns). Report opens the
+             progress overview in a Studio sub-view. -->
+        <div class="ait-tool-grid">
+          <button class="ait-tool-btn" id="ait-tool-quiz" type="button"><span class="material-symbols-outlined">quiz</span><span><strong>Create Quiz</strong></span></button>
+          <button class="ait-tool-btn" id="ait-tool-fc" type="button"><span class="material-symbols-outlined">style</span><span><strong>Flashcards</strong></span></button>
+          <button class="ait-tool-btn" id="ait-tool-guide" type="button"><span class="material-symbols-outlined">menu_book</span><span><strong>Study Guide</strong></span></button>
+          <button class="ait-tool-btn" id="ait-tool-summary" type="button"><span class="material-symbols-outlined">summarize</span><span><strong>Summary</strong></span></button>
+          <button class="ait-tool-btn" id="ait-tool-faq" type="button"><span class="material-symbols-outlined">question_answer</span><span><strong>FAQ</strong></span></button>
+          <button class="ait-tool-btn" id="ait-tool-report" type="button"><span class="material-symbols-outlined">monitoring</span><span><strong>Report</strong></span></button>
+        </div>
 
-        <!-- Studio output list -->
+        <!-- Fine divider: actions above, generated content below. -->
+        <hr class="ait-studio-rule" aria-hidden="true">
+
+        <!-- Generated content only (quizzes, notes, summaries, guides, FAQ) -->
         <div class="ait-studio-outputs" id="ait-studio-outputs"></div>
 
-        <div class="ait-studio-sec"><span class="material-symbols-outlined">workspaces</span>Your Studio</div>
-        <div class="ait-tabs" role="tablist" aria-label="Studio tabs">
-          <button class="ait-tab active" data-gtab="notes" type="button" role="tab">Notes</button>
-          <button class="ait-tab" data-gtab="reports" type="button" role="tab">Reports</button>
-          <button class="ait-tab" data-gtab="files" type="button" role="tab">Files</button>
-        </div>
-        <div class="ait-panes">
-          <div class="ait-pane active" id="ait-pane-notes">
-            <div class="ait-notes-toolbar">
-              <button class="ait-nt-btn-p" id="ait-note-new" type="button"><span class="material-symbols-outlined">add</span>New Note</button>
-              <input class="ait-note-search" id="ait-note-search" type="text" placeholder="Search notes…">
-            </div>
-            <div class="ait-notes-list" id="ait-notes-list"><div class="ait-empty"><span class="material-symbols-outlined">note_add</span>Loading notes…</div></div>
-            <div class="ait-note-editor" id="ait-note-editor" style="display:none;">
-              <div class="ait-note-editor-hdr">
-                <button class="ait-ib" id="ait-note-back" type="button" title="Back"><span class="material-symbols-outlined">arrow_back</span></button>
-                <input class="ait-note-title" id="ait-note-title" type="text" placeholder="Note title">
-                <button class="ait-ib" id="ait-note-pin" type="button" title="Pin note"><span class="material-symbols-outlined">push_pin</span></button>
-                <button class="ait-ib ait-nt-btn danger" id="ait-note-delete" type="button" title="Delete note"><span class="material-symbols-outlined">delete</span></button>
-              </div>
-              <div class="ait-note-readonly" id="ait-note-readonly"></div>
-              <textarea class="ait-note-edit" id="ait-note-edit" placeholder="Write your note…" style="display:none;"></textarea>
-              <div class="ait-note-editor-foot">
-                <button class="ait-nt-btn" id="ait-note-edit-toggle" type="button">Edit</button>
-                <button class="ait-nt-btn-p" id="ait-note-save" type="button">Save</button>
-              </div>
-            </div>
-          </div>
-          <div class="ait-pane" id="ait-pane-reports"><div class="ait-empty"><span class="material-symbols-outlined">monitoring</span>Loading reports…</div></div>
-          <div class="ait-pane" id="ait-pane-files"><div class="ait-empty"><span class="material-symbols-outlined">folder_open</span>Loading files…</div></div>
-        </div>
-
-        <!-- Add note fixed button -->
+        <!-- Add note — centred, floating over the content at the bottom. -->
         <button class="ait-add-note" id="ait-add-note-btn" type="button"><span class="material-symbols-outlined">note_add</span>Add note</button>
       </div>
 
@@ -244,31 +253,32 @@ JS;
   <div class="ait-toast" id="ait-toast"></div>
 </div>
 
-<!-- Attach materials drawer (AI Tutor workspace) -->
-<div class="umat-attach-drawer umat-drawer-enhanced" id="ait-attach-drawer">
-  <div class="umat-drawer-hdr">
-    <div class="umat-drawer-hdr-left">
-      <span class="material-symbols-outlined" style="font-size:17px;color:var(--u-p);">attach_file</span>
-      <h4>Select Materials</h4>
-      <span class="umat-drawer-count" id="ait-drawer-count">0 selected</span>
+<!-- Flashcards generator overlay — centred 970x485 config dialog (opened by
+     the Studio Flashcards action button). Wired by amd/src/ai_tutor.js. -->
+<div class="ait-fc-modal" id="ait-fc-modal" style="display:none;" aria-hidden="true">
+  <div class="ait-fc-backdrop" data-ait-fc-close="1"></div>
+  <div class="ait-fc-dialog" role="dialog" aria-modal="true" aria-label="Generate Flashcards">
+    <div class="ait-fc-hdr">
+      <span class="material-symbols-outlined">style</span>
+      <div class="ait-fc-hdr-txt"><strong>Generate Flashcards</strong><small>AI builds study cards from your course materials — your private deck.</small></div>
+      <button class="ait-ib" id="ait-fc-close" type="button" title="Close"><span class="material-symbols-outlined">close</span></button>
     </div>
-    <div class="umat-drawer-hdr-actions">
-      <button class="umat-drawer-clear-btn" id="ait-drawer-clear" type="button">Clear</button>
-      <button class="umat-drawer-close-btn" id="ait-drawer-close" type="button"><span class="material-symbols-outlined">close</span></button>
+    <div class="ait-fc-body">
+      <div class="ait-fc-sec-lbl">Select materials (first 3 pre-selected)</div>
+      <div class="ait-fc-mats" id="ait-fc-mats"><div class="ait-fc-loading"><span class="material-symbols-outlined">hourglass_empty</span>Loading materials…</div></div>
+      <div class="ait-fc-cfg">
+        <label>Topic label <input type="text" id="ait-fc-topic" placeholder="Optional — e.g. Week 1" maxlength="120"></label>
+        <label>Number of cards <select id="ait-fc-count"><option value="5">5</option><option value="10" selected>10</option><option value="15">15</option><option value="20">20</option><option value="30">30</option></select></label>
+      </div>
+      <div class="ait-fc-msg" id="ait-fc-msg"></div>
     </div>
-  </div>
-  <div class="umat-drawer-search-wrap">
-    <span class="material-symbols-outlined umat-drawer-search-icon">search</span>
-    <input type="text" id="ait-drawer-search" placeholder="Search materials…">
-  </div>
-  <div class="umat-drawer-cats" id="ait-drawer-cats"></div>
-  <div class="umat-drawer-recent" id="ait-drawer-recent"></div>
-  <div class="umat-drawer-list" id="ait-drawer-list"><div class="umat-drawer-loading"><div class="umat-vw-spinner"></div><span>Loading materials&hellip;</span></div></div>
-  <div class="umat-drawer-foot">
-    <span class="umat-drawer-foot-info">Select materials for AI</span>
-    <button class="umat-drawer-confirm" id="ait-drawer-confirm" type="button"><span class="material-symbols-outlined">check</span> Use Selected</button>
+    <div class="ait-fc-foot">
+      <button class="ait-nt-btn" id="ait-fc-cancel" type="button">Cancel</button>
+      <button class="ait-nt-btn-p" id="ait-fc-gen" type="button"><span class="material-symbols-outlined">auto_awesome</span>Generate Flashcards</button>
+    </div>
   </div>
 </div>
+
 HTML;
     }
 
@@ -286,28 +296,25 @@ HTML;
         $moodleSesskey = json_encode(sesskey());
         $jsUD        = $userData;
 
+        // Side nav: Flashcards / My Notes / Sessions were removed — those
+        // workflows now live inside the AI Tutor Studio (generation overlay,
+        // note editor, session history). New Session quick action removed too.
         $tabs = [
             ['id' => 'home',      'icon' => 'home',          'label' => 'Home',      'active' => true],
             ['id' => 'ai-tutor',  'icon' => 'smart_toy',     'label' => 'AI Tutor',  'active' => false],
             ['id' => 'courses',   'icon' => 'menu_book',     'label' => 'My Courses','active' => false],
             ['id' => 'library',   'icon' => 'local_library', 'label' => 'Resource Materials', 'active' => false],
-            ['id' => 'flashcards','icon' => 'style',         'label' => 'Flashcards','active' => false],
-            ['id' => 'my-notes',  'icon' => 'note_add',      'label' => 'My Notes',  'active' => false],
-            ['id' => 'sessions',   'icon' => 'chat_bubble',   'label' => 'Sessions',   'active' => false],
             ['id' => 'report-issue', 'icon' => 'forum',      'label' => 'Student Issues','active' => false, 'badge' => 'responses'],
         ];
-        $sidebar = self::sidebar_html($tabs, 'New Session', 'stu-ws-close', $platformName);
+        $sidebar = self::sidebar_html($tabs, '', 'stu-ws-close', $platformName);
         $sharedJs = self::shared_js('umat-student-ov', 'stu-ws-close');
 
-        // Glassmorphism mobile tab bar (in-overlay)
+        // Glassmorphism mobile tab bar (in-overlay) — mirrors the side nav.
         $stuGlassTabs = [
             ['id' => 'home',     'icon' => 'home',        'label' => 'Home',     'active' => true],
             ['id' => 'ai-tutor', 'icon' => 'smart_toy',   'label' => 'Tutor',    'active' => false],
             ['id' => 'courses',  'icon' => 'menu_book',   'label' => 'Courses',  'active' => false],
             ['id' => 'library',  'icon' => 'local_library','label' => 'Resource Materials', 'active' => false],
-            ['id' => 'flashcards','icon' => 'style',      'label' => 'Cards',    'active' => false],
-            ['id' => 'my-notes', 'icon' => 'note_add',    'label' => 'Notes',    'active' => false],
-            ['id' => 'sessions',   'icon' => 'chat_bubble', 'label' => 'Sessions',  'active' => false],
             ['id' => 'report-issue', 'icon' => 'forum',    'label' => 'Issues',    'active' => false, 'badge' => 'responses'],
         ];
         $stuMobTabs = self::glassmorph_tab_bar($stuGlassTabs, 'sb-tab', 'stu-glass-tabs');
@@ -519,10 +526,6 @@ HTML;
             <button class="umat-qa-btn" data-sb-tab="library" type="button">
               <span class="material-symbols-outlined">local_library</span>
               <div class="umat-qa-btn-text"><strong>Course Library</strong><span>Notes, PDFs &amp; more</span></div>
-            </button>
-            <button class="umat-qa-btn" data-sb-tab="sessions" type="button">
-              <span class="material-symbols-outlined">chat_bubble</span>
-              <div class="umat-qa-btn-text"><strong>Past Sessions</strong><span>Resume previous chats</span></div>
             </button>
           </div>
         </div>
@@ -787,30 +790,23 @@ HTML;
           </button>' : '';
         $rbViewHtml = $enableRb ? '
         <!-- Private Bank view (hidden initially) -->
-        <div id="lec-private-bank-view" style="display:none;flex-direction:column;flex:1;min-height:0;">
-          <!-- Toolbar -->
-          <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--u-olv);flex-wrap:wrap;">
+        <div id="lec-private-bank-view" style="display:none;flex-direction:column;flex:0 0 auto;min-height:0;overflow:visible;">
+          <!-- Toolbar (compact: upload + new folder only) -->
+          <div class="lcp-rb-toolbar" style="padding:8px 12px;">
             <span style="font-size:12px;font-weight:600;color:var(--u-ons);margin-right:4px;">Private Resources</span>
-            <button type="button" class="rb-action-btn umat-btn-xs-p" id="rb-upload-btn" title="Upload files">
-              <span class="material-symbols-outlined" style="font-size:14px;">upload</span>Upload
+            <button type="button" class="lcp-rb-icon-btn" id="rb-upload-btn" title="Upload files">
+              <span class="material-symbols-outlined" style="font-size:14px;">upload</span>
             </button>
-            <button type="button" class="rb-action-btn" id="rb-new-folder-btn" title="Create folder" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--u-olv);border-radius:var(--u-rp);font-size:11px;font-weight:500;color:var(--u-ons);background:var(--u-sflo);cursor:pointer;font-family:inherit;">
-              <span class="material-symbols-outlined" style="font-size:14px;">create_new_folder</span>Folder
-            </button>
-            <div style="flex:1;"></div>
-            <button type="button" class="rb-batch-btn" id="rb-delete-btn" disabled style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--u-ter);border-radius:var(--u-rp);font-size:11px;font-weight:600;color:var(--u-ter);background:var(--u-sflo);cursor:pointer;font-family:inherit;opacity:.4;">
-              <span class="material-symbols-outlined" style="font-size:14px;">delete</span>Delete
-            </button>
-            <button type="button" class="rb-batch-btn" id="rb-push-btn" disabled style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--u-p);border-radius:var(--u-rp);font-size:11px;font-weight:600;color:var(--u-p);background:var(--u-sflo);cursor:pointer;font-family:inherit;opacity:.4;">
-              <span class="material-symbols-outlined" style="font-size:14px;">publish</span>Push to Course
+            <button type="button" class="lcp-rb-icon-btn" id="rb-new-folder-btn" title="Create folder">
+              <span class="material-symbols-outlined" style="font-size:14px;">create_new_folder</span>
             </button>
           </div>
           <!-- Breadcrumb -->
-          <div id="rb-breadcrumb" style="display:flex;align-items:center;gap:4px;padding:6px 12px;font-size:11px;color:var(--u-ol);border-bottom:1px solid var(--u-olv);">
+          <div id="rb-breadcrumb" class="lcp-rb-bread" style="padding:6px 12px;">
             <span style="cursor:pointer;color:var(--u-p);font-weight:600;" data-rb-root="1">My Resources</span>
           </div>
           <!-- Files area -->
-          <div id="rb-content" style="flex:1;overflow-y:auto;padding:8px 12px;">
+          <div id="rb-content" class="lcp-rb-list" style="flex:0 0 auto;overflow:visible;padding:8px 12px;">
             <div id="rb-loading" style="text-align:center;padding:40px 0;color:var(--u-ol);font-size:12px;">Loading…</div>
           </div>
           <!-- Hidden file input -->
@@ -1137,13 +1133,6 @@ HTML;
           <button class="lcp-rb-icon-btn" id="lcp-rb-folder" type="button" title="New folder">
             <span class="material-symbols-outlined">create_new_folder</span>
           </button>
-          <div style="flex:1;"></div>
-          <button class="lcp-rb-icon-btn lcp-rb-del" id="lcp-rb-del" type="button" title="Delete selected" style="display:none;">
-            <span class="material-symbols-outlined">delete</span>
-          </button>
-          <button class="lcp-rb-icon-btn lcp-rb-push" id="lcp-rb-push" type="button" title="Push to course" style="display:none;">
-            <span class="material-symbols-outlined">publish</span>
-          </button>
         </div>
         <!-- Breadcrumb -->
         <div class="lcp-rb-bread" id="lcp-rb-bread">
@@ -1304,7 +1293,7 @@ HTML;
       </div>
 
       <!-- LIBRARY (LECTURER) -->
-      <div class="umat-tab-pane" id="lec-library" style="position:relative;min-height:0;">
+      <div class="umat-tab-pane" id="lec-library" style="position:relative;min-height:0;overflow-y:auto;">
         <style>
           .umat-lib-toggle{background:var(--u-sfl);color:var(--u-ol);font-weight:600;transition:all .15s;}
           .umat-lib-toggle.active{background:var(--u-p);color:#fff;font-weight:700;}
@@ -1317,7 +1306,7 @@ HTML;
           {$rbToggleBtn}
         </div>
         <!-- Course Materials view (default) — fills remaining height -->
-        <div id="lec-lib-course-view" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+        <div id="lec-lib-course-view" style="display:flex;flex-direction:column;flex:0 0 auto;min-height:0;overflow:visible;">
           <!-- Content header: hidden until a course is selected -->
           <div class="umat-content-hdr" id="lec-lib-hdr" style="display:none;">
             <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>local_library</span> Library</h2>
@@ -1327,7 +1316,7 @@ HTML;
             </div>
           </div>
           <!-- Course selector (shown when multiple courses, hidden after selection) -->
-          <div id="lec-lib-cs-inline" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;">
+          <div id="lec-lib-cs-inline" style="display:flex;flex-direction:column;flex:0 0 auto;min-height:0;overflow:visible;">
             <div class="umat-content-hdr">
               <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>local_library</span> Resource Materials</h2>
             </div>
@@ -1378,7 +1367,7 @@ HTML;
             </div>
           </div>
           <!-- Lecture Recordings section — hidden until course is selected -->
-          <div id="lec-lib-recordings-wrap" style="display:none;flex:1;overflow-y:auto;min-height:0;">
+          <div id="lec-lib-recordings-wrap" style="display:none;flex:0 0 auto;overflow:visible;min-height:0;">
             <div class="umat-lib-section">
               <div class="umat-lib-section-hdr">
                 <span class="material-symbols-outlined" style="font-size:18px;color:var(--u-p);">play_circle</span>
@@ -1390,7 +1379,7 @@ HTML;
             </div>
           </div>
           <!-- Materials grid — hidden until course is selected -->
-          <div class="umat-lib-grid" id="lec-lib-grid" style="flex:1;overflow-y:auto;min-height:0;display:none;">
+          <div class="umat-lib-grid" id="lec-lib-grid" style="flex:0 0 auto;overflow:visible;min-height:0;display:none;">
             <div class="umat-lib-picker">
               <span class="material-symbols-outlined">folder_open</span>
               <p>Select a course to browse its library materials.</p>
@@ -1904,7 +1893,7 @@ function loadLcpLibraryPane(){
           if(privateView){privateView.style.display='none';}
         } else {
           courseView.style.display='none';
-          if(privateView){privateView.style.display='';privateView.style.flex='1';lcpRbLoad(null);}
+          if(privateView){privateView.style.display='';privateView.style.flex='1';_rbAttach('lcp-rb-list','lcp-rb-bread');lcpRbLoad(null);}
         }
       });
     });
@@ -1951,13 +1940,137 @@ function loadLcpLibraryPane(){
      PRIVATE BANK — compact file manager
      ══════════════════════════════════════════════════════ */
   if(!privateView)return;  /* RB not enabled */
-  var _rbTrail=[],_rbSelected={},_rbCurFolder=null;
+  var _rbTrail=[],_rbCurFolder=null;
   var rbList=document.getElementById('lcp-rb-list');
   var rbBread=document.getElementById('lcp-rb-bread');
-  var rbDelBtn=document.getElementById('lcp-rb-del');
-  var rbPushBtn=document.getElementById('lcp-rb-push');
+  var _rbPdfLoaded=false;
+
+  /* ── Re-point the RB render targets (compact panel vs full-overlay pane) ── */
+  function _rbAttach(listId,breadId){
+    var nl=document.getElementById(listId),nb=document.getElementById(breadId);
+    if(nl)rbList=nl;
+    if(nb)rbBread=nb;
+  }
 
   function _rbAjax(m,a,d,f){ajax('local_umat_ai_resource_bank_'+m,a,function(r){if(d)d(r);},function(e){if(f)f(e);else console.error('[lcp-rb]',m,e);});}
+
+  /* ── Resolve base URL for pptx_render.php / doc_preview.php ── */
+  function _rbBaseUrl(fileUrl){
+    try{var a=document.createElement('a');a.href=fileUrl;var pi=a.pathname.indexOf('/pluginfile.php');return a.origin+(pi>=0?a.pathname.substring(0,pi):'');}catch(e){return M.cfg.wwwroot;}
+  }
+
+  /* ── Load pdf.js once ── */
+  function _rbLoadPdfJs(cb){
+    if(_rbPdfLoaded||window.pdfjsLib){_rbPdfLoaded=true;cb();return;}
+    var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=function(){window.pdfjsLib&&(pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js');_rbPdfLoaded=true;cb();};
+    s.onerror=function(){cb();};document.head.appendChild(s);
+  }
+
+  /* ── Generate actual content thumbnail for a row ── */
+  function _rbGenThumb(row){
+    var mime=(row.dataset.rbMime||'').toLowerCase();
+    var url=row.dataset.rbFileurl;
+    var name=row.dataset.rbName||'';
+    var thCell=row.querySelector('.lcp-rb-row-th');
+    if(!thCell||!url||row.dataset.rbFolder==='1')return;
+    /* Skip when the JS-side material_thumb image already populated this cell. */
+    if(thCell.querySelector('.rb-thumb-img'))return;
+
+    /* Image — direct <img> */
+    if(mime.indexOf('image')!==-1){
+      var img=document.createElement('img');img.className='lcp-rb-thumb-img';img.loading='lazy';
+      img.src=url;thCell.innerHTML='';thCell.appendChild(img);return;
+    }
+    /* Video — seek frame */
+    if(mime.indexOf('video')!==-1){
+      var v=document.createElement('video');v.src=url;v.preload='metadata';v.muted=true;
+      v.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:6px;';
+      v.addEventListener('loadedmetadata',function(){v.currentTime=Math.min(2,v.duration*0.1);});
+      v.addEventListener('seeked',function(){thCell.innerHTML='';thCell.appendChild(v);});
+      v.load();return;
+    }
+    /* PDF — render page 1 via pdf.js */
+    if(mime.indexOf('pdf')!==-1||name.match(/\.pdf$/i)){
+      thCell.innerHTML='<div class="lcp-rb-thumb-spinner"></div>';
+      _rbLoadPdfJs(function(){
+        if(!window.pdfjsLib){thCell.innerHTML='<span class="material-symbols-outlined" style="font-size:22px;color:#dc2626;">picture_as_pdf</span>';return;}
+        pdfjsLib.getDocument(url).promise.then(function(p){return p.getPage(1);}).then(function(pg){
+          var vp=pg.getViewport({scale:1});var sc=Math.min(thCell.offsetWidth/vp.width,thCell.offsetHeight/vp.height)||1;
+          var vp2=pg.getViewport({scale:sc});var c=document.createElement('canvas');
+          c.width=vp2.width;c.height=vp2.height;c.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:6px;';
+          thCell.innerHTML='';thCell.appendChild(c);
+          pg.render({canvasContext:c.getContext('2d'),viewport:vp2});
+        }).catch(function(){thCell.innerHTML='<span class="material-symbols-outlined" style="font-size:22px;color:#dc2626;">picture_as_pdf</span>';});
+      });return;
+    }
+    /* PPTX — server-side slide render */
+    if(mime.indexOf('presentation')!==-1||mime.indexOf('powerpoint')!==-1||name.match(/\.pptx?$/i)){
+      var eu;try{eu=encodeURIComponent(decodeURIComponent(url));}catch(e){eu=encodeURIComponent(url);}
+      var base=_rbBaseUrl(url);
+      var img=document.createElement('img');img.className='lcp-rb-thumb-img';img.loading='lazy';
+      img.onerror=function(){thCell.innerHTML='<span class="material-symbols-outlined" style="font-size:22px;color:#ea580c;">slideshow</span>';};
+      img.src=base+'/local/umat_ai/pptx_render.php?action=slide&url='+eu+'&slide=1';
+      thCell.innerHTML='';thCell.appendChild(img);return;
+    }
+    /* DOCX — server-side text preview */
+    if(mime.indexOf('word')!==-1||mime.indexOf('document')!==-1||name.match(/\.docx?$/i)){
+      var eu2;try{eu2=encodeURIComponent(decodeURIComponent(url));}catch(e2){eu2=encodeURIComponent(url);}
+      var base2=_rbBaseUrl(url);
+      thCell.innerHTML='<div class="lcp-rb-thumb-spinner"></div>';
+      fetch(base2+'/local/umat_ai/doc_preview.php?url='+eu2+'&type=docx').then(function(r){return r.json();}).then(function(d){
+        var dv=document.createElement('div');dv.className='lcp-rb-thumb-doc';
+        if(d.lines&&d.lines.length){d.lines.slice(0,5).forEach(function(l){
+          var dl=document.createElement('div');dl.className='lcp-rb-thumb-doc-line';
+          var txt=typeof l==='string'?l:(Array.isArray(l)?l.filter(Boolean).join(' '):'');
+          dl.textContent=txt.substring(0,50)||'\u00a0';dv.appendChild(dl);
+        });}else{for(var i=0;i<4;i++){var dl=document.createElement('div');dl.className='lcp-rb-thumb-doc-line';dv.appendChild(dl);}}
+        thCell.innerHTML='';thCell.appendChild(dv);
+      }).catch(function(){thCell.innerHTML='<span class="material-symbols-outlined" style="font-size:22px;color:#2563eb;">description</span>';});
+      return;
+    }
+    /* XLSX — server-side text preview */
+    if(mime.indexOf('spreadsheet')!==-1||mime.indexOf('excel')!==-1||name.match(/\.xlsx?$/i)){
+      var eu3;try{eu3=encodeURIComponent(decodeURIComponent(url));}catch(e3){eu3=encodeURIComponent(url);}
+      var base3=_rbBaseUrl(url);
+      thCell.innerHTML='<div class="lcp-rb-thumb-spinner"></div>';
+      fetch(base3+'/local/umat_ai/doc_preview.php?url='+eu3+'&type=xlsx').then(function(r){return r.json();}).then(function(d){
+        var dv=document.createElement('div');dv.className='lcp-rb-thumb-doc';
+        if(d.lines&&d.lines.length){d.lines.slice(0,5).forEach(function(l){
+          var dl=document.createElement('div');dl.className='lcp-rb-thumb-doc-line';
+          var txt=typeof l==='string'?l:(Array.isArray(l)?l.filter(Boolean).join(' | '):'');
+          dl.textContent=txt.substring(0,50)||'\u00a0';dv.appendChild(dl);
+        });}else{for(var i=0;i<4;i++){var dl=document.createElement('div');dl.className='lcp-rb-thumb-doc-line';dv.appendChild(dl);}}
+        thCell.innerHTML='';thCell.appendChild(dv);
+      }).catch(function(){thCell.innerHTML='<span class="material-symbols-outlined" style="font-size:22px;color:#16a34a;">table_chart</span>';});
+      return;
+    }
+    /* Audio — waveform icon */
+    if(mime.indexOf('audio')!==-1){
+      thCell.innerHTML='<span class="material-symbols-outlined" style="font-size:22px;color:#0891b2;">headphones</span>';return;
+    }
+    /* Fallback — generic icon */
+    var ext=(name.split('.').pop()||'').toUpperCase().substring(0,5);
+    thCell.innerHTML='<span class="material-symbols-outlined" style="font-size:22px;color:#6366f1;">'+_lcpIcon(mime)+'</span>'+(ext?'<span class="lcp-rb-row-ext">'+ext+'</span>':'');
+  }
+
+  /* ── Batch-load thumbnails for all rows ── */
+  function _rbLoadThumbs(container){
+    container.querySelectorAll('.lcp-rb-row[data-rb-fileurl]').forEach(function(row){_rbGenThumb(row);});
+  }
+
+  /* ── Viewer type from mime ── */
+  function _rbViewerType(mime,name){
+    var m=(mime||'').toLowerCase();var n=(name||'').toLowerCase();
+    if(m.indexOf('video')!==-1)return 'video';
+    if(m.indexOf('audio')!==-1)return 'audio';
+    if(m.indexOf('image')!==-1)return 'image';
+    if(m.indexOf('pdf')!==-1||n.endsWith('.pdf'))return 'pdf';
+    if(m.indexOf('presentation')!==-1||n.endsWith('.pptx')||n.endsWith('.ppt'))return 'pptx';
+    if(m.indexOf('word')!==-1||m.indexOf('document')!==-1||n.endsWith('.docx')||n.endsWith('.doc'))return 'docx';
+    if(m.indexOf('spreadsheet')!==-1||m.indexOf('excel')!==-1||n.endsWith('.xlsx')||n.endsWith('.xls'))return 'xlsx';
+    return 'pdf';
+  }
 
   /* Breadcrumb */
   function _rbRenderBread(){
@@ -1978,7 +2091,7 @@ function loadLcpLibraryPane(){
 
   /* Load folder contents */
   function lcpRbLoad(parentId){
-    _rbCurFolder=parentId;_rbSelected={};_rbUpdateBatchBtns();_rbRenderBread();
+    _rbCurFolder=parentId;_rbRenderBread();
     rbList.innerHTML='<div class="lcp-pane-loading"><span class="material-symbols-outlined" style="font-size:18px;animation:lcpSpin 1s linear infinite;">refresh</span>Loading…</div>';
     _rbAjax('list',{parentid:parentId||0},function(r){
       var items=r.items||[];
@@ -1989,21 +2102,41 @@ function loadLcpLibraryPane(){
       /* Sort: folders first, then by name */
       items.sort(function(a,b){if(a.isfolder&&!b.isfolder)return -1;if(!a.isfolder&&b.isfolder)return 1;return (a.name||'').localeCompare(b.name||'');});
       rbList.innerHTML=items.map(function(it){
-        var icon=it.isfolder?'folder':(_lcpIcon(it.mimetype||''));
-        var ext=it.isfolder?'':((it.name||'').split('.').pop().toUpperCase().substring(0,5));
-        var sizeLabel=it.isfolder?(it.itemcount||''):_fmtSize(it.filesize);
+        var sizeLabel=_fmtSize(it.filesize);
         var timeLabel=_timeAgo(it.timecreated);
+        var mime=(it.mimetype||'').toLowerCase();
+        /* Determine thumbnail cell content */
+        var thContent='';
+        if(it.isfolder){
+          thContent='<div class="lcp-rb-row-th"><span class="material-symbols-outlined" style="font-size:22px;color:var(--u-p);">folder</span></div>';
+        } else if(mime.indexOf('image')!==-1){
+          thContent='<div class="lcp-rb-row-th"></div>'; /* will load <img> */
+        } else if(mime.indexOf('video')!==-1){
+          thContent='<div class="lcp-rb-row-th"></div>'; /* will load <video> */
+        } else if(mime.indexOf('pdf')!==-1||(it.name||'').match(/\.pdf$/i)){
+          thContent='<div class="lcp-rb-row-th"></div>'; /* will render via pdf.js */
+        } else if(mime.indexOf('presentation')!==-1||mime.indexOf('powerpoint')!==-1||(it.name||'').match(/\.pptx?$/i)){
+          thContent='<div class="lcp-rb-row-th"></div>'; /* will load slide image */
+        } else if(mime.indexOf('word')!==-1||mime.indexOf('document')!==-1||(it.name||'').match(/\.docx?$/i)){
+          thContent='<div class="lcp-rb-row-th"></div>'; /* will load text preview */
+        } else if(mime.indexOf('spreadsheet')!==-1||mime.indexOf('excel')!==-1||(it.name||'').match(/\.xlsx?$/i)){
+          thContent='<div class="lcp-rb-row-th"></div>'; /* will load text preview */
+        } else if(mime.indexOf('audio')!==-1){
+          thContent='<div class="lcp-rb-row-th"><span class="material-symbols-outlined" style="font-size:22px;color:#0891b2;">headphones</span></div>';
+        } else {
+          var ext=(it.name||'').split('.').pop().toUpperCase().substring(0,5);
+          thContent='<div class="lcp-rb-row-th"><span class="material-symbols-outlined" style="font-size:22px;color:#6366f1;">'+_lcpIcon(mime)+'</span>'+(ext?'<span class="lcp-rb-row-ext">'+ext+'</span>':'')+'</div>';
+        }
         return '<div class="lcp-rb-row" data-rb-id="'+it.id+'" data-rb-folder="'+(it.isfolder?1:0)+'" data-rb-name="'+esc(it.name)+'" data-rb-fileurl="'+esc(it.fileurl||'')+'" data-rb-mime="'+esc(it.mimetype||'')+'">'+
-          '<div class="lcp-rb-row-ico '+(it.isfolder?'lcp-rb-row-ico-folder':'lcp-rb-row-ico-file')+'">'+
-            '<span class="material-symbols-outlined">'+icon+'</span>'+
-            (ext?'<span class="lcp-rb-row-ext">'+ext+'</span>':'')+
-          '</div>'+
+          thContent+
           '<div class="lcp-rb-row-info"><div class="lcp-rb-row-name">'+esc(it.name)+'</div>'+
-          '<div class="lcp-rb-row-meta">'+(it.isfolder?(sizeLabel?'Folder · '+sizeLabel+' items':'Folder'):(sizeLabel?' · '+sizeLabel:'')+(timeLabel?' · '+timeLabel:''))+'</div></div>'+
-          '<span class="material-symbols-outlined lcp-rb-row-more" data-rb-id="'+it.id+'" data-rb-name="'+esc(it.name)+'" data-rb-folder="'+(it.isfolder?1:0)+'">more_vert</span>'+
+          '<div class="lcp-rb-row-meta">'+(it.isfolder?'Folder':(sizeLabel?sizeLabel:'')+(timeLabel?' · '+timeLabel:''))+'</div></div>'+
+          '<span class="material-symbols-outlined lcp-rb-row-more" data-rb-id="'+it.id+'" data-rb-name="'+esc(it.name)+'" data-rb-folder="'+(it.isfolder?1:0)+'" data-rb-fileurl="'+esc(it.fileurl||'')+'" data-rb-mime="'+esc(it.mimetype||'')+'">more_vert</span>'+
         '</div>';
       }).join('');
-      /* Row click: open folder or download file */
+      /* Generate actual content thumbnails for non-folder rows */
+      _rbLoadThumbs(rbList);
+      /* Row click: open folder or view file */
       rbList.querySelectorAll('.lcp-rb-row').forEach(function(el){
         el.addEventListener('click',function(e){
           if(e.target.closest('.lcp-rb-row-more'))return;
@@ -2014,7 +2147,7 @@ function loadLcpLibraryPane(){
           } else {
             var url=this.dataset.rbFileurl;var name=this.dataset.rbName;var mime=this.dataset.rbMime||'';
             if(url&&window.umatMaterialViewer){
-              var vt='pdf';if(mime.indexOf('video')!==-1)vt='video';else if(mime.indexOf('image')!==-1)vt='image';else if(mime.indexOf('audio')!==-1)vt='audio';
+              var vt=_rbViewerType(mime,name);
               window.umatMaterialViewer.open(vt,{url:url,name:name,downloadUrl:url});
             } else if(url){window.open(url,'_blank');}
           }
@@ -2047,7 +2180,7 @@ function loadLcpLibraryPane(){
         var act=item.dataset.act;menu.remove();
         if(act==='rename')_rbPromptRename(id,name);
         else if(act==='delete')_rbConfirmDelete(id,name);
-        else if(act==='push')_rbConfirmPush([id]);
+        else if(act==='push')_rbShowPushPicker([id]);
       });
     });
     setTimeout(function(){
@@ -2055,14 +2188,7 @@ function loadLcpLibraryPane(){
     },0);
   }
 
-  /* Batch selection update */
-  function _rbUpdateBatchBtns(){
-    var count=Object.keys(_rbSelected).length;
-    if(rbDelBtn){rbDelBtn.style.display=count>0?'':'none';}
-    if(rbPushBtn){rbPushBtn.style.display=count>0?'':'none';}
-  }
-
-  /* Rename prompt — use simple inline prompt */
+  /* Rename prompt */
   function _rbPromptRename(id,name){
     var newName=prompt('Rename:',name);
     if(!newName||newName===name)return;
@@ -2075,20 +2201,40 @@ function loadLcpLibraryPane(){
     _rbAjax('delete',{itemids:[id]},function(){lcpRbLoad(_rbCurFolder);});
   }
 
-  /* Push to course — prompt with course list */
-  function _rbConfirmPush(ids){
+  /* Push to course — picker using teaching courses API */
+  function _rbShowPushPicker(ids){
     if(!ids||!ids.length)return;
-    var cs=(UD&&UD.courses)||[];
-    if(!cs.length){alert('No courses available.');return;}
-    var names=cs.map(function(c,i){return (i+1)+'. '+c.fullname;}).join('\\n');
-    var choice=prompt('Push to which course? Enter number:\\n\\n'+names);
-    if(!choice)return;
-    var idx=parseInt(choice)-1;
-    if(idx<0||idx>=cs.length){alert('Invalid selection.');return;}
-    var cid=cs[idx].id;
-    _rbAjax('push',{itemids:ids,courseid:cid},function(){
-      alert('Pushed to '+cs[idx].fullname);
-      _rbSelected={};_rbUpdateBatchBtns();
+    _rbAjax('teaching_courses',{},function(r){
+      var courses=r.courses||[];
+      if(!courses.length){alert('No courses available to push to.');return;}
+      var ov=document.createElement('div');
+      ov.className='umat-cs-overlay';ov.style.display='flex';
+      ov.innerHTML='<div class="umat-cs-modal" style="max-width:320px;">'+
+        '<div class="umat-cs-modal-hdr"><h3><span class="material-symbols-outlined">publish</span>Push to Course</h3>'+
+        '<button class="umat-cs-close" type="button"><span class="material-symbols-outlined">close</span></button></div>'+
+        '<div class="umat-cs-list" style="padding:8px 0;">'+
+        courses.map(function(c){
+          return '<div class="umat-cs-item" data-cid="'+c.id+'" style="padding:10px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--u-olv);font-size:12px;">'+
+            '<span class="material-symbols-outlined" style="font-size:18px;color:var(--u-p);">school</span>'+
+            '<div><div style="font-weight:600;color:var(--u-ons);">'+esc(c.fullname)+'</div>'+
+            '<div style="font-size:10px;color:var(--u-ol);">'+esc(c.shortname)+'</div></div></div>';
+        }).join('')+'</div></div>';
+      document.body.appendChild(ov);
+      ov.querySelector('.umat-cs-close').addEventListener('click',function(){ov.remove();});
+      ov.querySelectorAll('.umat-cs-item').forEach(function(item){
+        item.addEventListener('click',function(){
+          var cid=parseInt(this.dataset.cid);var cname=this.textContent.trim();
+          ov.remove();
+          _rbAjax('push',{itemids:ids,courseid:cid},function(){
+            var toast=document.createElement('div');
+            toast.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--u-p);color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;z-index:99999;animation:lcpRbCtxIn .2s ease;';
+            toast.textContent='Pushed to '+cname;
+            document.body.appendChild(toast);setTimeout(function(){toast.remove();},2000);
+            lcpRbLoad(_rbCurFolder);
+          });
+        });
+      });
+      ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
     });
   }
 
@@ -2100,10 +2246,11 @@ function loadLcpLibraryPane(){
       fi.addEventListener('change',function(){
         if(!this.files.length)return;
         var files=Array.from(this.files);var total=files.length,done=0;
-        rbList.innerHTML='<div class="lcp-pane-loading"><span class="material-symbols-outlined" style="font-size:18px;animation:lcpSpin 1s linear infinite;">cloud_upload</span>Uploading…</div>';
+        rbList.innerHTML='<div class="lcp-pane-loading"><span class="material-symbols-outlined" style="font-size:18px;animation:lcpSpin 1s linear infinite;">cloud_upload</span>Uploading '+total+' file'+(total>1?'s':'')+'…</div>';
         files.forEach(function(file){
           var fd=new FormData();fd.append('file',file);fd.append('parentid',_rbCurFolder||0);fd.append('sesskey',moodleSesskey);
           var xhr=new XMLHttpRequest();
+          xhr.open('POST',M.cfg.wwwroot+'/local/umat_ai/resource_upload.php',true);
           xhr.onload=function(){done++;if(done>=total){lcpRbLoad(_rbCurFolder);}};
           xhr.onerror=function(){done++;if(done>=total){lcpRbLoad(_rbCurFolder);}};
           xhr.send(fd);
@@ -2124,23 +2271,103 @@ function loadLcpLibraryPane(){
     });
   }
 
-  /* ── Batch delete ── */
-  if(rbDelBtn){
-    rbDelBtn.addEventListener('click',function(){
-      var ids=Object.keys(_rbSelected).map(Number);
-      if(!ids.length||!confirm('Delete '+ids.length+' item(s)? This cannot be undone.'))return;
-      _rbAjax('delete',{itemids:ids},function(){lcpRbLoad(_rbCurFolder);});
+  /* ── Full-overlay Library tab: Course Materials / Private Bank toggle ── */
+  var lecCourseView=document.getElementById('lec-lib-course-view');
+  var lecPrivateView=document.getElementById('lec-private-bank-view');
+  var libToggles=document.querySelectorAll('#lec-library .umat-lib-toggle');
+  libToggles.forEach(function(btn){
+    btn.addEventListener('click',function(){
+      libToggles.forEach(function(b){b.classList.toggle('active',b===btn);});
+      if(btn.dataset.libview==='private'){
+        if(lecCourseView)lecCourseView.style.display='none';
+        if(lecPrivateView){
+          lecPrivateView.style.display='flex';
+          _rbAttach('rb-content','rb-breadcrumb');
+          lcpRbLoad(_rbCurFolder);
+        }
+      } else {
+        if(lecPrivateView)lecPrivateView.style.display='none';
+        if(lecCourseView){
+          lecCourseView.style.display='flex';
+          if(lecLibCourseId)selectLibCourse(lecLibCourseId);else openLecLibPicker();
+        }
+      }
+    });
+  });
+
+  /* ── Full-overlay Private Bank: upload + new folder buttons ── */
+  var rbUpBtn=document.getElementById('rb-upload-btn');
+  var rbFileInput=document.getElementById('rb-file-input');
+  if(rbUpBtn&&rbFileInput){
+    rbUpBtn.addEventListener('click',function(){rbFileInput.value='';rbFileInput.click();});
+    rbFileInput.addEventListener('change',function(){
+      if(!this.files.length)return;
+      var files=Array.from(this.files);var total=files.length,done=0;
+      rbList.innerHTML='<div class="lcp-pane-loading"><span class="material-symbols-outlined" style="font-size:18px;animation:lcpSpin 1s linear infinite;">cloud_upload</span>Uploading '+total+' file'+(total>1?'s':'')+'…</div>';
+      files.forEach(function(file){
+        var fd=new FormData();fd.append('file',file);fd.append('parentid',_rbCurFolder||0);fd.append('sesskey',moodleSesskey);
+        var xhr=new XMLHttpRequest();
+        xhr.open('POST',M.cfg.wwwroot+'/local/umat_ai/resource_upload.php',true);
+        xhr.onload=function(){done++;if(done>=total)lcpRbLoad(_rbCurFolder);};
+        xhr.onerror=function(){done++;if(done>=total)lcpRbLoad(_rbCurFolder);};
+        xhr.send(fd);
+      });
     });
   }
-  /* ── Batch push ── */
-  if(rbPushBtn){
-    rbPushBtn.addEventListener('click',function(){
-      var ids=Object.keys(_rbSelected).map(Number);_rbConfirmPush(ids);
+  var rbNewFolderBtn=document.getElementById('rb-new-folder-btn');
+  if(rbNewFolderBtn){
+    rbNewFolderBtn.addEventListener('click',function(){
+      var name=prompt('Folder name:');
+      if(!name)return;
+      _rbAjax('create_folder',{parentid:_rbCurFolder||0,name:name},function(){lcpRbLoad(_rbCurFolder);});
     });
   }
+
   /* Expose for external access */
   window._lcpRbLoad=lcpRbLoad;
+  window._lcpRbCur=function(){return _rbCurFolder;};
 }
+
+/* ── RB drag & drop: drop OS files onto a folder row to upload into it ── */
+(function(){
+  var curRow=null;
+  function _hasFiles(e){return e.dataTransfer&&e.dataTransfer.types&&e.dataTransfer.types.indexOf('Files')!==-1;}
+  function _dropClear(){if(curRow){curRow.classList.remove('lcp-rb-drop-target');curRow=null;}}
+  function _dropHighlight(r){_dropClear();if(r&&r.dataset&&r.dataset.rbFolder==='1'){curRow=r;r.classList.add('lcp-rb-drop-target');}}
+  function _dropRow(e){return e.target&&e.target.closest?e.target.closest('.lcp-rb-row[data-rb-folder="1"]'):null;}
+  document.addEventListener('dragenter',function(e){if(_hasFiles(e))_dropHighlight(_dropRow(e));},true);
+  document.addEventListener('dragover',function(e){
+    if(!_hasFiles(e))return;
+    e.preventDefault();
+    if(e.dataTransfer)e.dataTransfer.dropEffect='copy';
+    _dropHighlight(_dropRow(e));
+  },false);
+  document.addEventListener('dragleave',function(e){
+    if(!e.target||!e.target.closest)return;
+    if(!e.target.closest('.lcp-rb-row[data-rb-folder="1"]')||(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest('.lcp-rb-row[data-rb-folder="1"]')))_dropClear();
+  },true);
+  document.addEventListener('drop',function(e){
+    if(!_hasFiles(e))return;
+    e.preventDefault();_dropClear();
+    var files=Array.from(e.dataTransfer.files||[]);
+    if(!files.length)return;
+    var row=_dropRow(e);
+    var parentId=row?parseInt(row.dataset.rbId):(window._lcpRbCur?window._lcpRbCur():0)||0;
+    var listEl=(e.target&&e.target.closest?e.target.closest('.lcp-rb-list'):null)||(row?row.closest('.lcp-rb-list'):null);
+    var targetName=row?row.dataset.rbName:'this folder';
+    if(listEl)listEl.innerHTML='<div class="lcp-pane-loading"><span class="material-symbols-outlined" style="font-size:18px;animation:lcpSpin 1s linear infinite;">cloud_upload</span>Uploading to '+esc(targetName)+'…</div>';
+    var total=files.length,done=0;
+    files.forEach(function(file){
+      var fd=new FormData();fd.append('file',file);fd.append('parentid',parentId);fd.append('sesskey',moodleSesskey);
+      var xhr=new XMLHttpRequest();
+      xhr.open('POST',M.cfg.wwwroot+'/local/umat_ai/resource_upload.php',true);
+      xhr.onload=function(){done++;if(done>=total&&window._lcpRbLoad)window._lcpRbLoad(window._lcpRbCur?window._lcpRbCur():parentId);};
+      xhr.onerror=function(){done++;if(done>=total&&window._lcpRbLoad)window._lcpRbLoad(window._lcpRbCur?window._lcpRbCur():parentId);};
+      xhr.send(fd);
+    });
+  },false);
+})();
+
 function loadLcpSessionsPane(){
   var body=document.getElementById('lcp-sess-body');
   function _timeAgo(ts){if(!ts)return '';var diff=Date.now()/1000-ts;var m=Math.floor(diff/60);if(m<1)return 'Just now';if(m<60)return m+'m ago';var h=Math.floor(m/60);if(h<24)return h+'h ago';var dd=Math.floor(h/24);return dd+'d ago';}

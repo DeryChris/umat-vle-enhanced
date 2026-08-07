@@ -1,10 +1,11 @@
 # ============================================================
 # POST /api/v1/flashcards/generate — AI flashcard generation (F3)
 #
-# Lecturer-only: generates spaced-repetition study cards (front/back/topic)
-# strictly grounded in the indexed chunks of the selected materials.
-# Moodle persists the cards with status=pending and drives the SM-2 review
-# loop itself (see local_umat_ai classes/external/flashcards.php).
+# Self-service: any enrolled user (student or lecturer) generates
+# spaced-repetition study cards (front/back/topic) strictly grounded in
+# the indexed chunks of the selected course materials.
+# Moodle persists the cards (private per-user deck) and drives the SM-2
+# review loop itself (see local_umat_ai classes/external/flashcards.php).
 # ============================================================
 
 import json
@@ -195,9 +196,12 @@ async def generate_flashcards(
     request: FlashcardGenRequest,
     _ = Depends(verify_token),
 ):
-    """Generate flashcards from indexed material chunks (lecturer only)."""
-    if (request.role or "student").lower() != "lecturer":
-        raise HTTPException(status_code=403, detail="Flashcard generation is lecturer-only.")
+    """Generate flashcards from indexed material chunks (self-service for enrolled users)."""
+    # The `role` field is informational (kept for audit logging); access control
+    # is enforced in Moodle (enrolled user + chatwithai capability). Any caller
+    # holding the service token may generate cards for a course they are enrolled in.
+    if (request.role or "student").lower() not in ("student", "lecturer"):
+        logger.warning(f"Unknown role '{request.role}' in flashcard generation request")
 
     try:
         context = _resolve_context(request.course_id, request.material_ids)
@@ -221,8 +225,8 @@ async def generate_flashcards(
             raise HTTPException(status_code=500, detail="AI returned no valid flashcards.")
 
         logger.info(
-            "Flashcards generated: %d (requested %d) for course %s, materials %s",
-            len(cards), request.count, request.course_id, request.material_ids,
+            "Flashcards generated: %d (requested %d) for course %s, materials %s (role=%s)",
+            len(cards), request.count, request.course_id, request.material_ids, request.role or "student",
         )
         return FlashcardGenResponse(cards=cards, total=len(cards), llm_used=settings.llm_provider)
 

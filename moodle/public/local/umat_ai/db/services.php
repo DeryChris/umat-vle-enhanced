@@ -396,37 +396,37 @@ $functions = [
     'local_umat_ai_resource_bank_list' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'list_items',
         'description' => 'List items in a resource bank folder', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:manageresources',
     ],
     'local_umat_ai_resource_bank_create_folder' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'create_folder',
         'description' => 'Create a folder in the resource bank', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:manageresources',
     ],
     'local_umat_ai_resource_bank_upload' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'upload_file',
         'description' => 'Upload a file to the resource bank', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:manageresources',
     ],
     'local_umat_ai_resource_bank_delete' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'delete_items',
         'description' => 'Delete items from the resource bank', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:manageresources',
     ],
     'local_umat_ai_resource_bank_push' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'push_to_course',
         'description' => 'Push resource bank items to a course', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:manageresources',
     ],
     'local_umat_ai_resource_bank_teaching_courses' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'list_teaching_courses',
         'description' => 'List courses the user can push resources to', 'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:manageresources',
     ],
     'local_umat_ai_resource_bank_rename' => [
         'classname'   => '\local_umat_ai\external\resource_bank', 'methodname' => 'rename_item',
         'description' => 'Rename a resource bank item', 'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:manageresources',
     ],
     'local_umat_ai_get_session_attendance' => [
         'classname'   => '\local_umat_ai\external\get_session_attendance', 'methodname' => 'get_session_attendance',
@@ -456,25 +456,18 @@ $functions = [
         'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
-
-    /* ---- Flashcards (M2 / F3 spaced repetition) ---- */
+    /* ---- Flashcards (M2 / F3 spaced repetition — private self-service decks) ---- */
     'local_umat_ai_generate_flashcards' => [
         'classname'   => '\local_umat_ai\external\flashcards', 'methodname' => 'generate_flashcards',
-        'description' => 'Lecturer generates flashcards from indexed materials via the AI service',
+        'description' => 'Enrolled user generates their own private flashcards from indexed materials via the AI service',
         'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:approveoutput',
-    ],
-    'local_umat_ai_approve_flashcards' => [
-        'classname'   => '\local_umat_ai\external\flashcards', 'methodname' => 'approve_flashcards',
-        'description' => 'Lecturer approves or rejects pending flashcards in bulk',
-        'type' => 'write', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:approveoutput',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
     'local_umat_ai_get_flashcards' => [
         'classname'   => '\local_umat_ai\external\flashcards', 'methodname' => 'get_flashcards',
-        'description' => 'List flashcards for a course (students see approved cards only)',
+        'description' => 'List the user\'s own private flashcard deck for a course',
         'type' => 'read', 'ajax' => true,
-        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewsummary',
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
     'local_umat_ai_get_due_flashcards' => [
         'classname'   => '\local_umat_ai\external\flashcards', 'methodname' => 'get_due_flashcards',

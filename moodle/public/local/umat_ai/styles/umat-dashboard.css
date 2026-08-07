@@ -7502,6 +7502,12 @@
 }
 .lcp-rb-row:last-child { border-bottom: none; }
 .lcp-rb-row:hover { background: var(--u-sflo); }
+/* Drag & drop target — drop OS files onto a folder row to upload into it */
+.lcp-rb-row.lcp-rb-drop-target {
+  outline: 2px dashed var(--u-p);
+  outline-offset: -2px;
+  background: var(--u-sflo);
+}
 .lcp-rb-row-ico {
   width: 32px;
   height: 32px;
@@ -7521,6 +7527,75 @@
   background: rgba(99,102,241,.08);
 }
 .lcp-rb-row-ico-file .material-symbols-outlined { color: #6366f1; }
+.lcp-rb-row-ico-pdf .material-symbols-outlined { color: #dc2626; }
+.lcp-rb-row-ico-pptx .material-symbols-outlined { color: #ea580c; }
+.lcp-rb-row-ico-docx .material-symbols-outlined { color: #2563eb; }
+.lcp-rb-row-ico-video .material-symbols-outlined { color: #9333ea; }
+.lcp-rb-row-ico-audio .material-symbols-outlined { color: #0891b2; }
+
+/* ── Image thumbnail ── */
+.lcp-rb-row-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--u-sflo);
+}
+.lcp-rb-row-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ── Content thumbnail cell ── */
+.lcp-rb-row-th {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--u-sflo);
+  position: relative;
+}
+.lcp-rb-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 6px;
+}
+.lcp-rb-thumb-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--u-olv);
+  border-top-color: var(--u-p);
+  border-radius: 50%;
+  animation: lcpSpin .6s linear infinite;
+}
+.lcp-rb-thumb-doc {
+  width: 100%;
+  height: 100%;
+  padding: 3px 4px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lcp-rb-thumb-doc-line {
+  height: 3px;
+  border-radius: 1px;
+  background: var(--u-olv);
+  width: 100%;
+}
+.lcp-rb-thumb-doc-line:nth-child(2) { width: 85%; }
+.lcp-rb-thumb-doc-line:nth-child(3) { width: 70%; }
+.lcp-rb-thumb-doc-line:nth-child(4) { width: 90%; }
+.lcp-rb-thumb-doc-line:nth-child(5) { width: 60%; }
 .lcp-rb-row-ext {
   position: absolute;
   bottom: -2px;
@@ -8310,5 +8385,20 @@
   .ins-all-courses-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Real rendered preview in Resource Bank tiles (material_thumb.php).
+   .rb-thumb already has position:relative, so the img overlays the icon;
+   onerror removes it, revealing the icon fallback. */
+.rb-thumb-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--u-r8);
+}
+.rb-item .umat-ext-label {
+  z-index: 2;
 }
 

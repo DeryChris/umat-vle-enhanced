@@ -48,7 +48,7 @@ require_login($course, true);
 // ─────────────────────────────────────────────────
 // 3. Cache setup
 // ─────────────────────────────────────────────────
-$cachekey  = md5($filehash . '_' . $filemtime);
+$cachekey  = md5($filehash . '_' . $filemtime . '_v3');
 $cachedir  = $CFG->dataroot . '/.pptx-cache/' . $cachekey;
 $cachejson = $cachedir . '/slides.json';
 
@@ -113,13 +113,19 @@ if ($action === 'slide') {
     if (!file_exists($slidepath)) {
         $slides = render_pptx($actualpath, $cachedir);
         if ($slides === false) {
-            http_response_code(500);
-            die('Failed to render presentation');
+            // Return a placeholder SVG for failed renders
+            header('Content-Type: image/svg+xml');
+            $placeholder = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90" viewBox="0 0 120 90"><rect fill="#f3f4f6" width="120" height="90" rx="8"/><text fill="#9ca3af" font-family="sans-serif" font-size="10" x="60" y="45" text-anchor="middle" dominant-baseline="middle">PPTX Preview</text></svg>';
+            echo $placeholder;
+            exit;
         }
         // Re-check after render
         if (!file_exists($slidepath)) {
-            http_response_code(404);
-            die('Slide not found after render');
+            // HTML mode was used — return a placeholder
+            header('Content-Type: image/svg+xml');
+            $placeholder = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90" viewBox="0 0 120 90"><rect fill="#f3f4f6" width="120" height="90" rx="8"/><text fill="#9ca3af" font-family="sans-serif" font-size="10" x="60" y="45" text-anchor="middle" dominant-baseline="middle">PPTX Slide</text></svg>';
+            echo $placeholder;
+            exit;
         }
     }
     header('Content-Type: image/png');
@@ -167,7 +173,8 @@ function resolve_pluginfile_url(string $url): ?array {
 
     // Match: /pluginfile.php/CONTEXTID/COMPONENT/FILEAREA/ITEMID/REST
     if (!preg_match('#/pluginfile\.php/(\d+)/([^/]+)/([^/]+)/([^/]+)/(.*)$#', $path, $m)) {
-        return null;
+        // Not a pluginfile URL — try as a direct dataroot path
+        return resolve_direct_url($url);
     }
 
     $contextid = (int)$m[1];
@@ -206,8 +213,76 @@ function resolve_pluginfile_url(string $url): ?array {
         return build_result($file, $courseid, $filename, $filepath, 0);
     }
 
-    // Fallback: look in ai_materials directory
+    // Fallback 1: try common variations (different itemids, different filepath)
+    $variations = [
+        [$itemid, '/'],
+        [0, '/'],
+        [$itemid, $filepath],
+    ];
+    foreach ($variations as [$tryItem, $tryPath]) {
+        $file = $fs->get_file($contextid, $component, $filearea, $tryItem, $tryPath, $filename);
+        if ($file) {
+            return build_result($file, $courseid, $filename, $tryPath, 0);
+        }
+    }
+
+    // Fallback 2: search all files in this context for a matching filename
+    $allfiles = $fs->get_area_files($contextid, $component, $filearea, false, 'id, filename, contenthash, timecreated', 'filename');
+    foreach ($allfiles as $f) {
+        if (isset($f['filename']) && $f['filename'] === $filename) {
+            $file = $fs->get_file_by_hashname($f['contenthash']);
+            if ($file) {
+                return build_result($file, $courseid, $filename, '/', 0);
+            }
+        }
+    }
+
+    // Fallback 3: look in ai_materials directory
     return build_result(null, $courseid, $filename, null, 0);
+}
+
+/**
+ * Handle direct URLs (non-pluginfile) — e.g., dataroot paths.
+ */
+function resolve_direct_url(string $url): ?array {
+    global $CFG, $DB;
+
+    $parts = parse_url($url);
+    $path = $parts['path'] ?? '';
+
+    // Check if it points to dataroot/ai_materials/...
+    if (preg_match('#/ai_materials/(\d+)/(.+)$#', $path, $m)) {
+        $courseid = (int)$m[1];
+        $filename = urldecode($m[2]);
+        $filepath = $CFG->dataroot . '/ai_materials/' . $courseid . '/' . $filename;
+        if (file_exists($filepath)) {
+            return [
+                'path'     => $filepath,
+                'filename' => $filename,
+                'hash'     => md5_file($filepath),
+                'mtime'    => filemtime($filepath),
+                'courseid' => $courseid,
+            ];
+        }
+    }
+
+    // Check mdl_umat_ai_materials by filename
+    $basename = basename(urldecode($path));
+    $mat = $DB->get_record('umat_ai_materials', ['filename' => $basename], 'courseid');
+    if ($mat) {
+        $filepath = $CFG->dataroot . '/ai_materials/' . $mat->courseid . '/' . $basename;
+        if (file_exists($filepath)) {
+            return [
+                'path'     => $filepath,
+                'filename' => $basename,
+                'hash'     => md5_file($filepath),
+                'mtime'    => filemtime($filepath),
+                'courseid' => $mat->courseid,
+            ];
+        }
+    }
+
+    return null;
 }
 
 function build_result(?stored_file $file, int $courseid, string $filename, ?string $filepath, int $mtime): array {
@@ -226,7 +301,23 @@ function build_result(?stored_file $file, int $courseid, string $filename, ?stri
         // Plugin's own uploads: dataroot/ai_materials/$courseid/$filename
         $path = $CFG->dataroot . '/ai_materials/' . $courseid . '/' . $filename;
         if (!file_exists($path)) {
-            $path = $filename; // raw filename as fallback
+            // Try URL-decoded filename variations
+            $decoded = urldecode($filename);
+            $altPath = $CFG->dataroot . '/ai_materials/' . $courseid . '/' . $decoded;
+            if (file_exists($altPath)) {
+                $path = $altPath;
+                $filename = $decoded;
+            } else {
+                // Final fallback: search for any file matching the basename in ai_materials
+                $basename = basename($decoded);
+                $pattern = $CFG->dataroot . '/ai_materials/' . $courseid . '/' . $basename;
+                if (file_exists($pattern)) {
+                    $path = $pattern;
+                    $filename = $basename;
+                } else {
+                    $path = $decoded; // raw filename as last resort
+                }
+            }
         }
         $hash = file_exists($path) ? md5_file($path) : md5($filename);
         $mtime = file_exists($path) ? filemtime($path) : time();
@@ -246,17 +337,38 @@ function build_result(?stored_file $file, int $courseid, string $filename, ?stri
  * Returns array of slides or false on failure.
  */
 function render_pptx(string $path, string $cachedir): array|false {
-    if (!file_exists($path)) return false;
+    // Try multiple path variations
+    $candidates = [$path];
+    if (!file_exists($path)) {
+        // Try URL-decoded version
+        $candidates[] = urldecode($path);
+        // Try basename only in common locations
+        global $CFG;
+        $basename = basename($path);
+        if ($CFG) {
+            $candidates[] = $CFG->dataroot . '/ai_materials/' . dirname($path) . '/' . $basename;
+        }
+    }
+    
+    $actualPath = $path;
+    foreach ($candidates as $c) {
+        if (file_exists($c)) {
+            $actualPath = $c;
+            break;
+        }
+    }
+    
+    if (!file_exists($actualPath)) return false;
 
     // Try LibreOffice pipeline (produces full slide images)
-    $slides = render_via_libreoffice($path, $cachedir);
+    $slides = render_via_libreoffice($actualPath, $cachedir);
     if ($slides !== false) {
         $GLOBALS['_pptx_mode'] = 'images';
         return $slides;
     }
 
     // Fallback to HTML extraction
-    $slides = render_via_html($path, $cachedir);
+    $slides = render_via_html($actualPath, $cachedir);
     if ($slides !== false) {
         $GLOBALS['_pptx_mode'] = 'html';
         return $slides;
@@ -310,7 +422,9 @@ function render_via_libreoffice(string $path, string $cachedir): array|false {
     }
 
     if (file_exists($pdffile)) {
-        $existing = glob($cachedir . '/slide_*.png');
+        // Only count properly named slide_N.png files (excludes malformed
+        // leftovers such as 'slide_ d-1.png' from older buggy runs).
+        $existing = glob($cachedir . '/slide_[0-9]*.png');
         if (count($existing) > 0) {
             $slides = []; $i = 1;
             while (file_exists($cachedir . '/slide_' . $i . '.png')) { $slides[] = ['slide' => $i]; $i++; }
@@ -320,9 +434,26 @@ function render_via_libreoffice(string $path, string $cachedir): array|false {
         $magick = find_magick();
         if ($magick) {
             $escPdf = escapeshellarg($pdffile);
-            $escOut2 = escapeshellarg($cachedir . '/slide_%d.png');
-            $cmd = "\"$magick\" -density 200 $escPdf -quality 92 -background white -alpha remove $escOut2 2>&1";
+            // NOTE 1: -scene 1 is required — ImageMagick numbers %d sequences
+            // from 0 by default, but the rest of the code expects slide_1.png
+            // to be the FIRST slide (without it, slide 1 is dropped and every
+            // slide in the viewer is off by one).
+            // NOTE 2: Do NOT pass the %d output pattern through
+            // escapeshellarg() — PHP's Windows escapeshellarg() mangles '%d'
+            // (observed as 'slide_ d-N.png' files), so the slide_N.png lookup
+            // below misses and every request falls back to the placeholder.
+            // $cachedir is built from $CFG->dataroot + md5 (no quotes/$
+            // characters), so plain double quotes are safe here.
+            $outPattern = '"' . $cachedir . '/slide_%d.png"';
+            $cmd = "\"$magick\" -density 200 $escPdf -scene 1 -quality 92 -background white -alpha remove $outPattern 2>&1";
             shell_exec($cmd);
+            // Clean up any malformed leftovers (e.g. 'slide_ d-N.png' from the
+            // older escapeshellarg bug) so they can never confuse the lookup.
+            foreach (glob($cachedir . '/slide_*.png') as $stale) {
+                if (!preg_match('#/slide_\d+\.png$#', $stale)) {
+                    @unlink($stale);
+                }
+            }
             $pngs = glob($cachedir . '/slide_*.png');
             if (count($pngs) > 0) {
                 $slides = []; $i = 1;

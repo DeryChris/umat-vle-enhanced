@@ -1,10 +1,11 @@
-define([], function () {
+define(['local_umat_ai/touch_utils'], function (T) {
     'use strict';
 
     var viewerEl = null;
     var activeType = null;
     var activeMedia = null;
     var kbdHandler = null;
+    var swipeHandler = null;
     var typeCleanups = {};
 
     var loadedScripts = {};
@@ -163,6 +164,62 @@ define([], function () {
         };
         document.addEventListener('keydown', kbdHandler);
 
+        // Add swipe support for touch devices
+        if (swipeHandler) {
+            try { viewerEl.removeEventListener('touchstart', swipeHandler._touchStart); } catch (e) {}
+            try { viewerEl.removeEventListener('touchmove', swipeHandler._touchMove); } catch (e) {}
+            try { viewerEl.removeEventListener('touchend', swipeHandler._touchEnd); } catch (e) {}
+        }
+        var _touchData = {};
+        swipeHandler = {
+            _touchStart: function (e) {
+                var t = e.changedTouches[0];
+                _touchData.x0 = t.clientX;
+                _touchData.y0 = t.clientY;
+                _touchData.t0 = Date.now();
+                _touchData.swiping = true;
+            },
+            _touchMove: function (e) {
+                if (!_touchData.swiping) return;
+                var t = e.changedTouches[0];
+                _touchData.x1 = t.clientX;
+                _touchData.y1 = t.clientY;
+            },
+            _touchEnd: function (e) {
+                if (!_touchData.swiping) return;
+                _touchData.swiping = false;
+                var dx = _touchData.x1 - _touchData.x0;
+                var dy = _touchData.y1 - _touchData.y0;
+                var threshold = 60;
+                if (Math.abs(dy) > Math.abs(dx) && dy > threshold) {
+                    // Swipe down to close
+                    closeViewer();
+                    return;
+                }
+                if (activeType === 'video' && activeMedia) {
+                    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > threshold) {
+                        // Swipe left/right on video to seek
+                        if (dx > 0) activeMedia.currentTime = Math.max(0, activeMedia.currentTime - 15);
+                        else activeMedia.currentTime = Math.min(activeMedia.duration || 0, activeMedia.currentTime + 15);
+                    } else if (Math.abs(dy) > Math.abs(dx) && dy < -threshold) {
+                        // Swipe up to toggle play/pause
+                        if (activeMedia.paused) activeMedia.play();
+                        else activeMedia.pause();
+                    }
+                }
+            }
+        };
+        viewerEl.addEventListener('touchstart', swipeHandler._touchStart, { passive: true });
+        viewerEl.addEventListener('touchmove', swipeHandler._touchMove, { passive: true });
+        viewerEl.addEventListener('touchend', swipeHandler._touchEnd, { passive: true });
+
+        // Make toolbar buttons touch-friendly
+        viewerEl.querySelectorAll('.umat-vw-btn').forEach(function (btn) {
+            btn.style.minWidth = '44px';
+            btn.style.minHeight = '44px';
+            btn.style.touchAction = 'manipulation';
+        });
+
         switch (type) {
             case 'video': viewVideo(body, opts); break;
             case 'image': viewImage(body, opts); break;
@@ -198,6 +255,12 @@ define([], function () {
         if (kbdHandler) {
             document.removeEventListener('keydown', kbdHandler);
             kbdHandler = null;
+        }
+        if (swipeHandler && viewerEl) {
+            try { viewerEl.removeEventListener('touchstart', swipeHandler._touchStart); } catch (e) {}
+            try { viewerEl.removeEventListener('touchmove', swipeHandler._touchMove); } catch (e) {}
+            try { viewerEl.removeEventListener('touchend', swipeHandler._touchEnd); } catch (e) {}
+            swipeHandler = null;
         }
         // Run type-specific cleanup
         if (typeCleanups[activeType]) {
@@ -446,6 +509,166 @@ define([], function () {
     }
 
     // ═══════════════════════════════════════════
+    //  SHARED NAV BAR for silurus WASM viewers
+    //  (DocxViewer / PptxViewer have NO built-in
+    //  navigation — wheel, keys and buttons are ours)
+    // ═══════════════════════════════════════════
+
+    // ─── Silurus fit / zoom helpers ───────────────────────────────
+
+    // Fit a silurus viewer (docx/pptx) so the WHOLE page/slide is visible with
+    // SILURUS_FIT_PAD px of breathing room. Uses the natural page size the
+    // viewer exposes; falls back to the public fitPage/fitWidth API when the
+    // internals are unavailable. NOTE: PptxViewer (silurus 0.74.2) has NO
+    // fitPage/fitWidth at all — it renders at canvas.offsetWidth (300px by
+    // default) unless setScale() is called, which is why slides looked tiny.
+    function fitSilurus(viewer, container, pad) {
+        if (!viewer || !container) return;
+        var cw = container.clientWidth - pad * 2;
+        var ch = container.clientHeight - pad * 2;
+        if (cw <= 0 || ch <= 0) return;
+        var natW = 0, natH = 0;
+        try {
+            if (viewer._naturalWidthPx) {
+                natW = viewer._naturalWidthPx();
+                if (viewer._doc && viewer._doc.pageSize) {
+                    var ps = viewer._doc.pageSize(viewer.currentPage || 0);
+                    if (ps) natH = ps.heightPt * 4 / 3; // pt → px (silurus uses Se = 4/3)
+                } else if (viewer.engine && viewer.engine.slideWidth > 0) {
+                    natH = natW * (viewer.engine.slideHeight || 0) / viewer.engine.slideWidth;
+                }
+            }
+        } catch (e) { natW = 0; }
+        if (natW <= 0 || (viewer._doc && natH <= 0)) {
+            // Fallback: public API.
+            try { if (viewer.fitPage) { viewer.fitPage(); return; } } catch (e1) {}
+            try { if (viewer.fitWidth) { viewer.fitWidth(); return; } } catch (e2) {}
+            return;
+        }
+        var sc = Math.min(cw / natW, natH > 0 ? ch / natH : cw / natW);
+        if (sc > 0 && viewer.setScale) viewer.setScale(sc);
+    }
+
+    // Re-fit a silurus viewer whenever its container resizes (modal open
+    // animation, window resize, sidebar toggles) — debounced, and only while
+    // this viewer type is the open one. Returns a cleanup function.
+    function attachSilurusFit(container, getViewer, type) {
+        if (typeof ResizeObserver === 'undefined') return function () {};
+        var timer = null;
+        var ro = new ResizeObserver(function () {
+            if (!viewerEl || !viewerEl.classList.contains('open') || activeType !== type) return;
+            var v = getViewer();
+            if (!v) return;
+            clearTimeout(timer);
+            timer = setTimeout(function () { fitSilurus(v, container, SILURUS_FIT_PAD); }, 120);
+        });
+        ro.observe(container);
+        return function () { clearTimeout(timer); ro.disconnect(); };
+    }
+
+    function attachSilurusNav(container, getViewer, type) {
+        var bar = document.createElement('div');
+        bar.className = 'umat-vw-silurus-bar';
+        bar.innerHTML =
+            '<button type="button" class="umat-vw-silurus-btn umat-vw-silurus-zoomin" title="Zoom in (Ctrl + scroll)">' +
+                '<span class="material-symbols-outlined">add</span></button>' +
+            '<span class="umat-vw-silurus-pct">100%</span>' +
+            '<button type="button" class="umat-vw-silurus-btn umat-vw-silurus-zoomout" title="Zoom out (Ctrl + scroll)">' +
+                '<span class="material-symbols-outlined">remove</span></button>' +
+            '<button type="button" class="umat-vw-silurus-btn umat-vw-silurus-fit" title="Fit to window (Ctrl + 0)">' +
+                '<span class="material-symbols-outlined">fit_screen</span></button>' +
+            '<span class="umat-vw-silurus-sep"></span>' +
+            '<button type="button" class="umat-vw-silurus-btn umat-vw-silurus-prev" title="Previous (arrows / scroll)">' +
+                '<span class="material-symbols-outlined">chevron_left</span></button>' +
+            '<span class="umat-vw-silurus-counter">1 / 1</span>' +
+            '<button type="button" class="umat-vw-silurus-btn umat-vw-silurus-next" title="Next (arrows / scroll)">' +
+                '<span class="material-symbols-outlined">chevron_right</span></button>';
+        container.appendChild(bar);
+
+        var counter = bar.querySelector('.umat-vw-silurus-counter');
+        var pct = bar.querySelector('.umat-vw-silurus-pct');
+        var alive = true;
+
+        function current() { return getViewer(); }
+        function next() {
+            var v = current();
+            if (!v) return;
+            if (v.nextPage) { v.nextPage(); } else if (v.nextSlide) { v.nextSlide(); }
+        }
+        function prev() {
+            var v = current();
+            if (!v) return;
+            if (v.prevPage) { v.prevPage(); } else if (v.prevSlide) { v.prevSlide(); }
+        }
+        function zoomBy(f) {
+            var v = current();
+            if (!v || !v.setScale) return;
+            var s = (v.getScale ? v.getScale() : 1) * f;
+            v.setScale(s); // silurus clamps to zoomMin/zoomMax (0.1 – 4)
+        }
+        function fitNow() {
+            var v = current();
+            if (!v) return;
+            fitSilurus(v, container, SILURUS_FIT_PAD);
+        }
+
+        // Only respond while THIS viewer type is the one open in the modal.
+        function viewerOpen() {
+            return viewerEl && viewerEl.classList.contains('open') && activeType === type;
+        }
+
+        var onWheel = function (e) {
+            if (!alive || !viewerOpen()) return;
+            if (e.target && e.target.closest && e.target.closest('.umat-vw-silurus-bar')) return;
+            e.preventDefault();
+            if (e.ctrlKey || e.metaKey) {
+                // Ctrl + wheel = zoom (like PDF viewers)
+                if (e.deltaY < 0) zoomBy(1.25); else zoomBy(1 / 1.25);
+                return;
+            }
+            if (e.deltaY > 0 || e.deltaX > 0) next(); else prev();
+        };
+        container.addEventListener('wheel', onWheel, { passive: false });
+
+        var onKey = function (e) {
+            if (!alive || !viewerOpen()) return;
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') {
+                e.preventDefault(); next();
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+                e.preventDefault(); prev();
+            } else if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
+                e.preventDefault(); zoomBy(1.25);
+            } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+                e.preventDefault(); zoomBy(1 / 1.25);
+            } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+                e.preventDefault(); fitNow();
+            }
+        };
+        document.addEventListener('keydown', onKey);
+
+        bar.querySelector('.umat-vw-silurus-prev').addEventListener('click', prev);
+        bar.querySelector('.umat-vw-silurus-next').addEventListener('click', next);
+        bar.querySelector('.umat-vw-silurus-zoomin').addEventListener('click', function () { zoomBy(1.25); });
+        bar.querySelector('.umat-vw-silurus-zoomout').addEventListener('click', function () { zoomBy(1 / 1.25); });
+        bar.querySelector('.umat-vw-silurus-fit').addEventListener('click', fitNow);
+
+        return {
+            update: function (idx, total) {
+                counter.textContent = (idx + 1) + ' / ' + total;
+            },
+            updateScale: function (s) {
+                pct.textContent = Math.round((s || 1) * 100) + '%';
+            },
+            detach: function () {
+                alive = false;
+                container.removeEventListener('wheel', onWheel);
+                document.removeEventListener('keydown', onKey);
+                if (bar.parentNode === container) container.removeChild(bar);
+            }
+        };
+    }
+
+    // ═══════════════════════════════════════════
     //  DOCX VIEWER  (silurus/ooxml WASM + mammoth fallback)
     // ═══════════════════════════════════════════
 
@@ -460,10 +683,14 @@ define([], function () {
         // Track cleanup
         var docViewer = null;
         var docCanvas = null;
+        var nav = null;
+        var fitCleanup = null;
         var mammothFallback = false;
 
         typeCleanups['docx'] = function () {
             if (docViewer && docViewer.destroy) { try { docViewer.destroy(); } catch (e) {} }
+            if (nav) { nav.detach(); nav = null; }
+            if (fitCleanup) { fitCleanup(); fitCleanup = null; }
             docViewer = null; docCanvas = null;
         };
 
@@ -471,15 +698,23 @@ define([], function () {
             showLoading(container, 'Rendering with WASM engine\u2026');
             container.style.padding = '0';
             container.style.overflow = 'hidden';
+            container.style.position = 'relative';
 
             loadESModule(SILURUS_CDN).then(function (mod) {
                 // Create a full-size canvas
                 var canvas = document.createElement('canvas');
                 canvas.className = 'umat-vw-docx-canvas';
-                canvas.style.cssText = 'width:100%;height:100%;display:block;';
+                // No inline sizing: silurus sets canvas.style.width/height per
+                // render (zoom-safe), the CSS rules handle centering via
+                // margin:auto, and the flex wrapper keeps overflow scrollable.
+                canvas.style.cssText = 'display:block;';
                 container.innerHTML = '';
-                container.appendChild(canvas);
+                var wrap = document.createElement('div');
+                wrap.className = 'umat-vw-silurus-wrap';
+                wrap.appendChild(canvas);
+                container.appendChild(wrap);
                 docCanvas = canvas;
+                nav = attachSilurusNav(container, function () { return docViewer; }, 'docx');
 
                 // Fetch the file
                 return fetch(url).then(function (r) {
@@ -487,15 +722,23 @@ define([], function () {
                     return r.arrayBuffer();
                 }).then(function (buf) {
                     var viewer = new mod.docx.DocxViewer(canvas, {
-                        wasmUrl: SILURUS_WASM,
+                        wasmUrl: SILURUS_WASM_DOCX,
                         mode: 'main',
+                        onPageChange: function (i, total) { if (nav) nav.update(i, total); },
+                        onScaleChange: function (s) { if (nav) nav.updateScale(s); },
                     });
                     docViewer = viewer;
                     return viewer.load(buf);
                 }).then(function () {
                     document.getElementById('umat-vw-meta').textContent = '';
+                    // Fit the whole page into the container so nothing is clipped.
+                    // Manual fit: PptxViewer has no fitPage, so both viewers share
+                    // this path; it also re-fits when the container resizes.
+                    setTimeout(function () { fitSilurus(viewer, container, SILURUS_FIT_PAD); }, 120);
+                    fitCleanup = attachSilurusFit(container, function () { return viewer; }, 'docx');
                 });
             }).catch(function (err) {
+                if (nav) { nav.detach(); nav = null; }
                 // Silurus failed, fall back to mammoth
                 console.warn('[umat] silurus/ooxml failed, falling back to mammoth:', err.message);
                 tryFallbackMammoth();
@@ -508,7 +751,44 @@ define([], function () {
             container.style.overflow = '';
             showLoading(container, 'Processing document\u2026');
 
+            // Server-side text preview (doc_preview.php) — used when the
+            // mammoth CDN build cannot run under RequireJS (UMD define clash)
+            // or the file cannot be fetched client-side.
+            function serverPreview() {
+                showLoading(container, 'Loading document preview\u2026');
+                var a = document.createElement('a');
+                a.href = url;
+                var parts = a.pathname.split('/');
+                var idx = parts.indexOf('local');
+                var root = idx > 0 ? parts.slice(0, idx).join('/') : '';
+                var api = a.origin + root + '/local/umat_ai/doc_preview.php?url=' + encodeURIComponent(url) + '&type=docx';
+                fetch(api).then(function (r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                }).then(function (d) {
+                    if (d.error) { showError(container, 'Could not render this document.', d.error, doConvert); return; }
+                    var lines = d.lines || [];
+                    if (!lines.length) { showError(container, 'Could not render this document.', 'No content extracted.', doConvert); return; }
+                    var html = '<div class="umat-vw-docx-body">' +
+                        '<div style="font-size:11px;color:var(--u-ol);margin-bottom:10px;font-style:italic;">Text preview \u2014 formatting simplified</div>';
+                    lines.forEach(function (l) {
+                        var t = typeof l === 'string' ? l : (Array.isArray(l) ? l.filter(Boolean).join(' ') : '');
+                        if (t) html += '<p>' + esc(t) + '</p>';
+                    });
+                    html += '</div>';
+                    container.innerHTML = html;
+                    document.getElementById('umat-vw-meta').textContent = '';
+                }).catch(function (err) {
+                    showError(container, 'Could not render this document.', err.message, doConvert);
+                });
+            }
+
             function doConvert() {
+                // mammoth may be unavailable (RequireJS UMD clash) — use server preview.
+                if (!window.mammoth) {
+                    serverPreview();
+                    return;
+                }
                 showLoading(container, 'Processing document\u2026');
                 fetch(url).then(function (r) {
                     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -537,6 +817,12 @@ define([], function () {
 
             if (window.mammoth) {
                 doConvert();
+            } else if (typeof define === 'function' && define.amd) {
+                // AMD (RequireJS) is active: the UMD mammoth build cannot
+                // register itself (anonymous define clash) and would throw
+                // "Mismatched anonymous define()" — go straight to the
+                // server-side preview instead of loading it at all.
+                serverPreview();
             } else {
                 loadScript(MAMMOTH_CDN).then(doConvert).catch(function () {
                     showError(container, 'Failed to load the document viewer library.', 'Check your internet connection or download the file instead.');
@@ -849,11 +1135,15 @@ define([], function () {
 
         var pptxViewer = null;
         var pptxCanvas = null;
+        var nav = null;
+        var fitCleanup = null;
         var useFallback = false;
         var fallbackState = { slides: [], currentSlide: 1, fullscreenActive: false, pptMode: '', slideW: 960, slideH: 540 };
 
         typeCleanups['pptx'] = function () {
             if (pptxViewer && pptxViewer.destroy) { try { pptxViewer.destroy(); } catch (e) {} }
+            if (nav) { nav.detach(); nav = null; }
+            if (fitCleanup) { fitCleanup(); fitCleanup = null; }
             pptxViewer = null; pptxCanvas = null;
             // Clean up fallback keyboard handler if active
             if (fallbackState._navHandler) {
@@ -866,22 +1156,32 @@ define([], function () {
             showLoading(container, 'Rendering with WASM engine\u2026');
             container.style.padding = '0';
             container.style.overflow = 'hidden';
+            container.style.position = 'relative';
 
             loadESModule(SILURUS_CDN).then(function (mod) {
                 var canvas = document.createElement('canvas');
                 canvas.className = 'umat-vw-pptx-canvas';
-                canvas.style.cssText = 'width:100%;height:100%;display:block;';
+                // No inline sizing: silurus sets canvas.style.width/height per
+                // render (zoom-safe), the CSS rules handle centering via
+                // margin:auto, and the flex wrapper keeps overflow scrollable.
+                canvas.style.cssText = 'display:block;';
                 container.innerHTML = '';
-                container.appendChild(canvas);
+                var wrap = document.createElement('div');
+                wrap.className = 'umat-vw-silurus-wrap';
+                wrap.appendChild(canvas);
+                container.appendChild(wrap);
                 pptxCanvas = canvas;
+                nav = attachSilurusNav(container, function () { return pptxViewer; }, 'pptx');
 
                 return fetch(url).then(function (r) {
                     if (!r.ok) throw new Error('HTTP ' + r.status);
                     return r.arrayBuffer();
                 }).then(function (buf) {
                     var viewer = new mod.pptx.PptxViewer(canvas, {
-                        wasmUrl: SILURUS_WASM,
+                        wasmUrl: SILURUS_WASM_PPTX,
                         mode: 'main',
+                        onSlideChange: function (i, total) { if (nav) nav.update(i, total); },
+                        onScaleChange: function (s) { if (nav) nav.updateScale(s); },
                     });
                     pptxViewer = viewer;
                     return viewer.load(buf);
@@ -889,8 +1189,14 @@ define([], function () {
                     // Get slide count from the viewer
                     // (silurus doesn't expose slide count directly on viewer, but we can try)
                     document.getElementById('umat-vw-meta').textContent = opts.size ? formatBytes(opts.size) : '';
+                    // Fit the slide into the container. PptxViewer has NO fitPage —
+                    // without a manual fit it renders at canvas.offsetWidth (300px
+                    // default) which is why slides appeared tiny.
+                    setTimeout(function () { fitSilurus(viewer, container, SILURUS_FIT_PAD); }, 120);
+                    fitCleanup = attachSilurusFit(container, function () { return viewer; }, 'pptx');
                 });
             }).catch(function (err) {
+                if (nav) { nav.detach(); nav = null; }
                 console.warn('[umat] silurus/ooxml PPTX failed, falling back to server-side:', err.message);
                 useFallback = true;
                 fallbackPptxRender();
@@ -1095,7 +1401,14 @@ define([], function () {
     // ═══════════════════════════════════════════
 
     var SILURUS_CDN = 'https://cdn.jsdelivr.net/npm/@silurus/ooxml@0.74.2/+esm';
-    var SILURUS_WASM = 'https://cdn.jsdelivr.net/npm/@silurus/ooxml@0.74.2/dist/'; // WASM files are in dist/
+    // NOTE: wasmUrl expects the FULL URL of the parser .wasm file (see silurus
+    // README). Pointing it at the dist/ directory made the fetch return
+    // jsdelivr's HTML error page ('<!DOCTYPE' bytes), which failed the wasm
+    // magic-word and MIME checks in every browser.
+    var SILURUS_WASM_DOCX = 'https://cdn.jsdelivr.net/npm/@silurus/ooxml@0.74.2/dist/docx_parser_bg.wasm';
+    var SILURUS_WASM_PPTX = 'https://cdn.jsdelivr.net/npm/@silurus/ooxml@0.74.2/dist/pptx_parser_bg.wasm';
+    // Breathing room (px) kept between the fitted page/slide and the viewer edges.
+    var SILURUS_FIT_PAD = 24;
     var MAMMOTH_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
     var PRISM_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0';
     var EXT_LANG = {

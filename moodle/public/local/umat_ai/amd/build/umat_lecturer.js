@@ -1824,11 +1824,21 @@ function _renderRbItems(items){
     var iconCls=it.isfolder?'rb-folder-icon':'rb-file-icon';
     var sizeLabel=it.isfolder?'':RB._fmtSize(it.filesize);
     var timeLabel=RB._timeAgo(it.timecreated);
+    /* Real first-page preview for office/PDF files (LibreOffice-rendered) */
+    var thumbImg='';
+    if(!it.isfolder&&it.fileurl&&/\.(pdf|docx?|pptx?|xlsx?)$/i.test(it.name||'')){
+      var a=document.createElement('a');a.href=it.fileurl;
+      var pp=a.pathname.split('/');
+      var ri=pp.indexOf('local');
+      var rt=ri>0?pp.slice(0,ri).join('/'):'';
+      thumbImg='<img class="rb-thumb-img" src="'+esc(a.origin+rt+'/local/umat_ai/material_thumb.php?url='+encodeURIComponent(it.fileurl))+'" alt="" loading="lazy" onerror="this.remove()">';
+    }
     html+='<div class="rb-item" data-rb-id="'+it.id+'" data-rb-folder="'+(it.isfolder?1:0)+'" data-rb-name="'+esc(it.name)+'" data-rb-fileurl="'+esc(it.fileurl||'')+'" data-rb-mime="'+esc(it.mimetype||'')+'">'
       +'<label class="rb-chk" style="position:absolute;top:8px;left:8px;z-index:2;cursor:pointer;display:none;">'
       +'<input type="checkbox" class="rb-cb" data-rb-id="'+it.id+'" style="accent-color:var(--u-p);width:16px;height:16px;cursor:pointer;"></label>'
       +'<div class="rb-thumb" style="background:'+(it.isfolder?'rgba(0,107,47,.08)':'rgba(99,102,241,.08)')+';border-radius:var(--u-r8);width:100%;aspect-ratio:1.6;display:flex;align-items:center;justify-content:center;font-size:32px;color:'+(it.isfolder?'var(--u-p)':'#6366f1')+';position:relative;">'
       +'<span class="material-symbols-outlined">'+icon+'</span>'
+      +thumbImg
       +(it.isfolder?'':'<span class="umat-ext-label">'+_getExtLabel(it.name)+'</span>')
       +'</div>'
       +'<div class="rb-info" style="padding:6px 4px;">'

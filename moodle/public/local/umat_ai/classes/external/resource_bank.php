@@ -9,6 +9,50 @@ require_once($CFG->libdir . '/filelib.php');
 class resource_bank extends \external_api {
 
     /**
+     * Access check for the Resource Bank.
+     *
+     * Moodle grants capabilities per role-assignment context. Most lecturers only
+     * have roles assigned at COURSE level, so a strict system-context check fails
+     * for them even though the capability is granted to editingteacher/teacher/
+     * manager archetypes. We therefore accept the capability from ANY context the
+     * user is assigned in (system, or any course), plus a site-admin bypass.
+     *
+     * @return bool
+     */
+    private static function has_resource_bank_access() {
+        global $USER;
+        if (is_siteadmin()) {
+            return true;
+        }
+        if (has_capability('local/umat_ai:manageresources', \context_system::instance())) {
+            return true;
+        }
+        // Fallback: capability held in any course context (lecturer role anywhere).
+        $courses = enrol_get_users_courses($USER->id, true, 'id');
+        foreach ($courses as $c) {
+            $ctx = \context_course::instance($c->id);
+            if (has_capability('local/umat_ai:manageresources', $ctx)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Throw when the user lacks resource bank access.
+     */
+    private static function require_resource_bank_access() {
+        if (!self::has_resource_bank_access()) {
+            throw new \required_capability_exception(
+                \context_system::instance(),
+                'local/umat_ai:manageresources',
+                'nopermission',
+                ''
+            );
+        }
+    }
+
+    /**
      * List items in a folder (or root).
      */
     public static function list_items_parameters() {
@@ -22,7 +66,7 @@ class resource_bank extends \external_api {
         self::validate_parameters(self::list_items_parameters(), ['parentid' => $parentid]);
         $context = \context_user::instance($USER->id);
         self::validate_context($context);
-        require_capability('local/umat_ai:viewanalytics', \context_system::instance());
+        self::require_resource_bank_access();
 
         $pid = $parentid ? $parentid : null;
         $items = $DB->get_records('umat_resource_items', [
@@ -103,7 +147,7 @@ class resource_bank extends \external_api {
         ]);
         $context = \context_user::instance($USER->id);
         self::validate_context($context);
-        require_capability('local/umat_ai:viewanalytics', \context_system::instance());
+        self::require_resource_bank_access();
 
         $name = trim($name);
         if (!$name) {
@@ -149,7 +193,7 @@ class resource_bank extends \external_api {
         ]);
         $context = \context_user::instance($USER->id);
         self::validate_context($context);
-        require_capability('local/umat_ai:viewanalytics', \context_system::instance());
+        self::require_resource_bank_access();
 
         $name = trim($name);
         if (!$name) {
@@ -243,7 +287,7 @@ class resource_bank extends \external_api {
         ]);
         $context = \context_user::instance($USER->id);
         self::validate_context($context);
-        require_capability('local/umat_ai:viewanalytics', \context_system::instance());
+        self::require_resource_bank_access();
 
         $filename = trim($filename);
         if (!$filename) {
@@ -335,7 +379,7 @@ class resource_bank extends \external_api {
         self::validate_parameters(self::delete_items_parameters(), ['itemids' => $itemids]);
         $context = \context_user::instance($USER->id);
         self::validate_context($context);
-        require_capability('local/umat_ai:viewanalytics', \context_system::instance());
+        self::require_resource_bank_access();
 
         if (empty($itemids)) {
             return ['deleted' => 0];
@@ -408,7 +452,7 @@ class resource_bank extends \external_api {
         ]);
         $coursectx = \context_course::instance($courseid);
         self::validate_context($coursectx);
-        require_capability('local/umat_ai:viewanalytics', \context_system::instance());
+        self::require_resource_bank_access();
 
         if (empty($itemids)) {
             return ['pushed' => 0];

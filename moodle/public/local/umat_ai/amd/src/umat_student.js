@@ -1886,6 +1886,9 @@ window.selectCourse=selectCourse;
 _umatInitEsc([
   {id:'ws-attach-drawer',isOpen:function(e){return e.classList.contains('open');},close:function(e){e.classList.remove('open');}},
   {id:'umat-note-editor',isOpen:function(e){return e.classList.contains('open');},close:function(e){closeNoteEditor();}},
+  // AI Tutor chat drawer — before umat-student-ov so ESC closes the drawer
+  // without also closing the whole workspace overlay.
+  {id:'ait-attach-drawer',isOpen:function(e){return e.classList.contains('open');},close:function(e){e.classList.remove('open');}},
   {id:'umat-student-ov',isOpen:function(e){return e.classList.contains('open');},close:closeOverlay},
   {id:'stu-cp-ov',isOpen:function(e){return e.classList.contains('open');},close:function(e){e.classList.remove('open');}}
 ]);
@@ -2033,13 +2036,21 @@ switchToTab=function(name){
   _origSwitchToTab(name);
 };
 
-/* ---- FLASHCARDS TAB (M2 / F3 spaced repetition) ---- */
+/* ---- FLASHCARDS TAB (M2 / F3 spaced repetition — private self-service deck) ---- */
 var fcLoaded=false, fcDue=[], fcAll=[], fcIdx=0, fcReviewing=false;
 function _fcEl(id){return document.getElementById(id);}
 function _fcAjax(method,args){
-  return require(['core/ajax'],function(A){
-    return A.call([{methodname:method,args:args}])[0];
+  /* core/ajax promises are only reachable INSIDE the require callback
+     (require() itself returns undefined), so wrap with a tiny done/fail
+     emitter to keep the call sites chainable. */
+  var cbs={d:null,f:null};
+  var api={done:function(fn){cbs.d=fn;return api;},fail:function(fn){cbs.f=fn;return api;}};
+  require(['core/ajax'],function(A){
+    A.call([{methodname:method,args:args}])[0]
+      .done(function(r){if(cbs.d)cbs.d(r);})
+      .fail(function(e){if(cbs.f)cbs.f(e);});
   });
+  return api;
 }
 function _fcMsg(text){
   var el=_fcEl('ws-fc-empty-text');
@@ -2059,6 +2070,12 @@ function _fcStats(){
   if(start){start.style.display=dueCount>0&&!fcReviewing?'flex':'none';}
   if(cnt)cnt.textContent=dueCount;
 }
+/* Short topic → short rank-ish label for the poker corners (max 6 chars). */
+function _fcRank(topic){
+  var t=(topic||'FC').trim();
+  if(t.length>6)t=t.substring(0,6);
+  return t||'FC';
+}
 function _fcRenderGrid(){
   var grid=_fcEl('ws-fc-grid');if(!grid)return;
   var empty=_fcEl('ws-fc-empty');
@@ -2067,10 +2084,11 @@ function _fcRenderGrid(){
   var now=Math.floor(Date.now()/1000);
   grid.innerHTML=fcAll.map(function(c){
     var due=c.review&&c.review.due_at<=now;
+    var learned=!due&&c.review;
     return '<div class="umat-fc-deck-item'+(due?' umat-fc-deck-due':'')+'" data-id="'+c.id+'">'
-      +'<div class="umat-fc-deck-topic">'+_umatEsc(c.topic||'General')+'</div>'
+      +'<div class="umat-fc-deck-corner">'+_umatEsc(_fcRank(c.topic))+'</div>'
       +'<div class="umat-fc-deck-front">'+_umatEsc(c.front)+'</div>'
-      +'<div class="umat-fc-deck-meta"><span class="umat-fc-deck-badge'+(due?'':' ok')+'">'+(due?'due now':'learned')+'</span></div>'
+      +'<div class="umat-fc-deck-meta"><span class="umat-fc-deck-badge'+(due?'':' ok')+'">'+(due?'due now':(learned?'learned':'new'))+'</span></div>'
       +'</div>';
   }).join('');
 }
@@ -2086,8 +2104,8 @@ function _fcShowCard(i){
   fcIdx=i;
   var inner=_fcEl('ws-fc-card-inner');
   if(inner)inner.classList.remove('flipped');
-  _fcEl('ws-fc-topic').textContent=c.topic||'General';
-  _fcEl('ws-fc-topic-back').textContent=c.topic||'General';
+  _fcEl('ws-fc-topic').textContent=_fcRank(c.topic);
+  _fcEl('ws-fc-topic-back').textContent=_fcRank(c.topic);
   _fcEl('ws-fc-front').textContent=c.front;
   _fcEl('ws-fc-back').textContent=c.back;
   _fcEl('ws-fc-flip-hint').style.display='';
@@ -2127,7 +2145,7 @@ function _fcLoad(){
   _fcAjax('local_umat_ai_get_due_flashcards',{courseid:courseId,limit:100})
     .done(function(due){
       fcDue=(due&&due.cards)||[];
-      _fcAjax('local_umat_ai_get_flashcards',{courseid:courseId,status:1})
+      _fcAjax('local_umat_ai_get_flashcards',{courseid:courseId})
         .done(function(all){
           fcAll=(all&&all.cards)||[];
           _fcStats();
@@ -2137,6 +2155,59 @@ function _fcLoad(){
     })
     .fail(function(){_fcMsg('Could not load due cards.');});
 }
+/* Generate flow — pick indexed materials → AI builds private deck. */
+function _fcGenMsg(text,tone){
+  var el=_fcEl('ws-fc-gen-msg');if(!el)return;
+  el.textContent=text;
+  el.className='umat-fc-lect-msg'+(tone==='err'?' umat-fc-lect-msg-err':(tone==='ok'?' umat-fc-lect-msg-ok':''));
+}
+function _fcLoadMats(){
+  var list=_fcEl('ws-fc-mats');if(!list)return;
+  if(!courseId){
+    list.innerHTML='<div class="umat-fc-gen-loading"><span>Select a course first.</span></div>';
+    return;
+  }
+  list.innerHTML='<div class="umat-fc-gen-loading"><div class="umat-vw-spinner"></div><span>Loading materials…</span></div>';
+  _fcAjax('local_umat_ai_get_course_materials',{courseid:courseId})
+    .done(function(r){
+      var mats=(r&&r.materials)||[];
+      var indexed=mats.filter(function(m){return m.is_indexed||m.indexed;});
+      var selectable=indexed.length?indexed:mats;
+      if(!selectable.length){
+        list.innerHTML='<div class="umat-fc-gen-empty">No course materials found. Upload materials to the course library first.</div>';
+        return;
+      }
+      list.innerHTML=selectable.map(function(m,i){
+        return '<label class="umat-fc-mat-item"><input type="checkbox" value="'+m.id+'"'+(i<3?' checked':'')+'>'
+          +'<span class="umat-fc-mat-name">'+_umatEsc(m.filename||m.name||'Material '+m.id)+'</span>'
+          +(m.is_indexed?'':'<span class="umat-fc-mat-tag">not indexed</span>')
+          +'</label>';
+      }).join('');
+    })
+    .fail(function(){
+      list.innerHTML='<div class="umat-fc-gen-empty">Could not load materials. Try again.</div>';
+    });
+}
+function _fcGenerate(){
+  var list=_fcEl('ws-fc-mats');
+  var ids=Array.prototype.slice.call((list||document).querySelectorAll('#ws-fc-mats input:checked')).map(function(i){return parseInt(i.value)||0;});
+  if(!ids.length){_fcGenMsg('Select at least one material.','err');return;}
+  var count=parseInt(_fcEl('ws-fc-count').value)||10;
+  var topic=(_fcEl('ws-fc-topic-inp').value||'').trim();
+  var gen=_fcEl('ws-fc-gen');
+  gen.disabled=true;gen.style.opacity='.55';
+  _fcGenMsg('Generating '+count+' flashcards from '+ids.length+' material(s)…','');
+  _fcAjax('local_umat_ai_generate_flashcards',{courseid:courseId,material_ids:JSON.stringify(ids),count:count,topic_label:topic})
+    .done(function(r){
+      gen.disabled=false;gen.style.opacity='';
+      if(r&&r.success){_fcGenMsg(r.message||'Cards generated.','ok');setTimeout(_fcLoad,900);}
+      else{_fcGenMsg((r&&r.message)||'Generation failed.','err');}
+    })
+    .fail(function(){
+      gen.disabled=false;gen.style.opacity='';
+      _fcGenMsg('Could not reach the AI service.','err');
+    });
+}
 function _fcInit(){
   fcLoaded=true;
   var start=_fcEl('ws-fc-start');
@@ -2145,7 +2216,7 @@ function _fcInit(){
     _fcShowCard(0);
   });
   var refresh=_fcEl('ws-fc-refresh');
-  if(refresh)refresh.addEventListener('click',function(){_fcLoad();});
+  if(refresh)refresh.addEventListener('click',function(){_fcLoad();_fcLoadMats();});
   var card=_fcEl('ws-fc-card');
   if(card)card.addEventListener('click',function(){
     if(!fcReviewing||fcDue.length===0)return;
@@ -2154,9 +2225,20 @@ function _fcInit(){
     _fcEl('ws-fc-flip-hint').style.display=flipped?'none':'';
     _fcEl('ws-fc-actions').style.display=flipped?'flex':'none';
   });
-  _fcEl('ws-fc-actions').querySelectorAll('.umat-fc-btn').forEach(function(b){
+  var cardBtn=_fcEl('ws-fc-card');
+  if(cardBtn)cardBtn.addEventListener('keydown',function(e){
+    if((e.key==='Enter'||e.key===' ')&&fcReviewing&&fcDue.length){
+      e.preventDefault();
+      cardBtn.click();
+    }
+  });
+  var act=_fcEl('ws-fc-actions');
+  if(act)act.querySelectorAll('.umat-fc-btn').forEach(function(b){
     b.addEventListener('click',function(){_fcGrade(b.dataset.grade);});
   });
+  var gen=_fcEl('ws-fc-gen');
+  if(gen)gen.addEventListener('click',_fcGenerate);
+  _fcLoadMats();
   _fcLoad();
 }
 var _origSwitchToTab2=switchToTab;

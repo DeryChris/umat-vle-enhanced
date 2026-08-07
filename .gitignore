@@ -201,6 +201,7 @@ moodle/local/umat_ai/amd/build/*
 .claude
 .blackbox
 .opencode
+memory
 
 # ============================================================
 # Stray runtime artefacts (created when running from repo root)
