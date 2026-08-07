@@ -156,9 +156,10 @@ class login_issue extends \external_api {
     public static function submit_issue_parameters() {
         return new \external_function_parameters([
             'username'    => new \external_value(PARAM_TEXT, 'Student username/ID'),
-            'courseid'    => new \external_value(PARAM_INT, 'Course ID to report about'),
+            'courseid'    => new \external_value(PARAM_INT, 'Course ID to report about (0 = not course-specific)'),
             'description' => new \external_value(PARAM_RAW, 'Description of the issue'),
             'name'        => new \external_value(PARAM_TEXT, 'Optional student name', VALUE_DEFAULT, ''),
+            'recipient'   => new \external_value(PARAM_ALPHA, 'Report recipient: lecturer or admin', VALUE_DEFAULT, 'lecturer'),
         ]);
     }
 
@@ -170,7 +171,7 @@ class login_issue extends \external_api {
         ]);
     }
 
-    public static function submit_issue($username, $courseid, $description, $name = '') {
+    public static function submit_issue($username, $courseid, $description, $name = '', $recipient = 'lecturer') {
         global $DB;
         try {
             $params = self::validate_parameters(self::submit_issue_parameters(), [
@@ -178,11 +179,13 @@ class login_issue extends \external_api {
                 'courseid'    => $courseid,
                 'description' => $description,
                 'name'        => $name,
+                'recipient'   => $recipient,
             ]);
             $username    = trim($params['username']);
             $courseid    = (int)$params['courseid'];
             $description = trim($params['description']);
             $name        = trim($params['name']);
+            $recipient   = $params['recipient'] === 'admin' ? 'admin' : 'lecturer';
 
             if (strlen($description) < 10) {
                 return [
@@ -192,12 +195,17 @@ class login_issue extends \external_api {
                 ];
             }
 
-            if (!$courseid) {
+            // Lecturer reports must name a course; admin reports may be
+            // course-specific or platform-wide (courseid 0 → SITEID).
+            if ($recipient === 'lecturer' && !$courseid) {
                 return [
                     'success' => false,
                     'message' => 'Please select a course.',
                     'issue_id' => 0,
                 ];
+            }
+            if ($courseid <= 0) {
+                $courseid = SITEID;
             }
 
             // Find the user to link the report (if user exists).
@@ -213,11 +221,12 @@ class login_issue extends \external_api {
 
             // Create the report (userid=0 for unknown/guest users).
             $now = time();
+            $isadmin = ($recipient === 'admin');
             $id = $DB->insert_record('umat_ai_issue_reports', (object)[
                 'userid'          => $userid,
                 'courseid'        => $courseid,
-                'category'        => 'login_issue',
-                'topic'           => 'Login Issue Report',
+                'category'        => $isadmin ? 'admin_complaint' : 'login_issue',
+                'topic'           => $isadmin ? 'Admin Complaint' : 'Login Issue Report',
                 'description'     => $description,
                 'status'          => 'open',
                 'lecturer_notes'  => null,
@@ -229,7 +238,9 @@ class login_issue extends \external_api {
 
             return [
                 'success' => true,
-                'message' => 'Your issue has been submitted. Your lecturer will review it shortly.',
+                'message' => $isadmin
+                    ? 'Your report has been sent to the platform administrator. You will be contacted soon.'
+                    : 'Your issue has been submitted. Your lecturer will review it shortly.',
                 'issue_id' => (int)$id,
             ];
 

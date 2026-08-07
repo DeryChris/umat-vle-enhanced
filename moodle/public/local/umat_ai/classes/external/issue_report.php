@@ -167,7 +167,7 @@ class issue_report extends \external_api {
         $sql  = 'SELECT r.*, u.firstname, u.lastname, u.picture, u.imagealt, u.email
                  FROM {umat_ai_issue_reports} r
                  JOIN {user} u ON u.id = r.userid
-                 WHERE r.courseid = ?';
+                 WHERE r.courseid = ? AND r.category <> \'admin_complaint\'';
         $args = [$courseid];
         if ($status !== '') {
             $sql   .= ' AND r.status = ?';

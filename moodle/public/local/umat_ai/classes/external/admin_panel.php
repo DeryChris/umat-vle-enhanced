@@ -225,4 +225,150 @@ class admin_panel extends \external_api {
             'plugin_version'    => new \external_value(PARAM_TEXT, 'Plugin version string'),
         ]);
     }
+
+    // ------------------------------------------------------------------ //
+    // list_complaints — admin sees all issue reports (login page + admin  //
+    // complaints) across every course, newest first.                      //
+    // ------------------------------------------------------------------ //
+    public static function list_complaints_parameters() {
+        return new \external_function_parameters([
+            'status' => new \external_value(PARAM_ALPHAEXT, 'Filter by status (open|in_review|resolved|closed, empty=all)', VALUE_DEFAULT, ''),
+        ]);
+    }
+
+    public static function list_complaints($status = '') {
+        self::validate_parameters(self::list_complaints_parameters(), ['status' => $status]);
+        $context = \context_system::instance();
+        self::validate_context($context);
+        require_capability('local/umat_ai:adminpanel', $context);
+
+        global $DB, $PAGE;
+        $status = trim((string)$status);
+
+        $sql  = 'SELECT r.*, c.fullname AS coursename, u.firstname, u.lastname, u.picture, u.imagealt, u.email
+                 FROM {umat_ai_issue_reports} r
+                 LEFT JOIN {course} c ON c.id = r.courseid
+                 LEFT JOIN {user} u ON u.id = r.userid
+                 WHERE 1 = 1';
+        $args = [];
+        if ($status !== '') {
+            $sql   .= ' AND r.status = ?';
+            $args[] = $status;
+        }
+        $sql .= ' ORDER BY r.timecreated DESC, r.id DESC';
+
+        $rows = $DB->get_records_sql($sql, $args);
+        $complaints = [];
+        foreach ($rows as $r) {
+            $userpic = new \user_picture((object)[
+                'id' => $r->userid, 'picture' => $r->picture, 'imagealt' => $r->imagealt,
+                'firstname' => $r->firstname, 'lastname' => $r->lastname, 'email' => $r->email,
+            ]);
+            $complaints[] = [
+                'id'                => (int)$r->id,
+                'userid'            => (int)$r->userid,
+                'fullname'          => $r->firstname ? fullname($r) : ($r->reporter_name ?? ''),
+                'reporter_username' => (string)($r->reporter_username ?? ''),
+                'userpicture'       => $r->userid ? $userpic->get_url($PAGE)->out(false) : '',
+                'courseid'          => (int)$r->courseid,
+                'coursename'        => $r->coursename ? format_string($r->coursename) : '',
+                'category'          => (string)($r->category ?? ''),
+                'topic'             => (string)($r->topic ?? ''),
+                'description'       => (string)$r->description,
+                'status'            => (string)($r->status ?? ''),
+                'lecturer_notes'    => (string)($r->lecturer_notes ?? ''),
+                'lecturer_response' => (string)($r->lecturer_response ?? ''),
+                'timecreated'       => (int)$r->timecreated,
+                'timemodified'      => (int)$r->timemodified,
+            ];
+        }
+        return ['complaints' => $complaints, 'total' => count($complaints)];
+    }
+
+    public static function list_complaints_returns() {
+        return new \external_single_structure([
+            'complaints' => new \external_multiple_structure(
+                new \external_single_structure([
+                    'id'                => new \external_value(PARAM_INT, 'Report ID'),
+                    'userid'            => new \external_value(PARAM_INT, 'Reporter user ID (0 if unknown)'),
+                    'fullname'          => new \external_value(PARAM_TEXT, 'Reporter display name'),
+                    'reporter_username' => new \external_value(PARAM_TEXT, 'Username given on the login form'),
+                    'userpicture'       => new \external_value(PARAM_URL, 'Reporter avatar URL', VALUE_OPTIONAL),
+                    'courseid'          => new \external_value(PARAM_INT, 'Course ID'),
+                    'coursename'        => new \external_value(PARAM_TEXT, 'Course full name'),
+                    'category'          => new \external_value(PARAM_ALPHAEXT, 'Category (login_issue|admin_complaint|...)'),
+                    'topic'             => new \external_value(PARAM_TEXT, 'Topic/title'),
+                    'description'       => new \external_value(PARAM_RAW, 'Report description'),
+                    'status'            => new \external_value(PARAM_ALPHAEXT, 'Status'),
+                    'lecturer_notes'    => new \external_value(PARAM_RAW, 'Private notes'),
+                    'lecturer_response' => new \external_value(PARAM_RAW, 'Public response'),
+                    'timecreated'       => new \external_value(PARAM_INT, 'Created timestamp'),
+                    'timemodified'      => new \external_value(PARAM_INT, 'Modified timestamp'),
+                ])
+            ),
+            'total' => new \external_value(PARAM_INT, 'Total count'),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // update_complaint — admin updates status, private notes, response    //
+    // ------------------------------------------------------------------ //
+    public static function update_complaint_parameters() {
+        return new \external_function_parameters([
+            'complaint_id'   => new \external_value(PARAM_INT, 'Report ID'),
+            'status'         => new \external_value(PARAM_ALPHAEXT, 'New status: open|in_review|resolved|closed'),
+            'admin_notes'    => new \external_value(PARAM_RAW, 'Private admin notes', VALUE_DEFAULT, ''),
+            'admin_response' => new \external_value(PARAM_RAW, 'Public response to the reporter', VALUE_DEFAULT, ''),
+        ]);
+    }
+
+    public static function update_complaint($complaint_id, $status, $admin_notes = '', $admin_response = '') {
+        self::validate_parameters(self::update_complaint_parameters(), [
+            'complaint_id'   => $complaint_id,
+            'status'         => $status,
+            'admin_notes'    => $admin_notes,
+            'admin_response' => $admin_response,
+        ]);
+        $context = \context_system::instance();
+        self::validate_context($context);
+        require_capability('local/umat_ai:adminpanel', $context);
+
+        global $DB;
+        $complaint_id = (int)$complaint_id;
+        $status       = (string)$status;
+        $valid        = ['open', 'in_review', 'resolved', 'closed'];
+        if (!in_array($status, $valid, true)) {
+            throw new \invalid_parameter_exception('Invalid status.');
+        }
+
+        $record = $DB->get_record('umat_ai_issue_reports', ['id' => $complaint_id]);
+        if (!$record) {
+            throw new \moodle_exception('Issue not found.');
+        }
+
+        $now = time();
+        $update = (object)[
+            'id'           => $complaint_id,
+            'status'       => $status,
+            'timemodified' => $now,
+        ];
+        if ($admin_notes !== '') {
+            $update->lecturer_notes = $admin_notes;
+        }
+        if ($admin_response !== '') {
+            $update->lecturer_response = $admin_response;
+            $update->response_seen     = 0;
+            $update->timereplied       = $now;
+        }
+        $DB->update_record('umat_ai_issue_reports', $update);
+
+        return ['success' => true, 'message' => 'Complaint updated.'];
+    }
+
+    public static function update_complaint_returns() {
+        return new \external_single_structure([
+            'success' => new \external_value(PARAM_BOOL, 'Success flag'),
+            'message' => new \external_value(PARAM_TEXT, 'Status message'),
+        ]);
+    }
 }

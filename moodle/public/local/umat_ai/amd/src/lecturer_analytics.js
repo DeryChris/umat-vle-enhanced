@@ -28,13 +28,18 @@ define([
     'use strict';
 
     var cid = 0;
+    var requestedCid = 0;   // course requested at fetch time (fast-switch detection)
     var state = {
         data: null,
         filter: 'all',
         charts: {},          // elementId -> echarts instance
         inFlight: false,
         lastLoaded: 0,
-        students: []
+        students: [],
+        cache: {},           // courseId -> payload (instant course switching)
+        cacheTs: {},         // courseId -> fetch timestamp
+        cacheTtl: 60000,     // 60s: render from cache instantly, refresh behind
+        prefetching: {}      // courseId -> true (in-flight prefetch)
     };
 
     var PALETTE = {
@@ -83,8 +88,11 @@ define([
         var lbl = byId('la-course-label');
         if (!lbl) return;
         var name = '';
-        if (window.CN) name = window.CN;
-        else {
+        if (cid === 0) {
+            name = 'All Courses';
+        } else if (window.CN) {
+            name = window.CN;
+        } else {
             var insLbl = byId('ins-cs-label');
             if (insLbl && insLbl.textContent && insLbl.textContent !== 'All Courses') {
                 name = insLbl.textContent;
@@ -106,30 +114,298 @@ define([
         return 'trending_flat';
     }
 
-    /* ── Data loading (deduped, like the struggle dashboard) ───────── */
+    /* ── Data loading (cache-first, deduped, prefetch-aware) ───────── */
+
+    function coursesFromGlobals() {
+        var list = (window.UD && window.UD.courses) || [];
+        return list.filter(function(c) { return c && c.id; });
+    }
+
+    function courseTag(c) {
+        var t = c.shortname || c.fullname || '';
+        return t ? String(t).trim().split(/\s+/)[0] : 'Course ' + c.id;
+    }
+
+    function fetchPayload(courseId) {
+        return Ajax.call([{
+            methodname: 'local_umat_ai_get_analytics_data',
+            args: { courseid: courseId, days: 30 }
+        }])[0];
+    }
 
     function loadData(force) {
-        if (!cid) return;
-        if (state.inFlight) return;
-        // Reuse a fresh payload (2 min) instead of refetching on tab re-entry.
-        if (!force && state.data && state.lastLoaded && (Date.now() - state.lastLoaded) < 120000) {
-            renderAll(state.data);
+        var target = cid;
+        requestedCid = cid;
+        if (!target) {
+            loadComposite();
             return;
         }
+
+        // 1. Cache fast path: paint immediately if we have any copy.
+        var cached = state.cache[target];
+        if (cached) {
+            state.data = cached;
+            renderAll(cached);
+        }
+        // 2. Skip the network only while the copy is still fresh.
+        if (cached && !force && state.cacheTs[target] && (Date.now() - state.cacheTs[target]) < state.cacheTtl) {
+            return;
+        }
+        // 3. Dedupe: one fetch at a time; on completion re-dispatch for the
+        //    currently selected course (so fast switching mid-flight works).
+        if (state.inFlight) return;
+
         state.inFlight = true;
         var errorEl = byId('la-error');
         if (errorEl) errorEl.style.display = 'none';
-        Ajax.call([{
-            methodname: 'local_umat_ai_get_analytics_data',
-            args: { courseid: cid, days: 30 }
-        }])[0].done(function(data) {
+        fetchPayload(target).done(function(data) {
             state.inFlight = false;
-            state.data = data || {};
-            state.lastLoaded = Date.now();
-            renderAll(state.data);
+            data = data || {};
+            state.cache[target] = data;
+            state.cacheTs[target] = Date.now();
+            if (cid === 0) { loadComposite(); return; }          // composite upgrades as data lands
+            if (requestedCid !== cid) { loadData(true); return; } // switched mid-flight
+            state.data = data;
+            renderAll(data);
+            prefetchAll();
         }).fail(function() {
             state.inFlight = false;
-            showError('Failed to load analytics data. Check that you have analytics permission for this course.');
+            if (cid === 0) { loadComposite(); return; }
+            if (requestedCid !== cid) { loadData(true); return; }
+            if (!cached) {
+                showError('Failed to load analytics data. Check that you have analytics permission for this course.');
+            }
+        });
+    }
+
+    /* ── "All Courses" composite view (built client-side) ──────────── */
+
+    function loadComposite() {
+        var courses = coursesFromGlobals();
+        if (!courses.length) return;
+        var payload = buildComposite(courses, state.cache);
+        if (!payload) {
+            prefetchAll(); // nothing cached yet — pull every course, then re-render
+            return;
+        }
+        state.data = payload;
+        renderAll(payload);
+    }
+
+    function buildComposite(courses, cache) {
+        var payloads = [];
+        courses.forEach(function(c) { if (cache[c.id]) payloads.push(cache[c.id]); });
+        if (!payloads.length) return null;
+        var tags = {};
+        courses.forEach(function(c) { tags[c.id] = courseTag(c); });
+
+        // KPI cards: totals + student-weighted quiz average.
+        var kpis = {};
+        var sumKeys = ['students', 'at_risk', 'active', 'questions'];
+        var base = payloads[0].kpis || {};
+        sumKeys.forEach(function(key) {
+            var sum = 0;
+            payloads.forEach(function(p) {
+                if (p.kpis && p.kpis[key]) sum += num(p.kpis[key].value);
+            });
+            kpis[key] = {
+                value: sum,
+                label: (base[key] && base[key].label) || key,
+                icon: (base[key] && base[key].icon) || 'bar_chart',
+                hint: (base[key] && base[key].hint) || '',
+                trend: 'flat',
+                trend_pct: 0
+            };
+        });
+        var wsum = 0, wcnt = 0;
+        payloads.forEach(function(p) {
+            var s = num(p.kpis && p.kpis.students && p.kpis.students.value);
+            var q = num(p.kpis && p.kpis.avg_quiz && p.kpis.avg_quiz.value);
+            if (q) { wsum += q * (s || 1); wcnt += (s || 1); }
+        });
+        kpis.avg_quiz = {
+            value: wcnt ? wsum / wcnt : 0,
+            label: 'Quiz Avg',
+            icon: 'quiz',
+            hint: 'Average quiz score across all selected courses',
+            trend: 'flat',
+            trend_pct: 0
+        };
+
+        // Executive health: merged highlights + generated summary line.
+        var goingWell = [], needsAttention = [];
+        payloads.forEach(function(p, i) {
+            var tag = tags[courses[i].id];
+            var h = p.health || {};
+            (h.going_well || []).slice(0, 2).forEach(function(t) { goingWell.push('[' + tag + '] ' + t); });
+            (h.needs_attention || []).slice(0, 2).forEach(function(t) { needsAttention.push('[' + tag + '] ' + t); });
+        });
+        var health = {
+            grade: '',
+            label: '',
+            executive_summary: 'Combined view of ' + payloads.length + ' course(s): ' + num(kpis.at_risk.value) +
+                ' student(s) at risk, ' + num(kpis.questions.value) + ' question(s) asked this week.',
+            going_well: goingWell.slice(0, 3),
+            needs_attention: needsAttention.slice(0, 3),
+            top_recommendation: ''
+        };
+
+        // Priority actions: course-tagged so context stays visible.
+        var actions = [];
+        payloads.forEach(function(p, i) {
+            var tag = tags[courses[i].id];
+            (p.priority_actions || []).forEach(function(a) {
+                actions.push(Object.assign({}, a, { title: '[' + tag + '] ' + (a.title || 'Action needed') }));
+            });
+        });
+
+        // Trend: align by day label so course windows can differ slightly.
+        var trend = { labels: [], values: [], quiz_trend: '', quiz_trend_pct: 0 };
+        var seen = {};
+        payloads.forEach(function(p) {
+            var t = p.performance_trend || {};
+            (t.labels || []).forEach(function(l, i) {
+                if (!seen[l]) { seen[l] = true; trend.labels.push(l); trend.values.push(0); }
+                trend.values[trend.labels.indexOf(l)] += num((t.values || [])[i]);
+            });
+        });
+
+        // Risk donut.
+        var risk = { good: 0, warning: 0, critical: 0 };
+        payloads.forEach(function(p) {
+            var r = p.risk_distribution || {};
+            risk.good += num(r.good); risk.warning += num(r.warning); risk.critical += num(r.critical);
+        });
+
+        // At-risk students: capped + course-tagged so names stay unambiguous.
+        var students = [];
+        payloads.forEach(function(p, i) {
+            var tag = tags[courses[i].id];
+            (p.at_risk_students || []).forEach(function(s) {
+                if (students.length >= 12) return;
+                var copy = Object.assign({}, s);
+                if (tag) copy.fullname = tag + ' ' + (s.fullname || 'Student');
+                students.push(copy);
+            });
+        });
+
+        // Topic struggle: keep per-course scores, rebuild heatmap indices.
+        var topics = [], heatmap = [];
+        payloads.forEach(function(p) {
+            var ts = p.topic_struggle || {};
+            (ts.topics || []).forEach(function(t, i) {
+                if (topics.length >= 6) return;
+                var h = (ts.heatmap || [])[i];
+                topics.push(t);
+                heatmap.push([topics.length - 1, 0, h ? num(h[2]) : 0]);
+            });
+        });
+
+        // Secondary grid: common questions, quiz stats, recordings, resources.
+        var questions = [];
+        payloads.forEach(function(p) {
+            questions = questions.concat(p.common_questions || []);
+        });
+        var quiz = { distribution: [] };
+        var qsum = 0, qcnt = 0, avgtot = 0, hi = null, lo = null, medtot = 0, mcnt = 0, passtot = 0, pcnt = 0;
+        payloads.forEach(function(p) {
+            var q = p.quiz_analytics || {};
+            if (q.quiz_attempts) qsum += num(q.quiz_attempts);
+            if (q.average_score !== null && q.average_score !== undefined) { avgtot += num(q.average_score); qcnt++; }
+            if (q.highest_score !== null && q.highest_score !== undefined) hi = hi === null ? num(q.highest_score) : Math.max(hi, num(q.highest_score));
+            if (q.lowest_score !== null && q.lowest_score !== undefined) lo = lo === null ? num(q.lowest_score) : Math.min(lo, num(q.lowest_score));
+            if (q.median_score !== null && q.median_score !== undefined) { medtot += num(q.median_score); mcnt++; }
+            if (q.pass_rate !== null && q.pass_rate !== undefined) { passtot += num(q.pass_rate); pcnt++; }
+            quiz.most_failed_questions = (quiz.most_failed_questions || []).concat(q.most_failed_questions || []);
+        });
+        if (qsum) quiz.quiz_attempts = qsum;
+        if (qcnt) quiz.average_score = avgtot / qcnt;
+        if (hi !== null) quiz.highest_score = hi;
+        if (lo !== null) quiz.lowest_score = lo;
+        if (mcnt) quiz.median_score = medtot / mcnt;
+        if (pcnt) quiz.pass_rate = passtot / pcnt;
+        if ((quiz.most_failed_questions || []).length) {
+            quiz.most_failed_questions = quiz.most_failed_questions.slice(0, 3);
+        } else {
+            delete quiz.most_failed_questions;
+        }
+
+        var recordings = [], resources = [];
+        payloads.forEach(function(p, i) {
+            var tag = tags[courses[i].id];
+            (p.recording_analytics || []).forEach(function(r) {
+                var copy = Object.assign({}, r);
+                if (tag && r.title) copy.title = '[' + tag + '] ' + r.title;
+                recordings.push(copy);
+            });
+            (p.resource_analytics || []).forEach(function(r) {
+                var copy = Object.assign({}, r);
+                if (tag && r.filename) copy.filename = '[' + tag + '] ' + r.filename;
+                resources.push(copy);
+            });
+        });
+
+        // NLG insights: best effort, course-tagged.
+        var insights = [];
+        payloads.forEach(function(p, i) {
+            var tag = tags[courses[i].id];
+            (p.insights || []).forEach(function(ins) {
+                var copy = Object.assign({}, ins);
+                if (tag && ins.text) copy.text = '[' + tag + '] ' + ins.text;
+                insights.push(copy);
+            });
+        });
+
+        var sources = [];
+        payloads.forEach(function(p) {
+            ((p.meta && p.meta.data_sources) || []).forEach(function(s) {
+                if (sources.indexOf(s) === -1) sources.push(s);
+            });
+        });
+
+        return {
+            kpis: kpis,
+            health: health,
+            priority_actions: actions.slice(0, 5),
+            performance_trend: trend,
+            risk_distribution: risk,
+            at_risk_students: students,
+            topic_struggle: { topics: topics, heatmap: heatmap },
+            common_questions: questions.slice(0, 8),
+            quiz_analytics: quiz,
+            recording_analytics: recordings.slice(0, 5),
+            resource_analytics: resources.slice(0, 5),
+            insights: insights.slice(0, 4),
+            meta: {
+                courseid: 0,
+                days: 30,
+                generated_at: Date.now(),
+                data_sources: sources,
+                cached: true,
+                composite: true,
+                courses: courses.map(function(c) { return c.id; })
+            }
+        };
+    }
+
+    /* ── Prefetch: warm the cache for every lecturer course ────────── */
+
+    function prefetchAll() {
+        var courses = coursesFromGlobals();
+        courses.forEach(function(c) {
+            var id = parseInt(c.id, 10) || 0;
+            if (!id || id === cid || state.cache[id] || state.prefetching[id]) return;
+            state.prefetching[id] = true;
+            fetchPayload(id).done(function(data) {
+                state.prefetching[id] = false;
+                if (data && typeof data === 'object') {
+                    state.cache[id] = data;
+                    state.cacheTs[id] = Date.now();
+                }
+                if (cid === 0) loadComposite(); // composite view upgrades as data lands
+            }).fail(function() {
+                state.prefetching[id] = false;
+            });
         });
     }
 
@@ -800,13 +1076,12 @@ define([
             cfg = courseId;
             courseId = cfg.courseId;
         }
+        // 0 == "All Courses" (client-side composite); any other id == course.
         cid = parseInt(courseId, 10) || 0;
-        if (!cid) return;
         loadData(false);
     }
 
     function refresh() {
-        state.lastLoaded = 0;
         loadData(true);
     }
 

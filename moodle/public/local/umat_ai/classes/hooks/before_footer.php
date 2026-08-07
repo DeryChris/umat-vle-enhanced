@@ -59,13 +59,19 @@ class before_footer {
             $hook->add_html('<link rel="preconnect" href="https://cdnjs.cloudflare.com">');
             $hook->add_html('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">');
             $hook->add_html('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">');
-            /* Admin check — site admins see only the admin FAB, bypass all other overlays */
-            $isAdmin = has_capability('local_umat_ai:adminpanel', \context_system::instance());
+            /* Admin check — site admins see only the admin FAB, bypass all other overlays.
+               NOTE: is_siteadmin() override is required because site admins implicitly pass
+               every has_capability() check, so the $isCourseIssueManager capability probe below
+               would otherwise be TRUE on every course page and suppress the admin FAB there.
+               Admins who ALSO teach a specific course (non-site-admin adminpanel holders) keep
+               the lecturer FAB in that course for issue management. */
+            $isAdmin = has_capability('local/umat_ai:adminpanel', \context_system::instance());
+            $isSiteAdmin = is_siteadmin($USER->id);
             $isCourseIssueManager = $courseid && has_capability(
-                'local_umat_ai:viewanalytics',
+                'local/umat_ai:viewanalytics',
                 \context_course::instance($courseid)
             );
-            if ($isAdmin && get_config('local_umat_ai', 'enable_admin_fab') && !$isCourseIssueManager) {
+            if ($isAdmin && get_config('local_umat_ai', 'enable_admin_fab') && ($isSiteAdmin || !$isCourseIssueManager)) {
                 $hook->add_html('<link rel="stylesheet" href="' . $wwwroot . '/local/umat_ai/styles/umat-admin.css?v=' . filemtime(__DIR__ . '/../../styles/umat-admin.css') . '">');
                 $hook->add_html(\local_umat_ai\overlay_helper::admin_overlay($wwwroot, $USER, $platformName));
                 $hook->add_html(\local_umat_ai\overlay_helper::glassmorph_init_js());

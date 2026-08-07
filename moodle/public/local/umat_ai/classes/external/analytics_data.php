@@ -54,6 +54,21 @@ class analytics_data extends \external_api {
         $context = \context_course::instance($cid);
         require_capability('local/umat_ai:viewanalytics', $context);
 
+        // ---- Server-side cache (see db/cache.php) -------------------------
+        // Payload is course-level (identical for every lecturer), so a short
+        // shared TTL makes course switching effectively instant while still
+        // picking up fresh data within a minute.
+        $cache = \cache::make('local_umat_ai', 'analytics_data');
+        // NOTE: keep the key filesystem-safe — the file cache store uses the
+        // raw key as a directory name when simplekeys is enabled, and a ':'
+        // is invalid on Windows (silently failing set()).
+        $cachekey = $cid . '_' . $window;
+        $cached = $cache->get($cachekey);
+        if ($cached !== false && is_array($cached)) {
+            $cached['meta']['cached'] = true;
+            return $cached;
+        }
+
         $generated = time();
         $sources = [];
 
@@ -96,15 +111,30 @@ class analytics_data extends \external_api {
             $sources[] = 'ai_insights';
         }
 
-        return [
+        // Health grade/label: prefer the AI-enriched grade; fall back to a
+        // deterministic grade computed from the real KPIs when the AI service
+        // was unavailable or rate-limited (health_grade arrives as '').
+        $healthGrade = $struggle['health_grade'] ?? '';
+        $healthLabel = $struggle['health_label'] ?? '';
+        $execSummary = $struggle['executive_summary'] ?? '';
+        $topReco     = $struggle['top_recommendation'] ?? '';
+        if ($healthGrade === '') {
+            $healthFallback = self::compute_health_fallback($kpis, $riskDistribution);
+            $healthGrade = $healthFallback['grade'];
+            $healthLabel = $healthFallback['label'];
+            if ($execSummary === '') { $execSummary = $healthFallback['executive_summary']; }
+            if ($topReco === '')     { $topReco = $healthFallback['top_recommendation']; }
+        }
+
+        $payload = [
             'kpis'                => $kpis,
             'health'              => [
-                'grade'              => $struggle['health_grade'] ?? 'N/A',
-                'label'              => $struggle['health_label'] ?? '',
-                'executive_summary'  => $struggle['executive_summary'] ?? '',
+                'grade'              => $healthGrade,
+                'label'              => $healthLabel,
+                'executive_summary'  => $execSummary,
                 'going_well'         => $struggle['going_well'] ?? [],
                 'needs_attention'    => $struggle['needs_attention'] ?? [],
-                'top_recommendation' => $struggle['top_recommendation'] ?? '',
+                'top_recommendation' => $topReco,
             ],
             'priority_actions'    => $struggle['priority_actions'] ?? [],
             'performance_trend'   => $trend,
@@ -121,8 +151,19 @@ class analytics_data extends \external_api {
                 'days'          => $window,
                 'generated_at'  => $generated,
                 'data_sources'  => $sources,
+                'cached'        => false,
             ],
         ];
+
+        // Cache the assembled payload so repeat loads (and prefetches) are
+        // served instantly. Never let a cache write failure fail the request.
+        try {
+            $cache->set($cachekey, $payload);
+        } catch (\Throwable $e) {
+            // Cache write failure is non-fatal.
+        }
+
+        return $payload;
     }
 
     /**
@@ -215,6 +256,70 @@ class analytics_data extends \external_api {
             'good'     => max(0, $total - $atRisk),
             'warning'  => $atRisk,
             'critical' => 0,
+        ];
+    }
+
+    /**
+     * Deterministic health grade (A–F) computed from real course metrics.
+     *
+     * Used whenever the AI service is unavailable or rate-limited so the
+     * dashboard health chip always has data (previously it showed a bare
+     * "—" because get_struggle_insights left health_grade empty once the
+     * AI calls were skipped).
+     *
+     * Rubric (0-100 weighted score):
+     *   45% quiz average    – actual graded attempts (0-100)
+     *   30% safety          – share of students NOT at risk
+     *   15% risk severity   – share of students not critical/warning
+     *   10% engagement      – active students this week
+     *
+     * Also produces a deterministic one-line summary + top recommendation so
+     * the briefing block never shows "no data" placeholders.
+     *
+     * @return array{grade: string, label: string, executive_summary: string, top_recommendation: string}
+     */
+    private static function compute_health_fallback(array $kpis, array $risk): array {
+        $total    = (int) ($kpis['students']['value'] ?? 0);
+        $students = max(1, (float) $total);
+        $atRisk   = (float) ($kpis['at_risk']['value'] ?? 0);
+        $avgQuiz  = min(100, max(0, (float) ($kpis['avg_quiz']['value'] ?? 0)));
+        $active   = (float) ($kpis['active']['value'] ?? 0);
+        $critical = (float) ($risk['critical'] ?? 0);
+        $warning  = (float) ($risk['warning'] ?? 0);
+
+        $score = (0.45 * $avgQuiz)
+               + (0.30 * (1 - min(1, $atRisk / $students)) * 100)
+               + (0.15 * (1 - min(1, ($critical + $warning) / $students)) * 100)
+               + (0.10 * min(1, $active / $students) * 100);
+
+        $grade = 'F';
+        $label = 'At Risk';
+        if ($score >= 85)      { $grade = 'A'; $label = 'Excellent'; }
+        else if ($score >= 70) { $grade = 'B'; $label = 'Good'; }
+        else if ($score >= 55) { $grade = 'C'; $label = 'Fair'; }
+        else if ($score >= 40) { $grade = 'D'; $label = 'Needs Attention'; }
+
+        // Deterministic briefing text (shown when the AI service is offline).
+        $atRiskPct = round($atRisk / $students * 100);
+        $activePct = round($active / $students * 100);
+        $summary = $total . ' student' . ($total === 1 ? '' : 's') . ', ' . (int) $atRisk
+            . ' at risk (' . $atRiskPct . '%), quiz average ' . round($avgQuiz) . '%, '
+            . (int) $active . ' active this week.';
+
+        $reco = 'Overall trends look stable. Keep monitoring weekly.';
+        if ($avgQuiz < 50) {
+            $reco = 'Quiz performance is low — consider reviewing recent quiz material in class.';
+        } else if ($atRisk / $students > 0.5) {
+            $reco = 'More than half the class is at risk — follow up with the flagged students below.';
+        } else if ($active / $students < 0.5) {
+            $reco = 'Engagement is low — encourage students to use the AI tutor and course materials.';
+        }
+
+        return [
+            'grade'               => $grade,
+            'label'               => $label,
+            'executive_summary'   => $summary,
+            'top_recommendation'  => $reco,
         ];
     }
 
@@ -562,6 +667,7 @@ class analytics_data extends \external_api {
                 'courseid'     => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                 'days'         => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
                 'generated_at' => new \external_value(PARAM_INT, '', VALUE_OPTIONAL),
+                'cached'       => new \external_value(PARAM_BOOL, '', VALUE_OPTIONAL),
                 'data_sources' => new \external_multiple_structure(
                     new \external_value(PARAM_TEXT), '', VALUE_OPTIONAL
                 ),

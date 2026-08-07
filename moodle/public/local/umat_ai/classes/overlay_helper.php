@@ -1474,6 +1474,10 @@ HTML;
 var CID = {$jsCid};
 var CN  = {$jsName};
 var UD  = {$jsUD};
+/* Expose preloaded user/course data + current course for AMD modules
+   (e.g. lecturer_analytics.js builds the "All Courses" composite from
+   window.UD.courses). */
+window.UD=UD; window.CID=CID; window.CN=CN;
 var lecLoaded = {}, anLoaded = {};
 var wwwroot  = {$jsWwwroot};
 var streamUrl = {$streamUrl};
@@ -3375,19 +3379,14 @@ var insCid = CID || 0;
    "CID = 0" hack was trying to achieve at the cost of every other tab. */
 var insSelected = false;
 
-/* Resolve the active insights course: explicit choice > CID > insCid > first course from UD */
+/* Resolve the active insights course: explicit choice > CID > insCid > All Courses */
 function resolveInsightsCid(){
   if(insSelected) return insCid;
   if(CID) return CID;
   if(insCid) return insCid;
-  if(typeof UD!=='undefined'&&UD&&UD.courses&&UD.courses.length){
-    var first=UD.courses[0];
-    insCid=first.id;
-    console.log('[StruggleDashboard] auto-selected course: '+first.fullname+' (id='+first.id+')');
-    var lbl=document.getElementById('ins-cs-label');
-    if(lbl) lbl.textContent=first.fullname||first.shortname||'Course';
-    return first.id;
-  }
+  /* Nothing chosen yet — default to the composite "All Courses" overview
+     (the selector's pre-selected state) instead of silently auto-selecting
+     the first course. cid=0 is rendered client-side by lecturerAnalytics. */
   return 0;
 }
 
@@ -3483,6 +3482,24 @@ function loadInsights(cid){
     },250);
   }
 }
+
+/* Programmatic course selection for the Insights dashboard. Mirrors the
+   picker's click-handler state (insSelected/insCid + label + highlight) so
+   every entry point — My Courses tab, compact panel — lands on the same
+   course and the header selector stays in sync. cid=0 == All Courses. */
+function selectInsightsCourse(cid,cname){
+  cid=parseInt(cid)||0;
+  insCid=cid;insSelected=true;
+  var list=document.getElementById('ins-cs-list');
+  if(list){
+    list.querySelectorAll('.umat-cs-item').forEach(function(it){it.classList.remove('umat-cs-item-active');});
+    var match=list.querySelector('[data-cid="'+cid+'"]');
+    if(match)match.classList.add('umat-cs-item-active');
+  }
+  var lbl=document.getElementById('ins-cs-label');
+  if(lbl)lbl.textContent=cid?(cname||'Course'):'All Courses';
+}
+window.selectInsightsCourse=selectInsightsCourse;
 
 /* ── KPI Ribbon ── */
 function renderInsightsKpiRibbon(kpis){
@@ -4060,6 +4077,9 @@ var streamUrl = {$streamUrl};
 var moodleSesskey = {$moodleSesskey};
 var UD  = {$jsUD};
 var sessKey = 'hub_' + Math.random().toString(36).substr(2,18);
+
+/* Expose preloaded user data for AMD modules (same convention as _lecBoot). */
+window.UD=UD;
 
 /* Fallback ajax when AMD is unavailable */
 if(typeof ajax!=='function'){
@@ -4728,6 +4748,9 @@ HTML;
         <button class="umat-sb-item" data-aexp-tab="aexp-actions" type="button" title="Actions">
           <span class="material-symbols-outlined">bolt</span><span class="umat-sb-item-lbl">Actions</span>
         </button>
+        <button class="umat-sb-item" data-aexp-tab="aexp-complaints" type="button" title="Complaints">
+          <span class="material-symbols-outlined">report</span><span class="umat-sb-item-lbl">Complaints</span>
+        </button>
       </nav>
       <div class="umat-sb-divider"></div>
       <div class="umat-sb-foot">
@@ -4861,6 +4884,70 @@ HTML;
         </div>
       </div>
 
+      <!-- COMPLAINTS TAB — WhatsApp-style chat (mirrors lecturer Student Issues) -->
+      <div class="umat-tab-pane" id="aexp-complaints" style="width:100%;min-width:0;">
+        <div class="umat-content-hdr">
+          <h2><span class="material-symbols-outlined" umat-fs-18 umat-va-m umat-c-p>report</span> Complaints &amp; Issues</h2>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span class="umat-pill pill-info" id="aexp-complaints-count">0</span>
+            <button class="umat-content-hdr-btn" id="aexp-complaints-refresh" type="button" title="Refresh"><span class="material-symbols-outlined">refresh</span></button>
+          </div>
+        </div>
+        <div class="umat-issue-app umat-issue-lecturer" id="aexp-issue-app">
+          <!-- Conversation list -->
+          <section class="umat-issue-view active" id="aexp-issue-list-view">
+            <div class="umat-issue-filters">
+              <label><span class="material-symbols-outlined">search</span><input type="search" id="aexp-complaints-search" placeholder="Search reporter, course, or message"></label>
+              <select id="aexp-complaints-status" aria-label="Filter by status">
+                <option value="">All statuses</option>
+                <option value="open">Open</option>
+                <option value="in_review">In review</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+              </select>
+              <select id="aexp-complaints-category" aria-label="Filter by category">
+                <option value="">All categories</option>
+                <option value="admin_complaint">Admin complaint</option>
+                <option value="login_issue">Login issue</option>
+                <option value="course_material">Course material</option>
+                <option value="assignment">Assignment</option>
+                <option value="quiz_examination">Quiz or examination</option>
+                <option value="grade_feedback">Grade or feedback</option>
+                <option value="live_class_recording">Live class or recording</option>
+                <option value="technical_problem">Technical problem</option>
+                <option value="access_permission">Access or permission</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="umat-issue-list" id="aexp-complaints-list"><div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>Loading complaints...</p></div></div>
+          </section>
+          <!-- Conversation thread -->
+          <section class="umat-issue-view" id="aexp-issue-thread-view">
+            <div class="umat-issue-thread-head">
+              <button class="umat-icon-btn" id="aexp-issue-back" type="button" aria-label="Back to inbox"><span class="material-symbols-outlined">arrow_back</span></button>
+              <div class="umat-issue-thread-title"><strong id="aexp-issue-title"></strong><span id="aexp-issue-meta"></span></div>
+              <select id="aexp-issue-status" aria-label="Complaint status" style="flex-shrink:0;border:1px solid rgba(0,107,47,.16);border-radius:12px;padding:6px 8px;font:inherit;font-size:11px;font-weight:650;color:var(--u-ons);background:#fff;outline:none;">
+                <option value="open">Open</option>
+                <option value="in_review">In review</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+              </select>
+            </div>
+            <div class="umat-issue-notes-row" id="aexp-issue-notes-row" style="display:none;padding:8px 16px;border-bottom:1px solid rgba(217,119,6,.18);background:rgba(255,251,235,.7);">
+              <div style="font-size:10px;font-weight:750;color:#92400e;margin-bottom:4px;"><span class="material-symbols-outlined" style="font-size:12px;vertical-align:-2px;">sticky_note_2</span> Private notes (never shown to the reporter)</div>
+              <textarea id="aexp-issue-notes" rows="2" maxlength="10000" placeholder="Internal notes about this complaint..." style="width:100%;box-sizing:border-box;border:1px solid rgba(217,119,6,.25);border-radius:12px;padding:8px 10px;font:inherit;font-size:11px;line-height:1.45;color:var(--u-ons);background:#fff;outline:none;resize:vertical;"></textarea>
+            </div>
+            <div class="umat-issue-messages" id="aexp-issue-messages" aria-live="polite"></div>
+            <div class="umat-issue-send-error" id="aexp-issue-send-error" role="alert"></div>
+            <div class="umat-issue-composer">
+              <button class="umat-issue-attach-btn" id="aexp-issue-notes-btn" type="button" title="Private notes"><span class="material-symbols-outlined">sticky_note_2</span><span class="sr-only">Private notes</span></button>
+              <textarea id="aexp-issue-reply" rows="1" maxlength="10000" placeholder="Type a reply to the reporter..."></textarea>
+              <button class="umat-issue-send-btn" id="aexp-issue-send" type="button"><span class="material-symbols-outlined">send</span><span class="sr-only">Send</span></button>
+            </div>
+          </section>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -4890,6 +4977,7 @@ HTML;
       <button class="umat-cp-tab" data-acp-tab="acp-features" type="button">Features</button>
       <button class="umat-cp-tab" data-acp-tab="acp-theme" type="button">Theme</button>
       <button class="umat-cp-tab" data-acp-tab="acp-actions" type="button">Actions</button>
+      <button class="umat-cp-tab" data-acp-tab="acp-complaints" type="button">Complaints</button>
     </div>
 
     <!-- DASHBOARD TAB -->
@@ -4985,6 +5073,18 @@ HTML;
         </a>
       </div>
       <div id="acp-action-msg" style="padding:0 14px 14px;font-size:11px;display:none;"></div>
+    </div>
+
+    <!-- COMPLAINTS TAB (compact — WhatsApp-style list; opens full thread) -->
+    <div class="umat-cp-pane" id="acp-complaints" style="overflow-y:auto;">
+      <div style="padding:12px 14px 8px;display:flex;align-items:center;justify-content:space-between;">
+        <div class="umat-fs-11 umat-fw-7 umat-ttu umat-c-ol">Complaints &amp; Issues</div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span class="umat-pill pill-info" id="acp-complaints-count">0</span>
+          <button class="umat-content-hdr-btn" id="acp-complaints-refresh" type="button" title="Refresh"><span class="material-symbols-outlined" style="font-size:14px;">refresh</span></button>
+        </div>
+      </div>
+      <div class="umat-issue-list" id="acp-complaints-list" style="flex:none;padding:4px 12px 14px;"><div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>Loading complaints...</p></div></div>
     </div>
 
   </div>
@@ -5355,6 +5455,189 @@ function _bindActions(containerId,msgId){
 _bindActions('acp-actions','acp-action-msg');
 _bindActions('aexp-actions','aexp-action-msg');
 
+/* ─── Complaints & Issues — WhatsApp-style chat (mirrors lecturer Issues) ─── */
+var _complaintsCache=[];
+var _complaintsFilters={q:'',status:'',category:''};
+var _complaintsActiveId=0;
+var _compStatusLabels={open:'Open',in_review:'In review',resolved:'Resolved',closed:'Closed'};
+var _compCatLabels={admin_complaint:'Admin complaint',login_issue:'Login issue',course_material:'Course material',assignment:'Assignment',quiz_examination:'Quiz or examination',grade_feedback:'Grade or feedback',live_class_recording:'Live class or recording',technical_problem:'Technical problem',access_permission:'Access or permission',other:'Other'};
+function _compCatLbl(cat){return _compCatLabels[cat]||cat||'Other';}
+function _compTime(ts){if(!ts)return '';var d=new Date(ts*1000),now=new Date();var opts={hour:'numeric',minute:'2-digit'};if(d.toDateString()===now.toDateString())return d.toLocaleTimeString([],opts);return d.toLocaleDateString([],{month:'short',day:'numeric'})+' '+d.toLocaleTimeString([],opts);}
+function _compInitials(name){return (name||'?').split(/\s+/).slice(0,2).map(function(p){return p.charAt(0);}).join('').toUpperCase();}
+function _compStatusPill(st){
+  var cfg={open:['#fee2e2','#991b1b'],in_review:['#fef3c7','#78350f'],resolved:['#dcfce7','#065f46'],closed:['#e2e8f0','#334155']};
+  var c=cfg[st]||cfg.open;
+  return '<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:9px;font-weight:750;background:'+c[0]+';color:'+c[1]+';">'+esc(_compStatusLabels[st]||st)+'</span>';
+}
+function _compView(name){
+  ['aexp'].forEach(function(p){
+    var lv=document.getElementById(p+'-issue-list-view');
+    var tv=document.getElementById(p+'-issue-thread-view');
+    if(lv)lv.classList.toggle('active',name==='list');
+    if(tv)tv.classList.toggle('active',name==='thread');
+  });
+}
+/* Conversation list (renders into BOTH expanded + compact panes) */
+function renderComplaints(){
+  var aexp=document.getElementById('aexp-complaints-list');
+  var acp=document.getElementById('acp-complaints-list');
+  var openCount=_complaintsCache.filter(function(c){return c.status==='open'||c.status==='in_review';}).length;
+  var total=_complaintsCache.length;
+  if(document.getElementById('aexp-complaints-count'))document.getElementById('aexp-complaints-count').textContent=total+(openCount?' ('+openCount+' open)':'');
+  if(document.getElementById('acp-complaints-count'))document.getElementById('acp-complaints-count').textContent=total;
+  var f=_complaintsFilters,q=(f.q||'').toLowerCase();
+  var rows=_complaintsCache.filter(function(c){
+    if(f.status&&c.status!==f.status)return false;
+    if(f.category&&c.category!==f.category)return false;
+    if(q){var hay=(((c.fullname||'')+' '+(c.reporter_username||'')+' '+(c.topic||'')+' '+(c.description||'')+' '+(c.coursename||'')+' '+_compCatLbl(c.category)).toLowerCase());if(hay.indexOf(q)<0)return false;}
+    return true;
+  });
+  var html=rows.length?rows.map(function(c){
+    var reporter=c.fullname||c.reporter_username||('User #'+c.userid);
+    var preview=(c.topic&&c.topic!=='Login Issue Report'&&c.topic!=='Admin Complaint'?c.topic+': ':'')+(c.description||'');
+    return '<button class="umat-issue-row '+(c.status==='open'||c.status==='in_review'?'unread':'')+'" data-complaint-id="'+c.id+'" type="button">'+
+      '<span class="umat-issue-avatar">'+esc(_compInitials(reporter))+'</span>'+
+      '<span class="umat-issue-row-main">'+
+        '<span class="umat-issue-row-title"><strong>'+esc(reporter)+'</strong><span class="umat-issue-category">'+esc(_compCatLbl(c.category))+'</span></span>'+
+        '<span class="umat-issue-preview"><strong>'+esc(c.coursename||('Course #'+c.courseid))+':</strong> '+esc(preview)+'</span>'+
+        '<span class="umat-issue-row-sub">'+esc(c.topic&&c.topic!=='Login Issue Report'&&c.topic!=='Admin Complaint'?c.topic:(c.reporter_username||''))+'</span>'+
+      '</span>'+
+      '<span class="umat-issue-row-side"><time>'+esc(_compTime(c.timecreated))+'</time>'+_compStatusPill(c.status)+'</span>'+
+    '</button>';
+  }).join(''):'<div class="umat-empty"><span class="material-symbols-outlined">forum</span><p>No complaints or issue reports yet.</p></div>';
+  if(aexp)aexp.innerHTML=html;
+  if(acp)acp.innerHTML=html;
+  var wire=function(cont,fromCompact){
+    if(!cont)return;
+    cont.querySelectorAll('[data-complaint-id]').forEach(function(row){
+      row.addEventListener('click',function(){
+        var id=parseInt(row.dataset.complaintId,10);
+        if(fromCompact){closePanel();expOv.classList.add('open');showAexpPane('aexp-complaints');}
+        openComplaint(id);
+      });
+    });
+  };
+  wire(aexp,false);wire(acp,true);
+}
+function loadComplaints(){
+  ajax('local_umat_ai_admin_list_complaints',{},function(d){
+    _complaintsCache=(d&&d.complaints)||[];
+    renderComplaints();
+    if(_complaintsActiveId)renderComplaintThread();
+  },function(err){
+    var msg='Could not load complaints'+(err&&err.message?': '+err.message:'');
+    var aexp=document.getElementById('aexp-complaints-list');
+    var acp=document.getElementById('acp-complaints-list');
+    var html='<div class="umat-empty"><span class="material-symbols-outlined">error_outline</span><p>'+esc(msg)+'</p></div>';
+    if(aexp)aexp.innerHTML=html;
+    if(acp)acp.innerHTML=html;
+  });
+}
+/* Thread view */
+function openComplaint(id){
+  _complaintsActiveId=id;
+  _compView('thread');
+  renderComplaintThread();
+}
+function renderComplaintThread(){
+  var box=document.getElementById('aexp-issue-messages');
+  var c=_complaintsCache.find(function(x){return x.id===_complaintsActiveId;});
+  if(!c){_compView('list');return;}
+  var reporter=c.fullname||c.reporter_username||('User #'+c.userid);
+  var title=document.getElementById('aexp-issue-title');
+  var meta=document.getElementById('aexp-issue-meta');
+  var statusSel=document.getElementById('aexp-issue-status');
+  var notesRow=document.getElementById('aexp-issue-notes-row');
+  var notes=document.getElementById('aexp-issue-notes');
+  if(title)title.textContent=reporter;
+  if(meta)meta.textContent=(c.coursename||('Course #'+c.courseid))+' \u00b7 '+_compCatLbl(c.category)+(c.topic&&c.topic!=='Login Issue Report'&&c.topic!=='Admin Complaint'?' \u00b7 '+c.topic:'');
+  if(statusSel)statusSel.value=c.status||'open';
+  if(notes)notes.value=c.lecturer_notes||'';
+  if(notesRow&&notesRow.style.display===''&&c.lecturer_notes)notesRow.style.display='';
+  /* Chat messages: reporter's report (left) + admin response (right, if any) */
+  var msgs='';
+  msgs+='<article class="umat-issue-message" data-mid="'+c.id+'" data-other="1"><span class="umat-issue-sender">'+esc(reporter)+'</span><div class="umat-issue-bubble"><div class="umat-issue-body">'+
+    (c.topic&&c.topic!=='Login Issue Report'&&c.topic!=='Admin Complaint'?'<strong>'+esc(c.topic)+'</strong><br><br>':'')+esc(c.description||'')+
+    '</div><div class="umat-issue-message-meta"><time>'+esc(_compTime(c.timecreated))+'</time></div></div></article>';
+  if(c.lecturer_response){
+    msgs+='<article class="umat-issue-message mine" data-mid="'+c.id+'-r"><span class="umat-issue-sender">You (Administrator)</span><div class="umat-issue-bubble"><div class="umat-issue-body">'+esc(c.lecturer_response)+'</div><div class="umat-issue-message-meta"><time>'+esc(_compTime(c.timemodified))+'</time><span class="umat-issue-receipt viewed" aria-label="Viewed">&#10003;&#10003;</span></div></div></article>';
+  }
+  if(!c.lecturer_response&&!box)return;
+  if(box){box.innerHTML=msgs;box.scrollTop=box.scrollHeight;}
+}
+function _complaintSave(extra){
+  var c=_complaintsCache.find(function(x){return x.id===_complaintsActiveId;});
+  if(!c)return;
+  var statusSel=document.getElementById('aexp-issue-status');
+  var notes=document.getElementById('aexp-issue-notes');
+  var reply=document.getElementById('aexp-issue-reply');
+  var payload={
+    complaint_id:_complaintsActiveId,
+    status:statusSel?statusSel.value:(c.status||'open'),
+    admin_notes:notes?notes.value:(c.lecturer_notes||''),
+    admin_response:extra&&extra.response!==undefined?extra.response:(c.lecturer_response||'')
+  };
+  ajax('local_umat_ai_admin_update_complaint',payload,function(r){
+    if(r&&r.success){
+      if(extra&&extra.response!==undefined&&reply)reply.value='';
+      loadComplaints();
+    }else{alert('Could not update complaint.');}
+  },function(err){
+    alert('Connection error: '+(err&&err.message?err.message:''));
+  });
+}
+/* Wire thread controls */
+var _threadBack=document.getElementById('aexp-issue-back');
+if(_threadBack)_threadBack.addEventListener('click',function(){_complaintsActiveId=0;_compView('list');loadComplaints();});
+var _threadSend=document.getElementById('aexp-issue-send');
+if(_threadSend)_threadSend.addEventListener('click',function(){
+  var reply=document.getElementById('aexp-issue-reply');
+  var body=reply?reply.value.trim():'';
+  if(!body)return;
+  var temp=document.getElementById('aexp-issue-messages');
+  if(temp){
+    var el=document.createElement('article');
+    el.className='umat-issue-message mine';
+    el.id='aexp-issue-temp';
+    el.innerHTML='<span class="umat-issue-sender">You (Administrator)</span><div class="umat-issue-bubble"><div class="umat-issue-body">'+esc(body)+'</div><div class="umat-issue-message-meta"><span>Sending...</span></div></div>';
+    temp.appendChild(el);temp.scrollTop=temp.scrollHeight;
+  }
+  _complaintSave({response:body});
+});
+var _threadReply=document.getElementById('aexp-issue-reply');
+if(_threadReply)_threadReply.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(_threadSend)_threadSend.click();}
+});
+var _threadStatus=document.getElementById('aexp-issue-status');
+if(_threadStatus)_threadStatus.addEventListener('change',_complaintSave);
+var _threadNotesBtn=document.getElementById('aexp-issue-notes-btn');
+var _threadNotesRow=document.getElementById('aexp-issue-notes-row');
+var _threadNotes=document.getElementById('aexp-issue-notes');
+if(_threadNotesBtn&&_threadNotesRow)_threadNotesBtn.addEventListener('click',function(){
+  var show=_threadNotesRow.style.display==='none';
+  _threadNotesRow.style.display=show?'':'none';
+  if(show&&_threadNotes)_threadNotes.focus();
+});
+if(_threadNotes)_threadNotes.addEventListener('change',_complaintSave);
+/* Filters (expanded pane) */
+var _fSearch=document.getElementById('aexp-complaints-search');
+var _fStatus=document.getElementById('aexp-complaints-status');
+var _fCategory=document.getElementById('aexp-complaints-category');
+if(_fSearch)_fSearch.addEventListener('input',function(){_complaintsFilters.q=_fSearch.value;renderComplaints();});
+if(_fStatus)_fStatus.addEventListener('change',function(){_complaintsFilters.status=_fStatus.value;renderComplaints();});
+if(_fCategory)_fCategory.addEventListener('change',function(){_complaintsFilters.category=_fCategory.value;renderComplaints();});
+/* Load when the Complaints tab is opened (both compact + expanded) */
+function _maybeLoadComplaints(tabId){
+  if(tabId==='acp-complaints'||tabId==='aexp-complaints')loadComplaints();
+}
+var _origShowAcp=showAcpPane, _origShowAexp=showAexpPane;
+showAcpPane=function(tabId){_origShowAcp(tabId);_maybeLoadComplaints(tabId);};
+showAexpPane=function(tabId){_origShowAexp(tabId);_maybeLoadComplaints(tabId);};
+var _cpRefreshBtn=document.getElementById('acp-complaints-refresh');
+var _aexpRefreshBtn=document.getElementById('aexp-complaints-refresh');
+if(_cpRefreshBtn)_cpRefreshBtn.addEventListener('click',loadComplaints);
+if(_aexpRefreshBtn)_aexpRefreshBtn.addEventListener('click',loadComplaints);
+
 /* Init */
 loadTheme();
 
@@ -5415,33 +5698,144 @@ HTML;
 </script>
 
 <script>
-/* Fallback: direct toggle init without AMD (works even if AMD fails) */
+/* Self-contained login report wiring — toggle, course lookup, submit.
+   NOTE: the Moodle login page loads YUI only (no RequireJS), so the AMD
+   module route is deliberately NOT used here. We drive the public ajax
+   services (local_umat_ai_login_lookup_courses /
+   local_umat_ai_login_submit_issue) with a plain XMLHttpRequest, and show
+   explicit feedback for every step. */
 (function(){
-  var toggle=document.getElementById('lr-show-form');
-  var backBtn=document.getElementById('lr-report-back');
-  var closeBtn=document.getElementById('lr-close-btn');
-  var wrapper=document.getElementById('lr-wrapper');
-  var reportCard=document.getElementById('lr-report-card');
-  console.log('[umat-login-report-fallback] init:', {toggle:!!toggle, backBtn:!!backBtn, closeBtn:!!closeBtn, wrapper:!!wrapper, reportCard:!!reportCard});
-  if(!toggle || !reportCard) return;
+  var wired=false;
+  var sesskey=(window.M&&M.cfg&&M.cfg.sesskey)?M.cfg.sesskey:'';
+  var wwwroot=(window.M&&M.cfg&&M.cfg.wwwroot)?M.cfg.wwwroot:'';
+  var RECIPIENT_LECTURER='lecturer', RECIPIENT_ADMIN='admin';
+  var recipient=RECIPIENT_LECTURER;
 
-  var loginForm=document.querySelector('.loginform')||document.querySelector('#page-login-index form')||document.querySelector('form[action*="login"]');
-  console.log('[umat-login-report-fallback] loginForm:', !!loginForm);
-
-  toggle.addEventListener('click', function(e){
-    e.preventDefault();
-    console.log('[umat-login-report-fallback] toggle clicked');
-    if(loginForm) loginForm.style.display='none';
-    if(wrapper) wrapper.style.display='none';
-    reportCard.style.display='';
-  });
-  function showLoginForm(){
-    reportCard.style.display='none';
-    if(loginForm) loginForm.style.display='';
-    if(wrapper) wrapper.style.display='';
+  function lr$(id){ return document.getElementById(id); }
+  function lrMsg(elId, text, isError){
+    var el=lr$(elId);
+    if(!el) return;
+    el.textContent=text;
+    el.className='umat-login-report-msg '+(isError?'error':'success');
+    el.style.display='block';
   }
-  if(backBtn) backBtn.addEventListener('click', function(e){e.preventDefault();showLoginForm();});
-  if(closeBtn) closeBtn.addEventListener('click', function(e){e.preventDefault();showLoginForm();});
+  function lrAjax(method, args, done, fail){
+    var loader=lr$('lr-loader');
+    if(loader) loader.style.display='flex';
+    var x=new XMLHttpRequest();
+    x.open('POST', wwwroot+'/lib/ajax/service.php?sesskey='+encodeURIComponent(sesskey));
+    x.setRequestHeader('Content-Type','application/json');
+    x.onload=function(){
+      if(loader) loader.style.display='none';
+      if(x.status!==200){ (fail||function(){})(new Error('HTTP '+x.status)); return; }
+      try{
+        var r=JSON.parse(x.responseText);
+        if(r&&r[0]&&!r[0].error){ (done||function(){})(r[0].data); }
+        else { (fail||function(){})(new Error((r&&r[0]&&r[0].message)||'Service error')); }
+      }catch(e){ (fail||function(){})(e); }
+    };
+    x.onerror=function(){ if(loader) loader.style.display='none'; (fail||function(){})(new Error('Network error')); };
+    x.send(JSON.stringify([{index:0, methodname:method, args:args||{}}]));
+  }
+  function setRecipient(r){
+    recipient=r;
+    document.querySelectorAll('.lr-recipient-btn').forEach(function(b){
+      b.classList.toggle('active', b.getAttribute('data-recipient')===r);
+    });
+    var hint=lr$('lr-recipient-hint');
+    if(hint) hint.textContent = (r===RECIPIENT_ADMIN)
+      ? 'Your report goes directly to the platform administrator.'
+      : 'Your report goes to the lecturer of the selected course.';
+  }
+  function wireLookup(){
+    var btn=lr$('lr-lookup-btn'), input=lr$('lr-username');
+    if(!btn||!input) return;
+    btn.addEventListener('click', function(){
+      var u=(input.value||'').trim();
+      lrMsg('lr-msg','',false);
+      if(u.length<2){ lrMsg('lr-msg','Please enter your student ID, username, or email address.',true); return; }
+      lrMsg('lr-msg','Searching for your courses\u2026',false);
+      lrAjax('local_umat_ai_login_lookup_courses', {username:u}, function(data){
+        if(!data||!data.success){ lrMsg('lr-msg', (data&&data.message)||'No student found.', true); return; }
+        var courses=data.courses||[];
+        if(!courses.length){ lrMsg('lr-msg', data.message||'No courses found for this student.', true); return; }
+        var sel=lr$('lr-course');
+        sel.innerHTML='';
+        if(recipient===RECIPIENT_ADMIN){
+          var gen=document.createElement('option'); gen.value='0'; gen.textContent='General / Not course-specific'; sel.appendChild(gen);
+        }
+        courses.forEach(function(c){
+          var o=document.createElement('option');
+          o.value=c.id; o.textContent=c.fullname+' ('+c.shortname+')';
+          sel.appendChild(o);
+        });
+        lr$('lr-step-identify').style.display='none';
+        lr$('lr-step-report').style.display='';
+        lrMsg('lr-submit-msg','',false);
+      }, function(err){
+        lrMsg('lr-msg','Lookup failed: '+err.message, true);
+      });
+    });
+  }
+  function wireSubmit(){
+    var btn=lr$('lr-submit-btn');
+    if(!btn) return;
+    btn.addEventListener('click', function(){
+      var username=(lr$('lr-username').value||'').trim();
+      var courseid=parseInt(lr$('lr-course').value||'0',10);
+      var name=(lr$('lr-name').value||'').trim();
+      var desc=(lr$('lr-desc').value||'').trim();
+      if(recipient===RECIPIENT_LECTURER && !courseid){ lrMsg('lr-submit-msg','Please select a course.', true); return; }
+      if(desc.length<10){ lrMsg('lr-submit-msg','Please describe the issue in more detail (at least 10 characters).', true); return; }
+      lrMsg('lr-submit-msg','Submitting your report\u2026',false);
+      lrAjax('local_umat_ai_login_submit_issue', {
+        username:username, courseid:courseid, description:desc, name:name, recipient:recipient
+      }, function(data){
+        if(!data||!data.success){ lrMsg('lr-submit-msg', (data&&data.message)||'Could not submit your report.', true); return; }
+        lr$('lr-step-report').style.display='none';
+        lr$('lr-step-done').style.display='';
+        var doneText=lr$('lr-done-text');
+        if(doneText) doneText.textContent=(recipient===RECIPIENT_ADMIN)
+          ? 'The platform administrator will review your report and get back to you.'
+          : 'Your lecturer will review your issue and get back to you.';
+      }, function(err){
+        lrMsg('lr-submit-msg','Submit failed: '+err.message, true);
+      });
+    });
+  }
+  function wireToggle(){
+    var toggle=lr$('lr-show-form');
+    var backBtn=lr$('lr-report-back');
+    var closeBtn=lr$('lr-close-btn');
+    var wrapper=lr$('lr-wrapper');
+    var reportCard=lr$('lr-report-card');
+    if(!toggle||!reportCard) return;
+    var loginForm=document.querySelector('.loginform')||document.querySelector('#page-login-index form')||document.querySelector('form[action*="login"]');
+    toggle.addEventListener('click', function(e){
+      e.preventDefault();
+      if(loginForm) loginForm.style.display='none';
+      if(wrapper) wrapper.style.display='none';
+      reportCard.style.display='';
+    });
+    function showLoginForm(){
+      reportCard.style.display='none';
+      if(loginForm) loginForm.style.display='';
+      if(wrapper) wrapper.style.display='';
+    }
+    if(backBtn) backBtn.addEventListener('click', function(e){e.preventDefault();showLoginForm();});
+    if(closeBtn) closeBtn.addEventListener('click', function(e){e.preventDefault();showLoginForm();});
+  }
+  function boot(){
+    if(wired) return; wired=true;
+    document.querySelectorAll('.lr-recipient-btn').forEach(function(b){
+      b.addEventListener('click', function(){ setRecipient(b.getAttribute('data-recipient')); });
+    });
+    wireToggle();
+    wireLookup();
+    wireSubmit();
+  }
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', boot); }
+  else { boot(); }
 })();
 </script>
 
@@ -5470,6 +5864,16 @@ HTML;
     <div class="umat-login-report-step" id="lr-step-report" style="display:none;">
       <label for="lr-course">Course</label>
       <select id="lr-course" class="umat-login-report-input"></select>
+      <label for="lr-recipient" style="margin-top:12px;">Report To</label>
+      <div class="lr-recipient-row" id="lr-recipient" role="group" aria-label="Report recipient">
+        <button type="button" class="umat-login-report-btn lr-recipient-btn active" data-recipient="lecturer">
+          My Lecturer
+        </button>
+        <button type="button" class="umat-login-report-btn lr-recipient-btn" data-recipient="admin">
+          Platform Admin
+        </button>
+      </div>
+      <div class="umat-login-report-hint" id="lr-recipient-hint">Your report goes to the lecturer of the selected course.</div>
       <label for="lr-name" style="margin-top:12px;">Your Name <span style="font-weight:400;color:#8aa08e;">(optional)</span></label>
       <input type="text" id="lr-name" class="umat-login-report-input" placeholder="e.g. John Doe" autocomplete="off" />
       <label for="lr-desc" style="margin-top:12px;">Describe the Issue</label>
@@ -5485,7 +5889,7 @@ HTML;
       <div class="umat-login-report-success">
         <span class="material-symbols-outlined" style="font-size:48px;color:#006b2f;">check_circle</span>
         <h3>Report Submitted!</h3>
-        <p>Your lecturer will review your issue and get back to you.</p>
+        <p id="lr-done-text">Your lecturer will review your issue and get back to you.</p>
         <button class="umat-login-report-btn" id="lr-close-btn" type="button">Close &amp; return to login</button>
       </div>
     </div>

@@ -3,13 +3,15 @@
     Lecturer Analytics Dashboard — Redesign v2 (glassmorphism + Material hybrid).
 
     Layout (mobile-first, priority above the fold):
-      1. Nav bar           – course selector, refresh, export
-      2. KPI strip         – 5 KPI cards (students, at-risk, quiz avg, active, questions)
-      3. NLG insights      – natural-language insight cards (AI or template generated)
-      4. Priority actions  – what needs attention right now
-      5. Charts row        – Performance trend (ECharts line) | Risk donut | Topic heatmap
-      6. Students row      – At-risk students | What Students Are Asking
-      7. Secondary row     – Quiz analytics | Recording engagement | Resource engagement
+      1. KPI strip         – 5 KPI cards (students, at-risk, quiz avg, active, questions)
+      2. NLG insights      – natural-language insight cards (AI or template generated)
+      3. Priority actions  – what needs attention right now
+      4. Charts row        – Performance trend (ECharts line) | Risk donut | Topic heatmap
+      5. Students row      – At-risk students | What Students Are Asking
+      6. Secondary row     – Quiz analytics | Recording engagement | Resource engagement
+      (Course selector lives in the overlay header; refresh lives in the
+      "What Needs Your Attention" section header — the standalone nav bar
+      was removed on request.)
       (NLQ removed: "Ask About Your Students" now lives in the Ask AI Assistant FAB)
 
     All content is rendered by the AMD module (local_umat_ai/lecturer_analytics)
@@ -18,20 +20,6 @@
     Context (provided by JS): courseid, coursefullname
 }}
 <div class="la-dashboard" id="la-dashboard" data-courseid="{{{courseid}}}">
-
-  <!-- ═══════════════════ NAV BAR ═══════════════════ -->
-  <nav class="la-nav">
-    <div class="la-nav-brand">
-      <span class="material-symbols-outlined">analytics</span>
-      <span>Course Analytics</span>
-      <span class="la-nav-course" id="la-course-label"></span>
-    </div>
-    <div class="la-nav-filters">
-      <button class="la-btn la-btn-icon" id="la-refresh-btn" type="button" title="Refresh data" aria-label="Refresh data">
-        <span class="material-symbols-outlined" id="la-refresh-icon">refresh</span>
-      </button>
-    </div>
-  </nav>
 
   <!-- ═══════════════════ KPI STRIP ═══════════════════ -->
   <section class="la-kpi-strip" id="la-kpi-strip" aria-label="Course key indicators">
@@ -61,6 +49,9 @@
       <span class="material-symbols-outlined">auto_awesome</span>
       What Needs Your Attention
       <span class="la-pill" id="la-insights-source">AI-generated</span>
+      <button class="la-btn la-btn-icon" id="la-refresh-btn" type="button" title="Refresh data" aria-label="Refresh data">
+        <span class="material-symbols-outlined" id="la-refresh-icon">refresh</span>
+      </button>
     </h3>
     <div class="la-insight-list" id="la-insight-list"></div>
   </section>

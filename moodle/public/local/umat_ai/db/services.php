@@ -337,6 +337,18 @@ $functions = [
         'description' => 'Get AI service and system health', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
     ],
+    'local_umat_ai_admin_list_complaints' => [
+        'classname'   => '\local_umat_ai\external\admin_panel', 'methodname' => 'list_complaints',
+        'description' => 'List all issue reports / complaints for the admin overlay',
+        'type' => 'read', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
+    'local_umat_ai_admin_update_complaint' => [
+        'classname'   => '\local_umat_ai\external\admin_panel', 'methodname' => 'update_complaint',
+        'description' => 'Update complaint status, notes and response from the admin overlay',
+        'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:adminpanel',
+    ],
 
     /* ---- Login Issue Report (no auth required) ---- */
     'local_umat_ai_login_lookup_courses' => [

@@ -216,6 +216,35 @@
   color: #5a7a5e;
 }
 
+/* Recipient segmented control ("My Lecturer" / "Platform Admin") */
+.lr-recipient-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.lr-recipient-btn {
+  flex: 1;
+  padding: 9px 8px;
+  border: 1.5px solid #d4e0d0;
+  border-radius: 8px;
+  background: #f5f9f4;
+  color: #4a6a4e;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.lr-recipient-btn:hover {
+  border-color: #006b2f;
+}
+.lr-recipient-btn.active {
+  background: #006b2f;
+  border-color: #006b2f;
+  color: #fff;
+}
+
 /* Loader */
 .umat-login-report-loader {
   position: absolute;
@@ -306,4 +335,13 @@
   .umat-login-report-btn {
     margin-top: 6px;
   }
+}
+
+/* Remove the "Some courses may allow guest access" heading from the login form.
+   Targets only the h2.login-heading immediately followed by the guest login
+   form (#guestlogin) — other login headings (identity providers, instructions)
+   are untouched. Works for both the core loginform and boost_magnific
+   theme_login_form templates, which share this exact structure. */
+h2.login-heading:has(+ #guestlogin) {
+  display: none;
 }

@@ -1054,6 +1054,11 @@ class get_struggle_insights extends \external_api {
                 if (count($questionItems) >= 100) break; // batch limit
             }
 
+            // Short-circuit flag: once the AI provider rate-limits us (429),
+            // skip every remaining AI call so one switch doesn't burn 4
+            // sequential timeouts (~15s each) for nothing.
+            $aiQuotaExhausted = false;
+
             if (!empty($questionItems)) {
                 $payload = json_encode([
                     'course_id' => $cid,
@@ -1062,6 +1067,9 @@ class get_struggle_insights extends \external_api {
                 ]);
                 $raw = $client->post($cfg['url'] . '/api/v1/analytics/classify-questions', $payload);
                 $aiResult = json_decode($raw, true);
+                if (stripos((string)$raw, '429') !== false || stripos((string)$raw, 'rate limit') !== false) {
+                    $aiQuotaExhausted = true;
+                }
 
                 if ($aiResult && isset($aiResult['classifications'])) {
                     // Merge AI classifications into topic matrix
@@ -1120,7 +1128,7 @@ class get_struggle_insights extends \external_api {
             }
 
             // ── AI struggle-topics enrichment ──
-            if (!empty($topicMatrix)) {
+            if (!$aiQuotaExhausted && !empty($topicMatrix)) {
                 $aiStruggleTopics = [];
                 foreach ($topicMatrix as $tm) {
                     $aiStruggleTopics[] = [
@@ -1134,6 +1142,9 @@ class get_struggle_insights extends \external_api {
                 $payload = json_encode(['topics' => $aiStruggleTopics]);
                 $raw2 = $client->post($cfg['url'] . '/api/v1/analytics/struggle-topics', $payload);
                 $stResult = json_decode($raw2, true);
+                if (stripos((string)$raw2, '429') !== false || stripos((string)$raw2, 'rate limit') !== false) {
+                    $aiQuotaExhausted = true;
+                }
                 if ($stResult && isset($stResult['topics'])) {
                     $aiRecs = [];
                     foreach ($stResult['topics'] as $aiT) {
@@ -1152,7 +1163,7 @@ class get_struggle_insights extends \external_api {
             }
 
             // ── AI student-risk enrichment ──
-            if (!empty($atRiskStudents)) {
+            if (!$aiQuotaExhausted && !empty($atRiskStudents)) {
                 $aiStudentData = [];
                 foreach ($atRiskStudents as $s) {
                     $aiStudentData[] = [
@@ -1168,6 +1179,9 @@ class get_struggle_insights extends \external_api {
                 $payload = json_encode(['students' => $aiStudentData]);
                 $raw3 = $client->post($cfg['url'] . '/api/v1/analytics/student-risk', $payload);
                 $srResult = json_decode($raw3, true);
+                if (stripos((string)$raw3, '429') !== false || stripos((string)$raw3, 'rate limit') !== false) {
+                    $aiQuotaExhausted = true;
+                }
                 if ($srResult && isset($srResult['students'])) {
                     $aiRiskMap = [];
                     foreach ($srResult['students'] as $aiS) {
@@ -1201,7 +1215,7 @@ class get_struggle_insights extends \external_api {
             }
             $totalEvents = array_sum($eventBreakdown);
 
-            if (!empty($topicMatrix)) {
+            if (!$aiQuotaExhausted && !empty($topicMatrix)) {
                 $courseName = $DB->get_field('course', 'fullname', ['id' => $cid]) ?: 'Course';
                 $sectionSummaries = [];
                 foreach ($sectionStruggle as $ss) {
