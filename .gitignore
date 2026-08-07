@@ -201,7 +201,8 @@ moodle/local/umat_ai/amd/build/*
 .claude
 .blackbox
 .opencode
-memory
+memory/
+.remember/
 
 # ============================================================
 # Stray runtime artefacts (created when running from repo root)
@@ -248,6 +249,7 @@ docs/Execution*.md
 docs/screenshots/images.html
 docs/screenshots/dashboard.html
 tests/api_keys.py
+dy
 
 # ============================================================
 # Sreenshots and media
