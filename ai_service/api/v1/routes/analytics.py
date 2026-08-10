@@ -26,6 +26,45 @@ router   = APIRouter(tags=["analytics"])
 settings = get_settings()
 
 
+def _safe_int(value, dflt: int = 0):
+    """Coerce an untrusted LLM-provided value to int without crashing.
+
+    LLM JSON output is unpredictable — counts sometimes arrive as 'S1',
+    '12 students', or None. Extracts a leading optional-sign integer and
+    falls back to `dflt` (pass None to filter junk out entirely).
+    """
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+    if value is None:
+        return dflt
+    s = str(value).strip()
+    if not s:
+        return dflt
+    i = 1 if s[0] in '+-' else 0
+    j = i
+    while j < len(s) and s[j].isdigit():
+        j += 1
+    if j == i:
+        return dflt
+    return int(s[:j])
+
+
+def _is_llm_quota_error(e: Exception) -> bool:
+    """True when the failure is an LLM provider quota / rate-limit (429).
+
+    Endpoints use this to return a graceful degraded response instead of a
+    500 so the Moodle side can fall back to its template-generated content
+    without treating the AI service as broken.
+    """
+    msg = str(e).lower()
+    return any(k in msg for k in (
+        '429', 'quota', 'rate limit', 'rate_limit', 'too many requests',
+        'resource exhausted',
+    ))
+
+
 # ── Schemas ─────────────────────────────────────────────────
 
 class QuestionItem(BaseModel):
@@ -237,7 +276,10 @@ def _parse_llm_json(raw: str):
                         start = -1
                         continue
 
-    raise json.JSONDecodeError("No valid JSON found in LLM response")
+    # JSONDecodeError requires (msg, doc, pos) — doc/pos are only used for the
+    # rendered message; pos 0 keeps the callers' `except json.JSONDecodeError`
+    # handling intact.
+    raise json.JSONDecodeError("No valid JSON found in LLM response", raw or "", 0)
 
 
 # ── Prompts ──────────────────────────────────────────────────
@@ -620,6 +662,9 @@ async def natural_language_query(
         logger.error(f"LLM returned invalid JSON for NLQ: {result}")
         raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
     except Exception as e:
+        if _is_llm_quota_error(e):
+            logger.warning(f"NLQ: LLM quota exceeded — degraded response ({e})")
+            return NLQResponse(students=[], global_insight="")
         logger.error(f"NLQ error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -648,6 +693,9 @@ async def classify_questions(
         logger.error(f"LLM returned invalid JSON: {result}")
         raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
     except Exception as e:
+        if _is_llm_quota_error(e):
+            logger.warning(f"Classification: LLM quota exceeded — degraded response ({e})")
+            return ClassifyResponse(classifications=[], llm_used=settings.llm_provider)
         logger.error(f"Classification error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -677,6 +725,9 @@ async def struggle_topics(
         logger.error(f"LLM returned invalid JSON: {result}")
         raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
     except Exception as e:
+        if _is_llm_quota_error(e):
+            logger.warning(f"Struggle topics: LLM quota exceeded — degraded response ({e})")
+            return StruggleTopicsResponse(topics=[], summary="")
         logger.error(f"Struggle topics error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -791,24 +842,31 @@ async def extract_course_topics(
         def parse_topic(topic: dict) -> dict:
             """Parse a validated topic dict into a structured ExtractTopicsTopic."""
             ev_src = topic.get("evidence_sources", {})
+            # LLM output is untrusted: count/score fields can arrive as junk
+            # like 'S1' — coerce defensively (see _safe_int).
+            affected_ids = []
+            for s in (topic.get("affected_student_ids", []) or []):
+                v = _safe_int(s, None)
+                if v is not None:
+                    affected_ids.append(v)
             return {
                 "topic_name": topic.get("topic_name", "").strip(),
-                "struggle_score": min(100, max(0, float(topic.get("struggle_score", 50)))),
+                "struggle_score": min(100, max(0, float(topic.get("struggle_score", 50) or 0))),
                 "severity": topic.get("severity", "watch"),
                 "trend": topic.get("trend", "stable"),
-                "student_count": int(topic.get("student_count", 0)),
-                "question_count": int(topic.get("question_count", 0)),
+                "student_count": _safe_int(topic.get("student_count", 0)),
+                "question_count": _safe_int(topic.get("question_count", 0)),
                 "evidence_sources": {
-                    "chat_questions": int(ev_src.get("chat_questions", 0)),
-                    "quiz_failures": int(ev_src.get("quiz_failures", 0)),
-                    "repeated_views": int(ev_src.get("repeated_views", 0)),
-                    "assignment_failures": int(ev_src.get("assignment_failures", 0)),
-                    "issue_reports": int(ev_src.get("issue_reports", 0)),
+                    "chat_questions": _safe_int(ev_src.get("chat_questions", 0)),
+                    "quiz_failures": _safe_int(ev_src.get("quiz_failures", 0)),
+                    "repeated_views": _safe_int(ev_src.get("repeated_views", 0)),
+                    "assignment_failures": _safe_int(ev_src.get("assignment_failures", 0)),
+                    "issue_reports": _safe_int(ev_src.get("issue_reports", 0)),
                 },
                 "sample_questions": topic.get("sample_questions", [])[:3],
                 "related_materials": topic.get("related_materials", []),
                 "related_sections": topic.get("related_sections", []),
-                "affected_student_ids": [int(s) for s in (topic.get("affected_student_ids", []) or []) if s],
+                "affected_student_ids": affected_ids,
                 "suggestion": topic.get("suggestion", ""),
                 "suggestion_type": topic.get("suggestion_type", "recap"),
             }
@@ -961,6 +1019,12 @@ async def extract_course_topics(
         logger.error(f"LLM returned invalid JSON for extract-topics: {result}")
         raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
     except Exception as e:
+        if _is_llm_quota_error(e):
+            logger.warning(f"Topic extraction: LLM quota exceeded — degraded response ({e})")
+            return ExtractTopicsResponse(
+                topics=[], confidence=0.0, summary_insight="",
+                total_questions_analyzed=total_questions, from_cache=False,
+            )
         logger.error(f"Topic extraction error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1028,6 +1092,9 @@ async def _run_extraction_batch(request: ExtractTopicsRequest, batch_questions: 
             "confidence": parsed.get("confidence", 0.0),
         }
 
+    except json.JSONDecodeError as e:
+        logger.error(f"Extraction batch error: LLM returned invalid JSON: {e}")
+        return {"topics": [], "summary_insight": "", "confidence": 0.0}
     except Exception as e:
         logger.error(f"Extraction batch error: {e}")
         return {"topics": [], "summary_insight": "", "confidence": 0.0}
@@ -1050,6 +1117,9 @@ async def student_risk(
         logger.error(f"LLM returned invalid JSON: {result}")
         raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
     except Exception as e:
+        if _is_llm_quota_error(e):
+            logger.warning(f"Student risk: LLM quota exceeded — degraded response ({e})")
+            return StudentRiskResponse(students=[])
         logger.error(f"Student risk error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1148,6 +1218,13 @@ async def analytics_dashboard(
         logger.error(f"LLM returned invalid JSON for dashboard: {result}")
         raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
     except Exception as e:
+        if _is_llm_quota_error(e):
+            logger.warning(f"Dashboard: LLM quota exceeded — degraded response ({e})")
+            return DashboardResponse(
+                kpis=DashboardKPIs(engagement_score=0.0, at_risk_count=0,
+                                   total_students=0, top_topic_insight=""),
+                recommendations=[], impact_summary="",
+            )
         logger.error(f"Dashboard error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1222,6 +1299,9 @@ async def course_health(
         logger.error(f"LLM returned invalid JSON: {result}")
         raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
     except Exception as e:
+        if _is_llm_quota_error(e):
+            logger.warning(f"Course health: LLM quota exceeded — degraded response ({e})")
+            return CourseHealthResponse(overall_health="degraded")
         logger.error(f"Course health error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1360,6 +1440,9 @@ async def student_progress(
         logger.error(f"LLM returned invalid JSON for student progress: {result}")
         raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
     except Exception as e:
+        if _is_llm_quota_error(e):
+            logger.warning(f"Student progress: LLM quota exceeded — degraded response ({e})")
+            return StudentProgressResponse(recommendation="")
         logger.error(f"Student progress error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1473,7 +1556,7 @@ async def teaching_intelligence(
         recommendations = []
         for rec in parsed.get("recommendations", []):
             recommendations.append(TeachingRecommendation(
-                priority=int(rec.get("priority", 0)),
+                priority=_safe_int(rec.get("priority", 0)),
                 type=rec.get("type", "topic_review"),
                 title=rec.get("title", ""),
                 urgency=rec.get("urgency", "medium"),
@@ -1497,6 +1580,12 @@ async def teaching_intelligence(
         logger.error(f"LLM returned invalid JSON for teaching intelligence: {result}")
         raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
     except Exception as e:
+        if _is_llm_quota_error(e):
+            logger.warning(f"Teaching intelligence: LLM quota exceeded — degraded response ({e})")
+            return TeachingIntelligenceResponse(
+                recommendations=[], global_insight="",
+                course_health="", priority_focus="",
+            )
         logger.error(f"Teaching intelligence error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1634,7 +1723,7 @@ def _generate_template_insights(req: AnalyticsInsightsRequest) -> List[Analytics
     if want("topic_struggle"):
         for topic in (req.struggling_topics or [])[:3]:
             name = topic.get("name", "this topic")
-            affected = int(topic.get("affected", 0))
+            affected = _safe_int(topic.get("affected", 0))
             score = float(topic.get("struggle_score", 0))
             if score < 60 or affected > 0:
                 insights.append(AnalyticsInsight(
@@ -1724,5 +1813,11 @@ async def analytics_insights(
             generated_by="templates",
         )
     except Exception as e:
+        if _is_llm_quota_error(e):
+            logger.warning(f"Analytics insights: LLM quota exceeded — degraded response ({e})")
+            return AnalyticsInsightsResponse(
+                insights=_generate_template_insights(request),
+                generated_by="templates",
+            )
         logger.error(f"Analytics insights error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -490,7 +490,7 @@ class quizgen extends \external_api {
                 'shufflequestions'   => $config['shuffle_questions'] ?? 0,
                 'shuffleanswers'     => $config['shuffle_answers'] ?? 1,
                 'showfeedback'       => $config['show_feedback'] ?? 1,
-                'timelimit'          => $config['time_limit'] ?? 0,
+                'timelimit'          => (int)($config['time_limit'] ?? 0) * 60, // minutes -> Moodle seconds (0 = unlimited).
                 'attempts'           => $config['max_attempts'] ?? -1,
                 // Schedule
                 'timeopen'           => $config['time_open'] ?? 0,
@@ -601,16 +601,43 @@ class quizgen extends \external_api {
 
         $rows = $DB->get_records_sql($sql, ['courseid' => $params['courseid'], 'lim' => $limit]);
 
+        // Resolve course module info (id + visibility) for every created quiz
+        // in a single query so the UI can offer Publish/Hide/Delete actions.
+        $quizids = array_values(array_filter(array_map(function ($r) {
+            return (int)$r->quiz_id;
+        }, $rows)));
+        $cminfo = [];
+        if ($quizids) {
+            list($insql, $inparams) = $DB->get_in_or_equal($quizids, SQL_PARAMS_NAMED);
+            $quizmod = $DB->get_field('modules', 'id', ['name' => 'quiz'], MUST_EXIST);
+            $cms = $DB->get_records_sql(
+                "SELECT cm.id AS cmid, cm.instance, cm.visible
+                   FROM {course_modules} cm
+                  WHERE cm.module = :quizmod AND cm.instance $insql",
+                array_merge(['quizmod' => $quizmod], $inparams)
+            );
+            foreach ($cms as $c) {
+                $cminfo[(int)$c->instance] = (object)[
+                    'cmid'    => (int)$c->cmid,
+                    'visible' => (int)$c->visible,
+                ];
+            }
+        }
+
         $history = [];
         foreach ($rows as $row) {
             $config = json_decode($row->config_json, true) ?: [];
+            $quizId = (int)($row->quiz_id ?: 0);
+            $cm = $cminfo[$quizId] ?? null;
 
             $history[] = [
                 'job_id'         => (int)$row->id,
                 'status'         => $row->status,
                 'question_count' => $row->qjson_len > 2 ? max(1, intval($row->qjson_len / 200)) : 0,
                 'category_name'  => $row->category_name,
-                'quiz_id'        => (int)($row->quiz_id ?: 0),
+                'quiz_id'        => $quizId,
+                'quiz_cmid'      => $cm ? $cm->cmid : 0,
+                'visible'        => $cm ? $cm->visible : 0,
                 'failure_reason' => $row->failure_reason ?? '',
                 'timecreated'    => (int)$row->timecreated,
                 'timemodified'   => (int)$row->timemodified,
@@ -620,6 +647,11 @@ class quizgen extends \external_api {
                     'question_types'  => $config['question_types'] ?? ['multichoice'],
                     'total_questions' => $config['total_questions'] ?? 5,
                 ]),
+                // Full settings so the UI can prefill the reconfigure dialog
+                // without an extra round trip. Must be JSON-encoded — external
+                // values reject arrays/objects (strict mode throws
+                // "Invalid response value detected").
+                'config'         => json_encode($config),
             ];
         }
 
@@ -635,10 +667,13 @@ class quizgen extends \external_api {
                     'question_count' => new \external_value(PARAM_INT, 'Number of questions generated'),
                     'category_name'  => new \external_value(PARAM_TEXT, 'Quiz/category name'),
                     'quiz_id'        => new \external_value(PARAM_INT, 'Quiz activity ID (0 if not yet imported)'),
+                    'quiz_cmid'      => new \external_value(PARAM_INT, 'Course module ID of the quiz (0 if not created)'),
+                    'visible'        => new \external_value(PARAM_INT, '1 = quiz visible on course page, 0 = hidden draft'),
                     'failure_reason' => new \external_value(PARAM_TEXT, 'Error message if failed'),
                     'timecreated'    => new \external_value(PARAM_INT, 'Unix timestamp'),
                     'timemodified'   => new \external_value(PARAM_INT, 'Last update timestamp'),
                     'config_summary' => new \external_value(PARAM_RAW, 'JSON summary of generation config'),
+                    'config'         => new \external_value(PARAM_RAW, 'JSON object of the full quiz settings for reconfigure prefill'),
                 ])
             ),
         ]);
@@ -1073,6 +1108,417 @@ class quizgen extends \external_api {
                 'id' => new \external_value(PARAM_INT, 'Grouping ID'),
                 'name' => new \external_value(PARAM_TEXT, 'Grouping name'),
             ])),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // set_quiz_visible — publish (show) or unpublish (hide) a quiz on     //
+    // the course page. No external config needed: the plugin controls     //
+    // visibility directly via the standard Moodle API.                    //
+    // ------------------------------------------------------------------ //
+    public static function set_quiz_visible_parameters() {
+        return new \external_function_parameters([
+            'jobid'   => new \external_value(PARAM_INT, 'Quiz generation job ID'),
+            'visible' => new \external_value(PARAM_INT, '1 = publish to course page, 0 = hide (draft)', VALUE_DEFAULT, 1),
+        ]);
+    }
+
+    public static function set_quiz_visible($jobid, $visible = 1) {
+        global $DB;
+
+        $params = self::validate_parameters(self::set_quiz_visible_parameters(), [
+            'jobid'   => $jobid,
+            'visible' => $visible,
+        ]);
+
+        $job = $DB->get_record('umat_ai_quizgen_jobs', ['id' => $params['jobid']], '*', MUST_EXIST);
+
+        $context = \context_course::instance($job->courseid);
+        self::validate_context($context);
+        require_capability('local/umat_ai:viewanalytics', $context);
+
+        if (!$job->quiz_id) {
+            throw new \moodle_exception('quizgen_not_created', 'local_umat_ai', '', null,
+                "Job {$job->id} has no quiz activity yet.");
+        }
+        if ($job->status === 'deleted') {
+            throw new \moodle_exception('quizgen_already_deleted', 'local_umat_ai');
+        }
+
+        $quizmod = $DB->get_field('modules', 'id', ['name' => 'quiz'], MUST_EXIST);
+        $cm = $DB->get_record('course_modules', [
+            'module'   => $quizmod,
+            'instance' => $job->quiz_id,
+        ], '*', MUST_EXIST);
+
+        // Standard Moodle visibility toggle — fires course_module_updated events,
+        // updates visible/visibleold and refreshes caches.
+        set_coursemodule_visible($cm->id, (int)$params['visible']);
+
+        // Track state on the job so history can show Draft/Published status.
+        $newstatus = (int)$params['visible'] === 1 ? 'published' : 'imported';
+        $DB->update_record('umat_ai_quizgen_jobs', (object)[
+            'id'           => $job->id,
+            'status'       => $newstatus,
+            'timemodified' => time(),
+        ]);
+
+        return [
+            'status'    => $newstatus,
+            'quiz_id'   => (int)$job->quiz_id,
+            'quiz_cmid' => (int)$cm->id,
+            'visible'   => (int)$params['visible'],
+        ];
+    }
+
+    public static function set_quiz_visible_returns() {
+        return new \external_single_structure([
+            'status'    => new \external_value(PARAM_ALPHAEXT, 'published or imported (draft)'),
+            'quiz_id'   => new \external_value(PARAM_INT, 'Quiz activity ID'),
+            'quiz_cmid' => new \external_value(PARAM_INT, 'Course module ID of the quiz'),
+            'visible'   => new \external_value(PARAM_INT, '1 = visible, 0 = hidden'),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // delete_quiz — remove a draft or published quiz created by the       //
+    // plugin. Uses the standard mod_quiz deletion API so all quiz data    //
+    // (slots, attempts, grade items, course module) is cleaned up.        //
+    // Questions stay in the course question bank, matching Moodle's       //
+    // standard behaviour when deleting any quiz.                          //
+    // ------------------------------------------------------------------ //
+    public static function delete_quiz_parameters() {
+        return new \external_function_parameters([
+            'jobid' => new \external_value(PARAM_INT, 'Quiz generation job ID'),
+        ]);
+    }
+
+    public static function delete_quiz($jobid) {
+        global $DB, $CFG;
+
+        $params = self::validate_parameters(self::delete_quiz_parameters(), [
+            'jobid' => $jobid,
+        ]);
+
+        $job = $DB->get_record('umat_ai_quizgen_jobs', ['id' => $params['jobid']], '*', MUST_EXIST);
+
+        $context = \context_course::instance($job->courseid);
+        self::validate_context($context);
+        require_capability('local/umat_ai:viewanalytics', $context);
+
+        if (!$job->quiz_id) {
+            throw new \moodle_exception('quizgen_not_created', 'local_umat_ai', '', null,
+                "Job {$job->id} has no quiz activity to delete.");
+        }
+        if ($job->status === 'deleted') {
+            throw new \moodle_exception('quizgen_already_deleted', 'local_umat_ai');
+        }
+
+        require_once($CFG->dirroot . '/mod/quiz/lib.php');
+        quiz_delete_instance($job->quiz_id);
+
+        $DB->update_record('umat_ai_quizgen_jobs', (object)[
+            'id'           => $job->id,
+            'status'       => 'deleted',
+            'quiz_id'      => null,
+            'timemodified' => time(),
+        ]);
+
+        return [
+            'status'  => 'deleted',
+            'job_id'  => (int)$job->id,
+            'message' => get_string('quizgen_deleted', 'local_umat_ai'),
+        ];
+    }
+
+    public static function delete_quiz_returns() {
+        return new \external_single_structure([
+            'status'  => new \external_value(PARAM_ALPHAEXT, 'deleted on success'),
+            'job_id'  => new \external_value(PARAM_INT, 'Quiz generation job ID'),
+            'message' => new \external_value(PARAM_TEXT, 'Human-readable confirmation'),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // update_quiz_settings — reconfigure a generated quiz after creation. //
+    // Accepts a JSON object of settings (same key names as config_json).  //
+    // The merged config is saved on the job, and when a quiz activity     //
+    // exists the values are pushed into the mdl_quiz record — the same    //
+    // fields the importer sets at creation time, so the live quiz and the //
+    // stored job config never drift apart.                                //
+    // ------------------------------------------------------------------ //
+    public static function update_quiz_settings_parameters() {
+        return new \external_function_parameters([
+            'jobid'    => new \external_value(PARAM_INT, 'Quiz generation job ID'),
+            'settings' => new \external_value(PARAM_RAW, 'JSON object of settings to change'),
+        ]);
+    }
+
+    public static function update_quiz_settings($jobid, $settings = '{}') {
+        global $DB;
+
+        $params = self::validate_parameters(self::update_quiz_settings_parameters(), [
+            'jobid'    => $jobid,
+            'settings' => $settings,
+        ]);
+
+        $job = $DB->get_record('umat_ai_quizgen_jobs', ['id' => $params['jobid']], '*', MUST_EXIST);
+
+        $context = \context_course::instance($job->courseid);
+        self::validate_context($context);
+        require_capability('local/umat_ai:viewanalytics', $context);
+
+        if ($job->status === 'deleted') {
+            throw new \moodle_exception('quizgen_already_deleted', 'local_umat_ai');
+        }
+
+        $incoming = json_decode($params['settings'], true);
+        if (!is_array($incoming) || empty($incoming)) {
+            throw new \moodle_exception('quizgen_invalid_settings', 'local_umat_ai');
+        }
+
+        // Only these settings can be reconfigured after creation (same names
+        // as stored in config_json). Everything else is generation-time only.
+        $whitelist = [
+            'time_limit', 'max_attempts', 'time_open', 'time_close', 'password',
+            'browser_security', 'shuffle_questions', 'shuffle_answers', 'show_feedback',
+            'questions_per_page', 'preferred_behaviour', 'grade_method', 'nav_method',
+            'review_attempt', 'review_correctness', 'review_marks', 'review_responses',
+            'review_feedback', 'review_overall',
+        ];
+
+        $config = json_decode($job->config_json, true) ?: [];
+        $changed = [];
+        foreach ($whitelist as $key) {
+            if (array_key_exists($key, $incoming)) {
+                $config[$key] = $incoming[$key];
+                $changed[] = $key;
+            }
+        }
+        if (empty($changed)) {
+            throw new \moodle_exception('quizgen_invalid_settings', 'local_umat_ai');
+        }
+
+        // Persist the merged config on the job (drives later finalize/import).
+        $DB->update_record('umat_ai_quizgen_jobs', (object)[
+            'id'           => $job->id,
+            'config_json'  => json_encode($config),
+            'timemodified' => time(),
+        ]);
+
+        $quizupdated = false;
+        if (!empty($job->quiz_id)) {
+            $quiz = $DB->get_record('quiz', ['id' => $job->quiz_id], '*', MUST_EXIST);
+            $upd = (object)['id' => $quiz->id, 'timemodified' => time()];
+
+            if (array_key_exists('time_limit', $incoming)) {
+                $upd->timelimit = (int)$config['time_limit'] * 60; // minutes -> seconds (0 = unlimited).
+            }
+            if (array_key_exists('max_attempts', $incoming)) {
+                $upd->attempts = (int)$config['max_attempts'];
+            }
+            if (array_key_exists('time_open', $incoming)) {
+                $upd->timeopen = (int)$config['time_open'];
+            }
+            if (array_key_exists('time_close', $incoming)) {
+                $upd->timeclose = (int)$config['time_close'];
+            }
+            if (array_key_exists('password', $incoming)) {
+                $upd->password = (string)$config['password'];
+            }
+            if (array_key_exists('browser_security', $incoming)) {
+                $browserMap = [0 => '', 1 => 'securewindow', 2 => 'securewindowandcmid'];
+                $upd->browsersecurity = $browserMap[(int)$config['browser_security']] ?? '';
+            }
+            if (array_key_exists('shuffle_questions', $incoming)) {
+                // Moodle 5: shufflequestions lives on quiz_sections, not mdl_quiz.
+                $DB->set_field_select('quiz_sections', 'shufflequestions', (int)$config['shuffle_questions'], 'quizid = ?', [$quiz->id]);
+            }
+            if (array_key_exists('shuffle_answers', $incoming)) {
+                $upd->shuffleanswers = (int)$config['shuffle_answers'];
+            }
+            if (array_key_exists('questions_per_page', $incoming)) {
+                // Pagination is stored on mdl_quiz.questionsperpage (quiz_sections
+                // has no such column in Moodle 5).
+                $upd->questionsperpage = (int)$config['questions_per_page'];
+            }
+            if (array_key_exists('preferred_behaviour', $incoming)) {
+                $upd->preferredbehaviour = $config['preferred_behaviour'];
+            }
+            if (array_key_exists('grade_method', $incoming)) {
+                $upd->grademethod = (int)$config['grade_method'];
+            }
+            if (array_key_exists('nav_method', $incoming)) {
+                $upd->navmethod = $config['nav_method'] === 'sequential' ? 'sequential' : 'free';
+            }
+
+            // Review options are stored as bitfields on mdl_quiz. When any
+            // review_* flag changes, recompute them all (same mapping the
+            // importer uses at creation time) to keep them consistent.
+            // NOTE: 'review responses' (reviewresponses) column was removed
+            // in Moodle 5 — the setting is kept in config_json but cannot be
+            // written to the quiz record anymore.
+            $reviewKeys = [
+                'review_attempt'     => 'reviewattempt',
+                'review_correctness' => 'reviewcorrectness',
+                'review_marks'       => 'reviewmarks',
+                'review_feedback'    => 'reviewfeedback',
+                'review_overall'     => 'reviewoverall',
+            ];
+            if (array_intersect(array_keys($reviewKeys), $changed)) {
+                $during = \mod_quiz\question\display_options::DURING;
+                $immediately = \mod_quiz\question\display_options::IMMEDIATELY_AFTER;
+                $open = \mod_quiz\question\display_options::LATER_WHILE_OPEN;
+                $closed = \mod_quiz\question\display_options::AFTER_CLOSE;
+                $allphases = $during | $immediately | $open | $closed;
+                $allbutduring = $immediately | $open | $closed;
+
+                $rAttempt   = (int)($config['review_attempt'] ?? 1) ? $allphases : 0;
+                $rCorrect   = (int)($config['review_correctness'] ?? 1) ? $allphases : 0;
+                $rMarks     = (int)($config['review_marks'] ?? 1) ? $allphases : 0;
+                $rFeedback  = (int)($config['review_feedback'] ?? 1) ? $allphases : 0;
+                $rOverall   = (int)($config['review_overall'] ?? 1) ? $allbutduring : 0;
+
+                $upd->reviewattempt          = $rAttempt;
+                $upd->reviewcorrectness      = $rCorrect;
+                $upd->reviewmarks            = $rMarks;
+                $upd->reviewspecificfeedback = $rFeedback;
+                $upd->reviewgeneralfeedback  = $rFeedback;
+                $upd->reviewrightanswer      = $rCorrect;
+                $upd->reviewoverallfeedback  = $rOverall;
+            }
+
+            $DB->update_record('quiz', $upd);
+            $quizupdated = true;
+        }
+
+        return [
+            'status'       => 'updated',
+            'job_id'       => (int)$job->id,
+            'quiz_id'      => (int)($job->quiz_id ?: 0),
+            'quiz_updated' => $quizupdated ? 1 : 0,
+            'updated_keys' => implode(',', $changed),
+            'config'       => json_encode($config),
+        ];
+    }
+
+    public static function update_quiz_settings_returns() {
+        return new \external_single_structure([
+            'status'       => new \external_value(PARAM_ALPHAEXT, 'updated on success'),
+            'job_id'       => new \external_value(PARAM_INT, 'Quiz generation job ID'),
+            'quiz_id'      => new \external_value(PARAM_INT, 'Quiz activity ID (0 if not created yet)'),
+            'quiz_updated' => new \external_value(PARAM_INT, '1 = live quiz updated, 0 = settings saved for later import only'),
+            'updated_keys' => new \external_value(PARAM_TEXT, 'Comma-separated list of changed settings'),
+            'config'       => new \external_value(PARAM_RAW, 'Updated full settings object (JSON)'),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ //
+    // reopen_quiz — make a generated quiz available to students again.    //
+    // Clears an expired close date and/or a future open date so the quiz  //
+    // is available immediately, and re-shows it on the course page if it  //
+    // was hidden. Existing finished attempts are kept (lecturers can      //
+    // remove individual attempts from the standard quiz reports if        //
+    // needed).                                                            //
+    // ------------------------------------------------------------------ //
+    public static function reopen_quiz_parameters() {
+        return new \external_function_parameters([
+            'jobid' => new \external_value(PARAM_INT, 'Quiz generation job ID'),
+        ]);
+    }
+
+    public static function reopen_quiz($jobid) {
+        global $DB;
+
+        $params = self::validate_parameters(self::reopen_quiz_parameters(), [
+            'jobid' => $jobid,
+        ]);
+
+        $job = $DB->get_record('umat_ai_quizgen_jobs', ['id' => $params['jobid']], '*', MUST_EXIST);
+
+        $context = \context_course::instance($job->courseid);
+        self::validate_context($context);
+        require_capability('local/umat_ai:viewanalytics', $context);
+
+        if (!$job->quiz_id) {
+            throw new \moodle_exception('quizgen_not_created', 'local_umat_ai', '', null,
+                "Job {$job->id} has no quiz activity yet.");
+        }
+        if ($job->status === 'deleted') {
+            throw new \moodle_exception('quizgen_already_deleted', 'local_umat_ai');
+        }
+
+        $quiz = $DB->get_record('quiz', ['id' => $job->quiz_id], '*', MUST_EXIST);
+        $now = time();
+        $changed = [];
+
+        // 1) Clear a close date that has already passed.
+        $upd = (object)['id' => $quiz->id, 'timemodified' => $now];
+        if ($quiz->timeclose > 0 && $quiz->timeclose < $now) {
+            $upd->timeclose = 0;
+            $changed[] = 'timeclose';
+        }
+        // 2) Clear a future open date so the quiz is available right now.
+        if ($quiz->timeopen > 0 && $quiz->timeopen > $now) {
+            $upd->timeopen = 0;
+            $changed[] = 'timeopen';
+        }
+        if ($changed) {
+            $DB->update_record('quiz', $upd);
+        }
+
+        // 3) Make sure the quiz is visible on the course page.
+        $quizmod = $DB->get_field('modules', 'id', ['name' => 'quiz'], MUST_EXIST);
+        $cm = $DB->get_record('course_modules', [
+            'module'   => $quizmod,
+            'instance' => $quiz->id,
+        ], '*', MUST_EXIST);
+        if (!$cm->visible) {
+            set_coursemodule_visible($cm->id, 1);
+            $cm->visible = 1;
+            $changed[] = 'visible';
+        }
+
+        // Mirror schedule changes into config_json so the stored job config
+        // stays in sync with the live quiz (used by later re-finalize).
+        if ($changed) {
+            $config = json_decode($job->config_json, true) ?: [];
+            if (in_array('timeclose', $changed, true)) {
+                $config['time_close'] = 0;
+            }
+            if (in_array('timeopen', $changed, true)) {
+                $config['time_open'] = 0;
+            }
+            $DB->update_record('umat_ai_quizgen_jobs', (object)[
+                'id'           => $job->id,
+                'status'       => 'published',
+                'config_json'  => json_encode($config),
+                'timemodified' => $now,
+            ]);
+        } else {
+            $DB->update_record('umat_ai_quizgen_jobs', (object)[
+                'id'           => $job->id,
+                'status'       => 'published',
+                'timemodified' => $now,
+            ]);
+        }
+
+        return [
+            'status'  => 'reopened',
+            'job_id'  => (int)$job->id,
+            'quiz_id' => (int)$quiz->id,
+            'visible' => (int)$cm->visible,
+            'changes' => implode(',', $changed ?: ['none']),
+        ];
+    }
+
+    public static function reopen_quiz_returns() {
+        return new \external_single_structure([
+            'status'  => new \external_value(PARAM_ALPHAEXT, 'reopened on success'),
+            'job_id'  => new \external_value(PARAM_INT, 'Quiz generation job ID'),
+            'quiz_id' => new \external_value(PARAM_INT, 'Quiz activity ID'),
+            'visible' => new \external_value(PARAM_INT, '1 = visible on course page'),
+            'changes' => new \external_value(PARAM_TEXT, 'Comma-separated list of what was changed (none = already open)'),
         ]);
     }
 }

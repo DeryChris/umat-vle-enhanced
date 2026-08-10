@@ -65,6 +65,7 @@ define(['core/ajax'], function(Ajax) {
 
     function init(courseId) {
         _currentCid = courseId;
+        ensureHistoryDelegation();
         var body = document.getElementById('qgen-body');
         if (!body) return;
 
@@ -1244,6 +1245,22 @@ define(['core/ajax'], function(Ajax) {
                 handleMaterialRetry(this, cid);
             });
         });
+        // Clicking a material card toggles its selection checkbox, unless a
+        // button inside the card (retry / BBB actions) was clicked instead.
+        list.querySelectorAll('.qgen-mat-item').forEach(function(item) {
+            var chk = item.querySelector('.qgen-mat-check');
+            if (!chk) return;
+            item.addEventListener('click', function(e) {
+                if (e.target.closest('button')) return;
+                if (chk.disabled) return;
+                chk.checked = !chk.checked;
+                item.classList.toggle('selected', chk.checked);
+            });
+            // Keep the card highlight in sync if the checkbox is toggled directly.
+            chk.addEventListener('change', function() {
+                item.classList.toggle('selected', chk.checked);
+            });
+        });
     }
 
     function renderResourceFilterChips() {
@@ -1269,12 +1286,23 @@ define(['core/ajax'], function(Ajax) {
             var icon = getFileIcon(m.mimetype || '');
             if (isBBB) icon = 'videocam';
 
+            // ChromaDB stores material_id = Moodle FILE id (see index_course_materials /
+            // material_uploaded event). That is the ID the AI service filters on when
+            // pulling indexed content. fileid=0 manual disk uploads store the
+            // umat_ai_materials.id instead, so fall back to material_id when id is 0.
+            var selId = m.id || m.material_id || 0;
+            var canSelect = isReady && selId > 0;
+            var lockHint = canSelect ? 'Click to select this material' :
+                (isBBB ? 'Recordings cannot be used as a quiz source yet' :
+                'Not indexed yet - select another material or retry indexing');
+
             var elementClasses = 'qgen-mat-item';
             if (isBBB) elementClasses += ' qgen-mat-item-bbb';
             if (isDocument) elementClasses += ' qgen-mat-item-document';
             if (isProcessing) elementClasses += ' qgen-mat-item-processing';
             if (isFailed) elementClasses += ' qgen-mat-item-failed';
             if (isHidden) elementClasses += ' qgen-mat-item-hidden';
+            elementClasses += canSelect ? ' qgen-mat-item-selectable' : ' qgen-mat-item-locked';
 
             var label = esc(m.filename || m.name || 'Material ' + m.id);
             if (isBBB) {
@@ -1303,6 +1331,7 @@ define(['core/ajax'], function(Ajax) {
             }
 
             return '<div class="' + elementClasses + '" data-resource-type="' + (m.resource_type || 'document') + '" data-status="' + (m.status || 'not_indexed') + '" data-hidden="' + (isHidden ? '1' : '0') + '">' +
+                '<input type="checkbox" class="qgen-mat-check" value="' + selId + '"' + (canSelect ? '' : ' disabled') + ' title="' + lockHint + '" aria-label="Select ' + label + '">' +
                 '<div class="qgen-mat-header">' +
                 '<div class="qgen-mat-icon-wrap">' +
                 '<span class="qgen-mat-icon material-symbols-outlined">' + icon + '</span>' +
@@ -1403,7 +1432,7 @@ define(['core/ajax'], function(Ajax) {
         var matId = parseInt(btn.dataset.matid);
         var row = btn.closest('.qgen-mat-item');
         var badge = row.querySelector('.qgen-mat-badge');
-        var name = row.querySelector('.qgen-mat-name');
+        var name = row.querySelector('.qgen-mat-title');
         var origText = badge.textContent;
         var origName = name ? name.textContent : '';
 
@@ -2561,11 +2590,7 @@ define(['core/ajax'], function(Ajax) {
                 }
             }])[0].done(function(result) {
                 if (result.status === 'imported') {
-                    msgEl.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">check_circle</span> Quiz created! ' +
-                        result.question_count + ' questions imported.' +
-                        '<br><a href="' + window.location.origin + '/mod/quiz/view.php?id=' + result.quiz_cmid + '" target="_blank" style="font-weight:700;color:var(--u-p);">Open Quiz \u2192</a>';
-                    msgEl.style.color = 'var(--u-sec)';
-                    btn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Quiz Created!';
+                    showQuizCreatedMsg(msgEl, btn, jobId, result);
                 } else {
                     msgEl.textContent = 'Unexpected status: ' + result.status;
                     msgEl.style.color = 'var(--u-ter)';
@@ -2589,11 +2614,7 @@ define(['core/ajax'], function(Ajax) {
                 }
             }])[0].done(function(result) {
                 if (result.status === 'imported') {
-                    msgEl.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">check_circle</span> Quiz created! ' +
-                        result.question_count + ' questions imported.' +
-                        '<br><a href="' + window.location.origin + '/mod/quiz/view.php?id=' + result.quiz_cmid + '" target="_blank" style="font-weight:700;color:var(--u-p);">Open Quiz \u2192</a>';
-                    msgEl.style.color = 'var(--u-sec)';
-                    btn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Quiz Created!';
+                    showQuizCreatedMsg(msgEl, btn, jobId, result);
                 } else {
                     msgEl.textContent = 'Unexpected status: ' + result.status;
                     msgEl.style.color = 'var(--u-ter)';
@@ -2607,6 +2628,47 @@ define(['core/ajax'], function(Ajax) {
                 btn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Approve & Create Quiz';
             });
         });
+    }
+
+    // Render the post-creation state: quiz is a hidden draft by default.
+    // Offer Publish to Course / Save as Draft / Open Quiz — all inside the plugin,
+    // no external Moodle configuration required.
+    function showQuizCreatedMsg(msgEl, btn, jobId, result) {
+        msgEl.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">check_circle</span> Quiz created! ' +
+            result.question_count + ' questions imported.' +
+            '<br><span style="opacity:.85;font-size:12px;">' + 'Created as a draft — students cannot see it yet. Publish it to make it available on the course page.' + '</span>' +
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">' +
+            '<button type="button" id="qgen-after-publish" class="qgen-act-btn qgen-act-publish" style="font-weight:700;"><span class="material-symbols-outlined">publish</span> Publish to Course</button>' +
+            '<button type="button" id="qgen-after-draft" class="qgen-act-btn"><span class="material-symbols-outlined">save</span> Save as Draft</button>' +
+            '<a href="' + window.location.origin + '/mod/quiz/view.php?id=' + result.quiz_cmid + '" target="_blank" style="font-weight:700;color:var(--u-p);display:inline-flex;align-items:center;gap:4px;padding:6px 10px;text-decoration:none;">Open Quiz \u2192</a>' +
+            '</div>';
+        msgEl.style.color = 'var(--u-sec)';
+        btn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Quiz Created!';
+
+        var pubBtn = document.getElementById('qgen-after-publish');
+        if (pubBtn) {
+            pubBtn.addEventListener('click', function() {
+                pubBtn.disabled = true;
+                Ajax.call([{
+                    methodname: 'local_umat_ai_set_quiz_visible',
+                    args: { jobid: jobId, visible: 1 }
+                }])[0].done(function() {
+                    msgEl.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">publish</span> Quiz published to the course page. Students can now see and attempt it.';
+                    loadHistory();
+                }).fail(function(e) {
+                    pubBtn.disabled = false;
+                    msgEl.innerHTML = 'Publish failed: ' + (e.message || 'Error');
+                    msgEl.style.color = 'var(--u-ter)';
+                });
+            });
+        }
+        var draftBtn = document.getElementById('qgen-after-draft');
+        if (draftBtn) {
+            draftBtn.addEventListener('click', function() {
+                msgEl.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">save</span> Quiz saved as a draft. You can publish or delete it later from the history below.';
+                loadHistory();
+            });
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -2776,6 +2838,51 @@ define(['core/ajax'], function(Ajax) {
     //  HISTORY
     // ═══════════════════════════════════════════════════════════
 
+    // Single delegated click handler for every history action button.
+    // Buttons carry data-act (view|retry|pub|hide|del|settings|reopen) and
+    // data-job attributes; the matching job is looked up from _allJobsData.
+    // Attached once per page load — immune to re-renders of the table.
+    var _historyDelegated = false;
+
+    function ensureHistoryDelegation() {
+        if (_historyDelegated) return;
+        _historyDelegated = true;
+
+        document.addEventListener('click', function(e) {
+            var el = e.target;
+            var btn = el && el.closest ? el.closest('.qgen-act-btn') : null;
+            if (!btn || btn.tagName === 'A') {
+                return; // Anchors (Open quiz) navigate normally.
+            }
+            var act = btn.getAttribute('data-act');
+            var jobId = parseInt(btn.getAttribute('data-job'), 10);
+            if (!act || !jobId) return;
+
+            var job = null;
+            for (var i = 0; i < _allJobsData.length; i++) {
+                if (_allJobsData[i].job_id === jobId) { job = _allJobsData[i]; break; }
+            }
+            if (!job) return;
+
+            e.preventDefault();
+            try {
+                switch (act) {
+                    case 'view':     viewJobQuestions(job.job_id); break;
+                    case 'retry':    retryJob(job); break;
+                    case 'pub':      setQuizVisible(job, 1); break;
+                    case 'hide':     setQuizVisible(job, 0); break;
+                    case 'del':      deleteQuiz(job); break;
+                    case 'settings': openQuizSettingsModal(job); break;
+                    case 'reopen':   reopenQuiz(job); break;
+                    default: break;
+                }
+            } catch (err) {
+                console.error('[qgen] action "' + act + '" failed:', err);
+                showMsg('Action failed: ' + (err && err.message ? err.message : 'Unknown error'), 'var(--u-ter)');
+            }
+        });
+    }
+
     function loadHistory() {
         var container = document.getElementById('qgen-tab-history');
         container.innerHTML = '<div class="qgen-loading"><span class="material-symbols-outlined" style="animation:spin 1s linear infinite;">refresh</span> Loading history\u2026</div>';
@@ -2804,7 +2911,7 @@ define(['core/ajax'], function(Ajax) {
         jobs.forEach(function(j) {
             var date = new Date(j.timecreated * 1000);
             var dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-            var statusLabel = j.status.charAt(0).toUpperCase() + j.status.slice(1);
+            var statusLabel = statusLabelFor(j);
             var config = {};
             try { config = JSON.parse(j.config_summary || '{}'); } catch(e) {}
             var qtypes = config.question_types || [];
@@ -2818,7 +2925,7 @@ define(['core/ajax'], function(Ajax) {
             html += '<tr class="qgen-hrow-' + j.status + '">' +
                 '<td class="qgen-hdate">' + esc(dateStr) + '</td>' +
                 '<td class="qgen-hname">' + esc(j.category_name) + '</td>' +
-                '<td><span class="qgen-status-badge ' + j.status + '">' + statusLabel + '</span></td>' +
+                '<td><span class="qgen-status-badge ' + (j.quiz_id > 0 ? (j.visible ? 'published' : 'draft') : j.status) + '">' + statusLabel + '</span></td>' +
                 '<td class="qgen-hconfig">' + esc(configStr) + '</td>' +
                 '<td>' + j.question_count + '</td>' +
                 '<td class="qgen-hactions">' + actionButtons(j) + '</td>' +
@@ -2828,26 +2935,326 @@ define(['core/ajax'], function(Ajax) {
         html += '</tbody></table></div>';
         container.innerHTML = html;
 
-        jobs.forEach(function(j) {
-            var viewBtn = document.getElementById('qgen-view-' + j.job_id);
-            if (viewBtn) viewBtn.addEventListener('click', function() { viewJobQuestions(j.job_id); });
-            var retryBtn = document.getElementById('qgen-retry-' + j.job_id);
-            if (retryBtn) retryBtn.addEventListener('click', function() { retryJob(j); });
-        });
+        // No per-button listeners here — all action buttons are handled by the
+        // single delegated click listener (ensureHistoryDelegation) which uses
+        // data-act/data-job attributes. This survives any re-render.
+    }
+
+    // Human-readable status label. Once a quiz activity exists the status is
+    // derived from its visibility: Draft (hidden) or Published (on course page).
+    function statusLabelFor(j) {
+        if (j.status === 'deleted') return 'Deleted';
+        if (j.quiz_id > 0) return j.visible ? 'Published' : 'Draft';
+        return j.status.charAt(0).toUpperCase() + j.status.slice(1);
     }
 
     function actionButtons(j) {
         var btns = '';
+        var job = 'data-act data-job="' + j.job_id + '"';
+        // Note: every button carries data-act + data-job and is handled by a
+        // single delegated listener (ensureHistoryDelegation), so buttons keep
+        // working no matter how/when the table is re-rendered.
         if (j.status === 'completed' || j.status === 'imported' || j.status === 'importing') {
-            btns += '<button class="qgen-act-btn" id="qgen-view-' + j.job_id + '" title="View questions"><span class="material-symbols-outlined">visibility</span></button>';
+            btns += '<button class="qgen-act-btn" data-act="view" data-job="' + j.job_id + '" id="qgen-view-' + j.job_id + '" title="View questions"><span class="material-symbols-outlined">visibility</span></button>';
         }
         if (j.quiz_id > 0) {
-            btns += '<a href="' + window.location.origin + '/mod/quiz/view.php?id=' + j.quiz_id + '" target="_blank" class="qgen-act-btn" title="Open quiz"><span class="material-symbols-outlined">open_in_new</span></a>';
+            // The quiz activity exists: offer publish/hide/delete based on state.
+            var cmid = j.quiz_cmid || j.quiz_id;
+            btns += '<a href="' + window.location.origin + '/mod/quiz/view.php?id=' + cmid + '" target="_blank" class="qgen-act-btn" title="Open quiz"><span class="material-symbols-outlined">open_in_new</span></a>';
+            btns += '<button class="qgen-act-btn" data-act="settings" data-job="' + j.job_id + '" id="qgen-settings-' + j.job_id + '" title="Reconfigure quiz settings"><span class="material-symbols-outlined">tune</span></button>';
+            btns += '<button class="qgen-act-btn" data-act="reopen" data-job="' + j.job_id + '" id="qgen-reopen-' + j.job_id + '" title="Reopen quiz for attempts"><span class="material-symbols-outlined">lock_open</span></button>';
+            if (j.visible) {
+                btns += '<button class="qgen-act-btn" data-act="hide" data-job="' + j.job_id + '" id="qgen-hide-' + j.job_id + '" title="Hide quiz (draft)"><span class="material-symbols-outlined">visibility_off</span></button>';
+            } else {
+                btns += '<button class="qgen-act-btn qgen-act-publish" data-act="pub" data-job="' + j.job_id + '" id="qgen-pub-' + j.job_id + '" title="Publish to course page"><span class="material-symbols-outlined">publish</span></button>';
+            }
+            btns += '<button class="qgen-act-btn qgen-act-danger" data-act="del" data-job="' + j.job_id + '" id="qgen-del-' + j.job_id + '" title="Delete quiz"><span class="material-symbols-outlined">delete</span></button>';
         }
         if (j.status === 'failed') {
-            btns += '<button class="qgen-act-btn" id="qgen-retry-' + j.job_id + '" title="Retry"><span class="material-symbols-outlined">refresh</span></button>';
+            btns += '<button class="qgen-act-btn" data-act="retry" data-job="' + j.job_id + '" id="qgen-retry-' + j.job_id + '" title="Retry"><span class="material-symbols-outlined">refresh</span></button>';
         }
         return btns;
+    }
+
+    // Publish (visible=1) or hide (visible=0) a generated quiz on the course page.
+    function setQuizVisible(j, visible) {
+        var label = visible ? 'Publish' : 'Hide';
+        if (visible && !window.confirm('Publish this quiz to the course page so students can see it?')) {
+            return;
+        }
+        Ajax.call([{
+            methodname: 'local_umat_ai_set_quiz_visible',
+            args: { jobid: j.job_id, visible: visible }
+        }])[0].done(function(result) {
+            showMsg(result.visible ? 'Quiz published to the course page. Students can now see and attempt it.'
+                                    : 'Quiz hidden. It is saved as a draft and can be published later.',
+                    'var(--u-sec)');
+            loadHistory();
+        }).fail(function(e) {
+            showMsg(label + ' failed: ' + (e.message || 'Error'), 'var(--u-ter)');
+        });
+    }
+
+    // Delete a generated quiz (draft or published) from the course.
+    function deleteQuiz(j) {
+        if (!window.confirm('Delete this quiz? This removes the quiz activity from the course. Generated questions stay in the question bank.')) {
+            return;
+        }
+        Ajax.call([{
+            methodname: 'local_umat_ai_delete_quiz',
+            args: { jobid: j.job_id }
+        }])[0].done(function(result) {
+            showMsg(result.message || 'Quiz deleted successfully.', 'var(--u-sec)');
+            loadHistory();
+        }).fail(function(e) {
+            showMsg('Delete failed: ' + (e.message || 'Error'), 'var(--u-ter)');
+        });
+    }
+
+    // ---- Reconfigure quiz settings ----------------------------------- //
+
+    // Unix timestamp -> value for <input type="datetime-local"> (local time).
+    function tsToLocalInput(ts) {
+        if (!ts) return '';
+        var d = new Date(ts * 1000);
+        var p = function(n) { return (n < 10 ? '0' : '') + n; };
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+            'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+
+    // <input type="datetime-local"> value -> Unix timestamp (local time).
+    function localInputToTs(str) {
+        if (!str) return 0;
+        var t = Date.parse(str);
+        return isNaN(t) ? 0 : Math.floor(t / 1000);
+    }
+
+    // Modal listing the settings that can be changed after a quiz exists.
+    // Prefilled from the job's stored config so lecturers can tweak time
+    // limit, attempts, schedule, security and review options and re-apply.
+    function openQuizSettingsModal(j) {
+        try {
+        var cfg = j.config || {};
+        try { if (typeof cfg === 'string') cfg = JSON.parse(cfg); } catch (e) { cfg = {}; }
+
+        var chk = function(v) { return v ? 'checked' : ''; };
+        var sel = function(cur, val) { return String(cur) === String(val) ? 'selected' : ''; };
+
+        var modalHtml = '<div class="qgen-modal-overlay" id="qgen-settings-overlay">' +
+            '<div class="qgen-modal" id="qgen-settings-modal">' +
+            '<div class="qgen-modal-header">' +
+            '<h3><span class="material-symbols-outlined">tune</span> Reconfigure Quiz: ' + esc(j.category_name) + '</h3>' +
+            '<button type="button" class="qgen-modal-close" id="qgen-settings-close"><span class="material-symbols-outlined">close</span></button>' +
+            '</div>' +
+            '<div class="qgen-modal-body">' +
+            '<p class="qgen-hint">Changes are applied to the quiz activity immediately and saved to the job config.</p>' +
+
+            '<div class="qgen-field-row">' +
+            '<div class="qgen-field">' +
+            '  <label>Time Limit (min)</label>' +
+            '  <input type="number" id="qgen-set-timelimit" class="qgen-input" value="' + esc(cfg.time_limit || 0) + '" min="0" max="600">' +
+            '</div>' +
+            '<div class="qgen-field">' +
+            '  <label>Max Attempts</label>' +
+            '  <input type="number" id="qgen-set-maxattempts" class="qgen-input" value="' + esc(cfg.max_attempts === undefined ? -1 : cfg.max_attempts) + '" min="-1" max="10">' +
+            '</div>' +
+            '</div>' +
+
+            '<div class="qgen-toggle-row">' +
+            '<label class="qgen-check-label"><input type="checkbox" id="qgen-set-shuffle-q" ' + chk(cfg.shuffle_questions) + '> Shuffle question order</label>' +
+            '<label class="qgen-check-label"><input type="checkbox" id="qgen-set-shuffle-a" ' + chk(cfg.shuffle_answers) + '> Shuffle answers</label>' +
+            '<label class="qgen-check-label"><input type="checkbox" id="qgen-set-show-fb" ' + chk(cfg.show_feedback) + '> Show feedback</label>' +
+            '</div>' +
+
+            '<div class="qgen-field-row">' +
+            '<div class="qgen-field">' +
+            '  <label>Open Date &amp; Time</label>' +
+            '  <input type="datetime-local" id="qgen-set-timeopen" class="qgen-input" value="' + esc(tsToLocalInput(cfg.time_open)) + '">' +
+            '</div>' +
+            '<div class="qgen-field">' +
+            '  <label>Close Date &amp; Time (Deadline)</label>' +
+            '  <input type="datetime-local" id="qgen-set-timeclose" class="qgen-input" value="' + esc(tsToLocalInput(cfg.time_close)) + '">' +
+            '</div>' +
+            '</div>' +
+
+            '<div class="qgen-field-row">' +
+            '<div class="qgen-field">' +
+            '  <label>Exam Password <span class="qgen-hint">(leave blank for none)</span></label>' +
+            '  <input type="text" id="qgen-set-password" class="qgen-input" value="' + esc(cfg.password || '') + '" placeholder="Optional password for quiz access">' +
+            '</div>' +
+            '<div class="qgen-field">' +
+            '  <label>Browser Security</label>' +
+            '  <select id="qgen-set-browser-security" class="qgen-select">' +
+            '    <option value="0" ' + sel(cfg.browser_security, 0) + '>None</option>' +
+            '    <option value="1" ' + sel(cfg.browser_security, 1) + '>Full screen pop-up with some JavaScript security</option>' +
+            '    <option value="2" ' + sel(cfg.browser_security, 2) + '>Full screen pop-up with JavaScript security and copy/paste restricted</option>' +
+            '  </select>' +
+            '</div>' +
+            '</div>' +
+
+            '<div class="qgen-field-row">' +
+            '<div class="qgen-field">' +
+            '  <label>Question Behaviour</label>' +
+            '  <select id="qgen-set-behaviour" class="qgen-select">' +
+            '    <option value="deferredfeedback" ' + sel(cfg.preferred_behaviour, 'deferredfeedback') + '>Deferred feedback (recommended)</option>' +
+            '    <option value="adaptive" ' + sel(cfg.preferred_behaviour, 'adaptive') + '>Adaptive mode</option>' +
+            '    <option value="adaptive_no_penalty" ' + sel(cfg.preferred_behaviour, 'adaptive_no_penalty') + '>Adaptive mode (no penalties)</option>' +
+            '    <option value="interactive" ' + sel(cfg.preferred_behaviour, 'interactive') + '>Interactive with multiple tries</option>' +
+            '    <option value="interactive_no_certificate" ' + sel(cfg.preferred_behaviour, 'interactive_no_certificate') + '>Interactive (no certificates)</option>' +
+            '  </select>' +
+            '</div>' +
+            '<div class="qgen-field">' +
+            '  <label>Grading Method</label>' +
+            '  <select id="qgen-set-grademethod" class="qgen-select">' +
+            '    <option value="1" ' + sel(cfg.grade_method, 1) + '>Mean of all attempts</option>' +
+            '    <option value="2" ' + sel(cfg.grade_method, 2) + '>Highest attempt</option>' +
+            '    <option value="4" ' + sel(cfg.grade_method, 4) + '>First attempt</option>' +
+            '    <option value="6" ' + sel(cfg.grade_method, 6) + '>Last attempt</option>' +
+            '  </select>' +
+            '</div>' +
+            '</div>' +
+
+            '<div class="qgen-field-row">' +
+            '<div class="qgen-field">' +
+            '  <label>Navigation Method</label>' +
+            '  <select id="qgen-set-navmethod" class="qgen-select">' +
+            '    <option value="free" ' + sel(cfg.nav_method, 'free') + '>Free (students answer in any order)</option>' +
+            '    <option value="sequential" ' + sel(cfg.nav_method, 'sequential') + '>Sequential (must answer in order)</option>' +
+            '  </select>' +
+            '</div>' +
+            '<div class="qgen-field">' +
+            '  <label>Questions per Page</label>' +
+            '  <input type="number" id="qgen-set-ppp" class="qgen-input" value="' + esc(cfg.questions_per_page || 0) + '" min="0" max="50">' +
+            '  <span class="qgen-hint">0 = all on one page</span>' +
+            '</div>' +
+            '</div>' +
+
+            '<div class="qgen-toggle-row">' +
+            '<label class="qgen-check-label"><input type="checkbox" id="qgen-set-review-attempt" ' + chk(cfg.review_attempt) + '> During attempt: attempt</label>' +
+            '<label class="qgen-check-label"><input type="checkbox" id="qgen-set-review-correctness" ' + chk(cfg.review_correctness) + '> During attempt: correctness</label>' +
+            '<label class="qgen-check-label"><input type="checkbox" id="qgen-set-review-marks" ' + chk(cfg.review_marks) + '> During attempt: marks</label>' +
+            '</div>' +
+            '<div class="qgen-toggle-row">' +
+            '<label class="qgen-check-label"><input type="checkbox" id="qgen-set-review-responses" ' + chk(cfg.review_responses) + '> After attempt: responses</label>' +
+            '<label class="qgen-check-label"><input type="checkbox" id="qgen-set-review-feedback" ' + chk(cfg.review_feedback) + '> After attempt: feedback</label>' +
+            '<label class="qgen-check-label"><input type="checkbox" id="qgen-set-review-overall" ' + chk(cfg.review_overall) + '> After attempt: overall feedback</label>' +
+            '</div>' +
+
+            '</div>' +
+            '<div class="qgen-modal-footer">' +
+            '<button type="button" class="umat-btn-s" id="qgen-settings-cancel">Cancel</button>' +
+            '<button type="button" class="umat-btn-p" id="qgen-settings-save"><span class="material-symbols-outlined">save</span> Save Settings</button>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+
+        // Append inside the dashboard's quizgen tab pane, NOT document.body:
+        // the modal then shares the dashboard's stacking context and always
+        // overlays it (a body-level fixed overlay can end up behind the
+        // dashboard's own stacking layers).
+        var host = document.getElementById('lec-quizgen') || document.body;
+        host.insertAdjacentHTML('beforeend', modalHtml);
+        var overlay = document.getElementById('qgen-settings-overlay');
+        if (!overlay) {
+            console.error('[qgen] settings modal overlay not found.');
+            return;
+        }
+
+        function closeModal() { if (overlay) overlay.remove(); }
+
+        document.getElementById('qgen-settings-close').addEventListener('click', closeModal);
+        document.getElementById('qgen-settings-cancel').addEventListener('click', closeModal);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) closeModal(); });
+        document.getElementById('qgen-settings-save').addEventListener('click', function() {
+            saveQuizSettings(j, closeModal);
+        });
+        } catch (err) {
+            console.error('[qgen] openQuizSettingsModal failed:', err);
+            showMsg('Could not open settings: ' + (err && err.message ? err.message : 'Unknown error'), 'var(--u-ter)');
+        }
+    }
+
+    // Collect the modal fields and push them to update_quiz_settings.
+    function saveQuizSettings(j, closeModal) {
+        var saveBtn = document.getElementById('qgen-settings-save');
+        function restoreBtn() {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<span class="material-symbols-outlined">save</span> Save Settings';
+            }
+        }
+        try {
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving\u2026'; }
+        var settings = {
+            time_limit: parseInt(document.getElementById('qgen-set-timelimit').value, 10) || 0,
+            max_attempts: parseInt(document.getElementById('qgen-set-maxattempts').value, 10),
+            time_open: localInputToTs(document.getElementById('qgen-set-timeopen').value),
+            time_close: localInputToTs(document.getElementById('qgen-set-timeclose').value),
+            password: document.getElementById('qgen-set-password').value,
+            browser_security: parseInt(document.getElementById('qgen-set-browser-security').value, 10),
+            shuffle_questions: document.getElementById('qgen-set-shuffle-q').checked ? 1 : 0,
+            shuffle_answers: document.getElementById('qgen-set-shuffle-a').checked ? 1 : 0,
+            show_feedback: document.getElementById('qgen-set-show-fb').checked ? 1 : 0,
+            preferred_behaviour: document.getElementById('qgen-set-behaviour').value,
+            grade_method: parseInt(document.getElementById('qgen-set-grademethod').value, 10),
+            nav_method: document.getElementById('qgen-set-navmethod').value,
+            questions_per_page: parseInt(document.getElementById('qgen-set-ppp').value, 10) || 0,
+            review_attempt: document.getElementById('qgen-set-review-attempt').checked ? 1 : 0,
+            review_correctness: document.getElementById('qgen-set-review-correctness').checked ? 1 : 0,
+            review_marks: document.getElementById('qgen-set-review-marks').checked ? 1 : 0,
+            review_responses: document.getElementById('qgen-set-review-responses').checked ? 1 : 0,
+            review_feedback: document.getElementById('qgen-set-review-feedback').checked ? 1 : 0,
+            review_overall: document.getElementById('qgen-set-review-overall').checked ? 1 : 0
+        };
+
+        Ajax.call([{
+            methodname: 'local_umat_ai_update_quiz_settings',
+            args: { jobid: j.job_id, settings: JSON.stringify(settings) }
+        }])[0].done(function(result) {
+            var applied = result.quiz_updated
+                ? 'Changes applied to the quiz in Moodle.'
+                : 'Saved — will be applied when the quiz is imported.';
+            showMsg('Settings saved. ' + applied, 'var(--u-sec)');
+            closeModal();
+            loadHistory();
+        }).fail(function(e) {
+            restoreBtn();
+            showMsg('Save failed: ' + (e.message || 'Error'), 'var(--u-ter)');
+        });
+        } catch (err) {
+            restoreBtn();
+            console.error('[qgen] saveQuizSettings failed:', err);
+            showMsg('Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'var(--u-ter)');
+        }
+    }
+
+    // Reopen a generated quiz: show it on the course page and clear any
+    // expired close date / future open date so students can attempt again.
+    function reopenQuiz(j) {
+        if (!window.confirm('Reopen this quiz for students?\n\n' +
+                'This will:\n' +
+                '- Show the quiz on the course page\n' +
+                '- Clear an expired close date\n' +
+                '- Clear a future open date (available immediately)\n\n' +
+                'Finished attempts are kept.')) {
+            return;
+        }
+        Ajax.call([{
+            methodname: 'local_umat_ai_reopen_quiz',
+            args: { jobid: j.job_id }
+        }])[0].done(function(result) {
+            var parts = [];
+            var changes = (result.changes || 'none').split(',');
+            changes.forEach(function(c) {
+                if (c === 'timeclose') parts.push('expired close date cleared');
+                else if (c === 'timeopen') parts.push('opened immediately');
+                else if (c === 'visible') parts.push('shown on course page');
+            });
+            showMsg('Quiz reopened — ' + (parts.length ? parts.join(', ') : 'already open for students.'), 'var(--u-sec)');
+            loadHistory();
+        }).fail(function(e) {
+            showMsg('Reopen failed: ' + (e.message || 'Error'), 'var(--u-ter)');
+        });
     }
 
     function viewJobQuestions(jobId) {
@@ -2930,12 +3337,24 @@ define(['core/ajax'], function(Ajax) {
         body.innerHTML = '<div class="umat-empty"><span class="material-symbols-outlined">error</span><p>' + esc(reason || 'An error occurred') + '</p></div>';
     }
 
+    // Body-level toast — visible from ANY tab (the old #qgen-msg div lives
+    // inside the Generate form which is display:none on other tabs, so its
+    // messages were invisible — that made saves look dead).
+    function showToast(text, color) {
+        var t = document.createElement('div');
+        t.className = 'umat-toast';
+        t.textContent = text;
+        t.style.color = color || '#111827';
+        document.body.appendChild(t);
+        setTimeout(function() { t.classList.add('umat-toast-show'); }, 10);
+        setTimeout(function() {
+            t.classList.remove('umat-toast-show');
+            setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 300);
+        }, 3500);
+    }
+
     function showMsg(text, color) {
-        var el = document.getElementById('qgen-msg');
-        if (!el) return;
-        el.style.display = 'block';
-        el.textContent = text;
-        el.style.color = color || 'var(--u-ol)';
+        showToast(text, color);
     }
 
     return { init: init };

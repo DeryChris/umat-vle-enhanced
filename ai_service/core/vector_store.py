@@ -274,6 +274,12 @@ class VectorStoreManager:
     ) -> List[Tuple[str, dict]]:
         """Return top-N relevant chunks for a query string.
 
+        Indexing is provider-independent (global): a material indexed under any
+        embedding provider stays readable no matter which provider is active
+        now.  We therefore query EVERY candidate collection for the course
+        (generic + provider-scoped + legacy names) and merge the results,
+        keeping the best (lowest) distance per chunk id.
+
         Privacy Layer 2: when role is 'student', chunks whose metadata
         carry ``visibility`` = ``"lecturer"`` or ``"admin"`` are excluded
         from the results.  Chunks without a ``visibility`` field (legacy
@@ -282,60 +288,134 @@ class VectorStoreManager:
         If material_ids is provided and non-empty, restrict search to only chunks
         belonging to those materials (using the material_id metadata field).
 
-        Returns an empty list if:
-        - No documents have been indexed for this course yet, OR
-        - The collection's embedding dimension differs from the current embedder
-          (e.g. after switching providers).  The dimension will be healed on the
-          next call to add_documents().
+        Returns an empty list if no collection has matching documents.
         """
         embedder = get_embedding_function()
-
-        try:
-            collection = self._resolve_collection(course_id)
-        except Exception:
-            return []  # No documents indexed for this course yet
-
         query_embedding = embedder.embed_query(query)
 
         where_filter = None
         if material_ids:
             where_filter = {"material_id": {"$in": [str(mid) for mid in material_ids]}}
 
-        # Request extra results so we have enough after visibility filtering.
+        # Request extra results per collection so we have enough after
+        # visibility filtering and de-duplication.
         fetch_n = n_results * 3 if role not in ("lecturer", "admin") else n_results
 
-        try:
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=fetch_n,
-                where=where_filter,
-                include=["documents", "metadatas", "distances"],
-            )
-        except InvalidDimensionException:
-            logger.info(
-                "Dimension mismatch for collection '%s' — "
-                "returning empty results (will heal on next add)",
-                self.get_collection_name(course_id),
-            )
-            return []
-        except Exception as e:
-            logger.warning(f"Dense search failed: {e}")
-            return []
+        merged: dict = {}  # chunk id -> (distance, doc, meta)
+        for candidate in self._candidate_collection_names(course_id):
+            try:
+                collection = get_chroma_client().get_collection(name=candidate)
+            except Exception:
+                continue
+            try:
+                results = collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=fetch_n,
+                    where=where_filter,
+                    include=["documents", "metadatas", "distances"],
+                )
+            except InvalidDimensionException:
+                # Provider-switched collection with a different embedding
+                # dimension — skip it, other collections may still match.
+                continue
+            except Exception as e:
+                logger.warning(f"Dense search failed on '{candidate}': {e}")
+                continue
 
-        documents = results["documents"][0] if results["documents"] else []
-        metadatas = results["metadatas"][0] if results["metadatas"] else []
+            ids = results.get("ids", [[]])[0] or []
+            documents = results.get("documents", [[]])[0] or []
+            metadatas = results.get("metadatas", [[]])[0] or []
+            distances = results.get("distances", [[]])[0] or []
 
-        # --- Privacy Layer 2: visibility post-filter --------------------
-        if role not in ("lecturer", "admin"):
-            paired = [
-                (doc, meta)
-                for doc, meta in zip(documents, metadatas)
-                if meta.get("visibility", "student") not in ("lecturer", "admin")
-            ]
-            documents = [doc for doc, _ in paired[:n_results]]
-            metadatas = [meta for _, meta in paired[:n_results]]
+            for i, docid in enumerate(ids):
+                dist = distances[i] if i < len(distances) else 1.0
+                if docid in merged:
+                    if dist < merged[docid][0]:
+                        merged[docid] = (dist, documents[i], metadatas[i])
+                    continue
+                merged[docid] = (dist, documents[i], metadatas[i])
 
-        return list(zip(documents, metadatas))
+        # Rank by distance across all collections, then apply visibility filter.
+        ranked = sorted(merged.values(), key=lambda x: x[0])
+        out: List[Tuple[str, dict]] = []
+        for _, doc, meta in ranked:
+            if role not in ("lecturer", "admin"):
+                if meta.get("visibility", "student") in ("lecturer", "admin"):
+                    continue
+            out.append((doc, meta))
+            if len(out) >= n_results:
+                break
+        return out
+
+    def _candidate_collection_names(self, course_id: int) -> List[str]:
+        """All collection names that may hold indexed chunks for a course.
+
+        Because a material is indexed once and must be readable by every AI
+        feature regardless of the provider that was active at index time, reads
+        consider every candidate: the provider-scoped name (current), the bare
+        legacy name, and any other provider names.  Order: current provider
+        first, then legacy/generic, then the remaining providers.
+        """
+        current = self.get_collection_name(course_id)
+        candidates = [
+            current,
+            f"course_{course_id}",
+            f"course_{course_id}_openrouter",
+            f"course_{course_id}_openai",
+            f"course_{course_id}_local",
+        ]
+        return list(dict.fromkeys(candidates))
+
+    def get_all_documents(
+        self,
+        course_id: int,
+        where_filter: dict = None,
+        limit: int = 10000,
+    ) -> List[Tuple[str, dict]]:
+        """Global read: fetch chunks from EVERY candidate collection for a course.
+
+        No embedding involved (plain metadata/filter read), so provider-scoped
+        collections with different vector dimensions are all safe to search.
+        Results are de-duplicated by chunk id; the first collection in priority
+        order wins per chunk id.
+        """
+        client = get_chroma_client()
+        seen_ids = set()
+        docs: List[str] = []
+        metas: List[dict] = []
+
+        for candidate in self._candidate_collection_names(course_id):
+            try:
+                collection = client.get_collection(name=candidate)
+            except Exception:
+                continue
+            try:
+                results = collection.get(
+                    where=where_filter,
+                    limit=limit,
+                    include=["documents", "metadatas"],
+                )
+            except Exception as e:
+                logger.warning(f"get_all_documents failed on '{candidate}': {e}")
+                continue
+
+            documents = results.get("documents", []) or []
+            metadatas = results.get("metadatas", []) or []
+            ids = results.get("ids", []) or []
+            for i, doc in enumerate(documents):
+                chunk_id = ids[i] if i < len(ids) else f"{candidate}:{i}"
+                if chunk_id in seen_ids:
+                    continue
+                seen_ids.add(chunk_id)
+                docs.append(doc)
+                metas.append(metadatas[i] if i < len(metadatas) else {})
+            if docs:
+                logger.info(
+                    "get_all_documents: %d doc(s) from '%s' (course %s, total %d)",
+                    len(documents), candidate, course_id, len(docs),
+                )
+
+        return list(zip(docs, metas))
 
     def get_documents_by_filter(
         self,
@@ -348,49 +428,11 @@ class VectorStoreManager:
         Uses collection.get() instead of collection.query() - no embedding needed.
         Useful for fetching all chunks belonging to a specific material_id.
 
-        Cross-collection fallback: after a provider switch (e.g. OpenRouter ->
-        Gemini) materials may live in a different collection with a different
-        embedding dimension. Because this method never embeds anything, it is
-        safe to search EVERY candidate collection (generic + provider-scoped +
-        legacy names) until matching documents are found, so historical index
-        data remains usable for flashcards / material-text retrieval.
+        Global read: searches every candidate collection (provider-scoped +
+        generic + legacy names), so historical index data remains usable for
+        flashcards / quizgen / material-text retrieval after a provider switch.
         """
-        client = get_chroma_client()
-        name = self.get_collection_name(course_id)
-
-        # Try order: generic -> provider-scoped -> legacy names.
-        candidates = [f"course_{course_id}", name]
-        candidates += [f"course_{course_id}_openrouter", f"course_{course_id}_openai", f"course_{course_id}_local"]
-
-        seen = set()
-        for candidate in candidates:
-            if candidate in seen:
-                continue
-            seen.add(candidate)
-            try:
-                collection = client.get_collection(name=candidate)
-            except Exception:
-                continue
-            try:
-                results = collection.get(
-                    where=where_filter,
-                    limit=limit,
-                    include=["documents", "metadatas"],
-                )
-            except Exception as e:
-                logger.warning(f"get_documents_by_filter failed on '{candidate}': {e}")
-                continue
-
-            documents = results.get("documents", []) or []
-            metadatas = results.get("metadatas", []) or []
-            if documents:
-                logger.info(
-                    "get_documents_by_filter: %d doc(s) from collection '%s' (course %s)",
-                    len(documents), candidate, course_id,
-                )
-                return list(zip(documents, metadatas))
-
-        return []
+        return self.get_all_documents(course_id, where_filter=where_filter, limit=limit)
 
     def delete_course_documents(self, course_id: int, source_filter: str = None):
         """Remove indexed documents for a course (or specific source file)."""

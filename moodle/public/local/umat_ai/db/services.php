@@ -225,6 +225,26 @@ $functions = [
         'description' => 'Fetch course sections, grade categories, groups, groupings for quiz config', 'type' => 'read', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
     ],
+    'local_umat_ai_set_quiz_visible' => [
+        'classname'   => '\local_umat_ai\external\quizgen', 'methodname' => 'set_quiz_visible',
+        'description' => 'Publish a generated quiz to the course page or hide it again (draft)', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_delete_quiz' => [
+        'classname'   => '\local_umat_ai\external\quizgen', 'methodname' => 'delete_quiz',
+        'description' => 'Delete a generated quiz (draft or published) via standard mod_quiz deletion', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_update_quiz_settings' => [
+        'classname'   => '\local_umat_ai\external\quizgen', 'methodname' => 'update_quiz_settings',
+        'description' => 'Reconfigure settings of a generated quiz (time limit, attempts, schedule, password, review options) and keep the job config in sync', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
+    'local_umat_ai_reopen_quiz' => [
+        'classname'   => '\local_umat_ai\external\quizgen', 'methodname' => 'reopen_quiz',
+        'description' => 'Reopen a generated quiz for student attempts: clear expired close/future open dates and show it on the course page', 'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:viewanalytics',
+    ],
 
     /* ---- Lecturer Insights Dashboard ---- */
     'local_umat_ai_get_dashboard_summary' => [

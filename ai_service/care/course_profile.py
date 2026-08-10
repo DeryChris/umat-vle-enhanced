@@ -48,10 +48,9 @@ class CourseProfileBuilder:
             return self._cache[course_id]
 
         try:
-            collection = self._vector._resolve_collection(course_id)
-            results = collection.get(include=["documents", "metadatas"])
-            docs = results.get("documents") or []
-            metas = results.get("metadatas") or []
+            paired = self._vector.get_all_documents(course_id)
+            docs = [doc for doc, _ in paired]
+            metas = [meta for _, meta in paired]
         except Exception as e:
             logger.debug(f"Cannot build course profile for {course_id}: {e}")
             profile = CourseProfile(course_id=course_id)

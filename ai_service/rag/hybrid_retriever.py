@@ -64,28 +64,28 @@ class HybridRetriever:
         self._bm25_cache: dict = {}
 
     def _load_corpus(self, course_id: int, material_ids: Optional[List[int]] = None):
-        """Load all indexed chunks for a course to build/reuse BM25 index."""
+        """Load all indexed chunks for a course to build/reuse BM25 index.
+
+        Global read: indexing is provider-independent, so the corpus is pulled
+        from EVERY candidate collection (provider-scoped + generic + legacy)
+        and merged — a material stays usable no matter which provider indexed
+        it or which provider is active now.
+        """
         cache_key = (course_id, tuple(material_ids or []))
         if cache_key in self._bm25_cache:
-            return self._bm25_cache[cache_key]
-
-        try:
-            collection = self._vector._resolve_collection(course_id)
-        except Exception:
-            self._bm25_cache[cache_key] = ([], None, [])
             return self._bm25_cache[cache_key]
 
         where_filter = None
         if material_ids:
             where_filter = {"material_id": {"$in": [str(mid) for mid in material_ids]}}
 
-        results = collection.get(
-            where=where_filter,
-            include=["documents", "metadatas"],
-        )
+        try:
+            paired = self._vector.get_all_documents(course_id, where_filter=where_filter)
+        except Exception:
+            paired = []
 
-        docs = results.get("documents") or []
-        metas = results.get("metadatas") or []
+        docs = [doc for doc, _ in paired]
+        metas = [meta for _, meta in paired]
 
         if not docs:
             self._bm25_cache[cache_key] = ([], None, [])

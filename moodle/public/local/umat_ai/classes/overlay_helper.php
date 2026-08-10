@@ -1799,6 +1799,7 @@ var lcpIssOpen=document.getElementById('lcp-iss-open-btn');if(lcpIssOpen)lcpIssO
 
 /* ── Lecturer compact pane loaders ── */
 function loadLcpQuizgen(){
+  var pendingJobId=0; /* Job ID of the latest generated draft — used by "Add to Course" */
   var courses=(UD&&UD.courses)||[];var sel=document.getElementById('lcp-qgen-course');
   if(sel&&!sel.options.length){
     sel.innerHTML='<option value="">Select course…</option>';
@@ -1812,7 +1813,7 @@ function loadLcpQuizgen(){
     var qtypes={};if(type==='mixed'){qtypes={multichoice:Math.ceil(count/2),truefalse:Math.floor(count/4),shortanswer:Math.floor(count/4)};}else if(type==='mcq'){qtypes={multichoice:parseInt(count)};}else{qtypes={shortanswer:parseInt(count)};}
     var res=document.getElementById('lcp-qgen-result');res.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:16px;"><div class="umat-vw-spinner"></div><span style="font-size:12px;color:var(--u-ol);">Generating '+count+' '+type+' questions…</span></div>';genBtn.disabled=true;genBtn.style.opacity='.5';
     ajax('local_umat_ai_generate_quiz_draft',{courseid:cid,source_type:'text',content:topic||'General review',question_types:JSON.stringify(qtypes),difficulty:difficulty},function(r){
-      genBtn.disabled=false;genBtn.style.opacity='1';var qs=r.questions||[];
+      genBtn.disabled=false;genBtn.style.opacity='1';var qs=r.questions||[];pendingJobId=r.job_id||0;
       if(!qs.length){res.innerHTML='<div class="lcp-pane-empty"><span class="material-symbols-outlined">quiz</span><p>No questions generated. Try a different topic.</p></div>';return;}
       var mcCount=qs.filter(function(q){return(q.type||'').indexOf('mc')!==-1||(q.options&&q.options.length);}).length;
       var shortCount=qs.length-mcCount;
@@ -1839,6 +1840,32 @@ function loadLcpQuizgen(){
         '<button class="lcp-pane-expand" id="lcp-qgen-full-btn" type="button" style="flex:1;font-size:11px;padding:6px;"><span class="material-symbols-outlined" style="font-size:14px;">open_in_full</span>Full View</button>'+
       '</div>';
       var fullBtn=document.getElementById('lcp-qgen-full-btn');if(fullBtn)fullBtn.addEventListener('click',function(){closePanel();lecOv.classList.add('open');switchPane('lec-quizgen');updateBodyLock();});
+      /* "Add to Course": create the quiz activity from the draft, then offer Publish */
+      var toCourseBtn=document.getElementById('lcp-qgen-to-course');
+      if(toCourseBtn&&pendingJobId){toCourseBtn.addEventListener('click',function(){
+        toCourseBtn.disabled=true;toCourseBtn.style.opacity='.5';
+        ajax('local_umat_ai_finalize_quiz',{jobid:pendingJobId,category_choice:'new',existing_job_id:0},function(rr){
+          toCourseBtn.disabled=false;toCourseBtn.style.opacity='1';
+          if(rr.status==='imported'){
+            res.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:12px 4px;flex-wrap:wrap;">'+
+              '<span class="material-symbols-outlined" style="color:var(--u-sec);font-size:18px;">check_circle</span>'+
+              '<span style="font-size:12px;font-weight:700;color:var(--u-ons);">Quiz created! '+rr.question_count+' questions imported.</span>'+
+              '<span style="font-size:10px;color:var(--u-ol);width:100%;">Created as a draft — publish to make it visible to students on the course page.</span>'+
+              '<button class="umat-btn-p" id="lcp-qgen-pub" type="button" style="flex:1;justify-content:center;font-size:11px;padding:6px;"><span class="material-symbols-outlined" style="font-size:14px;">publish</span>Publish to Course</button>'+
+              '<a href="'+window.location.origin+'/mod/quiz/view.php?id='+rr.quiz_cmid+'" target="_blank" class="lcp-pane-expand" style="flex:1;font-size:11px;padding:6px;text-align:center;text-decoration:none;">Open Quiz</a>'+
+            '</div>';
+            var pubBtn=document.getElementById('lcp-qgen-pub');
+            if(pubBtn)pubBtn.addEventListener('click',function(){
+              pubBtn.disabled=true;pubBtn.style.opacity='.5';
+              ajax('local_umat_ai_set_quiz_visible',{jobid:pendingJobId,visible:1},function(){
+                res.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:12px 4px;"><span class="material-symbols-outlined" style="color:var(--u-sec);font-size:18px;">publish</span><span style="font-size:12px;color:var(--u-ons);">Quiz published to the course page. Students can now see and attempt it.</span></div>';
+              },function(pe){pubBtn.disabled=false;pubBtn.style.opacity='1';res.innerHTML='<div class="lcp-pane-empty"><span class="material-symbols-outlined">error_outline</span><p>Publish failed: '+(pe.message||'Error')+'</p></div>';});
+            });
+          } else {
+            res.innerHTML='<div class="lcp-pane-empty"><span class="material-symbols-outlined">error_outline</span><p>Unexpected status: '+rr.status+'</p></div>';
+          }
+        },function(err){toCourseBtn.disabled=false;toCourseBtn.style.opacity='1';res.innerHTML='<div class="lcp-pane-empty"><span class="material-symbols-outlined">error_outline</span><p>Quiz creation failed: '+(err.message||'Error')+'</p></div>';});
+      });}
     },function(){genBtn.disabled=false;genBtn.style.opacity='1';res.innerHTML='<div class="lcp-pane-empty"><span class="material-symbols-outlined">error_outline</span><p>Generation failed. Try again.</p></div>';});
   });}
 }

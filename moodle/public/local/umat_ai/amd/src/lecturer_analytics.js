@@ -156,10 +156,12 @@ define([
         if (state.inFlight) return;
 
         state.inFlight = true;
+        state.prefetching[target] = true; // let prefetchAll skip the in-flight course
         var errorEl = byId('la-error');
         if (errorEl) errorEl.style.display = 'none';
         fetchPayload(target).done(function(data) {
             state.inFlight = false;
+            state.prefetching[target] = false;
             data = data || {};
             state.cache[target] = data;
             state.cacheTs[target] = Date.now();
@@ -170,6 +172,7 @@ define([
             prefetchAll();
         }).fail(function() {
             state.inFlight = false;
+            state.prefetching[target] = false;
             if (cid === 0) { loadComposite(); return; }
             if (requestedCid !== cid) { loadData(true); return; }
             if (!cached) {
@@ -1078,6 +1081,13 @@ define([
         }
         // 0 == "All Courses" (client-side composite); any other id == course.
         cid = parseInt(courseId, 10) || 0;
+        // Warm the cache for every other lecturer course IMMEDIATELY (in
+        // parallel with this course's own load) so the "All Courses"
+        // composite is already assembled by the time it gets clicked.
+        // Previously prefetch only started after the first course's payload
+        // arrived, which could take 10-40s (4 sequential LLM calls per
+        // course server-side) — making the first All Courses click slow.
+        prefetchAll();
         loadData(false);
     }
 

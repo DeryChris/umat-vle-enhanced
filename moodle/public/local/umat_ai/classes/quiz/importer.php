@@ -120,7 +120,7 @@ class importer {
         int $userid,
         array $quizSettings = []
     ): \stdClass {
-        global $DB;
+        global $DB, $CFG;
 
         $result = (object)[
             'category_id'  => 0,
@@ -149,27 +149,28 @@ class importer {
             'timeopen'           => (int)($quizSettings['timeopen'] ?? 0),
             'timeclose'          => (int)($quizSettings['timeclose'] ?? 0),
             'timelimit'          => (int)($quizSettings['timelimit'] ?? 0),
-            'preferredbehaviour' => $quizSettings['preferredbehaviour'] ?? 'deferredfeedback',
+'preferredbehaviour' => $quizSettings['preferredbehaviour'] ?? 'deferredfeedback',
             'canredoquestions'   => 0,
             'attempts'           => (int)($quizSettings['attempts'] ?? -1),
             'attemptonlast'      => 0,
             'grademethod'        => (int)($quizSettings['grademethod'] ?? 1),
             'decimalpoints'      => 2,
-            'questiondecimalpoints' => -1,
+            'questiondecimalpoints' => 2,
             'reviewattempt'      => $reviewOptions['reviewattempt'],
             'reviewcorrectness'  => $reviewOptions['reviewcorrectness'],
             'reviewmarks'        => $reviewOptions['reviewmarks'],
-            'reviewresponses'    => $reviewOptions['reviewresponses'],
-            'reviewspecificcomments' => 1,
-            'reviewoverallfeedback' => $reviewOptions['reviewoverallfeedback'],
+            'reviewspecificfeedback' => $reviewOptions['reviewspecificfeedback'],
+            'reviewgeneralfeedback'  => $reviewOptions['reviewgeneralfeedback'],
+            'reviewrightanswer'      => $reviewOptions['reviewrightanswer'],
+            'reviewoverallfeedback'  => $reviewOptions['reviewoverallfeedback'],
             'questionsperpage'   => (int)($quizSettings['questionsperpage'] ?? 0),
             'navmethod'          => $quizSettings['navmethod'] ?? 'free',
-            'shufflequestions'   => (int)($quizSettings['shufflequestions'] ?? 0),
             'shuffleanswers'     => (int)($quizSettings['shuffleanswers'] ?? 1),
             'sumgrades'          => 0,
             'grade'              => 100,
             'password'           => $quizSettings['password'] ?? '',
             'subnet'             => '',
+            'browsersecurity'    => $browserSec,
             'timecreated'        => time(),
             'timemodified'       => time(),
         ];
@@ -179,7 +180,8 @@ class importer {
             'quizid'           => $quiz->id,
             'firstslot'        => 1,
             'heading'          => '',
-            'shufflequestions' => 0,
+            // Moodle 5: shufflequestions moved from mdl_quiz to quiz_sections.
+            'shufflequestions' => (int)($quizSettings['shufflequestions'] ?? 0),
         ]);
 
         $cm = new \stdClass();
@@ -187,26 +189,41 @@ class importer {
         $cm->module   = $DB->get_field('modules', 'id', ['name' => 'quiz']);
         $cm->instance = $quiz->id;
         $cm->section  = (int)($quizSettings['sectionnum'] ?? 0);
+        // The quiz is created as a hidden draft by design. The lecturer
+        // publishes it (set_coursemodule_visible) from the plugin UI —
+        // no external Moodle configuration is required.
         $cm->visible  = 0;
         $cm->visibleold = 0;
         $cm->groupmode    = (int)($quizSettings['groupmode'] ?? 0);
         $cm->groupingid   = (int)($quizSettings['groupingid'] ?? 0);
         $cm->added    = time();
 
-        // Apply browser security via cm->availability_restrict or cm_extra.
-        if ($browserSec) {
-            $cm->extra = $browserSec;
+        // Enforce group access via the standard availability system so only
+        // members of the selected groups can see/attempt the quiz. The JSON
+        // format matches what the standard module form produces; validate it
+        // the same way add_moduleinfo() does, falling back to no restriction.
+        $groupids = $quizSettings['groupids'] ?? [];
+        if (!empty($groupids) && is_array($groupids)) {
+            $availabilityJson = json_encode([
+                'op'   => '|',
+                'show' => false,
+                'c'    => array_map(function ($gid) {
+                    return ['type' => 'group', 'id' => (int)$gid];
+                }, $groupids),
+            ]);
+            if (!empty($CFG->enableavailability)) {
+                try {
+                    $tree = new \core_availability\tree(json_decode($availabilityJson));
+                    $cm->availability = $availabilityJson;
+                } catch (\Throwable $e) {
+                    $cm->availability = null;
+                }
+            }
         }
+
         $cm->id = $DB->insert_record('course_modules', $cm);
 
         course_add_cm_to_section($courseid, $cm->id, (int)($quizSettings['sectionnum'] ?? 0));
-
-        // Apply group access: restrict access to specific groups via completion or enrol.
-        $groupids = $quizSettings['groupids'] ?? [];
-        if (!empty($groupids) && is_array($groupids)) {
-            // Set the group override for the quiz via quiz_overrides if needed.
-            // For now, we record group access on the course module.
-        }
 
         // Apply grade category.
         $gradeCategoryId = (int)($quizSettings['grade_category'] ?? 0);
@@ -280,30 +297,41 @@ class importer {
     }
 
     /**
-     * Build Moodle review option bitfield from individual settings.
+     * Build Moodle review option bitfields from individual settings.
+     *
+     * Moodle stores each review option (attempt, correctness, marks, ...) as a
+     * bitfield of phase constants:
+     *   \mod_quiz\question\display_options::DURING / IMMEDIATELY_AFTER /
+     *   LATER_WHILE_OPEN / AFTER_CLOSE
+     * The plugin UI offers a simple on/off per option, so an enabled option is
+     * applied to every phase (the same result as ticking every phase in the
+     * standard quiz settings form). Overall feedback is excluded from the
+     * "during attempt" phase, matching the standard form's behaviour.
      */
     private static function build_review_options(array $settings): array {
-        // Moodle review options are bitfields: REVIEW_ATTEMPT, REVIEW_CORRECTNESS, etc.
-        // We use the simple on/off per slot approach.
-        $rAttempt    = (int)($settings['reviewattempt'] ?? 1);
-        $rCorrect    = (int)($settings['reviewcorrectness'] ?? 1);
-        $rMarks      = (int)($settings['reviewmarks'] ?? 1);
-        $rResponses  = (int)($settings['reviewresponses'] ?? 1);
-        $rOverall    = (int)($settings['reviewoverall'] ?? 1);
+        $during = \mod_quiz\question\display_options::DURING;
+        $immediately = \mod_quiz\question\display_options::IMMEDIATELY_AFTER;
+        $open = \mod_quiz\question\display_options::LATER_WHILE_OPEN;
+        $closed = \mod_quiz\question\display_options::AFTER_CLOSE;
+        $allphases = $during | $immediately | $open | $closed;
+        $allbutduring = $immediately | $open | $closed;
 
-        // During attempt: attempt, correctness, marks
-        // After attempt: attempt, correctness, marks, specificcomment, responses, overallfeedback
-        // Moodle uses a combined bitfield. For simplicity, we set all "during" and "after" flags.
-        $during = ($rAttempt ? 1 : 0) | ($rCorrect ? 2 : 0) | ($rMarks ? 4 : 0);
-        $immediately = $during;
-        $later = $during | ($rResponses ? 8 : 0) | ($rOverall ? 16 : 0);
+        $rAttempt   = (int)($settings['reviewattempt'] ?? 1) ? $allphases : 0;
+        $rCorrect   = (int)($settings['reviewcorrectness'] ?? 1) ? $allphases : 0;
+        $rMarks     = (int)($settings['reviewmarks'] ?? 1) ? $allphases : 0;
+        // NOTE: 'review responses' (reviewresponses) column was removed in
+        // Moodle 5 — the option is intentionally not written anymore.
+        $rFeedback  = (int)($settings['reviewfeedback'] ?? 1) ? $allphases : 0;
+        $rOverall   = (int)($settings['reviewoverall'] ?? 1) ? $allbutduring : 0;
 
         return [
-            'reviewattempt'         => $later,
-            'reviewcorrectness'     => $later,
-            'reviewmarks'           => $later,
-            'reviewresponses'       => $later,
-            'reviewoverallfeedback' => $later,
+            'reviewattempt'         => $rAttempt,
+            'reviewcorrectness'     => $rCorrect,
+            'reviewmarks'           => $rMarks,
+            'reviewspecificfeedback'=> $rFeedback,
+            'reviewgeneralfeedback' => $rFeedback,
+            'reviewrightanswer'     => $rCorrect,
+            'reviewoverallfeedback' => $rOverall,
         ];
     }
 

@@ -209,6 +209,19 @@ $string['quizgen_import_preprocess_failed'] = 'Failed to preprocess the quiz XML
 $string['quizgen_import_process_failed']   = 'Failed to import questions into the question bank.';
 $string['quizgen_not_ready']               = 'Quiz generation is not yet complete. Check the job status and retry if needed.';
 $string['quizgen_no_xml']                  = 'No XML content is available for import.';
+$string['quizgen_not_created']             = 'No quiz activity has been created for this job yet.';
+$string['quizgen_already_deleted']         = 'This quiz has already been deleted.';
+$string['quizgen_published']               = 'Quiz published to the course page. Students can now see and attempt it.';
+$string['quizgen_hidden']                  = 'Quiz hidden. It is saved as a draft and can be published later.';
+$string['quizgen_deleted']                 = 'Quiz deleted successfully.';
+$string['quizgen_publish']                 = 'Publish to Course';
+$string['quizgen_publish_confirm']         = 'Publish this quiz to the course page so students can see it?';
+$string['quizgen_save_draft']              = 'Save as Draft';
+$string['quizgen_draft_saved']             = 'Quiz saved as a draft. You can publish or delete it later from the history below.';
+$string['quizgen_draft_hint']              = 'Created as a draft — students cannot see it yet. Publish it to make it available on the course page.';
+$string['quizgen_delete']                  = 'Delete Quiz';
+$string['quizgen_delete_confirm']          = 'Delete this quiz? This removes the quiz activity from the course. Generated questions stay in the question bank.';
+$string['quizgen_hide']                    = 'Hide Quiz';
 
 /* ---- Tasks ---- */
 $string['task_process_recording'] = 'Process BBB recordings through AI service';

@@ -18,10 +18,19 @@ $plugin->component = 'local_umat_ai';
 // db/services.php also gained local_umat_ai_import_session_quizzes
 // (Studio: import quizzes generated in past chat sessions) — same
 // re-registration requirement, bumped 2026080608 -> 2026080609.
+// Bumped 2026080609 -> 2026080610 for local_umat_ai_update_quiz_settings
+// and local_umat_ai_reopen_quiz (quizgen reconfigure/reopen).
+// Bumped 2026080610 -> 2026080611: quizgen history actions switched to a
+// single delegated click handler (data-act/data-job) + error surfacing so
+// every action button works reliably; invalidates AMD cache.
+// Bumped 2026080611 -> 2026080614: settings/reopen modal now appends inside
+// #lec-quizgen (shares the dashboard stacking context) + overlay raised to
+// z-index 99999, so the modal always renders above the dashboard.
+// Bumped 2026080612 -> 2026080614: modal card gets solid fallback colours (vars may be missing) + backdrop blur on the overlay.
 // Moodle caches AMD modules by plugin version, so this must increase
 // whenever amd/build changes or the dashboard will keep serving the
 // previous JavaScript.
-$plugin->version   = 2026080609;
+$plugin->version   = 2026080614;
 $plugin->requires  = 2023100900;
 $plugin->maturity  = MATURITY_BETA;
 $plugin->release   = '2.5.1';
