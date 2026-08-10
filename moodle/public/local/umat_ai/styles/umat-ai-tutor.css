@@ -191,10 +191,17 @@
 .ait-msgs .umat-msg-lbl{ color:var(--u-p); }
 
 /* Streaming bubble: breathing glow + sweeping shimmer + blinking caret so
-   the live answer clearly reads as "in progress". */
+   the live answer clearly reads as "in progress".
+   The bubble also gets two translucent wave bands that slide across each
+   other (left->right / right->left) plus a gentle vertical bob, so the
+   streamed answer moves like a water wave while it fills in. */
 .ait-msgs .umat-bubble-ai.is-streaming{
   position:relative; overflow:hidden;
-  animation:ait-stream-breathe 2.2s ease-in-out infinite;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0) 0 16px, rgba(255,255,255,.20) 16px 19px, rgba(255,255,255,0) 19px 38px),
+    repeating-linear-gradient(90deg, rgba(0,107,47,0) 0 22px, rgba(0,107,47,.10) 22px 26px, rgba(0,107,47,0) 26px 48px);
+  background-size:300% 100%, 300% 100%;
+  animation:ait-stream-breathe 2.2s ease-in-out infinite, ait-stream-wave 3.2s linear infinite, ait-stream-bob 1.7s ease-in-out infinite;
 }
 .ait-msgs .umat-bubble-ai.is-streaming::before{
   content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
@@ -218,6 +225,16 @@
 @keyframes ait-caret{
   0%,49%{ opacity:1; }
   50%,100%{ opacity:0; }
+}
+/* Two wave bands crossing in opposite directions (pair with background-size 300%). */
+@keyframes ait-stream-wave{
+  0%{ background-position:0 0, 100% 0; }
+  100%{ background-position:100% 0, 0 0; }
+}
+/* Gentle up-and-down bob so the bubble itself moves like a wave. */
+@keyframes ait-stream-bob{
+  0%,100%{ transform:translateY(0); }
+  50%{ transform:translateY(-3px); }
 }
 
 .ait-welcome{ text-align:center; padding:28px 12px 8px; max-width:640px; align-self:center; }
@@ -457,7 +474,7 @@
 .ait-bc-sep .material-symbols-outlined{ font-size:16px; }
 .ait-bc-title{ font-size:12px; font-weight:600; color:var(--u-ons); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-.ait-subview-content{ flex:1; overflow-y:auto; padding:14px; }
+.ait-subview-content{ flex:1; min-height:0; overflow-y:auto; padding:14px; display:flex; flex-direction:column; }
 
 /* Document view for Study Guide / Summary / FAQ sub-views */
 .ait-sv-content{ font-size:12.5px; line-height:1.65; color:var(--u-ons); }
@@ -590,23 +607,60 @@
 }
 .ait-nt-btn:hover{ border-color:var(--u-p); color:var(--u-p); }
 
-.ait-note-editor{ display:flex; flex-direction:column; gap:8px; }
+.ait-note-editor{ flex:1; min-height:0; display:flex; flex-direction:column; gap:8px; }
 .ait-note-editor-hdr{ display:flex; align-items:center; gap:6px; }
 .ait-note-title{
   flex:1; min-width:0; padding:7px 10px; border:1px solid var(--u-olv); border-radius:9px;
   background:var(--u-sbg); color:var(--u-ons); font-size:12.5px; font-weight:600; font-family:inherit; outline:none;
 }
 .ait-note-title:focus{ border-color:var(--u-p); }
+
+/* View-only mode: the note renders as a PDF-like document page that fills
+   the whole available sub-view height. Edit mode below keeps the compact
+   bordered editor, so the two modes are visually distinct. */
 .ait-note-readonly{
-  min-height:160px; max-height:340px; overflow-y:auto;
-  padding:11px 13px; border:1px solid var(--u-olv); border-radius:11px;
-  background:var(--u-sbg); font-size:12.5px; line-height:1.65; color:var(--u-ons);
+  flex:1; min-height:0; overflow-y:auto;
+  padding:12px; border:1px solid var(--u-olv); border-radius:12px;
+  background:linear-gradient(180deg,#edf0e9 0%,#e6eae1 100%);
 }
-.ait-note-readonly h1,.ait-note-readonly h2,.ait-note-readonly h3{ font-size:14px; margin:10px 0 4px; }
-.ait-note-readonly ul,.ait-note-readonly ol{ padding-left:18px; margin:6px 0; }
-.ait-note-readonly code{ background:var(--u-secc); padding:1px 5px; border-radius:5px; font-size:11.5px; }
-.ait-note-readonly blockquote{ margin:6px 0; padding:4px 10px; border-left:3px solid var(--u-p); background:var(--u-secc); border-radius:0 6px 6px 0; }
-.ait-note-readonly a{ color:var(--u-p); }
+.ait-note-paper{
+  max-width:660px; min-height:100%; margin:0 auto;
+  background:#ffffff; color:#26303a; border-radius:3px;
+  box-shadow:0 8px 26px rgba(20,35,20,.14), 0 2px 6px rgba(20,35,20,.08);
+  padding:36px 42px 48px;
+  font-family:Georgia,'Times New Roman',serif;
+  font-size:14px; line-height:1.78;
+  box-sizing:border-box;
+}
+.ait-note-paper-title{
+  font-family:inherit; font-size:21px; font-weight:700; color:#111827; line-height:1.35;
+  padding-bottom:12px; margin-bottom:16px; border-bottom:1.5px solid #d6dbe0;
+  word-break:break-word;
+}
+.ait-note-paper-body{ font-family:inherit; }
+.ait-note-paper-body h1,.ait-note-paper-body h2,.ait-note-paper-body h3{
+  font-family:inherit; color:#111827; margin:16px 0 6px; line-height:1.4;
+}
+.ait-note-paper-body h1{ font-size:17px; }
+.ait-note-paper-body h2{ font-size:15.5px; }
+.ait-note-paper-body h3{ font-size:14px; }
+.ait-note-paper-body ul,.ait-note-paper-body ol{ padding-left:22px; margin:8px 0; }
+.ait-note-paper-body li{ margin:3px 0; }
+.ait-note-paper-body code{
+  font-family:Consolas,Monaco,monospace; font-size:12px;
+  background:#f1f5f1; border:1px solid #e2e8e2; padding:1px 5px; border-radius:4px; color:#14532d;
+}
+.ait-note-paper-body pre{ background:#f6f8f6; border:1px solid #e2e8e2; border-radius:8px; padding:10px 12px; overflow-x:auto; }
+.ait-note-paper-body pre code{ background:none; border:none; padding:0; }
+.ait-note-paper-body blockquote{
+  margin:10px 0; padding:6px 14px; border-left:3px solid #9aa7b0; background:#f4f6f3;
+  border-radius:0 8px 8px 0; color:#3d4a54; font-style:italic;
+}
+.ait-note-paper-body a{ color:#0b6e3f; text-decoration:underline; }
+.ait-note-paper-body hr{ border:none; border-top:1px solid #d6dbe0; margin:14px 0; }
+.ait-note-paper-body table{ border-collapse:collapse; margin:10px 0; font-size:13px; }
+.ait-note-paper-body td,.ait-note-paper-body th{ border:1px solid #d6dbe0; padding:5px 9px; }
+.ait-note-paper-body img{ max-width:100%; border-radius:6px; }
 
 /* Rich-text toolbar + contenteditable body (formatting tools) */
 .ait-note-tb{
@@ -623,7 +677,7 @@
 .ait-note-tb button .material-symbols-outlined{ font-size:15px; }
 .ait-note-tb-sep{ width:1px; height:15px; background:var(--u-olv); margin:0 4px; }
 .ait-note-edit{
-  min-height:160px; max-height:340px; overflow-y:auto;
+  flex:1; min-height:120px; max-height:none; overflow-y:auto;
   padding:11px 13px; border:1px solid var(--u-olv); border-radius:0 0 10px 10px;
   background:var(--u-sbg); color:var(--u-ons); font-size:12.5px; line-height:1.6; font-family:inherit; outline:none;
 }
@@ -653,6 +707,15 @@
 .ait-rep-bar{ height:5px; border-radius:3px; background:var(--u-olv); margin-top:7px; overflow:hidden; }
 .ait-rep-bar i{ display:block; height:100%; background:linear-gradient(90deg,#00873d,#22c55e); border-radius:3px; }
 .ait-rep-meta{ font-size:10px; color:var(--u-ol); margin-top:5px; }
+/* Action row on each report attempt: Resume / Review re-opens the saved quiz. */
+.ait-rep-acts{ display:flex; gap:6px; margin-top:8px; }
+.ait-rep-act{
+  display:inline-flex; align-items:center; gap:5px; padding:6px 12px; border-radius:9px;
+  border:1px solid var(--u-olv); background:var(--u-sfl); color:var(--u-ons);
+  font-family:inherit; font-size:11.5px; font-weight:700; cursor:pointer;
+}
+.ait-rep-act:hover{ border-color:var(--u-p); color:var(--u-p); }
+.ait-rep-act .material-symbols-outlined{ font-size:15px; }
 
 .ait-empty{
   text-align:center; padding:26px 12px; color:var(--u-ol); font-size:11.5px; line-height:1.6;
@@ -780,9 +843,14 @@
 .ait-sv-fc-done .material-symbols-outlined{ font-size:34px; color:var(--u-p); }
 .ait-sv-fc-done h3{ margin:8px 0 4px; font-size:15px; color:var(--u-ons); }
 .ait-sv-fc-done p{ font-size:12px; color:var(--u-ol); margin:0; }
-/* Compact poker card inside the 330px Studio panel */
-.ait-sv-fc .umat-fc-poker{ width:250px; height:180px; margin:8px auto 0; }
-.ait-sv-fc .umat-fc-poker-center .umat-fc-text{ font-size:13px; padding:0 14px; }
+/* Compact poker card inside the Studio panel: wide enough for the card text,
+   keeps the poker ratio so the 3D flip faces line up at any size. */
+.ait-sv-fc .umat-fc-poker{ width:100%; max-width:360px; min-width:200px; height:auto; aspect-ratio:250/180; min-height:150px; margin:8px auto 0; }
+/* Spread the content across the card instead of squeezing it into a centred
+   middle column: drop the wide side padding, let the text use the full
+   width and stay vertically balanced. */
+.ait-sv-fc .umat-fc-poker-center{ padding:18px 22px; gap:10px; justify-content:center; }
+.ait-sv-fc .umat-fc-poker-center .umat-fc-text{ font-size:13px; line-height:1.55; width:100%; padding:0; }
 
 /* ═══ Attach materials drawer (chat panel) ═══
    The drawer markup lives inside #ait-chat-overlay. It carries BOTH

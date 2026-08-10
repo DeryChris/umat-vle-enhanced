@@ -178,4 +178,147 @@ class studio_outputs extends \external_api {
             'deleted' => new \external_value(PARAM_BOOL),
         ]);
     }
+
+    // ------------------------------------------------------------------ //
+    // import_session_quizzes — bring quizzes generated in past chat        //
+    // sessions onto the Studio panel.                                     //
+    // ------------------------------------------------------------------ //
+    public static function import_session_quizzes_parameters() {
+        return new \external_function_parameters([
+            'courseid' => new \external_value(PARAM_INT, 'Course ID'),
+        ]);
+    }
+
+    public static function import_session_quizzes($courseid) {
+        global $DB, $USER;
+
+        $params = self::validate_parameters(self::import_session_quizzes_parameters(), ['courseid' => $courseid]);
+        $cid = (int)$params['courseid'];
+
+        $context = \context_course::instance($cid);
+        self::validate_context($context);
+        require_capability('local/umat_ai:chatwithai', $context);
+
+        $userid = (int)$USER->id;
+
+        // One chat_logs row per Q&A exchange: role='student', `question` is
+        // the user's message and `answer` holds the assistant's reply (which
+        // may embed a ```json quiz payload).
+        $rows = $DB->get_records('umat_ai_chat_logs', ['userid' => $userid, 'courseid' => $cid], 'timecreated ASC');
+
+        // Titles already on the Studio (quiz cards dedupe by title).
+        $existing = $DB->get_fieldset_select('umat_ai_studio_outputs', 'title',
+            'userid = ? AND courseid = ? AND output_type = ?', [$userid, $cid, 'quiz']);
+
+        $found = 0; $imported = 0; $skipped = 0;
+        $now = time();
+
+        foreach ($rows as $row) {
+            $text = (string)($row->answer ?? '');
+            if (strlen($text) < 10 || stripos($text, 'quiz') === false) {
+                continue;
+            }
+
+            // Extract ```json {...} blocks plus bare JSON objects that look
+            // like quiz payloads (contain a "questions" array).
+            $blocks = [];
+            if (preg_match_all('/```(?:json)?\s*(\{[\s\S]*?\})\s*```/', $text, $m)) {
+                $blocks = array_merge($blocks, $m[1]);
+            }
+            if (preg_match_all('/\{[\s\S]*?"questions"\s*:\s*\[[\s\S]*?\](?:[\s\S]*?)\}/', $text, $m2)) {
+                $blocks = array_merge($blocks, $m2[0]);
+            }
+
+            foreach ($blocks as $block) {
+                $data = json_decode($block, true);
+                if (!is_array($data)) {
+                    continue;
+                }
+
+                $quiz = null;
+                if (is_array($data['quiz'] ?? null) && !empty($data['quiz']['questions'])) {
+                    $quiz = $data['quiz'];
+                } else if (!empty($data['questions'])) {
+                    $quiz = $data;
+                }
+                if (!$quiz) {
+                    continue;
+                }
+                $found++;
+
+                $title = trim((string)($quiz['quiz_title'] ?? $quiz['title'] ?? ''));
+                if ($title === '') {
+                    $title = 'Practice Quiz';
+                }
+                if (in_array($title, $existing, true)) {
+                    $skipped++;
+                    continue;
+                }
+
+                // Normalize each question into the shared attempt shape:
+                // {type, question, options, correct(INDEX), explanation}.
+                $questions = [];
+                foreach ($quiz['questions'] as $q) {
+                    if (!is_array($q)) {
+                        continue;
+                    }
+                    $options = array_values((array)($q['options'] ?? $q['choices'] ?? []));
+                    $answerText = trim((string)($q['answer'] ?? $q['correct_answer'] ?? ''));
+                    $correctIdx = -1;
+                    if (is_numeric($q['correct'] ?? null)) {
+                        $correctIdx = (int)$q['correct'];
+                    } else if ($answerText !== '') {
+                        $al = strtolower($answerText);
+                        foreach ($options as $i => $op) {
+                            $ol = strtolower(trim((string)$op));
+                            if ($ol === $al || (preg_match('/^[a-d]\)/', $al) && $ol !== '' && $ol[0] === $al[0])) {
+                                $correctIdx = $i;
+                                break;
+                            }
+                        }
+                    }
+                    $questions[] = [
+                        'type'        => (string)($q['type'] ?? 'objective'),
+                        'question'    => (string)($q['question'] ?? $q['q'] ?? ''),
+                        'options'     => $options,
+                        'correct'     => $correctIdx,
+                        'explanation' => (string)($q['explanation'] ?? $q['hint'] ?? ''),
+                    ];
+                }
+                if (empty($questions)) {
+                    continue;
+                }
+
+                $payload = json_encode([
+                    'quiz' => [
+                        'quiz_title' => $title,
+                        'title'      => $title,
+                        'questions'  => $questions,
+                    ],
+                ]);
+
+                $DB->insert_record('umat_ai_studio_outputs', [
+                    'userid'       => $userid,
+                    'courseid'     => $cid,
+                    'output_type'  => 'quiz',
+                    'title'        => $title,
+                    'payload'      => $payload,
+                    'timecreated'  => $now,
+                    'timemodified' => $now,
+                ]);
+                $existing[] = $title;
+                $imported++;
+            }
+        }
+
+        return ['imported' => $imported, 'found' => $found, 'skipped' => $skipped];
+    }
+
+    public static function import_session_quizzes_returns() {
+        return new \external_single_structure([
+            'imported' => new \external_value(PARAM_INT, 'Number of quizzes newly added to the Studio'),
+            'found'    => new \external_value(PARAM_INT, 'Quizzes found in past sessions'),
+            'skipped'  => new \external_value(PARAM_INT, 'Found but already in the Studio'),
+        ]);
+    }
 }

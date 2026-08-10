@@ -15,10 +15,13 @@ $plugin->component = 'local_umat_ai';
 // db/services.php gained local_umat_ai_admin_list_complaints and
 // local_umat_ai_admin_update_complaint — Moodle only re-registers
 // web services when this version increases, so this must be bumped.
+// db/services.php also gained local_umat_ai_import_session_quizzes
+// (Studio: import quizzes generated in past chat sessions) — same
+// re-registration requirement, bumped 2026080608 -> 2026080609.
 // Moodle caches AMD modules by plugin version, so this must increase
 // whenever amd/build changes or the dashboard will keep serving the
 // previous JavaScript.
-$plugin->version   = 2026080608;
+$plugin->version   = 2026080609;
 $plugin->requires  = 2023100900;
 $plugin->maturity  = MATURITY_BETA;
 $plugin->release   = '2.5.1';

@@ -513,6 +513,12 @@ $functions = [
         'type' => 'write', 'ajax' => true,
         'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
     ],
+    'local_umat_ai_import_session_quizzes' => [
+        'classname'   => '\local_umat_ai\external\studio_outputs', 'methodname' => 'import_session_quizzes',
+        'description' => 'Scan the user\'s past chat sessions for generated quizzes and persist them as Studio quiz cards',
+        'type' => 'write', 'ajax' => true,
+        'loginrequired' => true, 'capabilities' => 'local/umat_ai:chatwithai',
+    ],
 ];
 
 $services = [

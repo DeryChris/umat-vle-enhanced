@@ -341,12 +341,44 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                     return {
                         q: qo.q || qo.question || qo.Question || qo.text || qo.prompt || qo.question_text || qo.query || '',
                         options: qo.options || qo.choices || qo.Options || qo.Choices || qo.options_list || qo.answers || [],
-                        answer: qo.answer || qo.correct_answer || qo.correct || qo.Answer || qo.Correct || '',
+                        // Saved attempts (umat_student / quizgen flows) store
+                        // `correct` as the option INDEX — resolve it to text so
+                        // the text-comparison grading below still works.
+                        answer: (typeof qo.correct === 'number' && (qo.options || qo.choices || [])[qo.correct])
+                            || qo.answer || qo.correct_answer || qo.Answer || qo.Correct || '',
                         explanation: qo.explanation || qo.explain || qo.reason || qo.hint || qo.Explanation || ''
                     };
                 });
                 if (!quiz.title) quiz.title = quiz.quiz_title || 'Practice Quiz';
                 return quiz;
+            }
+
+            /* Serialize a renderer question into the server attempt shape:
+             * {type, question, options, correct(INDEX), explanation} — the
+             * format shared with the student quiz flow so attempts survive
+             * across panels and can be resumed from the Report. */
+            function quizToServerQ(q) {
+                var options = q.options || [];
+                var correctIdx = -1;
+                if (typeof q.answer === 'number') {
+                    correctIdx = q.answer;
+                } else {
+                    var ans = String(q.answer || '').trim().toLowerCase();
+                    for (var i = 0; i < options.length; i++) {
+                        var o = String(options[i]).trim().toLowerCase();
+                        if (o === ans || (ans && /^[a-d]\)/.test(ans) && o.charAt(0) === ans.charAt(0))) {
+                            correctIdx = i;
+                            break;
+                        }
+                    }
+                }
+                return {
+                    type: q.type || 'objective',
+                    question: q.q || q.question || '',
+                    options: options,
+                    correct: correctIdx,
+                    explanation: q.explanation || ''
+                };
             }
 
             function renderQuizCard(quiz) {
@@ -355,6 +387,7 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                 var card = document.createElement('div');
                 card.className = 'ait-quiz-card';
                 var idx = 0, correct = 0, answered = false, total = quiz.questions.length;
+                var answers = {}, graded = {}, attemptId = 0;
                 var q = quiz.questions[0];
 
                 function buildHeader() {
@@ -384,7 +417,7 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                             q = quiz.questions[0];
                             render();
                         });
-                        saveAttempt();
+                        saveAttempt(true);
                         return;
                     }
                     q = quiz.questions[idx];
@@ -409,6 +442,12 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                                 isCorrect = String(chosen).trim().charAt(0).toUpperCase() === String(q.answer).trim().charAt(0).toUpperCase();
                             }
                             if (isCorrect) correct++;
+                            // Track this answer so the attempt can be resumed
+                            // from the Studio Report (in_progress) or reviewed
+                            // after completion.
+                            answers[idx] = parseInt(btn.dataset.i);
+                            graded[idx] = { correct: isCorrect, explanation: q.explanation || '' };
+                            saveAttempt(false);
                             card.querySelectorAll('.ait-quiz-opt').forEach(function(b) {
                                 b.disabled = true;
                                 var txt = q.options[parseInt(b.dataset.i)];
@@ -432,22 +471,28 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                     });
                 }
 
-                function saveAttempt() {
+                function saveAttempt(done) {
                     var cid = currentCID();
                     if (!cid) return;
+                    var score = 0;
+                    Object.keys(graded).forEach(function(k) { if (graded[k] && graded[k].correct) score++; });
                     Ajax.call([{
                         methodname: 'local_umat_ai_save_quiz_attempt',
                         args: {
+                            attempt_id: attemptId || 0,
                             courseid: cid,
-                            quiztitle: quiz.title,
+                            session_key: sessKey || '',
+                            quiz_title: quiz.title,
+                            questions_json: JSON.stringify(quiz.questions.map(function(q) { return quizToServerQ(q); })),
+                            answers_json: JSON.stringify(answers),
+                            graded_json: JSON.stringify(graded),
+                            score: done ? score : null,
                             total: total,
-                            correct: correct,
-                            score: Math.round(correct / total * 100),
-                            details: JSON.stringify(quiz.questions.map(function(question, i) {
-                                return { q: question.q, answer: question.answer, chosen: null };
-                            }))
+                            status: done ? 'completed' : 'in_progress'
                         }
-                    }])[0].fail(function() {});
+                    }])[0]
+                        .done(function(r) { if (r && r.attempt_id) attemptId = r.attempt_id; })
+                        .fail(function() {});
                 }
 
                 render();
@@ -719,13 +764,26 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
             }
             if (bcBack) bcBack.addEventListener('click', closeSubView);
 
-            function openQuizSubView(quiz, title) {
+            /* Quiz sub-view. opts support resuming a saved attempt:
+             *   { startIdx, answers, graded, attemptId, sessionKey }
+             * When resuming, previously answered questions stay answered
+             * (their graded results feed the running score) and playback
+             * continues at the first unanswered question. */
+            function openQuizSubView(quiz, title, opts) {
                 quiz = normalizeQuiz(quiz);
                 if (!quiz) return;
                 openSubView(title || quiz.title || 'Quiz');
                 if (!subviewContent) return;
 
-                var idx = 0, correct = 0, answered = false, total = quiz.questions.length;
+                opts = opts || {};
+                var idx = opts.startIdx || 0;
+                var answers = opts.answers || {};
+                var graded = opts.graded || {};
+                var attemptId = opts.attemptId || 0;
+                var sessionKey = opts.sessionKey || sessKey || '';
+                var answered = false, total = quiz.questions.length;
+                var correct = 0;
+                Object.keys(graded).forEach(function(k) { if (graded[k] && graded[k].correct) correct++; });
 
                 function buildDots() {
                     var dots = '';
@@ -737,7 +795,7 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
 
                 function renderQ() {
                     if (idx >= total) {
-                        var pct = Math.round(correct / total * 100);
+                        var pct = total ? Math.round(correct / total * 100) : 0;
                         var msg = pct >= 80 ? 'Excellent work!' : (pct >= 50 ? 'Good effort — keep practising!' : 'Keep reviewing — you will get there!');
                         subviewContent.innerHTML =
                             '<div class="ait-subview-quiz-result">' +
@@ -748,8 +806,11 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                             '<div class="ait-subview-feedback"><button class="ait-subview-fb-btn" type="button"><span class="material-symbols-outlined">thumb_up</span>Good content</button>' +
                             '<button class="ait-subview-fb-btn" type="button"><span class="material-symbols-outlined">thumb_down</span>Bad content</button></div>';
                         var retry = subviewContent.querySelector('#ait-sv-quiz-retry');
-                        if (retry) retry.addEventListener('click', function() { idx = 0; correct = 0; renderQ(); });
-                        saveSVQuizAttempt(quiz, total, correct);
+                        if (retry) retry.addEventListener('click', function() {
+                            idx = 0; correct = 0; answers = {}; graded = {}; attemptId = 0;
+                            renderQ();
+                        });
+                        saveSVQuizAttempt(true);
                         return;
                     }
                     var q = quiz.questions[idx];
@@ -785,6 +846,9 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                                 isCorrect = String(chosen).trim().charAt(0).toUpperCase() === String(q.answer).trim().charAt(0).toUpperCase();
                             }
                             if (isCorrect) correct++;
+                            answers[idx] = parseInt(btn.dataset.i);
+                            graded[idx] = { correct: isCorrect, explanation: q.explanation || '' };
+                            saveSVQuizAttempt(false);
                             subviewContent.querySelectorAll('.ait-subview-quiz-opt').forEach(function(b) {
                                 b.disabled = true;
                                 var txt = q.options[parseInt(b.dataset.i)];
@@ -803,20 +867,72 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                     if (next) next.addEventListener('click', function() { idx++; renderQ(); });
                 }
 
-                function saveSVQuizAttempt(quiz, total, correct) {
+                function saveSVQuizAttempt(done) {
                     var cid = currentCID();
                     if (!cid) return;
+                    var score = 0;
+                    Object.keys(graded).forEach(function(k) { if (graded[k] && graded[k].correct) score++; });
                     Ajax.call([{
                         methodname: 'local_umat_ai_save_quiz_attempt',
                         args: {
-                            courseid: cid, quiztitle: quiz.title, total: total, correct: correct,
-                            score: Math.round(correct / total * 100),
-                            details: JSON.stringify(quiz.questions.map(function(q) { return { q: q.q, answer: q.answer, chosen: null }; }))
+                            attempt_id: attemptId || 0,
+                            courseid: cid,
+                            session_key: sessionKey,
+                            quiz_title: quiz.title,
+                            questions_json: JSON.stringify(quiz.questions.map(function(q) { return quizToServerQ(q); })),
+                            answers_json: JSON.stringify(answers),
+                            graded_json: JSON.stringify(graded),
+                            score: done ? score : null,
+                            total: total,
+                            status: done ? 'completed' : 'in_progress'
                         }
-                    }])[0].fail(function() {});
+                    }])[0]
+                        .done(function(r) { if (r && r.attempt_id) attemptId = r.attempt_id; })
+                        .fail(function() {});
                 }
 
                 renderQ();
+            }
+
+            /* Open a saved quiz attempt (from the Studio Report) — resume an
+             * in_progress quiz at the first unanswered question, or show the
+             * results screen for a completed one (Review). */
+            function openAttemptSubView(attempt) {
+                if (!subviewContent) return;
+                var questions = [];
+                try { questions = JSON.parse(attempt.questions_json || '[]'); } catch (e) { questions = []; }
+                if (!questions.length) {
+                    subviewContent.innerHTML = '<div class="ait-empty" style="padding:16px;"><span class="material-symbols-outlined">quiz</span>This attempt has no saved questions — it may have been created by an older version of the quiz tool.</div>';
+                    return;
+                }
+                // Saved attempts store `correct` as the option INDEX — convert
+                // to answer text so the shared renderer can grade it.
+                questions = questions.map(function(q) {
+                    if (typeof q.correct === 'number' && q.correct >= 0 && (q.options || []).length) {
+                        q.answer = q.options[q.correct];
+                    } else if (!q.answer && typeof q.correct === 'string') {
+                        q.answer = q.correct;
+                    }
+                    return q;
+                });
+                var answers = {}, graded = {};
+                try { answers = JSON.parse(attempt.answers_json || '{}'); } catch (e) { answers = {}; }
+                try { graded = JSON.parse(attempt.graded_json || '{}'); } catch (e) { graded = {}; }
+                var answeredCount = 0;
+                Object.keys(graded).forEach(function(k) { if (graded[k]) answeredCount++; });
+                var startIdx = (attempt.status === 'completed' || answeredCount >= questions.length)
+                    ? questions.length : answeredCount;
+                openQuizSubView(
+                    { title: attempt.quiz_title || 'Practice Quiz', questions: questions },
+                    attempt.quiz_title || 'Practice Quiz',
+                    {
+                        startIdx: startIdx,
+                        answers: answers,
+                        graded: graded,
+                        attemptId: attempt.attempt_id || 0,
+                        sessionKey: attempt.session_key || ''
+                    }
+                );
             }
 
             /* ── Studio tools ──────────────────────────────────────────── */
@@ -1326,18 +1442,36 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                     '<button class="ait-nt-btn-p" id="ait-note-save" type="button">Save</button>' +
                     '</div>' +
                     '</div>';
+                /* View-only mode renders the note as a PDF-like document page:
+                 * a white paper sheet with a document title block, serif
+                 * typography and a page gutter, filling the sub-view height. */
                 var ro = subviewContent.querySelector('#ait-note-readonly');
                 var ed = subviewContent.querySelector('#ait-note-edit');
+                var paperTitle = document.createElement('div');
+                paperTitle.className = 'ait-note-paper-title';
+                paperTitle.textContent = currentNote.title || 'Untitled note';
+                var paperBody = document.createElement('div');
+                paperBody.className = 'ait-note-paper-body';
+                var paper = document.createElement('div');
+                paper.className = 'ait-note-paper';
+                paper.appendChild(paperTitle);
+                paper.appendChild(paperBody);
+                ro.appendChild(paper);
                 if (currentNote.content && currentNote.content.indexOf('<') !== -1) {
                     // Legacy/rich HTML content — render as-is (scripts stripped).
                     var tmp = document.createElement('div');
                     tmp.innerHTML = currentNote.content;
                     tmp.querySelectorAll('script,style,iframe').forEach(function(el) { el.remove(); });
-                    ro.innerHTML = tmp.innerHTML;
+                    paperBody.innerHTML = tmp.innerHTML;
                 } else {
-                    ro.innerHTML = S._umatFormatAI(currentNote.content || '<em>Empty note</em>');
+                    paperBody.innerHTML = S._umatFormatAI(currentNote.content || '<em>Empty note</em>');
                 }
                 ed.innerHTML = currentNote.content || '';
+                // Keep the document title block in sync while renaming.
+                var titleInput = subviewContent.querySelector('#ait-note-title');
+                titleInput.addEventListener('input', function() {
+                    paperTitle.textContent = titleInput.value.trim() || 'Untitled note';
+                });
                 var pin = subviewContent.querySelector('#ait-note-pin');
                 pin.classList.toggle('ait-ib-on', !!currentNote.pinned);
                 ro.style.display = editing ? 'none' : '';
@@ -1420,13 +1554,33 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                 subviewContent.innerHTML = '<div class="ait-empty"><span class="material-symbols-outlined">hourglass_empty</span>Loading reports…</div>';
                 var stats = { sessions: 0, cards: 0, due: 0, attempts: 0, best: null };
 
+                function attemptCorrect(a) {
+                    var c = 0;
+                    try {
+                        var g = JSON.parse(a.graded_json || '{}');
+                        Object.keys(g).forEach(function(k) { if (g[k] && g[k].correct) c++; });
+                    } catch (e) {}
+                    return c;
+                }
+                function attemptTotal(a) {
+                    return (a.total && a.total > 0) ? a.total : (a.question_count || 0);
+                }
+
                 function render() {
                     var attemptsHtml = '';
                     if (stats.best && stats.best.length) {
-                        attemptsHtml = '<div class="ait-rep-sec-title">Recent Quiz Attempts</div>' + stats.best.slice(0, 8).map(function(a) {
-                            return '<div class="ait-rep-attempt"><div class="ait-rep-attempt-hdr"><strong>' + esc(a.quiztitle || 'Quiz') + '</strong><span>' + (a.score || 0) + '%</span></div>' +
-                                '<div class="ait-rep-bar"><i style="width:' + Math.min(100, a.score || 0) + '%"></i></div>' +
-                                '<div class="ait-rep-meta">' + (a.correct || 0) + ' / ' + (a.total || 0) + ' correct · ' + esc(S._umatTimeAgo ? S._umatTimeAgo(a.timemodified) : '') + '</div></div>';
+                        attemptsHtml = '<div class="ait-rep-sec-title">Recent Quiz Attempts</div>' + stats.best.slice(0, 10).map(function(a) {
+                            var c = attemptCorrect(a), t = attemptTotal(a);
+                            var pct = t ? Math.round(c / t * 100) : 0;
+                            var st = a.status === 'completed' ? 'Completed' : 'In progress';
+                            var action = a.status === 'completed'
+                                ? '<button class="ait-rep-act" type="button"><span class="material-symbols-outlined">rate_review</span>Review</button>'
+                                : '<button class="ait-rep-act" type="button"><span class="material-symbols-outlined">play_circle</span>Resume</button>';
+                            return '<div class="ait-rep-attempt" data-id="' + a.attempt_id + '">' +
+                                '<div class="ait-rep-attempt-hdr"><strong>' + esc(a.quiz_title || a.quiztitle || 'Quiz') + '</strong><span>' + pct + '%</span></div>' +
+                                '<div class="ait-rep-bar"><i style="width:' + Math.min(100, pct) + '%"></i></div>' +
+                                '<div class="ait-rep-meta">' + c + ' / ' + t + ' correct · ' + st + ' · ' + (S._umatTimeAgo ? esc(S._umatTimeAgo(a.timemodified)) : '') + '</div>' +
+                                '<div class="ait-rep-acts">' + action + '</div></div>';
                         }).join('');
                     } else {
                         attemptsHtml = '<div class="ait-empty" style="padding:14px;"><span class="material-symbols-outlined">quiz</span>No quiz attempts yet — try the "Create Quiz" tool!</div>';
@@ -1438,6 +1592,19 @@ define(['core/ajax', 'local_umat_ai/umatshared', 'local_umat_ai/material_viewer'
                         '<div class="ait-rep-card"><div class="ait-rep-num">' + stats.due + '</div><div class="ait-rep-lbl">Due for review</div></div>' +
                         '<div class="ait-rep-card"><div class="ait-rep-num">' + stats.attempts + '</div><div class="ait-rep-lbl">Quiz attempts</div></div>' +
                         '</div>' + attemptsHtml;
+
+                    // Resume / Review actions re-open the saved attempt inside
+                    // the Studio sub-view.
+                    subviewContent.querySelectorAll('.ait-rep-act').forEach(function(b) {
+                        b.addEventListener('click', function() {
+                            var row = b.closest('.ait-rep-attempt');
+                            var id = row ? parseInt(row.dataset.id) : 0;
+                            var attempts = stats.best || [];
+                            for (var i = 0; i < attempts.length; i++) {
+                                if (attempts[i].attempt_id === id) { openAttemptSubView(attempts[i]); return; }
+                            }
+                        });
+                    });
                 }
 
                 Ajax.call([{ methodname: 'local_umat_ai_get_ai_sessions', args: { courseid: cid, limit: 100 } }])[0]
